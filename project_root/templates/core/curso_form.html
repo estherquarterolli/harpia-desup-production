@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block title %}{% if form.instance.pk %}Editar Curso{% else %}Novo Curso{% endif %} | Harpia{% endblock %}
+{% block header_title %}{% if form.instance.pk %}Editar Curso{% else %}Novo Curso{% endif %}{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto p-0">
+
+  <!-- Breadcrumb -->
+  <nav class="breadcrumb-container mb-6" aria-label="Breadcrumb">
+    <a href="{% url 'core:unidade_list' %}" class="breadcrumb-item-link">Unidades</a>
+    <i class="ph ph-caret-right breadcrumb-separator"></i>
+    <a href="{% url 'core:curso_list' unidade_pk=unidade.pk %}" class="breadcrumb-item-link">{{ unidade.sigla }}</a>
+    <i class="ph ph-caret-right breadcrumb-separator"></i>
+    <span class="breadcrumb-item-active">{% if form.instance.pk %}Editar{% else %}Novo Curso{% endif %}</span>
+  </nav>
+
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8">
+    <h2 class="text-lg font-black text-[#025c9f] mb-1">
+      {% if form.instance.pk %}Editar Curso{% else %}Adicionar Novo Curso{% endif %}
+    </h2>
+    <p class="text-sm text-slate-400 mb-6">Unidade: <strong>{{ unidade.nome }}</strong></p>
+
+    <form method="post" class="space-y-5">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="p-3 bg-red-50 text-red-700 rounded-lg text-sm">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      <div>
+        <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">Nome do Curso</label>
+        <input type="text" name="nome" value="{{ form.nome.value|default:'' }}"
+          class="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-[#025c9f]/30 focus:border-[#025c9f] outline-none transition"
+          placeholder="Ex: Análise e Desenvolvimento de Sistemas">
+        {% if form.nome.errors %}<p class="text-red-500 text-xs mt-1">{{ form.nome.errors.0 }}</p>{% endif %}
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">Sigla</label>
+        <input type="text" name="sigla" value="{{ form.sigla.value|default:'' }}"
+          class="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-[#025c9f]/30 focus:border-[#025c9f] outline-none transition"
+          placeholder="Ex: ADS" maxlength="20">
+        {% if form.sigla.errors %}<p class="text-red-500 text-xs mt-1">{{ form.sigla.errors.0 }}</p>{% endif %}
+      </div>
+
+      <div class="flex gap-3 pt-2">
+        <button type="submit"
+          class="flex-1 bg-[#025c9f] hover:bg-[#153e70] text-white font-bold py-2.5 rounded-lg text-sm transition-colors">
+          Salvar
+        </button>
+        <a href="{% url 'core:curso_list' unidade_pk=unidade.pk %}"
+          class="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-lg text-xs transition-colors text-center uppercase shadow-sm">
+          Cancelar
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

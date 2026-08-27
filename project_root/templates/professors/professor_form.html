@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if form.instance.pk %}Editar Professor{% else %}Novo Professor{% endif %} | Harpia{% endblock %}
+{% block header_title %}{% if form.instance.pk %}Editar Professor{% else %}Novo Professor{% endif %}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+
+  <!-- Breadcrumb -->
+  <nav class="breadcrumb-container mb-6" aria-label="Breadcrumb">
+    <a href="{% url 'professors:professor_list' %}" class="breadcrumb-item-link">Professores</a>
+    <i class="ph ph-caret-right breadcrumb-separator"></i>
+    <span class="breadcrumb-item-active">{% if form.instance.pk %}Editar{% else %}Novo{% endif %}</span>
+  </nav>
+
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/70">
+      <h2 class="text-sm font-black text-[#025c9f] uppercase tracking-widest">
+        {% if form.instance.pk %}Editar Professor #{{ form.instance.pk }}{% else %}Cadastrar Novo Professor{% endif %}
+      </h2>
+    </div>
+
+    <form method="post" class="p-6 space-y-6">
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+      <div class="p-3 bg-red-50 border border-red-100 text-red-700 rounded-lg text-sm">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      <!-- Dados Básicos -->
+      <div>
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+          <span class="w-4 h-px bg-slate-200 block"></span>Dados Básicos<span class="flex-1 h-px bg-slate-100 block"></span>
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              ID Funcional <span class="text-red-400">*</span>
+            </label>
+            {{ form.id_funcional }}
+            {% if form.id_funcional.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.id_funcional.errors.0 }}</p>{% endif %}
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              Matrícula RH <span class="text-red-400">*</span>
+            </label>
+            {{ form.rh_matricula }}
+            {% if form.rh_matricula.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.rh_matricula.errors.0 }}</p>{% endif %}
+          </div>
+
+          <div class="md:col-span-2">
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              Nome <span class="text-red-400">*</span>
+            </label>
+            {{ form.rh_nome }}
+            {% if form.rh_nome.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.rh_nome.errors.0 }}</p>{% endif %}
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Contrato -->
+      <div>
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+          <span class="w-4 h-px bg-slate-200 block"></span>Contrato<span class="flex-1 h-px bg-slate-100 block"></span>
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Regime / Tipo de Contrato <span class="text-red-400">*</span></label>
+            {{ form.tipo_contrato }}
+            {% if form.tipo_contrato.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.tipo_contrato.errors.0 }}</p>{% endif %}
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Unidade</label>
+            {{ form.unidade_principal }}
+            {% if form.unidade_principal.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.unidade_principal.errors.0 }}</p>{% endif %}
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Eixo</label>
+            {{ form.materia }}
+            {% if form.materia.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.materia.errors.0 }}</p>{% endif %}
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Status</label>
+            {{ form.status }}
+            {% if form.status.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.status.errors.0 }}</p>{% endif %}
+          </div>
+
+          {% if user.perfil == 'DESUP' or user.is_superuser %}
+          <div class="md:col-span-2">
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              Limite de Horas Extracurriculares
+              <span class="text-slate-400 font-normal normal-case ml-1">(vazio = usa limite total do contrato)</span>
+            </label>
+            {{ form.limite_horas_extra }}
+            {% if form.limite_horas_extra.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.limite_horas_extra.errors.0 }}</p>{% endif %}
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+
+      <!-- Cursos -->
+      <div>
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+          <span class="w-4 h-px bg-slate-200 block"></span>Cursos<span class="flex-1 h-px bg-slate-100 block"></span>
+        </h3>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+            Cursos Disponíveis na Unidade Selecionada
+          </label>
+          <div id="cursos-container" class="bg-slate-50 border border-slate-200 rounded-lg p-4 min-h-[100px] max-h-60 overflow-y-auto">
+            {% if form.cursos.queryset %}
+              <div class="space-y-2">
+                {% for pk, choice in form.cursos.field.widget.choices %}
+                  <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer p-1 hover:bg-slate-100 rounded">
+                    <input type="checkbox" name="cursos" value="{{ pk }}" 
+                           {% if pk|stringformat:"s" in form.cursos.value|default:'' %}checked{% endif %}
+                           class="w-4 h-4 text-[#025c9f] bg-white border-slate-300 rounded focus:ring-[#025c9f]">
+                    <span>{{ choice }}</span>
+                  </label>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="text-sm text-slate-400 text-center mt-6">Selecione uma unidade para ver os cursos.</p>
+            {% endif %}
+          </div>
+          {% if form.cursos.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.cursos.errors.0 }}</p>{% endif %}
+        </div>
+      </div>
+
+      <!-- Botões -->
+      <div class="flex items-center gap-3 pt-2 border-t border-slate-100">
+        <button type="submit"
+          class="flex-grow bg-[#025c9f] hover:bg-[#153e70] text-white font-bold py-3 rounded-xl text-sm transition-colors shadow-md">
+          SALVAR
+        </button>
+        <a href="{% url 'professors:professor_list' %}"
+          class="px-5 py-3 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl text-xs transition-colors text-center uppercase shadow-sm">
+          Cancelar
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

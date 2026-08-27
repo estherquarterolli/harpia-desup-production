@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="p-6 max-w-2xl mx-auto">
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-[#025c9f]">{% if form.instance.pk %}Editar Janela{% else %}Nova Janela de Entrega{% endif %}</h1>
+        <p class="text-sm text-slate-500">Defina os prazos para o envio da alocação de turmas e matrizes.</p>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+            
+            {% if form.non_field_errors %}
+            <div class="p-4 bg-red-50 text-red-700 rounded-lg text-sm mb-4">
+                {{ form.non_field_errors }}
+            </div>
+            {% endif %}
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="col-span-1 md:col-span-2">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Semestre de Referência</label>
+                    {{ form.semestre }}
+                    {% if form.semestre.errors %}<p class="text-red-500 text-xs mt-1">{{ form.semestre.errors.0 }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Data de Início</label>
+                    {{ form.data_inicio }}
+                    {% if form.data_inicio.errors %}<p class="text-red-500 text-xs mt-1">{{ form.data_inicio.errors.0 }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Data de Fim</label>
+                    {{ form.data_fim }}
+                    {% if form.data_fim.errors %}<p class="text-red-500 text-xs mt-1">{{ form.data_fim.errors.0 }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Status</label>
+                    {{ form.status }}
+                    {% if form.status.errors %}<p class="text-red-500 text-xs mt-1">{{ form.status.errors.0 }}</p>{% endif %}
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Unidade</label>
+                    {{ form.unidade }}
+                    {% if form.unidade.errors %}<p class="text-red-500 text-xs mt-1">{{ form.unidade.errors.0 }}</p>{% endif %}
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-6 border-t border-slate-100">
+                <a href="{% url 'core:janela_list' %}" class="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-lg text-xs transition-colors text-center uppercase shadow-sm">
+                    Cancelar
+                </a>
+                <button type="submit" class="px-4 py-2 bg-[#025c9f] hover:bg-[#153e70] text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2">
+                    <i data-lucide="save" class="w-4 h-4"></i>
+                    Salvar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,418 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Alocações Extracurriculares — Harpia-DESUP{% endblock %}
+{% block header_title %}Alocações Extracurriculares{% endblock %}
+
+{% block extra_head %}
+<style>
+  .badge-pendente   { background:#fef9c3; color:#854d0e; }
+  .badge-enviado    { background:#dbeafe; color:#1e40af; }
+  .badge-aprovado   { background:#dcfce7; color:#166534; }
+  .badge-rascunho   { background:#f1f5f9; color:#475569; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="p-2 md:p-0">
+
+{% if window_fechada %}
+<div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 flex items-start gap-3">
+  <i class="ph ph-lock-key text-2xl text-amber-600 flex-shrink-0"></i>
+  <div>
+    <p class="font-black">Janela de entrega fechada</p>
+    <p class="text-xs mt-0.5">O período de registro de justificativas extracurriculares está encerrado para sua unidade.</p>
+  </div>
+</div>
+{% endif %}
+
+
+  {# ── Barra de filtros ── #}
+  <div class="flex flex-wrap items-end gap-3 mb-6">
+
+    {# Semestre #}
+    <div class="flex flex-col gap-1">
+      <label class="text-[10px] font-black text-[#025c9f] uppercase tracking-wide">Semestre</label>
+      <div class="relative">
+        <select id="filter-semestre" name="semestre"
+          hx-get="{% url 'extra_curricular:pendencia_list' %}"
+          hx-target="#pendencias-content"
+          hx-select="#pendencias-content"
+          hx-push-url="false"
+          hx-trigger="change"
+          hx-include="#filter-semestre,#filter-unidade"
+          class="bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer pr-10 appearance-none">
+          {% for s in semestres %}
+          <option value="{{ s }}" {% if s == semestre %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+        <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
+      </div>
+    </div>
+
+    {# Unidade (só DESUP) #}
+    {% if is_desup %}
+    <div class="flex flex-col gap-1">
+      <label class="text-[10px] font-black text-[#025c9f] uppercase tracking-wide">Unidade</label>
+      <div class="relative">
+        <select id="filter-unidade" name="unidade_id"
+          hx-get="{% url 'extra_curricular:pendencia_list' %}"
+          hx-target="#pendencias-content"
+          hx-select="#pendencias-content"
+          hx-push-url="false"
+          hx-trigger="change"
+          hx-include="#filter-semestre,#filter-unidade"
+          class="bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer pr-10 appearance-none">
+          <option value="">Todas as Unidades</option>
+          {% for u in unidades %}
+          <option value="{{ u.pk }}" {% if unidade_selecionada and unidade_selecionada.pk == u.pk %}selected{% endif %}>
+            {{ u.sigla }} — {{ u.nome }}
+          </option>
+          {% endfor %}
+        </select>
+        <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
+      </div>
+    </div>
+    {% else %}
+    {# Coordenador: exibe somente a própria unidade #}
+    <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm opacity-80 select-none">
+      <i class="ph ph-buildings text-base"></i>
+      {% if unidade_selecionada %}{{ unidade_selecionada.sigla }} — {{ unidade_selecionada.nome }}{% else %}—{% endif %}
+    </div>
+    {% endif %}
+
+    <div class="flex-1"></div>
+
+    {% if not is_desup %}
+    <a href="{% url 'extra_curricular:pendencia_create' %}"
+       class="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-black text-sm px-5 py-2.5 rounded-xl shadow-md transition-all hover:scale-105 active:scale-100">
+      <i class="ph ph-plus text-lg"></i>
+      Nova Justificativa
+    </a>
+    {% endif %}
+
+  </div>
+
+  <div id="pendencias-content">
+
+  {# ── Erro de vinculação ── #}
+  {% if erro %}
+  <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center gap-3">
+    <i class="ph ph-warning-circle text-2xl"></i>
+    {{ erro }}
+  </div>
+
+  {# ── Nenhuma pendência encontrada ── #}
+  {% elif pendencias_data|length == 0 %}
+  <div class="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-slate-200 border-dashed">
+    <i class="ph ph-check-circle text-5xl text-emerald-300 mb-3"></i>
+    <p class="text-sm font-bold text-slate-500">Nenhuma pendência encontrada para {{ semestre }}</p>
+    <p class="text-xs text-slate-400 mt-1">Todos os docentes atingiram a meta de carga horária.</p>
+  </div>
+
+  {# ── Tabela de pendências ── #}
+  {% else %}
+  
+  {# Barra de filtros instantâneos #}
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6">
+    <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center gap-4">
+      <div class="flex-1 min-w-[260px]">
+        <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Pesquisar Docente</label>
+        <div class="relative">
+          <input type="text" id="search-docente" placeholder="Buscar por nome do docente..."
+            class="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-sm font-semibold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] js-autocomplete" autocomplete="off">
+          <i class="ph ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-base"></i>
+        </div>
+      </div>
+      <div class="w-full sm:w-48">
+        <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Filtrar por Status</label>
+        <div class="relative">
+          <select id="filter-status"
+            class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-semibold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer pr-10 appearance-none">
+            <option value="">Todos os Status</option>
+            <option value="Rascunho" {% if status_filtro == 'rascunho' %}selected{% endif %}>Rascunho</option>
+            <option value="Pendente" {% if status_filtro == 'pendente' %}selected{% endif %}>Pendente</option>
+            <option value="Finalizado" {% if status_filtro == 'finalizado' %}selected{% endif %}>Finalizado</option>
+            <option value="Sem registro" {% if status_filtro == 'sem_registro' %}selected{% endif %}>Sem registro</option>
+          </select>
+          <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
+        </div>
+      </div>
+      <div class="w-full sm:w-56">
+        <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Filtrar por Justificativa</label>
+        <div class="relative">
+          <select id="filter-justificativa"
+            class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-semibold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer pr-10 appearance-none">
+            <option value="">Todos os Tipos</option>
+            <option value="TCC">Orientação de TCC</option>
+            <option value="Extensão">Atividade Extensionista</option>
+            <option value="Redução">Redução de CH</option>
+            <option value="Sem registro">Sem registro</option>
+          </select>
+          <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left min-w-[1000px]" id="pendencias-table">
+        <thead>
+          <tr class="bg-[#025c9f] text-white text-[10px] font-black uppercase tracking-widest border-b border-slate-200">
+            <th class="px-5 py-4 rounded-tl-2xl">Docente</th>
+            <th class="px-5 py-4">Processo SEI</th>
+            <th class="px-5 py-4">Justificativa</th>
+            <th class="px-5 py-4 text-center">Meta CH</th>
+            <th class="px-5 py-4 text-center">CH Alocada</th>
+            <th class="px-5 py-4 text-center">CH Pendente</th>
+            <th class="px-5 py-4 text-center">CH Justificada</th>
+            <th class="px-5 py-4 text-center">Não alocado</th>
+            <th class="px-5 py-4 text-center rounded-tr-2xl">Status</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for item in pendencias_data %}
+          <tr class="hover:bg-slate-50/70 transition-colors group {% if item.ch_faltante > 0 and not item.pendencia %}bg-red-50/30{% endif %} pendencia-row"
+              data-docente="{{ item.professor.nome|lower }}"
+              data-status="{% if item.status_item == 'RASCUNHO' %}Rascunho{% elif item.status_item == 'ENVIADO' or item.status_item == 'PENDENTE' %}Pendente{% elif item.status_item == 'APROVADO' %}Finalizado{% else %}Sem registro{% endif %}"
+              data-justificativa="{{ item.justificativa_tipo }}">
+
+            {# Docente #}
+            <td class="px-5 py-4">
+              <div class="flex items-center gap-2">
+                {% if item.pendencia %}
+                  {% if item.status_item == 'RASCUNHO' %}
+                    <i class="ph ph-pencil-simple text-orange-500 text-base flex-shrink-0" title="Rascunho"></i>
+                  {% elif item.status_item == 'ENVIADO' or item.status_item == 'PENDENTE' %}
+                    <i class="ph ph-paper-plane-right text-[#025c9f] text-base flex-shrink-0" title="Pendente"></i>
+                  {% elif item.status_item == 'APROVADO' %}
+                    <i class="ph ph-check-circle text-emerald-500 text-base flex-shrink-0" title="Finalizado"></i>
+                  {% else %}
+                    <i class="ph ph-circle-dashed text-slate-400 text-base flex-shrink-0" title="{{ item.status_item }}"></i>
+                  {% endif %}
+                {% elif item.ch_faltante > 0 %}
+                  <span class="relative flex h-3 w-3 flex-shrink-0" title="Pendência não justificada">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-orange-500"></span>
+                  </span>
+                {% else %}
+                  <i class="ph ph-check-circle text-emerald-500 text-base flex-shrink-0" title="CH coberta"></i>
+                {% endif %}
+                <div>
+                  {% if item.pendencia %}
+                  <a href="{% url 'extra_curricular:pendencia_detail' pk=item.pendencia.pk %}" class="text-sm font-black text-[#025c9f] hover:text-[#025c9f] hover:underline">
+                    {{ item.professor.nome }}
+                  </a>
+                  {% else %}
+                  <span class="text-sm font-black text-[#025c9f]">{{ item.professor.nome }}</span>
+                  {% endif %}
+                  <p class="text-[10px] text-slate-400 font-semibold">ID: {{ item.professor.id_funcional }}</p>
+                </div>
+              </div>
+            </td>
+
+            {# Processo SEI #}
+            <td class="px-5 py-4">
+              {% if item.sei_numero %}
+              <span class="text-xs font-bold text-[#025c9f] bg-slate-100 px-2 py-1 rounded">
+                {{ item.sei_numero }}
+              </span>
+              {% else %}
+              <span class="text-xs text-slate-400 italic">—</span>
+              {% endif %}
+            </td>
+
+            {# Justificativa #}
+            <td class="px-5 py-4">
+              <div class="text-xs font-semibold text-[#025c9f]">
+                {{ item.justificativa_detalhe }}
+              </div>
+              {% if item.justificativa_ch > 0 %}
+              <div class="text-[9px] text-indigo-600 font-black uppercase mt-0.5">
+                Carga Horária: +{{ item.justificativa_ch }}h
+              </div>
+              {% endif %}
+            </td>
+
+            {# Meta CH #}
+            <td class="px-5 py-4 text-center">
+              <span class="text-sm font-bold text-slate-700">{{ item.meta_horas }}h</span>
+            </td>
+
+            {# CH Alocada #}
+            <td class="px-5 py-4 text-center">
+              <span class="text-sm font-bold {% if item.ch_alocada < item.meta_horas %}text-amber-600{% else %}text-emerald-600{% endif %}">
+                {{ item.ch_alocada }}h
+              </span>
+            </td>
+
+            {# CH Pendente #}
+            <td class="px-5 py-4 text-center">
+              <span class="inline-block px-2 py-0.5 rounded-full text-xs font-black
+                {% if item.ch_pendente > 0 %}bg-red-50 text-red-700{% else %}bg-emerald-50 text-emerald-700{% endif %}">
+                {{ item.ch_pendente }}h
+              </span>
+            </td>
+
+            {# CH Justificada #}
+            <td class="px-5 py-4 text-center">
+              <span class="text-sm font-bold text-indigo-600">{{ item.ch_justificada }}h</span>
+            </td>
+
+            {# Não alocado (ch_faltante) #}
+            <td class="px-5 py-4 text-center">
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-black
+                {% if item.ch_faltante > 0 %}bg-orange-50 text-orange-700{% else %}bg-emerald-50 text-emerald-700{% endif %}">
+                {% if item.ch_faltante > 0 %}<i class="ph ph-warning text-sm"></i>{% endif %}
+                {{ item.ch_faltante }}h
+              </span>
+            </td>
+
+            {# Status da pendência #}
+            <td class="px-5 py-4 text-center">
+              {% if item.pendencia %}
+              {% if is_desup and item.pendencia.status != 'RASCUNHO' %}
+              <form method="POST" action="{% url 'extra_curricular:atualizar_status' pk=item.pendencia.pk %}" class="m-0 min-w-[280px] space-y-2 text-left" onsubmit="this.querySelector('button[type=submit], input[type=submit]').disabled=true; return true;">
+                {% csrf_token %}
+                <input type="hidden" name="status" value="APROVADO">
+                <input type="hidden" name="item_tipo" value="{{ item.item_tipo }}">
+                <input type="hidden" name="item_pk" value="{{ item.item_pk }}">
+
+                <div class="text-center">
+                  {% if item.pendencia.status == 'APROVADO' %}
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase badge-aprovado">
+                      <i class="ph ph-check-circle"></i> Finalizado
+                    </span>
+                  {% else %}
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-slate-100 text-slate-500">
+                      <i class="ph ph-hourglass-medium"></i> Pendente
+                    </span>
+                  {% endif %}
+                </div>
+
+                <div class="flex gap-2">
+                  <textarea name="motivo_status_desup" rows="2"
+                    class="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-[#025c9f] focus:ring-2 focus:ring-[#025c9f]/20"
+                    placeholder="Motivo da decisão">{{ item.pendencia.motivo_status_desup }}</textarea>
+                  <div class="w-20 flex-shrink-0">
+                    <input type="text" name="item_horas_aprovadas"
+                      value="{{ item.item_horas_aprovadas|default_if_none:'' }}"
+                      class="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-center text-[#025c9f] outline-none focus:border-[#025c9f] focus:ring-2 focus:ring-[#025c9f]/20"
+                      placeholder="{{ item.justificativa_ch }}h"
+                      title="Horas aprovadas desta justificativa. Se deixado em branco, será somado o total calculado automaticamente ({{ item.justificativa_ch }}h).">
+                    <p class="mt-1 text-[9px] leading-tight text-slate-400 text-center">Horas<br>aprovadas</p>
+                  </div>
+                </div>
+                <button type="submit"
+                  class="inline-flex items-center gap-1.5 rounded-lg bg-[#025c9f] px-3 py-1.5 text-[10px] font-black uppercase text-white transition-colors hover:bg-[#153e70]">
+                  <i class="ph ph-check-circle"></i>
+                  Finalizar
+                </button>
+              </form>
+              {% else %}
+                {% if item.status_item == 'RASCUNHO' %}
+                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase badge-rascunho">
+                    <i class="ph ph-pencil-simple"></i> Rascunho
+                  </span>
+                {% else %}
+                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase
+                    {% if item.status_item == 'ENVIADO' or item.status_item == 'PENDENTE' %}badge-enviado
+                    {% elif item.status_item == 'APROVADO' %}badge-aprovado
+                    {% endif %}">
+                    {% if item.status_item == 'ENVIADO' or item.status_item == 'PENDENTE' %}<i class="ph ph-paper-plane-right"></i>
+                    {% elif item.status_item == 'APROVADO' %}<i class="ph ph-check-circle"></i>
+                    {% endif %}
+                    {% if item.status_item == 'ENVIADO' or item.status_item == 'PENDENTE' %}Pendente
+                    {% elif item.status_item == 'APROVADO' %}Finalizado
+                    {% else %}{{ item.status_item }}{% endif %}
+                  </span>
+                {% endif %}
+
+                {% if item.pendencia.motivo_status_desup %}
+                  <p class="mt-1 text-[10px] font-semibold text-slate-500">{{ item.pendencia.motivo_status_desup }}</p>
+                {% endif %}
+              {% endif %}
+              {% else %}
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-slate-100 text-slate-500">
+                <i class="ph ph-minus-circle"></i>
+                Sem registro
+              </span>
+              {% endif %}
+            </td>
+
+          </tr>
+          {% endfor %}
+          <tr id="no-results-row" style="display: none;">
+            <td colspan="9" class="px-5 py-12 text-center text-slate-400">
+              <i class="ph ph-magnifying-glass text-4xl mb-2 text-slate-300"></i>
+              <p class="text-sm font-bold">Nenhum registro encontrado</p>
+              <p class="text-xs text-slate-400 mt-1">Experimente alterar os termos de busca ou filtros aplicados.</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    {# Rodapé #}
+    <div class="px-5 py-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
+      <p class="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">
+        {{ pendencias_data|length }} linha{{ pendencias_data|length|pluralize }} de justificativa em {{ semestre }}
+      </p>
+      {% if unidade_selecionada %}
+      <p class="text-[10px] text-slate-400 font-semibold">{{ unidade_selecionada.sigla }} — {{ unidade_selecionada.nome }}</p>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  </div>{# /pendencias-content #}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function initClientFilters() {
+    const searchInput = document.getElementById("search-docente");
+    const filterStatus = document.getElementById("filter-status");
+    const filterJustificativa = document.getElementById("filter-justificativa");
+    const rows = document.querySelectorAll(".pendencia-row");
+    const noResultsRow = document.getElementById("no-results-row");
+
+    function filterTable() {
+      const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : "";
+      const statusValue = filterStatus ? filterStatus.value : "";
+      const justificativaValue = filterJustificativa ? filterJustificativa.value : "";
+      let visibleCount = 0;
+      rows.forEach(row => {
+        const docente = row.getAttribute("data-docente") || "";
+        const status = row.getAttribute("data-status") || "";
+        const justificativa = row.getAttribute("data-justificativa") || "";
+        const matchesSearch = docente.includes(searchTerm);
+        const matchesStatus = !statusValue || status === statusValue;
+        const matchesJustificativa = !justificativaValue || justificativa === justificativaValue;
+        if (matchesSearch && matchesStatus && matchesJustificativa) {
+          row.style.display = "";
+          visibleCount++;
+        } else {
+          row.style.display = "none";
+        }
+      });
+      if (noResultsRow) noResultsRow.style.display = visibleCount === 0 ? "" : "none";
+    }
+
+    if (searchInput) { searchInput.removeEventListener("input", filterTable); searchInput.addEventListener("input", filterTable); }
+    if (filterStatus) { filterStatus.removeEventListener("change", filterTable); filterStatus.addEventListener("change", filterTable); }
+    if (filterJustificativa) { filterJustificativa.removeEventListener("change", filterTable); filterJustificativa.addEventListener("change", filterTable); }
+    filterTable();
+  }
+
+  document.addEventListener("DOMContentLoaded", initClientFilters);
+  document.body.addEventListener("htmx:afterSwap", function(e) {
+    if (e.detail.target && e.detail.target.id === "pendencias-content") {
+      initClientFilters();
+    }
+  });
+</script>
+{% endblock %}

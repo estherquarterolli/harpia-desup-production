@@ -1,0 +1,108 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Nova Justificativa Extracurricular — Harpia-DESUP{% endblock %}
+{% block header_title %}Nova Justificativa Extracurricular{% endblock %}
+
+{% block content %}
+<div class="p-2 md:p-0 max-w-3xl">
+
+  {% if window_fechada %}
+  <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 flex items-start gap-3 mb-4">
+    <i class="ph ph-lock-key text-2xl text-amber-600"></i>
+    <div>
+      <p class="font-black">Janela de entrega fechada</p>
+      <p class="text-xs mt-0.5">{{ window_message }}</p>
+    </div>
+  </div>
+  {% endif %}
+
+  {# Breadcrumb #}
+  <nav class="breadcrumb-container mb-5" aria-label="Breadcrumb">
+    <a href="{% url 'extra_curricular:pendencia_list' %}" class="breadcrumb-item-link flex items-center gap-1">
+      <i class="ph ph-arrow-left"></i> Pendências
+    </a>
+    <i class="ph ph-caret-right breadcrumb-separator"></i>
+    <span class="breadcrumb-item-active">Nova Justificativa</span>
+  </nav>
+
+  {# ── Tabela com Checkboxes de Docentes Pendentes ── #}
+  <form method="POST" class="mt-4"
+        {% if window_fechada and not is_desup %}data-window-lock="true" data-window-area="{{ window_area_label }}" data-window-action="{{ window_action_label }}" data-window-target="{{ window_target_label }}" data-window-message="{{ window_message }}"{% endif %}>
+    {% csrf_token %}
+    
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-sm font-black text-[#025c9f] uppercase tracking-wide">
+        <i class="ph ph-users-three mr-1"></i> Docentes com Pendência (Semestre: {{ semestre_atual }})
+      </h3>
+      <p class="text-[10px] text-slate-400">Selecione os docentes para os quais deseja criar a justificativa em lote.</p>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto mb-6">
+      <table class="w-full text-left min-w-[500px]">
+        <thead>
+          <tr class="bg-slate-50 text-[10px] font-black text-[#025c9f] uppercase tracking-widest border-b border-slate-100">
+            <th class="px-5 py-3 w-12 text-center">
+              <input type="checkbox" onclick="document.querySelectorAll('.prof-checkbox').forEach(c => c.checked = this.checked)" class="rounded text-[#025c9f] focus:ring-[#025c9f] cursor-pointer">
+            </th>
+            <th class="px-5 py-3">Docente</th>
+            <th class="px-5 py-3 text-center">ID</th>
+            <th class="px-5 py-3 text-center">CH Alocada / Meta</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for prof in professores %}
+          <tr class="hover:bg-slate-50/50 transition-colors">
+            <td class="px-5 py-3 text-center">
+              <input type="checkbox" name="professor_id" value="{{ prof.pk }}" class="prof-checkbox rounded border-slate-300 text-[#025c9f] focus:ring-[#025c9f] cursor-pointer">
+            </td>
+            <td class="px-5 py-3">
+              <span class="text-sm font-bold text-[#025c9f]">{{ prof.rh_nome }}</span>
+            </td>
+            <td class="px-5 py-3 text-center">
+              <span class="text-xs text-slate-500">ID: {{ prof.id_funcional }}</span>
+            </td>
+            <td class="px-5 py-3 text-center">
+              <span class="text-xs font-bold text-amber-600">{{ prof.ch_alocada }}h</span>
+              <span class="text-xs text-slate-400 mx-1">/</span>
+              <span class="text-xs font-bold text-slate-700">{{ prof.tipo_contrato.max_class_hours|default:20 }}h</span>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4" class="px-5 py-8 text-center text-slate-400">
+              <i class="ph ph-check-circle text-3xl mb-2 text-emerald-300"></i>
+              <p class="text-xs font-bold">Nenhum docente da unidade possui pendência.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {# Ações #}
+    {% if professores %}
+    <div class="flex gap-3">
+      <button type="submit"
+        class="flex-1 flex items-center justify-center gap-2 bg-[#025c9f] hover:bg-[#025c9f] text-white font-black py-3.5 px-6 rounded-xl shadow-md text-sm transition-all hover:scale-[1.01]">
+        <i class="ph ph-arrow-right text-lg"></i>
+        Prosseguir (Criar Rascunhos e Inserir Dados)
+      </button>
+      <a href="{% url 'extra_curricular:pendencia_list' %}"
+         class="px-5 py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl text-xs transition-colors text-center uppercase shadow-sm flex items-center justify-center gap-2">
+        Cancelar
+      </a>
+    </div>
+    {% else %}
+    <div class="flex">
+      <a href="{% url 'extra_curricular:pendencia_list' %}"
+         class="flex-1 flex items-center justify-center gap-2 border border-slate-200 text-slate-500 font-bold py-3.5 px-6 rounded-xl text-sm hover:bg-slate-50 transition-colors">
+        Voltar para o Painel
+      </a>
+    </div>
+    {% endif %}
+
+  </form>
+
+</div>
+{% endblock %}

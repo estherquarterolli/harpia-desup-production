@@ -1,0 +1,45 @@
+# Fix User Model and Authentication
+
+This plan addresses the critical and medium severity issues identified in the review of the `User` model.
+
+## User Review Required
+
+> [!IMPORTANT]
+> The authentication field will change from `username` to `email`. This is a breaking change for any existing login logic or test users.
+> The `is_academico` boolean field is being replaced by a `role` choice field.
+
+## Proposed Changes
+
+### accounts app
+
+#### [MODIFY] [models.py](file:///d:/Repositorios/AllocGest-DESUP/project_root/apps/accounts/models.py)
+- Implement `UserManager` to support email-based authentication.
+- Update `User` model:
+    - Set `email` as `unique=True`.
+    - Set `USERNAME_FIELD = 'email'`.
+    - Set `REQUIRED_FIELDS = ['username', 'cpf']`.
+    - Replace `is_academico` with `role` (using `TextChoices`).
+    - Update `ordering` to use `email`.
+    - Update `__str__` to use `email`.
+
+#### [MODIFY] [admin.py](file:///d:/Repositorios/AllocGest-DESUP/project_root/apps/accounts/admin.py)
+- Fix user import (use `from .models import User` instead of `django.contrib.auth.models`).
+- Update `list_display` to reflect the changes (e.g., use `role` instead of `is_academico` if applicable, although it wasn't there before).
+
+#### [MODIFY] [views.py](file:///d:/Repositorios/AllocGest-DESUP/project_root/apps/accounts/views.py)
+- Fix user import.
+- Simplify `login_view` logic since `authenticate` will now work with email directly.
+
+
+## Verification Plan
+
+### Automated Tests
+- Run `python manage.py makemigrations` and `python manage.py migrate`.
+- Create a test script to:
+    - Create a user with email and password.
+    - Verify that authentication works using email.
+    - Verify that creating a user with a duplicate email fails.
+    - Verify that the `role` field works as expected.
+
+### Manual Verification
+- Test `createsuperuser` command to ensure it asks for `email` and `cpf`.

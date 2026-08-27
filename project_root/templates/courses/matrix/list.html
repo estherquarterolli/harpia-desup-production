@@ -1,0 +1,198 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Matrizes Curriculares — Harpia-DESUP{% endblock %}
+{% block header_title %}Dashboard DESUP{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ---- Status badges ---- */
+  .badge-completo     { background:#dcfce7; color:#166534; }
+  .badge-incompleto   { background:#fef9c3; color:#854d0e; }
+  .badge-sem_professor{ background:#fee2e2; color:#991b1b; }
+  .badge-nao_oferecida{ background:#f1f5f9; color:#64748b; }
+
+  /* ---- Toolbar select DESUP ---- */
+  .select-unidade {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%231e3a5f'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right .6rem center;
+    background-size: 1rem;
+    padding-right: 2rem;
+  }
+
+  /* ---- HTMX loading indicator ---- */
+  #table-container.htmx-request::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,.6);
+    z-index: 10;
+    border-radius: .75rem;
+  }
+  #loading-spinner { display: none; }
+  .htmx-request #loading-spinner { display: flex; }
+
+  /* ---- Animated row highlight ---- */
+  @keyframes row-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  tbody tr { animation: row-in .2s ease; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="p-2 md:p-0">
+
+  {# ── Cabeçalho da seção com abas ── #}
+  <div class="mb-6">
+    <div class="flex items-center gap-6 border-b border-slate-200 pb-0">
+      <a href="?status=ativas{% if request.GET.unidade_id %}&unidade_id={{ request.GET.unidade_id }}{% endif %}"
+         class="pb-3 text-sm font-black uppercase tracking-wide border-b-2 transition-colors
+           {% if request.GET.status != 'inativas' %}border-[#025c9f] text-[#025c9f]{% else %}border-transparent text-slate-400 hover:text-slate-600{% endif %}">
+        <i class="ph ph-check-circle mr-1"></i> Matriz Vigente
+      </a>
+      <a href="?status=inativas{% if request.GET.unidade_id %}&unidade_id={{ request.GET.unidade_id }}{% endif %}"
+         class="pb-3 text-sm font-black uppercase tracking-wide border-b-2 transition-colors
+           {% if request.GET.status == 'inativas' %}border-[#025c9f] text-[#025c9f]{% else %}border-transparent text-slate-400 hover:text-slate-600{% endif %}">
+        <i class="ph ph-archive mr-1"></i> Matrizes Anteriores
+      </a>
+    </div>
+    <p class="text-xs text-slate-400 mt-2">
+      {% if request.GET.status == 'inativas' %}
+        Matrizes substituídas por versões mais recentes. Apenas visualização.
+      {% else %}
+        Gerencie os componentes curriculares por unidade e período letivo.
+      {% endif %}
+    </p>
+  </div>
+
+
+
+  {# ── Barra de ferramentas ── #}
+  <div class="flex flex-wrap items-center gap-3 mb-5">
+
+    {# Dropdown Selecionar Unidade — Admin vê todas; Unidade vê somente a própria (bloqueada) #}
+    {% if user.perfil == 'DESUP' or user.is_superuser %}
+      <div class="relative">
+        <select
+          id="select-unidade"
+          name="unidade_id"
+          class="select-unidade bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer pr-10 appearance-none"
+          hx-get="{% url 'courses:matrix_list_partial' %}"
+          hx-target="#table-container"
+          hx-trigger="change"
+          hx-indicator="#loading-spinner"
+          hx-include="[name='unidade_id']"
+        >
+          <option value="">Todas as Unidades</option>
+          {% for unidade in unidades %}
+            <option value="{{ unidade.pk }}" {% if unidade_selecionada_id == unidade.pk|stringformat:"s" %}selected{% endif %}>
+              {{ unidade.sigla }} — {{ unidade.nome }}
+            </option>
+          {% endfor %}
+        </select>
+        <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
+      </div>
+    {% else %}
+      {# Unidade: exibe somente a própria, campo bloqueado #}
+      <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm opacity-75 cursor-not-allowed select-none">
+        <i class="ph ph-lock text-slate-400"></i>
+        {{ user.unidade.sigla }} — {{ user.unidade.nome }}
+      </div>
+    {% endif %}
+
+    {# Botão filtro (funil) #}
+    <button
+      onclick="toggleElement('filterPanel')"
+      id="btn-filter"
+      class="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm hover:bg-slate-50 transition-colors"
+      title="Filtros"
+    >
+      <i class="ph ph-funnel text-lg"></i>
+      <span class="hidden sm:inline">Filtrar</span>
+    </button>
+
+    {# Spinner de loading HTMX #}
+    <div id="loading-spinner" class="items-center gap-2 text-sm text-slate-500 font-semibold" aria-live="polite">
+      <svg class="animate-spin w-4 h-4 text-[#025c9f]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+      </svg>
+      Carregando...
+    </div>
+
+    {# Spacer #}
+    <div class="flex-1"></div>
+
+    {# Botão Inserir Matriz #}
+    <a
+      href="{% url 'courses:matrix_create' %}"
+      class="flex items-center gap-2 bg-[#ffb800] hover:bg-yellow-500 text-[#025c9f] font-black text-sm px-5 py-2.5 rounded-xl shadow-md transition-all hover:scale-105 active:scale-100"
+    >
+      <i class="ph ph-plus text-lg"></i>
+      Inserir Matriz
+    </a>
+
+  </div>
+
+  {# ── Painel de filtros avançados (oculto por padrão) ── #}
+  <div id="filterPanel" class="menu-hidden mb-4 bg-white border border-slate-200 rounded-xl shadow-lg p-4">
+    <h4 class="text-xs font-black text-[#025c9f] uppercase mb-3">Filtros Avançados</h4>
+    <div class="flex flex-wrap gap-3">
+      <select
+        name="turno"
+        class="border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-[#025c9f]"
+        hx-get="{% url 'courses:matrix_list_partial' %}"
+        hx-target="#table-container"
+        hx-trigger="change"
+        hx-indicator="#loading-spinner"
+        hx-include="[name='unidade_id'],[name='turno'],[name='periodo_letivo']"
+      >
+        <option value="">Todos os Turnos</option>
+        <option value="M">Manhã</option>
+        <option value="T">Tarde</option>
+        <option value="N">Noite</option>
+      </select>
+      <select
+        name="periodo_letivo"
+        class="border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-[#025c9f]"
+        hx-get="{% url 'courses:matrix_list_partial' %}"
+        hx-target="#table-container"
+        hx-trigger="change"
+        hx-indicator="#loading-spinner"
+        hx-include="[name='unidade_id'],[name='turno'],[name='periodo_letivo']"
+      >
+        <option value="">Todos os Semestres</option>
+        <option value="1º Semestre">1º Semestre</option>
+        <option value="2º Semestre">2º Semestre</option>
+        <option value="3º Semestre">3º Semestre</option>
+        <option value="4º Semestre">4º Semestre</option>
+        <option value="5º Semestre">5º Semestre</option>
+        <option value="6º Semestre">6º Semestre</option>
+        <option value="7º Semestre">7º Semestre</option>
+        <option value="8º Semestre">8º Semestre</option>
+        <option value="9º Semestre">9º Semestre</option>
+        <option value="10º Semestre">10º Semestre</option>
+      </select>
+    </div>
+  </div>
+
+  {# ── Tabela principal ── #}
+  <div id="table-container" class="relative">
+    {% include 'courses/matrix/partials/_table_body.html' %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Reinicializa ícones Lucide após swap HTMX
+  document.body.addEventListener('htmx:afterSwap', function() {
+    if (window.lucide) lucide.createIcons();
+  });
+</script>
+{% endblock %}

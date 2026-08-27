@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard DESUP{% endblock %}
+
+{% block header_title %}Dashboard DESUP{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+    <div class="bg-white p-6 rounded-2xl shadow-md border-b-4 border-blue-500">
+        <p class="text-[10px] font-black text-slate-400 uppercase">Total Corpo Docente</p>
+        <h3 class="text-3xl font-black text-slate-800">12.879</h3>
+    </div>
+    <div class="bg-white p-6 rounded-2xl shadow-md border-b-4 border-indigo-500">
+        <p class="text-[10px] font-black text-slate-400 uppercase">Conformidade</p>
+        <h3 class="text-3xl font-black text-slate-800">89%</h3>
+    </div>
+    <div class="group-hover-card relative bg-white p-6 rounded-2xl shadow-md border-b-4 border-emerald-500 cursor-help">
+        <p class="text-[10px] font-black text-slate-400 uppercase">Unidades Conformes</p>
+        <h3 class="text-3xl font-black text-slate-800">8/11</h3>
+        <div class="tooltip-unidades absolute bottom-full mb-2 left-0 w-full bg-slate-800 text-white p-3 rounded-lg text-xs z-10">
+            <strong>Atenção:</strong> Quintino, Méier e Niterói possuem pendências.
+        </div>
+    </div>
+</div>
+
+<div class="flex flex-col md:flex-row gap-4 mb-6 relative">
+    <div class="flex-grow relative">
+        <i class="ph ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+        <input type="text" placeholder="BUSCAR..." class="w-full pl-12 pr-4 py-3 rounded-xl border font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500 js-autocomplete" autocomplete="off">
+    </div>
+    <button onclick="toggleElement('filterModal')" class="bg-white border px-6 py-3 rounded-xl font-black text-[#025c9f] hover:bg-slate-50">
+        <i class="ph ph-funnel mr-2"></i> FILTRAR
+    </button>
+
+    <div id="filterModal" class="menu-hidden absolute right-0 top-full mt-2 w-full md:w-80 bg-white rounded-xl shadow-2xl border z-50 p-6">
+        <h4 class="font-black uppercase text-xs mb-4">Filtros Avançados</h4>
+        <div class="space-y-4">
+            <select class="w-full border p-2 rounded font-bold text-xs"><option>Manhã</option><option>Tarde</option><option>Noite</option></select>
+            <select class="w-full border p-2 rounded font-bold text-xs"><option>Superior</option><option>Básico</option></select>
+            <button class="w-full bg-[#025c9f] text-white py-2 rounded font-black uppercase text-xs">Aplicar</button>
+        </div>
+    </div>
+</div>
+
+<div class="bg-white rounded-2xl shadow-md border overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead class="bg-slate-100 border-b">
+                <tr class="text-[10px] font-black text-[#025c9f] uppercase">
+                    <th class="p-4 border-r">ID</th>
+                    <th class="p-4 border-r">Nome</th>
+                    <th class="p-4 border-r text-center">CH</th>
+                    <th class="p-4 border-r text-center">Unidade</th>
+                    <th class="p-4 text-center">Dias</th>
+                </tr>
+            </thead>
+            <tbody class="text-sm font-bold text-slate-600 divide-y">
+                <tr>
+                    <td class="p-4 border-r">#001</td>
+                    <td class="p-4 border-r">PROF. EXEMPLO DA SILVA</td>
+                    <td class="p-4 border-r text-center">40h</td>
+                    <td class="p-4 border-r text-center">Quintino</td>
+                    <td class="p-4 text-center">2</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<a href="{% url 'core:exportar_logs' %}" class="inline-block mt-8 bg-[#ffb800] hover:bg-yellow-400 text-[#025c9f] font-black py-3 px-8 rounded-xl shadow-md uppercase text-xs text-center transition-colors">
+    Gerar LOG
+</a>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Script específico para o dashboard (filtros, etc)
+    function toggleElement(id) {
+        const el = document.getElementById(id);
+        if (el.classList.contains('menu-hidden')) {
+            el.classList.remove('menu-hidden');
+        } else {
+            el.classList.add('menu-hidden');
+        }
+    }
+</script>
+{% endblock %}

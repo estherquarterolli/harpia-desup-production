@@ -1,0 +1,408 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+  {% if form.instance.pk %}Editar{% else %}Nova{% endif %} Atividade Extracurricular — Harpia-DESUP
+{% endblock %}
+{% block header_title %}Dashboard DESUP{% endblock %}
+
+{% block extra_head %}
+<script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<link rel="stylesheet" href="{% static 'css/extracurricular.css' %}">
+
+<style>
+  /* Labels e erros padronizados */
+  .field-label {
+    display: block;
+    font-size: .625rem;
+    font-weight: 800;
+    color: #025c9f;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-bottom: .25rem;
+  }
+  .field-error {
+    font-size: .625rem;
+    font-weight: 600;
+    color: #dc2626;
+    margin-top: .2rem;
+  }
+
+  /* Status badge colorido no select */
+  select[name*="status"] option[value="ATIVA"]      { background:#dcfce7; }
+  select[name*="status"] option[value="PENDENTE"]    { background:#fef9c3; }
+  select[name*="status"] option[value="ENCERRADA"]   { background:#f1f5f9; }
+  select[name*="status"] option[value="CANCELADA"]   { background:#fee2e2; }
+
+  /* Linha do formset: animação de entrada */
+  @keyframes row-slide-in {
+    from { opacity:0; transform:translateY(-8px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+  .formset-row { animation: row-slide-in .25s ease; }
+
+  /* Pulse no spinner HTMX */
+  #htmx-spinner { display:none; }
+  .htmx-request #htmx-spinner { display:flex; }
+
+  /* Bloqueio de formulário (janela fechada) */
+  .form-locked fieldset { opacity:.6; pointer-events:none; }
+
+  /* Textarea compacta */
+  textarea.compact { resize: vertical; min-height: 3.5rem; }
+
+  /* Multiselect compacto */
+  select[multiple] { min-height: 4rem; max-height: 7rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="p-2 md:p-0 max-w-7xl">
+
+  {# ── Breadcrumb ── #}
+  <nav class="breadcrumb-container mb-6" aria-label="Breadcrumb">
+    <a href="{% url 'extracurricular_index' %}" class="breadcrumb-item-link">Extracurriculares</a>
+    <i class="ph ph-caret-right breadcrumb-separator"></i>
+    <span class="breadcrumb-item-active">{% if form.instance.pk %}Editar{% else %}Nova{% endif %} Atividade</span>
+  </nav>
+
+  {# ── Alerta de Janela Fechada (Bloqueio) ── #}
+  {% if janela_fechada %}
+  <div class="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 flex items-center gap-3">
+    <i class="ph ph-lock-key text-2xl text-amber-600"></i>
+    <div>
+      <p class="font-black">Janela de Entrega Fechada</p>
+      <p class="text-xs mt-0.5">{{ janela_mensagem|default:"Não é possível editar atividades fora do período de entrega." }}</p>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Erros globais do formulário ── #}
+  {% if form.non_field_errors %}
+  <div class="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+    <p class="font-black mb-1 flex items-center gap-2"><i class="ph ph-warning-circle"></i> Erro no formulário</p>
+    <ul class="list-disc list-inside space-y-0.5">
+      {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {# ── Erros do formset ── #}
+  {% if component_formset.non_form_errors %}
+  <div class="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+    <p class="font-black mb-1 flex items-center gap-2"><i class="ph ph-warning-circle"></i> Erro nos componentes</p>
+    <ul class="list-disc list-inside space-y-0.5">
+      {% for error in component_formset.non_form_errors %}<li>{{ error }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <form
+    method="POST"
+    id="extracurricular-form"
+    class="space-y-6 {% if janela_fechada %}form-locked{% endif %}"
+    hx-boost="false"
+  >
+    {% csrf_token %}
+
+    {# ═══════════════════════════════════════════════════════════
+       SEÇÃO 1 — Identificação da Atividade
+    ═══════════════════════════════════════════════════════════ #}
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+      <h3 class="text-sm font-black text-[#025c9f] uppercase tracking-wide">
+        <i class="ph ph-books mr-1"></i> Identificação da Atividade
+      </h3>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+        {# Título #}
+        <div class="space-y-1 md:col-span-2">
+          <label for="{{ form.titulo.id_for_label }}" class="field-label">{{ form.titulo.label|default:"Título da Atividade" }}</label>
+          {{ form.titulo }}
+          {% if form.titulo.errors %}<p class="field-error">{{ form.titulo.errors.0 }}</p>{% endif %}
+        </div>
+
+        {# Período Letivo #}
+        <div class="space-y-1">
+          <label for="{{ form.periodo_letivo.id_for_label }}" class="field-label">{{ form.periodo_letivo.label|default:"Período Letivo" }}</label>
+          {{ form.periodo_letivo }}
+          {% if form.periodo_letivo.errors %}<p class="field-error">{{ form.periodo_letivo.errors.0 }}</p>{% endif %}
+        </div>
+
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+
+        {# Unidade #}
+        <div class="space-y-1">
+          <label for="{{ form.unidade.id_for_label }}" class="field-label">{{ form.unidade.label|default:"Unidade" }}</label>
+          {{ form.unidade }}
+          {% if form.unidade.errors %}<p class="field-error">{{ form.unidade.errors.0 }}</p>{% endif %}
+        </div>
+
+        {# Categoria/Tipo #}
+        <div class="space-y-1">
+          <label for="{{ form.tipo.id_for_label }}" class="field-label">{{ form.tipo.label|default:"Categoria" }}</label>
+          {{ form.tipo }}
+          {% if form.tipo.errors %}<p class="field-error">{{ form.tipo.errors.0 }}</p>{% endif %}
+        </div>
+
+        {# CH Semanal #}
+        <div class="space-y-1">
+          <label for="{{ form.carga_horaria_semanal.id_for_label }}" class="field-label">{{ form.carga_horaria_semanal.label|default:"CH Semanal" }}</label>
+          {{ form.carga_horaria_semanal }}
+          {% if form.carga_horaria_semanal.errors %}<p class="field-error">{{ form.carga_horaria_semanal.errors.0 }}</p>{% endif %}
+          <p class="text-[10px] text-slate-400">Horas por semana dedicadas</p>
+        </div>
+
+        {# Status #}
+        <div class="space-y-1">
+          <label for="{{ form.status.id_for_label }}" class="field-label">{{ form.status.label|default:"Status" }}</label>
+          {{ form.status }}
+          {% if form.status.errors %}<p class="field-error">{{ form.status.errors.0 }}</p>{% endif %}
+        </div>
+
+      </div>
+
+      {# Descrição / Justificativa #}
+      <div class="space-y-1">
+        <label for="{{ form.descricao.id_for_label }}" class="field-label">{{ form.descricao.label|default:"Descrição / Justificativa" }}</label>
+        {{ form.descricao }}
+        {% if form.descricao.errors %}<p class="field-error">{{ form.descricao.errors.0 }}</p>{% endif %}
+        <p class="text-[10px] text-slate-400">Detalhe a atividade e a justificativa da carga horária extracurricular.</p>
+      </div>
+
+    </div>
+
+    {# ═══════════════════════════════════════════════════════════
+       SEÇÃO 2 — Professores Envolvidos (Formset Dinâmico)
+    ═══════════════════════════════════════════════════════════ #}
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/60">
+        <div>
+          <h3 class="text-sm font-black text-[#025c9f] uppercase tracking-wide">
+            <i class="ph ph-users mr-1"></i> Professores Envolvidos
+          </h3>
+          <p class="text-[10px] text-slate-400 mt-0.5">Cada linha vincula um professor e define sua carga horária nesta atividade.</p>
+        </div>
+        {# Spinner HTMX p/ adicionar linha #}
+        <div id="htmx-spinner" class="items-center gap-2 text-xs text-slate-500 font-semibold" aria-live="polite">
+          <svg class="animate-spin w-4 h-4 text-[#025c9f]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+          </svg>
+          Adicionando...
+        </div>
+      </div>
+
+      {# Management form — CRÍTICO: Django valida TOTAL_FORMS e INITIAL_FORMS #}
+      {{ professor_formset.management_form }}
+
+      {# Container das linhas — alvo dos swaps HTMX #}
+      <div class="overflow-x-auto w-full">
+        <table class="w-full text-left text-sm text-slate-600 whitespace-nowrap">
+          <thead class="bg-slate-100/50 text-xs font-bold text-[#025c9f] uppercase tracking-wider border-b border-slate-200">
+            <tr>
+              <th class="px-4 py-3 w-full">Professor</th>
+              <th class="px-4 py-3">CH Semanal</th>
+              <th class="px-4 py-3">Distribuição</th>
+              <th class="px-4 py-3">Status</th>
+              <th class="px-4 py-3">Observações</th>
+              <th class="px-4 py-3 w-10"></th>
+            </tr>
+          </thead>
+          <tbody id="formset-container" class="divide-y divide-slate-100">
+            {% for prof_form in professor_formset %}
+              {% include 'extracurricular/partials/_formset_row.html' with form_row=prof_form row_index=forloop.counter0 %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {# Botão Adicionar Professor via JS #}
+      <div class="px-4 pb-4 mt-4">
+        <button
+          type="button"
+          id="btn-add-row"
+          class="w-full flex items-center justify-center gap-2 border-2 border-dashed border-slate-200 rounded-xl py-3 text-xs font-black text-slate-400 hover:border-[#025c9f] hover:text-[#025c9f] hover:bg-blue-50/30 transition-all group"
+          onclick="addFormsetRow()"
+          {% if janela_fechada %}disabled{% endif %}
+        >
+          <i class="ph ph-plus-circle text-xl group-hover:scale-110 transition-transform"></i>
+          Adicionar Professor
+        </button>
+      </div>
+
+    </div>
+
+    {# ═══════════════════════════════════════════════════════════
+       SEÇÃO 3 — Ações do Formulário
+    ═══════════════════════════════════════════════════════════ #}
+    <div class="flex flex-col sm:flex-row gap-3 pb-4">
+      <button
+        type="button"
+        onclick="confirmSave()"
+        class="flex-1 flex items-center justify-center gap-2 bg-[#ffb800] hover:bg-yellow-500 text-[#025c9f] font-black py-3.5 px-6 rounded-xl shadow-md text-sm transition-all hover:scale-[1.01] active:scale-[.99]"
+        {% if janela_fechada %}disabled{% endif %}
+      >
+        <i class="ph ph-floppy-disk text-lg"></i>
+        SALVAR ATIVIDADE
+      </button>
+
+      <a
+        href="{% url 'extracurricular_index' %}"
+        class="px-5 py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl text-xs transition-colors text-center uppercase shadow-sm flex items-center justify-center gap-2"
+      >
+        Cancelar
+      </a>
+    </div>
+
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  /**
+   * ─── Formset Management ─────────────────────────────────
+   * Adiciona/remove linhas do formset de professores,
+   * respeitando os prefixos do Django (TOTAL_FORMS, etc.)
+   */
+  function addFormsetRow() {
+    const prefix = '{{ professor_formset.prefix|default:"professor_set" }}';
+    const totalInput = document.getElementById('id_' + prefix + '-TOTAL_FORMS');
+    const currentIndex = parseInt(totalInput.value, 10);
+
+    // Mostrar spinner
+    const spinner = document.getElementById('htmx-spinner');
+    if (spinner) spinner.style.display = 'flex';
+
+    // Clonar a template row (usamos a última row como template, ou criamos do zero)
+    const container = document.getElementById('formset-container');
+    const emptyRow = document.getElementById('empty-formset-row');
+
+    if (emptyRow) {
+      // Usar template row se existir
+      const newRow = emptyRow.cloneNode(true);
+      newRow.id = 'formset-row-' + currentIndex;
+      newRow.classList.remove('hidden');
+      newRow.classList.add('formset-row');
+      newRow.style.display = '';
+
+      // Atualiza o index dos nomes/ids
+      const regex = new RegExp('__prefix__', 'g');
+      newRow.innerHTML = newRow.innerHTML.replace(regex, currentIndex);
+
+      container.appendChild(newRow);
+    } else {
+      // Fallback: criar row com inputs manuais
+      const tr = document.createElement('tr');
+      tr.id = 'formset-row-' + currentIndex;
+      tr.className = 'formset-row hover:bg-slate-50 transition-colors';
+      tr.setAttribute('data-row-index', currentIndex);
+
+      tr.innerHTML = `
+        <td class="hidden"><input type="hidden" name="${prefix}-${currentIndex}-id" id="id_${prefix}-${currentIndex}-id"></td>
+        <td class="p-2 align-top">
+          <select name="${prefix}-${currentIndex}-professor" id="id_${prefix}-${currentIndex}-professor"
+            class="form-field w-full min-w-[200px]">
+            <option value="">Selecionar professor...</option>
+          </select>
+        </td>
+        <td class="p-2 align-top w-28">
+          <input type="number" name="${prefix}-${currentIndex}-carga_horaria_semanal" id="id_${prefix}-${currentIndex}-carga_horaria_semanal"
+            class="form-field w-20 text-center" step="0.5" min="0" max="40" value="0">
+        </td>
+        <td class="p-2 align-top w-32">
+          <input type="text" name="${prefix}-${currentIndex}-distribuicao" id="id_${prefix}-${currentIndex}-distribuicao"
+            class="form-field w-28" placeholder="Ex: 2a,4a">
+        </td>
+        <td class="p-2 align-top">
+          <select name="${prefix}-${currentIndex}-status" id="id_${prefix}-${currentIndex}-status"
+            class="form-field w-36">
+            <option value="ATIVA">Ativa</option>
+            <option value="PENDENTE">Pendente</option>
+            <option value="ENCERRADA">Encerrada</option>
+            <option value="CANCELADA">Cancelada</option>
+          </select>
+        </td>
+        <td class="p-2 align-top">
+          <textarea name="${prefix}-${currentIndex}-observacoes" id="id_${prefix}-${currentIndex}-observacoes"
+            class="form-field compact w-full min-w-[140px]" rows="1" placeholder="Obs..."></textarea>
+        </td>
+        <td class="p-2 align-top text-right">
+          <button type="button" onclick="removeFormsetRow(this)"
+            class="flex items-center justify-center w-8 h-8 rounded-full text-red-500 hover:bg-red-50 hover:text-red-700 transition-colors"
+            title="Remover linha">
+            <i class="ph ph-trash text-lg"></i>
+          </button>
+        </td>
+      `;
+
+      container.appendChild(tr);
+    }
+
+    // Incrementa TOTAL_FORMS
+    totalInput.value = currentIndex + 1;
+
+    // Ocultar spinner
+    if (spinner) spinner.style.display = 'none';
+  }
+
+  /**
+   * Remove uma linha do formset.
+   * Para linhas com DELETE checkbox, marca a checkbox.
+   * Para linhas novas (sem ID), remove do DOM.
+   */
+  function removeFormsetRow(btn) {
+    const row = btn.closest('.formset-row') || btn.closest('tr');
+    if (!row) return;
+
+    // Verifica se existe DELETE checkbox (Django pode gerar para linhas existentes)
+    const deleteCheckbox = row.querySelector('input[name$="-DELETE"]');
+    if (deleteCheckbox) {
+      deleteCheckbox.checked = true;
+      row.style.transition = 'opacity .2s, transform .2s';
+      row.style.opacity = '0.3';
+      row.style.pointerEvents = 'none';
+      return;
+    }
+
+    // Animação de saída
+    row.style.transition = 'opacity .2s, transform .2s';
+    row.style.opacity = '0';
+    row.style.transform = 'translateY(-6px)';
+    setTimeout(() => row.remove(), 200);
+
+    // Ajusta TOTAL_FORMS
+    const prefix = '{{ professor_formset.prefix|default:"professor_set" }}';
+    const totalInput = document.getElementById('id_' + prefix + '-TOTAL_FORMS');
+    totalInput.value = Math.max(0, parseInt(totalInput.value, 10) - 1);
+  }
+
+  // Reinicializa ícones Lucide após swap HTMX
+  document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (window.lucide) lucide.createIcons();
+    if (window.Alpine) Alpine.initTree(evt.detail.target);
+  });
+
+  // SweetAlert: Confirmação de salvar
+  function confirmSave() {
+    Swal.fire({
+      title: 'Salvar Atividade?',
+      text: "Você deseja realmente salvar esta atividade extracurricular?",
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#ffb800',
+      cancelButtonColor: '#dc2626',
+      confirmButtonText: '<span class="text-[#025c9f] font-bold">Sim, salvar!</span>',
+      cancelButtonText: 'Cancelar'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        document.getElementById('extracurricular-form').submit();
+      }
+    });
+  }
+</script>
+{% endblock %}

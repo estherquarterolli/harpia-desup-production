@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="p-6">
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-[#025c9f]">Unidades de Ensino</h1>
+            <p class="text-sm text-slate-500">Gestão de campus e centros administrativos da FAETEC.</p>
+        </div>
+        <div class="flex items-center gap-4">
+            <a href="{% url 'core:unidade_create' %}" class="bg-[#025c9f] hover:bg-[#153e70] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                Adicionar Unidade
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for unidade in unidades %}
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow relative overflow-hidden">
+            {% if unidade.status %}
+                <div class="absolute top-0 right-0 bg-green-100 text-green-600 text-[10px] font-bold px-3 py-1 rounded-bl-lg uppercase">Ativo</div>
+            {% else %}
+                <div class="absolute top-0 right-0 bg-red-100 text-red-600 text-[10px] font-bold px-3 py-1 rounded-bl-lg uppercase">Inativo</div>
+            {% endif %}
+            
+            <div class="flex items-center gap-4 mb-4">
+                <div class="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center text-[#025c9f] font-bold text-xl">
+                    {{ unidade.sigla|slice:":2" }}
+                </div>
+                <div>
+                    <h3 class="font-bold text-slate-800">{{ unidade.sigla }}</h3>
+                    <p class="text-xs text-slate-500">{{ unidade.nome }}</p>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center pt-4 border-t border-slate-50">
+                <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Status: 
+                    <span class="{% if unidade.status %}text-green-500{% else %}text-red-400{% endif %}">
+                        {% if unidade.status %}Ativo{% else %}Inativo{% endif %}
+                    </span>
+                </span>
+                <div class="flex items-center gap-2">
+                    <a href="{% url 'core:curso_list' unidade_pk=unidade.pk %}" class="text-[#025c9f] hover:text-blue-800 text-xs font-bold flex items-center gap-1 px-2 py-1 bg-blue-50 rounded hover:bg-blue-100 transition-colors">
+                        <i class="ph ph-graduation-cap text-sm"></i>
+                        Cursos
+                    </a>
+                    <a href="{% url 'core:unidade_update' unidade.pk %}" class="text-slate-400 hover:text-[#025c9f] text-xs font-bold flex items-center gap-1">
+                        <i data-lucide="edit-3" class="w-3 h-3"></i>
+                        Editar
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-span-full py-20 text-center text-slate-400">
+            <i data-lucide="building-2" class="w-12 h-12 mx-auto mb-4 opacity-10"></i>
+            Nenhuma unidade cadastrada.
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

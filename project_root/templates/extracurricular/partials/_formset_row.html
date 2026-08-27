@@ -1,0 +1,51 @@
+{# Partial: _formset_row.html (Extracurricular — Linha de professor no formset) #}
+
+<tr id="formset-row-{{ row_index }}" class="formset-row hover:bg-slate-50 transition-colors" data-row-index="{{ row_index }}">
+
+  {# ID para edição #}
+  <td class="hidden">{{ form_row.id }}</td>
+
+  {# Professor #}
+  <td class="p-2 align-top">
+    {{ form_row.professor }}
+    {% if form_row.professor.errors %}<div class="field-error">{{ form_row.professor.errors.0 }}</div>{% endif %}
+  </td>
+
+  {# CH Semanal #}
+  <td class="p-2 align-top w-28">
+    {{ form_row.carga_horaria_semanal }}
+    {% if form_row.carga_horaria_semanal.errors %}<div class="field-error">{{ form_row.carga_horaria_semanal.errors.0 }}</div>{% endif %}
+  </td>
+
+  {# Distribuição #}
+  <td class="p-2 align-top w-32">
+    {{ form_row.distribuicao }}
+    {% if form_row.distribuicao.errors %}<div class="field-error">{{ form_row.distribuicao.errors.0 }}</div>{% endif %}
+  </td>
+
+  {# Status #}
+  <td class="p-2 align-top">
+    {{ form_row.status }}
+    {% if form_row.status.errors %}<div class="field-error">{{ form_row.status.errors.0 }}</div>{% endif %}
+  </td>
+
+  {# Observações #}
+  <td class="p-2 align-top">
+    {{ form_row.observacoes }}
+    {% if form_row.observacoes.errors %}<div class="field-error">{{ form_row.observacoes.errors.0 }}</div>{% endif %}
+  </td>
+
+  {# Ações #}
+  <td class="p-2 align-top text-right">
+    {% if form_row.DELETE %}
+      <label class="flex items-center justify-center w-8 h-8 rounded-full text-red-500 hover:bg-red-50 hover:text-red-700 cursor-pointer transition-colors" title="Remover este professor">
+        <span class="hidden">{{ form_row.DELETE }}</span>
+        <i class="ph ph-trash text-lg"></i>
+      </label>
+    {% else %}
+      <button type="button" onclick="removeFormsetRow(this)" class="flex items-center justify-center w-8 h-8 rounded-full text-red-500 hover:bg-red-50 hover:text-red-700 transition-colors" title="Remover linha">
+        <i class="ph ph-trash text-lg"></i>
+      </button>
+    {% endif %}
+  </td>
+</tr>

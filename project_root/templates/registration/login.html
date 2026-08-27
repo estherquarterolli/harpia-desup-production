@@ -1,0 +1,136 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login — HARPIA</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="{% static 'css/login.css' %}">
+</head>
+<body class="login-page min-h-screen flex flex-col font-sans text-slate-800 bg-pattern">
+    <main class="login-main flex-grow flex items-center justify-center p-4 sm:p-6">
+        <section class="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 sm:p-10">
+            <header class="login-brand flex flex-col items-center">
+                <div class="login-brand-mark flex flex-col items-center justify-center">
+                    <img
+                        src="{% static 'img/logo-harpia-colorida-modificada.PNG' %}"
+                        alt="Logo Harpia"
+                        class="w-48 h-auto object-contain transition-transform hover:scale-110"
+                    >
+                </div>
+            </header>
+
+            <form
+                method="POST"
+                action="{% url 'login' %}"
+                hx-post="{% url 'login' %}"
+                hx-target="#form-errors"
+                hx-swap="innerHTML"
+                class="login-form space-y-5"
+            >
+                {% csrf_token %}
+
+                <div id="form-errors" class="login-errors">
+                    {% if form.errors or error %}
+                        <script>
+                            document.addEventListener("DOMContentLoaded", function() {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Erro!',
+                                    text: '{{ error|default:"Usuário ou senha incorretos." }}',
+                                    confirmButtonColor: '#025c9f'
+                                });
+                            });
+                        </script>
+                    {% endif %}
+                    {% if warning %}
+                        <div class="p-3 bg-amber-50 border border-amber-200 rounded-md mt-2">
+                            <p class="text-[10px] text-amber-700 font-bold text-center">
+                                <i class="ph ph-warning-circle mr-1"></i> {{ warning }}
+                            </p>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="login-field space-y-1.5">
+                    <label for="email" class="login-label text-xs font-bold text-[#025c9f] uppercase tracking-wide">Email</label>
+                    <div class="login-input-wrap relative">
+                        <span class="login-input-icon absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                            <i data-lucide="user" class="w-5 h-5"></i>
+                        </span>
+                        <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            placeholder="email@faetec.rj.gov.br"
+                            required
+                            class="login-input w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] focus:border-transparent placeholder:text-slate-300 transition-all"
+                        >
+                    </div>
+                </div>
+
+                <div class="login-field space-y-1.5">
+                    <label for="password" class="login-label text-xs font-bold text-[#025c9f] uppercase tracking-wide">Senha</label>
+                    <div class="login-input-wrap relative">
+                        <span class="login-input-icon absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                            <i data-lucide="lock" class="w-5 h-5"></i>
+                        </span>
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            placeholder="********"
+                            required
+                            class="login-input w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] focus:border-transparent placeholder:text-slate-300 transition-all"
+                        >
+                        <button type="button" class="login-password-toggle absolute inset-y-0 right-0 pr-3 flex items-center text-[#025c9f] hover:text-blue-800 transition-colors" aria-label="Mostrar senha">
+                            <i data-lucide="eye-off" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" class="login-submit w-full bg-[#1e293b] hover:bg-[#0f172a] text-white font-semibold py-3 rounded-lg text-sm transition-colors shadow-md flex justify-center items-center gap-2">
+                    ACESSAR
+                </button>
+            </form>
+
+            <div class="login-forgot text-center mt-5">
+                <a href="{% url 'forgot_password' %}" class="text-xs text-[#718096] hover:text-[#025c9f] hover:underline transition-all">
+                    Esqueci Minha Senha
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="login-footer bg-[#1e293b] text-white px-6 py-4 flex items-center justify-between shadow-inner mt-auto">
+        <div class="text-xs sm:text-sm font-semibold tracking-wide">
+            ©2026 HARPIA
+        </div>
+        <button class="login-support bg-[#f59e0b] hover:bg-[#d97706] text-white px-4 py-2 rounded-full text-xs sm:text-sm font-bold flex items-center gap-2 shadow-sm transition-colors">
+            <i data-lucide="headphones" class="w-4 h-4"></i>
+            Suporte
+        </button>
+    </footer>
+
+    <script src="{% static 'js/login.js' %}"></script>
+    {% if request.GET.changed == '1' %}
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            Swal.fire({
+                icon: 'success',
+                title: 'Senha Alterada!',
+                text: 'Sua senha foi alterada com sucesso. Por favor, faça login.',
+                confirmButtonColor: '#025c9f'
+            });
+        });
+    </script>
+    {% endif %}
+</body>
+</html>

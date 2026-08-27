@@ -1,0 +1,146 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alocação Curricular - DESUP</title>
+    <!-- Tailwind e Ícones -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Importação do HTMX (Crucial para funcionar) -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="{% static 'css/alloc_curricular.css' %}">
+</head>
+
+<body class="bg-grid min-h-screen flex no-scrollbar">
+
+    <aside id="sidebar"
+        class="sidebar-desktop group w-20 hover:w-64 bg-[#025c9f] text-white transition-all duration-300 flex flex-col h-screen sticky top-0 z-50">
+        <div class="p-4 mb-10 flex justify-center items-center">
+            <div class="w-14 h-14 rounded-full bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                <img src="{% static 'img/logo-harpia-colorida-modificada.PNG' %}" alt="Logo Harpia" class="w-11 h-11 object-contain" title="Harpia">
+            </div>
+        </div>
+        <nav class="flex-grow space-y-2 px-2">
+            <!-- Dashboard -->
+            <a href="{% url 'dashboard' %}" class="flex items-center p-3 hover:bg-[#025c9f] rounded-lg transition-colors">
+                <i class="ph ph-squares-four text-2xl"></i>
+                <span class="ml-4 hidden group-hover:block">Dashboard</span>
+            </a>
+            
+            <!-- Professores (Página Atual - Fica destacada com bg diferente) -->
+            <a href="{% url 'alloc_curricular' %}" class="flex items-center p-3 bg-[#025c9f] rounded-lg transition-colors">
+                <i class="ph ph-users text-2xl"></i>
+                <span class="ml-4 hidden group-hover:block">Professores</span>
+            </a>
+            
+            <!-- Matriz Vigente -->
+            <a href="#" class="flex items-center p-3 hover:bg-[#025c9f] rounded-lg transition-colors">
+                <i class="ph ph-file-text text-2xl"></i>
+                <span class="ml-4 hidden group-hover:block whitespace-nowrap">Matriz Vigente</span>
+            </a>
+            
+            <!-- Matrizes Antigas -->
+            <a href="#" class="flex items-center p-3 hover:bg-[#025c9f] rounded-lg transition-colors">
+                <i class="ph ph-archive text-2xl"></i>
+                <span class="ml-4 hidden group-hover:block whitespace-nowrap">Matrizes Antigas</span>
+            </a>
+            
+            <!-- Configuração e Suporte -->
+            <a href="#" class="flex items-center p-3 hover:bg-[#025c9f] rounded-lg transition-colors mt-8">
+                <i class="ph ph-gear text-2xl"></i>
+                <span class="ml-4 hidden group-hover:block whitespace-nowrap">Config. e Suporte</span>
+            </a>
+        </nav>
+        <div class="p-4 border-t border-blue-900">
+            <form action="{% url 'logout' %}" method="post" class="w-full m-0 p-0">
+                {% csrf_token %}
+                <button type="submit"
+                    class="w-full flex items-center p-3 text-red-400 hover:bg-red-900/20 rounded-lg text-left transition-colors">
+                    <i class="ph ph-sign-out text-2xl"></i>
+                    <span class="ml-4 hidden group-hover:block">Sair</span>
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <main class="flex-grow p-8">
+        <!-- HEADER MANTIDO -->
+        <header class="flex justify-between items-center mb-10">
+            <!-- Aqui você pode usar {{ request.user.nome }} e o grupo dele dinamicamente depois -->
+            <!-- ... seu código do header ... -->
+        </header>
+
+        <section class="mb-6">
+            <h2 class="section-title text-2xl font-bold text-[#025c9f]">Alocação Curricular</h2>
+        </section>
+
+        <!-- CONTROLES (SELECT E FILTRO) COM SEGURANÇA DE PERFIL -->
+        <div class="flex gap-4 mb-6">
+
+            {% if is_admin %}
+            <!-- Visão do ADMIN DESUP: Vê o Select com HTMX -->
+            <div class="relative w-64">
+                <!-- 
+                      hx-get: Qual URL o HTMX vai chamar
+                      hx-target: Onde ele vai jogar a resposta (no id tableBody)
+                      hx-trigger: Quando disparar (ao mudar o valor do select)
+                    -->
+                <select id="unidadeSelect" name="unidade"
+                    class="custom-select w-full border border-slate-300 rounded-md p-2 pr-10 appearance-none bg-white"
+                    hx-get="{% url 'htmx_tabela_alocacao' %}" hx-target="#tableBody" hx-trigger="change">
+                    <option value="" disabled selected>Selecionar Unidade</option>
+                    {% for unidade in unidades %}
+                    <option value="{{ unidade.id }}">{{ unidade.nome }}</option>
+                    {% endfor %}
+                </select>
+                <i
+                    class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500"></i>
+            </div>
+            {% else %}
+            <!-- Visão do GESTOR: Não tem Select, apenas um badge visual mostrando a unidade dele -->
+            <div
+                class="py-2 px-4 bg-slate-100 rounded-md text-[#025c9f] border border-slate-200 font-semibold flex items-center gap-2">
+                <i class="ph ph-buildings"></i> Unidade: {{ request.user.unidade.nome }}
+            </div>
+            {% endif %}
+
+            <button class="filter-btn p-2 border border-slate-300 rounded-md hover:bg-slate-50">
+                <i class="ph ph-funnel text-slate-600"></i>
+            </button>
+        </div>
+
+        <!-- TABELA DE ALOCAÇÃO -->
+        <div class="table-container bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+            <table class="w-full border-collapse text-sm">
+                <thead class="bg-slate-50 border-b border-slate-200 text-[#025c9f]">
+                    <tr>
+                        <th class="p-3 border-r border-slate-200 text-left">ID</th>
+                        <th class="p-3 border-r border-slate-200 text-left">Nome</th>
+                        <th class="p-3 border-r border-slate-200 text-center">RT</th>
+                        <th class="p-3 border-r border-slate-200 text-center">Tipo</th>
+                        <th class="p-3 border-r border-slate-200 text-center">Curso_turno1</th>
+                        <th class="p-3 border-r border-slate-200 text-center">Curso_turno2</th>
+                        <th class="p-3 border-r border-slate-200 text-center">CH Justificada</th>
+                        <th class="p-3 border-r border-slate-200 text-center font-bold">Total</th>
+                        <th class="p-3 border-r border-slate-200 text-center">Não alocado</th>
+                        <th class="p-3 text-center">% Alocado</th>
+                    </tr>
+                </thead>
+                <!-- O hx-trigger="load" faz a tabela ser preenchida automaticamente assim que a página abre -->
+                <tbody id="tableBody" hx-get="{% url 'htmx_tabela_alocacao' %}" hx-trigger="load">
+                    <tr>
+                        <td colspan="10" class="text-center py-8 text-slate-400">
+                            <i class="ph ph-spinner animate-spin text-2xl mb-2 inline-block"></i><br>
+                            Carregando dados da alocação...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+
+</html>

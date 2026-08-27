@@ -1,0 +1,12 @@
+{% if cursos %}
+  <div class="space-y-2">
+    {% for curso in cursos %}
+      <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer p-1 hover:bg-slate-100 rounded">
+        <input type="checkbox" name="cursos" value="{{ curso.id }}" class="w-4 h-4 text-[#025c9f] bg-white border-slate-300 rounded focus:ring-[#025c9f]">
+        <span>{{ curso }}</span>
+      </label>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="text-sm text-slate-400 text-center mt-6">Nenhum curso disponível para a unidade selecionada.</p>
+{% endif %}

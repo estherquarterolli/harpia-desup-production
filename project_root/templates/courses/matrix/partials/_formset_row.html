@@ -1,0 +1,70 @@
+
+<tr id="formset-row-{{ row_index }}" class="formset-row hover:bg-slate-50 transition-colors" data-row-index="{{ row_index }}">
+  
+  {# ID para edição #}
+  <td class="hidden">{{ form_row.id }}</td>
+
+  {# Período #}
+  <td class="p-2 align-top">
+    {{ form_row.periodo }}
+    {% if form_row.periodo.errors %}<div class="field-error">{{ form_row.periodo.errors.0 }}</div>{% endif %}
+  </td>
+
+  {# Código #}
+  <td class="p-2 align-top w-28">
+    {{ form_row.codigo }}
+    {% if form_row.codigo.errors %}<div class="field-error">{{ form_row.codigo.errors.0 }}</div>{% endif %}
+  </td>
+
+  {# Disciplina (Nome) #}
+  <td class="p-2 align-top">
+    {{ form_row.disciplina_nome }}
+    {% if form_row.disciplina_nome.errors %}<div class="field-error">{{ form_row.disciplina_nome.errors.0 }}</div>{% endif %}
+  </td>
+
+  {# Crédito #}
+  <td class="p-2 align-top w-28">
+    {{ form_row.creditos }}
+    {% if form_row.creditos.errors %}<div class="field-error">{{ form_row.creditos.errors.0 }}</div>{% endif %}
+  </td>
+
+  {# CH #}
+  <td class="p-2 align-top w-28">
+    {{ form_row.carga_horaria }}
+    {% if form_row.carga_horaria.errors %}<div class="field-error">{{ form_row.carga_horaria.errors.0 }}</div>{% endif %}
+  </td>
+
+  {# HA (CH Semanal) #}
+  <td class="p-2 align-top w-32">
+    {{ form_row.carga_horaria_semanal }}
+    {% if form_row.carga_horaria_semanal.errors %}<div class="field-error">{{ form_row.carga_horaria_semanal.errors.0 }}</div>{% endif %}
+  </td>
+
+  {# Ações / Campos Ocultos #}
+  <td class="p-2 align-top text-right">
+    <div class="hidden">
+      {{ form_row.docente }}
+      {{ form_row.compartilhado }}
+      {{ form_row.curso_compartilhado }}
+      {{ form_row.status }}
+      {{ form_row.observacoes }}
+    </div>
+
+    {% if form_row.DELETE %}
+      <div class="hidden">{{ form_row.DELETE }}</div>
+      <button type="button"
+              onclick="confirmarRemocaoComponente(this)"
+              class="flex items-center justify-center w-8 h-8 rounded-full text-red-500 hover:bg-red-50 hover:text-red-700 transition-colors"
+              title="Remover componente da matriz">
+        <i class="ph ph-trash text-lg"></i>
+      </button>
+    {% else %}
+      <button type="button"
+              onclick="confirmarRemocaoComponenteNovo(this)"
+              class="flex items-center justify-center w-8 h-8 rounded-full text-red-500 hover:bg-red-50 hover:text-red-700 transition-colors"
+              title="Remover linha">
+        <i class="ph ph-trash text-lg"></i>
+      </button>
+    {% endif %}
+  </td>
+</tr>

@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}Excluir Componente | Harpia{% endblock %}
+{% block header_title %}Excluir Componente{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+  <div class="bg-white rounded-xl shadow-sm border border-red-100 overflow-hidden">
+    <div class="px-6 py-5 border-b border-red-100 bg-red-50/60">
+      <h2 class="text-sm font-black text-red-700 uppercase tracking-widest flex items-center gap-2">
+        <i class="ph ph-warning text-lg"></i> Confirmar Exclusão
+      </h2>
+    </div>
+    <div class="p-6 space-y-4">
+      <p class="text-sm text-slate-700">
+        Tem certeza que deseja excluir o componente curricular abaixo? Esta ação não pode ser desfeita.
+      </p>
+      <div class="bg-slate-50 border border-slate-200 rounded-lg p-4">
+        <p class="text-xs text-slate-500 uppercase font-bold mb-1">Componente</p>
+        <p class="text-sm font-black text-slate-800">{{ object.sigla }} — {{ object.nome }}</p>
+        <p class="text-xs text-slate-500 mt-1">CH: {{ object.carga_horaria_padrao }}h &nbsp;|&nbsp; Créditos: {{ object.creditos }}</p>
+      </div>
+      <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 flex items-start gap-2">
+        <i class="ph ph-warning-circle text-base flex-shrink-0 mt-0.5"></i>
+        Se este componente estiver vinculado a alguma matriz curricular, a exclusão será bloqueada automaticamente.
+      </p>
+    </div>
+    <div class="px-6 pb-6 flex gap-3">
+      <form method="POST" class="flex-1">
+        {% csrf_token %}
+        <button type="submit"
+          class="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-black py-3 px-6 rounded-xl text-sm transition-colors">
+          <i class="ph ph-trash text-lg"></i> Sim, excluir
+        </button>
+      </form>
+      <a href="{% url 'courses:component_list' %}"
+        class="flex-1 flex items-center justify-center gap-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-black py-3 px-6 rounded-xl text-sm transition-colors text-center">
+        Cancelar
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

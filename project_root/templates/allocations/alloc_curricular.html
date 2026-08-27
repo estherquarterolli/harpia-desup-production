@@ -1,0 +1,459 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="space-y-6">
+  {% csrf_token %}
+
+  {% if window_fechada %}
+  <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 flex items-start gap-3">
+    <i class="ph ph-lock-key text-2xl text-amber-600"></i>
+    <div>
+      <p class="font-black">Janela de entrega fechada</p>
+      <p class="text-xs mt-0.5">{{ window_message }}</p>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Topo: Filtros -->
+  <div class="flex flex-wrap items-end gap-4 bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+    <form method="get" class="flex flex-wrap items-end gap-4 flex-1">
+      {% if user.perfil == 'DESUP' or user.is_superuser %}
+      <div class="w-64">
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Unidade</label>
+        <select name="unidade_id" onchange="this.form.submit()"
+          class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition">
+          <option value="">Todas as Unidades</option>
+          {% for u in unidades %}
+          <option value="{{ u.id }}" {% if unidade_selecionada_id == u.id|stringformat:"s" %}selected{% endif %}>{{ u.nome }} ({{ u.sigla }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% elif unidade_selecionada %}
+      <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm mt-6">
+        <i class="ph ph-buildings text-base text-[#025c9f]"></i>
+        {{ unidade_selecionada.sigla }} — {{ unidade_selecionada.nome }}
+      </div>
+      {% endif %}
+    </form>
+
+    {% if unidade_selecionada_id and user.perfil == 'DESUP' %}
+    <form method="POST" action="{% url 'aprovar_alocacao_unidade' unidade_id=unidade_selecionada_id %}" class="ml-auto m-0">
+      {% csrf_token %}
+      <button type="submit"
+        {% if not alocacao_curricular_preenchida %}disabled title="Ainda existem componentes sem docente"{% endif %}
+        onclick="if(!confirm('Deseja aprovar a alocação curricular desta unidade para este semestre?')) return false;"
+        class="flex items-center gap-2 text-white font-black text-sm px-5 py-2.5 rounded-xl shadow-md transition-all {% if alocacao_curricular_preenchida %}bg-emerald-600 hover:bg-emerald-700 hover:scale-105{% else %}bg-slate-300 cursor-not-allowed{% endif %}">
+        <i class="ph ph-check-circle text-lg"></i>
+        Aprovar Alocação
+      </button>
+      {% if not alocacao_curricular_preenchida and componentes_sem_docente %}
+      <p class="mt-1 text-[10px] font-semibold text-amber-700">{{ componentes_sem_docente }} componente(s) sem docente.</p>
+      {% endif %}
+    </form>
+    {% endif %}
+
+    {% if matrizes_data and user.perfil != 'DESUP' and not window_fechada %}
+    <div class="ml-auto">
+      <a href="{% url 'alloc_curricular' %}?unidade_id={{ unidade_selecionada_id }}" class="flex items-center gap-2 bg-[#025c9f] hover:bg-[#153e70] text-white font-bold px-5 py-2.5 rounded-xl shadow-md transition-all hover:-translate-y-0.5 text-sm">
+          <i class="ph ph-floppy-disk text-lg"></i>
+          Salvar Alocações
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if unidade_selecionada_id or user.perfil == 'DESUP' or user.is_superuser %}
+  
+  {% for item in matrizes_data %}
+  <div class="mb-8">
+    <div class="flex items-center gap-3 mb-4">
+      <h3 class="text-lg font-black text-[#025c9f] uppercase tracking-wide flex items-center gap-2">
+        <i class="ph ph-table text-xl text-[#025c9f]"></i>
+        Matriz - {{ item.matriz.curso.sigla }}
+        {% if item.matriz.turno %}
+        <span class="text-sm font-bold text-slate-400">({{ item.matriz.get_turno_display }})</span>
+        {% endif %}
+      </h3>
+    </div>
+    
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
+      <table class="w-full text-left border-collapse whitespace-nowrap min-w-max">
+        <thead class="bg-[#025c9f] text-white">
+          <tr>
+            <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider text-center w-16">Período</th>
+            <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider w-24">Código</th>
+            <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider min-w-[200px]">Nome Disciplina</th>
+            <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider min-w-[300px]">Docente</th>
+            <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider text-center w-20">Crédito</th>
+            <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider text-center w-16">HA</th>
+            <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider text-center w-16">HR</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for comp in item.componentes %}
+          <tr class="hover:bg-slate-50 transition-colors" id="row-comp-{{ comp.id }}">
+            <td class="px-4 py-3 text-center font-bold text-slate-700">{{ comp.periodo|default:"-" }}</td>
+            <td class="px-4 py-3 font-mono text-xs text-slate-500">{{ comp.codigo|default:"-" }}</td>
+            <td class="px-4 py-3 font-bold text-slate-800">{{ comp.componente_curricular.nome }}</td>
+            <td class="px-4 py-2">
+              <!-- Autocomplete Docente -->
+              <div class="ac-docente relative"
+                   data-comp-id="{{ comp.id }}"
+                   data-alocar-url="{% url 'alocar_docente_componente' pk=comp.id %}"
+                   data-current-id="{% if comp.docente %}{{ comp.docente.id }}{% elif comp.status == 'NAO_OFERECIDA' %}NAO_OFERECIDA{% else %}SEM_PROFESSOR{% endif %}"
+                   data-current-nome="{% if comp.docente %}{{ comp.docente.rh_nome }}{% elif comp.status == 'NAO_OFERECIDA' %}Não oferecido{% else %}{% endif %}"
+                   {% if window_fechada and user.perfil != 'DESUP' %}data-window-lock="true" data-window-area="{{ window_area_label }}" data-window-action="{{ window_action_label }}" data-window-target="{{ comp.componente_curricular.nome }}" data-window-message="{{ window_message }}"{% endif %}
+              >
+                <div class="ac-input-wrap flex items-center gap-1.5 w-full px-3 py-1.5 border rounded text-sm transition cursor-pointer
+                  {% if comp.docente %}border-emerald-300 bg-emerald-50{% elif comp.status == 'NAO_OFERECIDA' %}border-slate-300 bg-slate-100{% else %}border-slate-200 bg-slate-50{% endif %}"
+                >
+                  <input type="text"
+                         class="ac-input flex-1 bg-transparent outline-none
+                           {% if comp.docente %}text-emerald-800 font-semibold{% elif comp.status == 'NAO_OFERECIDA' %}text-slate-500 font-semibold{% else %}text-slate-600{% endif %}"
+                         placeholder="Escolha uma opção"
+                         value="{% if comp.docente %}{{ comp.docente.rh_nome }}{% elif comp.status == 'NAO_OFERECIDA' %}Não oferecido{% else %}{% endif %}"
+                         autocomplete="off"
+                         {% if user.perfil != 'DESUP' and user.perfil != 'COORDENADOR_UNIDADE' %}disabled{% endif %}
+                  >
+                  {% if comp.docente %}
+                  <button type="button" class="ac-clear text-emerald-400 hover:text-red-500 transition-colors flex-shrink-0" title="Remover docente">
+                    <i class="ph ph-x-circle text-base"></i>
+                  </button>
+                  {% endif %}
+                  <i class="ph ph-caret-down text-xs text-slate-400 flex-shrink-0 ac-caret transition-transform"></i>
+                </div>
+
+                <!-- Dropdown -->
+                <div class="ac-dropdown hidden absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 overflow-hidden"
+                     style="max-height: 256px;">
+                  <!-- Opções fixas -->
+                  <div class="ac-fixed-options border-b border-slate-100">
+                    <div class="ac-option px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 flex items-center gap-2 text-slate-500 transition-colors"
+                         data-value="SEM_PROFESSOR">
+                      <i class="ph ph-user-minus text-base"></i> Sem professor
+                    </div>
+                    <div class="ac-option px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 flex items-center gap-2 text-slate-400 transition-colors"
+                         data-value="NAO_OFERECIDA">
+                      <i class="ph ph-prohibit text-base"></i> Não oferecido
+                    </div>
+                  </div>
+                  <!-- Resultados dinâmicos -->
+                  <div class="ac-results overflow-y-auto" style="max-height: 200px;">
+                    <div class="ac-placeholder px-3 py-4 text-xs text-center text-slate-400">
+                      <i class="ph ph-magnifying-glass text-lg block mb-1"></i>
+                      Digite para buscar professores...
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-center text-slate-600">{{ comp.creditos }}</td>
+            <td class="px-4 py-3 text-center font-semibold text-slate-700">{{ comp.ha_semanal|floatformat:0 }}h</td>
+            <td class="px-4 py-3 text-center font-semibold text-slate-700">{{ comp.hr_semanal|floatformat:1 }}h</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="px-6 py-12 text-center text-slate-400 bg-white">
+              Nenhuma disciplina cadastrada nesta matriz.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% empty %}
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-16 text-center">
+    <i class="ph ph-warning-circle text-6xl text-slate-200 mb-4 inline-block"></i>
+    <h2 class="text-xl font-bold text-slate-600 mb-2">Nenhuma Matriz Encontrada</h2>
+    <p class="text-slate-400">Esta unidade não possui matrizes curriculares vigentes cadastradas.</p>
+  </div>
+  {% endfor %}
+
+  {% else %}
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-16 text-center">
+    <i class="ph ph-buildings text-6xl text-slate-200 mb-4 inline-block"></i>
+    <h2 class="text-xl font-bold text-slate-600 mb-2">Selecione uma Unidade</h2>
+    <p class="text-slate-400">Escolha uma unidade no filtro acima para visualizar o quadro de alocação curricular dos professores.</p>
+  </div>
+  {% endif %}
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  'use strict';
+
+  // ─── Config ──────────────────────────────────────────────
+  const SEARCH_URL   = '{% url "buscar_professores" %}';
+  const DEBOUNCE_MS  = 300;
+  const MIN_CHARS    = 0;   // 0 = busca ao focar (mostra todos)
+  const UNIDADE_ID   = '{{ unidade_selecionada_id|default:"" }}';
+  const IS_DESUP     = {% if user.perfil == 'DESUP' or user.is_superuser %}true{% else %}false{% endif %};
+
+  // ─── Helpers ─────────────────────────────────────────────
+  function getCSRFToken() {
+    const el = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (el) return el.value;
+    const cookies = document.cookie.split(';');
+    for (const c of cookies) {
+      const t = c.trim();
+      if (t.startsWith('csrftoken=')) return t.substring('csrftoken='.length);
+    }
+    return '';
+  }
+
+  function debounce(fn, ms) {
+    let timer;
+    return function(...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), ms);
+    };
+  }
+
+  // ─── Autocomplete Controller ─────────────────────────────
+  class AutocompleteDocente {
+    constructor(root) {
+      this.root      = root;
+      this.input     = root.querySelector('.ac-input');
+      this.wrap      = root.querySelector('.ac-input-wrap');
+      this.dropdown  = root.querySelector('.ac-dropdown');
+      this.results   = root.querySelector('.ac-results');
+      this.clearBtn  = root.querySelector('.ac-clear');
+      this.caret     = root.querySelector('.ac-caret');
+      this.compId    = root.dataset.compId;
+      this.alocarUrl = root.dataset.alocarUrl;
+      this.currentId = root.dataset.currentId;
+      this.currentNome = root.dataset.currentNome;
+      this.isLocked  = root.dataset.windowLock === 'true';
+
+      if (this.input.disabled) return;
+
+      this._bindEvents();
+    }
+
+    _bindEvents() {
+      // Focus → open dropdown and trigger search
+      this.input.addEventListener('focus', () => {
+        if (this.isLocked) return;
+        this.input.select();
+        this._doSearch(this.input.value.trim());
+        this._open();
+      });
+
+      // Typing → debounced search
+      this.input.addEventListener('input', debounce(() => {
+        this._doSearch(this.input.value.trim());
+      }, DEBOUNCE_MS));
+
+      // Click on fixed options
+      this.root.querySelectorAll('.ac-fixed-options .ac-option').forEach(opt => {
+        opt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (this.isLocked) {
+            this._triggerWindowLock();
+            return;
+          }
+          const label = opt.dataset.value === 'SEM_PROFESSOR' ? '' : opt.textContent.trim();
+          this._selectValue(opt.dataset.value, label);
+        });
+      });
+
+      // Clear button
+      if (this.clearBtn) {
+        this.clearBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (this.isLocked) {
+            this._triggerWindowLock();
+            return;
+          }
+          this._selectValue('SEM_PROFESSOR', '');
+        });
+      }
+
+      // Click on wrap opens dropdown
+      this.wrap.addEventListener('click', () => {
+        if (this.isLocked) return;
+        if (this.dropdown.classList.contains('hidden')) {
+          this.input.focus();
+        }
+      });
+
+      // Close on outside click (delegated at document level via init)
+      // Escape to close
+      this.input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          this._close();
+          this.input.blur();
+        }
+      });
+    }
+
+    _open() {
+      this.dropdown.classList.remove('hidden');
+      if (this.caret) this.caret.style.transform = 'rotate(180deg)';
+    }
+
+    _close() {
+      this.dropdown.classList.add('hidden');
+      if (this.caret) this.caret.style.transform = '';
+      // Restore current name if input was cleared without selection
+      if (!this.input.value.trim()) {
+        this.input.value = this.currentNome;
+      }
+    }
+
+    async _doSearch(q) {
+      const params = new URLSearchParams({ q });
+      if (UNIDADE_ID && !IS_DESUP) {
+        params.set('unidade_id', UNIDADE_ID);
+      }
+      // DESUP: não envia unidade_id para buscar globalmente
+
+      this.results.innerHTML = '<div class="px-3 py-3 text-xs text-center text-slate-400"><i class="ph ph-circle-notch ph-spin text-lg"></i></div>';
+
+      try {
+        const resp = await fetch(`${SEARCH_URL}?${params.toString()}`);
+        const data = await resp.json();
+        this._renderResults(data.results || []);
+      } catch (err) {
+        this.results.innerHTML = '<div class="px-3 py-3 text-xs text-center text-red-400">Erro ao buscar professores.</div>';
+      }
+    }
+
+    _renderResults(items) {
+      if (!items.length) {
+        this.results.innerHTML = `
+          <div class="px-3 py-4 text-xs text-center text-slate-400">
+            <i class="ph ph-user-list text-lg block mb-1"></i>
+            Nenhum professor encontrado.
+          </div>`;
+        return;
+      }
+
+      this.results.innerHTML = items.map(p => `
+        <div class="ac-option-result px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 flex items-center justify-between gap-2 transition-colors ${p.id == this.currentId ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-slate-700'}"
+             data-id="${p.id}" data-nome="${this._escapeAttr(p.nome)}">
+          <span class="flex items-center gap-2 truncate">
+            <i class="ph ph-user text-base text-slate-400 flex-shrink-0"></i>
+            <span class="truncate">${this._escapeHtml(p.nome)}</span>
+          </span>
+          ${p.unidade ? `<span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded flex-shrink-0">${this._escapeHtml(p.unidade)}</span>` : ''}
+        </div>
+      `).join('');
+
+      // Bind click on each result
+      this.results.querySelectorAll('.ac-option-result').forEach(el => {
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (this.isLocked) {
+            this._triggerWindowLock();
+            return;
+          }
+          this._selectValue(el.dataset.id, el.dataset.nome);
+        });
+      });
+    }
+
+    async _selectValue(value, label) {
+      this._close();
+
+      // Visual feedback: show loading state
+      this.input.value = label;
+      this.wrap.classList.add('opacity-60');
+      this.input.disabled = true;
+
+      try {
+        const resp = await fetch(this.alocarUrl, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': getCSRFToken(),
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: `docente_id=${encodeURIComponent(value)}`,
+        });
+
+        if (resp.ok) {
+          // Check for HX-Refresh header
+          const hxRefresh = resp.headers.get('HX-Refresh');
+          if (hxRefresh === 'true') {
+            window.location.reload();
+            return;
+          }
+        }
+        // Fallback: reload anyway
+        window.location.reload();
+      } catch (err) {
+        this.wrap.classList.remove('opacity-60');
+        this.input.disabled = false;
+        this.input.value = this.currentNome;
+        alert('Erro ao alocar docente. Tente novamente.');
+      }
+    }
+
+    _triggerWindowLock() {
+      // Delegate to existing window lock modal system from base.html
+      if (typeof openWindowLockModal === 'function' && typeof getWindowLockPayload === 'function') {
+        openWindowLockModal(getWindowLockPayload(this.root));
+      }
+    }
+
+    _escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    _escapeAttr(str) {
+      return str.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+  }
+
+  // ─── Initialization ──────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    const instances = [];
+    document.querySelectorAll('.ac-docente').forEach(el => {
+      instances.push(new AutocompleteDocente(el));
+    });
+
+    // Global: close all dropdowns on outside click
+    document.addEventListener('click', (e) => {
+      instances.forEach(ac => {
+        if (!ac.root.contains(e.target)) {
+          ac._close();
+        }
+      });
+    });
+  });
+})();
+</script>
+
+<style>
+  /* Autocomplete transition animations */
+  .ac-dropdown {
+    animation: acSlideDown 0.15s ease-out;
+  }
+  @keyframes acSlideDown {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .ac-option-result:active {
+    background-color: #dbeafe;
+  }
+  .ac-caret {
+    transition: transform 0.2s ease;
+  }
+  /* Spin animation for loading */
+  .ph-spin {
+    animation: phSpin 1s linear infinite;
+  }
+  @keyframes phSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+</style>
+{% endblock %}

@@ -1,0 +1,269 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+  {% if form.instance.pk %}Editar{% else %}Novo{% endif %} Componente Curricular | Harpia-DESUP
+{% endblock %}
+{% block header_title %}Componentes Curriculares{% endblock %}
+
+{% block extra_head %}
+<style>
+  .field-label {
+    display: block;
+    font-size: .625rem;
+    font-weight: 800;
+    color: #025c9f;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-bottom: .25rem;
+  }
+  .field-error {
+    font-size: .625rem;
+    font-weight: 600;
+    color: #dc2626;
+    margin-top: .2rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="p-2 md:p-0 max-w-3xl">
+
+  <!-- Breadcrumb -->
+  <nav class="breadcrumb-container mb-6" aria-label="Breadcrumb">
+    <a href="{% url 'courses:component_list' %}" class="breadcrumb-item-link">Componentes Curriculares</a>
+    <i class="ph ph-caret-right breadcrumb-separator"></i>
+    <span class="breadcrumb-item-active">{% if form.instance.pk %}Editar{% else %}Novo{% endif %}</span>
+  </nav>
+
+  <!-- Erros globais -->
+  {% if form.non_field_errors %}
+  <div class="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+    <p class="font-black mb-1 flex items-center gap-2"><i class="ph ph-warning-circle"></i> Erro no formulário</p>
+    <ul class="list-disc list-inside space-y-0.5">
+      {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <form method="POST" class="space-y-6">
+    {% csrf_token %}
+
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
+      <h3 class="text-sm font-black text-[#025c9f] uppercase tracking-wide">
+        <i class="ph ph-book-open mr-1"></i> Dados do Componente Curricular
+      </h3>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        <!-- Nome -->
+        <div class="md:col-span-2 space-y-1">
+          <label for="{{ form.nome.id_for_label }}" class="field-label">Nome do Componente *</label>
+          {{ form.nome }}
+          {% if form.nome.errors %}<p class="field-error">{{ form.nome.errors.0 }}</p>{% endif %}
+        </div>
+
+        <!-- Sigla -->
+        <div class="space-y-1">
+          <label for="{{ form.sigla.id_for_label }}" class="field-label">Sigla *</label>
+          {{ form.sigla }}
+          {% if form.sigla.errors %}<p class="field-error">{{ form.sigla.errors.0 }}</p>{% endif %}
+          <p class="text-[10px] text-slate-400">Ex: ADS, POO, CALG</p>
+        </div>
+
+        <!-- Código -->
+        <div class="space-y-1">
+          <label for="{{ form.codigo.id_for_label }}" class="field-label">Código</label>
+          {{ form.codigo }}
+          {% if form.codigo.errors %}<p class="field-error">{{ form.codigo.errors.0 }}</p>{% endif %}
+          <p class="text-[10px] text-slate-400">Ex: INF0001 (opcional)</p>
+        </div>
+
+        <!-- Carga Horária -->
+        <div class="space-y-1">
+          <label for="{{ form.carga_horaria_padrao.id_for_label }}" class="field-label">Carga Horária Padrão (h) *</label>
+          {{ form.carga_horaria_padrao }}
+          {% if form.carga_horaria_padrao.errors %}<p class="field-error">{{ form.carga_horaria_padrao.errors.0 }}</p>{% endif %}
+        </div>
+
+        <!-- Créditos -->
+        <div class="space-y-1">
+          <label for="{{ form.creditos.id_for_label }}" class="field-label">Créditos</label>
+          {{ form.creditos }}
+          {% if form.creditos.errors %}<p class="field-error">{{ form.creditos.errors.0 }}</p>{% endif %}
+        </div>
+
+        <!-- Obrigatória -->
+        <div class="md:col-span-2 flex items-center gap-2">
+          {{ form.obrigatoria }}
+          <label for="{{ form.obrigatoria.id_for_label }}" class="text-xs font-bold text-[#025c9f] uppercase tracking-wide cursor-pointer">
+            É uma matéria obrigatória
+          </label>
+        </div>
+
+        <!-- Tem pré-requisito -->
+        <div class="md:col-span-2 flex items-center gap-2">
+          <input type="checkbox" id="tem-pre-requisito" class="rounded text-[#025c9f]"
+            {% if form.pre_requisitos.value %}checked{% endif %}>
+          <label for="tem-pre-requisito" class="text-xs font-bold text-[#025c9f] uppercase tracking-wide cursor-pointer">
+            Tem algum pré-requisito
+          </label>
+        </div>
+
+        <!-- Pré-requisitos: busca e seleção -->
+        <div id="pre-requisitos-wrap" class="md:col-span-2 space-y-1 {% if not form.pre_requisitos.value %}hidden{% endif %}">
+          <label class="field-label">Pré-requisitos</label>
+          {{ form.pre_requisitos }}
+
+          <div id="pr-chips" class="flex flex-wrap gap-1.5 mb-1.5"></div>
+
+          <div class="pr-search relative">
+            <input type="text" id="pr-search-input" autocomplete="off"
+              placeholder="Buscar componente curricular..."
+              class="form-field w-full">
+            <div id="pr-dropdown" class="hidden absolute z-30 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 overflow-y-auto" style="max-height: 220px;"></div>
+          </div>
+          {% if form.pre_requisitos.errors %}<p class="field-error">{{ form.pre_requisitos.errors.0 }}</p>{% endif %}
+        </div>
+
+        <!-- Ementa -->
+        <div class="md:col-span-2 space-y-1">
+          <label for="{{ form.ementa.id_for_label }}" class="field-label">Ementa</label>
+          {{ form.ementa }}
+          {% if form.ementa.errors %}<p class="field-error">{{ form.ementa.errors.0 }}</p>{% endif %}
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Botões -->
+    <div class="flex flex-col sm:flex-row gap-3 pb-4">
+      <button type="submit"
+        class="flex-1 flex items-center justify-center gap-2 bg-[#ffb800] hover:bg-yellow-500 text-[#025c9f] font-black py-3.5 px-6 rounded-xl shadow-md text-sm transition-all hover:scale-[1.01] active:scale-[.99]">
+        <i class="ph ph-floppy-disk text-lg"></i>
+        {% if form.instance.pk %}SALVAR ALTERAÇÕES{% else %}CRIAR COMPONENTE{% endif %}
+      </button>
+      {% if form.instance.pk %}
+      <button type="button"
+        onclick="confirmarExclusaoComponente('{{ form.instance.nome|escapejs }}', '{% url 'courses:component_delete' form.instance.pk %}')"
+        class="px-5 py-3.5 bg-slate-700 hover:bg-slate-800 text-white font-black rounded-xl text-xs transition-colors text-center uppercase shadow-sm flex items-center justify-center gap-2">
+        <i class="ph ph-trash text-lg"></i> Excluir
+      </button>
+      {% endif %}
+      <a href="{% url 'courses:component_list' %}"
+        class="px-5 py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl text-xs transition-colors text-center uppercase shadow-sm flex items-center justify-center gap-2">
+        Cancelar
+      </a>
+    </div>
+
+  </form>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const temPreReqCheck = document.getElementById('tem-pre-requisito');
+  const wrap           = document.getElementById('pre-requisitos-wrap');
+  const hiddenSelect    = document.getElementById('id_pre_requisitos');
+  const chipsContainer  = document.getElementById('pr-chips');
+  const searchInput     = document.getElementById('pr-search-input');
+  const dropdown        = document.getElementById('pr-dropdown');
+
+  if (!temPreReqCheck || !hiddenSelect) return;
+
+  function options() {
+    return Array.from(hiddenSelect.options);
+  }
+
+  function renderChips() {
+    chipsContainer.innerHTML = '';
+    options().filter(o => o.selected).forEach(o => {
+      const chip = document.createElement('span');
+      chip.className = 'inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-[#025c9f] text-xs font-semibold pl-2.5 pr-1.5 py-1 rounded-full';
+      chip.innerHTML = `${o.textContent} <button type="button" class="pr-remove hover:text-red-600 transition-colors" data-value="${o.value}"><i class="ph ph-x-circle text-sm"></i></button>`;
+      chipsContainer.appendChild(chip);
+    });
+    chipsContainer.querySelectorAll('.pr-remove').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const opt = options().find(o => o.value === btn.dataset.value);
+        if (opt) opt.selected = false;
+        renderChips();
+      });
+    });
+  }
+
+  function renderDropdown(query) {
+    const q = query.trim().toLowerCase();
+    const matches = options().filter(o => !o.selected && (!q || o.textContent.toLowerCase().includes(q)));
+    if (!matches.length) {
+      dropdown.innerHTML = '<div class="px-3 py-3 text-xs text-center text-slate-400">Nenhum componente encontrado.</div>';
+    } else {
+      dropdown.innerHTML = matches.slice(0, 50).map(o =>
+        `<div class="pr-option px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 text-slate-700 transition-colors" data-value="${o.value}">${o.textContent}</div>`
+      ).join('');
+      dropdown.querySelectorAll('.pr-option').forEach(el => {
+        el.addEventListener('click', () => {
+          const opt = options().find(o => o.value === el.dataset.value);
+          if (opt) opt.selected = true;
+          searchInput.value = '';
+          renderChips();
+          renderDropdown('');
+          dropdown.classList.add('hidden');
+        });
+      });
+    }
+    dropdown.classList.remove('hidden');
+  }
+
+  searchInput.addEventListener('focus', () => renderDropdown(searchInput.value));
+  searchInput.addEventListener('input', () => renderDropdown(searchInput.value));
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.pr-search')) dropdown.classList.add('hidden');
+  });
+
+  temPreReqCheck.addEventListener('change', () => {
+    if (temPreReqCheck.checked) {
+      wrap.classList.remove('hidden');
+    } else {
+      wrap.classList.add('hidden');
+      options().forEach(o => { o.selected = false; });
+      renderChips();
+    }
+  });
+
+  renderChips();
+})();
+</script>
+
+{% if form.instance.pk %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+function confirmarExclusaoComponente(nome, url) {
+  Swal.fire({
+    title: 'Excluir componente?',
+    html: `Tem certeza que deseja excluir <strong>${nome}</strong>?<br><span class="text-sm text-slate-500">Esta ação não pode ser desfeita.</span>`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#dc2626',
+    cancelButtonColor: '#64748b',
+    confirmButtonText: 'Sim, excluir',
+    cancelButtonText: 'Cancelar',
+  }).then(result => {
+    if (result.isConfirmed) {
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = url;
+      const csrf = document.createElement('input');
+      csrf.type = 'hidden';
+      csrf.name = 'csrfmiddlewaretoken';
+      csrf.value = document.querySelector('[name=csrfmiddlewaretoken]').value;
+      form.appendChild(csrf);
+      document.body.appendChild(form);
+      form.submit();
+    }
+  });
+}
+</script>
+{% endif %}
+{% endblock %}

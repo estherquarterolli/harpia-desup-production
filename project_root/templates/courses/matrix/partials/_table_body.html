@@ -1,0 +1,92 @@
+<!-- Partial: _table_body.html (Renderizada via HTMX) -->
+
+{# ── Estado vazio ── #}
+{% if not matrices %}
+<div class="flex flex-col items-center justify-center py-16 text-center bg-white rounded-2xl border border-slate-200 border-dashed">
+  <i class="ph ph-file-dashed text-5xl text-slate-300 mb-3"></i>
+  <p class="text-sm font-bold text-slate-500">Nenhuma matriz encontrada</p>
+  <p class="text-xs text-slate-400 mt-1">Ajuste os filtros ou insira uma nova matriz.</p>
+</div>
+
+{# ── Tabela com dados ── #}
+{% else %}
+<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-left min-w-[640px]">
+
+      {# Cabeçalho #}
+      <thead>
+        <tr class="bg-[#025c9f] text-white text-[10px] font-black uppercase tracking-widest">
+          <th class="px-5 py-4 rounded-tl-2xl">Código da Matriz</th>
+          <th class="px-5 py-4">Unidade</th>
+          <th class="px-5 py-4">Curso</th>
+          <th class="px-5 py-4 text-center">Qtd. Matérias</th>
+          <th class="px-5 py-4 text-center">CH Total</th>
+          <th class="px-5 py-4 rounded-tr-2xl text-right">Ações</th>
+        </tr>
+      </thead>
+
+      <tbody class="divide-y divide-slate-100">
+        {% for matriz in matrices %}
+        <tr class="hover:bg-slate-50/70 transition-colors group">
+
+          {# Código da Matriz #}
+          <td class="px-5 py-4">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-black text-[#025c9f]">{{ matriz.nome|default:"—" }}</span>
+              {% if matriz.is_rascunho %}
+              <span class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-black uppercase">Rascunho</span>
+              {% endif %}
+            </div>
+          </td>
+
+          {# Unidade #}
+          <td class="px-5 py-4">
+            {% for unidade in matriz.unidades.all %}
+              <span class="text-sm font-bold text-slate-600">{{ unidade.sigla }}</span>{% if not forloop.last %}, {% endif %}
+            {% empty %}
+              <span class="text-slate-400">—</span>
+            {% endfor %}
+          </td>
+
+          {# Curso #}
+          <td class="px-5 py-4">
+            {% if matriz.curso %}
+            <span class="text-sm font-bold text-slate-700">{{ matriz.curso.nome }}</span>
+            <p class="text-[10px] text-slate-400 leading-tight truncate">Sigla: {{ matriz.curso.sigla }}</p>
+            {% else %}
+            <span class="text-slate-400 text-sm">—</span>
+            {% endif %}
+          </td>
+
+          {# Qtd Componentes #}
+          <td class="px-5 py-4 text-center">
+            <span class="text-sm font-bold text-slate-600">{{ matriz.qtd_componentes }}</span>
+          </td>
+
+          {# CH Total #}
+          <td class="px-5 py-4 text-center">
+            <span class="text-sm font-bold text-slate-600">{{ matriz.ch_total|default:"0" }}h</span>
+          </td>
+          
+          {# Ações #}
+          <td class="px-5 py-4 text-right">
+            <a href="{% url 'courses:matrix_update' matriz.pk %}" class="inline-flex items-center gap-1 px-3 py-1.5 bg-[#025c9f]/10 text-[#025c9f] hover:bg-[#025c9f]/20 rounded-lg text-xs font-bold transition-colors">
+              <i class="ph ph-pencil-simple"></i> Editar
+            </a>
+          </td>
+
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# Rodapé da tabela com contagem #}
+  <div class="px-5 py-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
+    <p class="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">
+      {{ matrices|length }} matriz{{ matrices|length|pluralize:"es" }} encontrada{{ matrices|length|pluralize }}
+    </p>
+  </div>
+</div>
+{% endif %}

@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}HARPIA{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-dashboard bg-pattern min-h-screen flex no-scrollbar">
+
+    <div id="sidebarBackdrop" class="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
+
+    <aside id="sidebar"
+        class="sidebar-desktop group w-20 hover:w-64 bg-[#025c9f] text-white transition-all duration-300 flex flex-col h-screen sticky top-0 z-50">
+        <div class="p-3 mb-10 flex justify-between items-center border-b border-white/5 rounded-xl mx-2 mt-3 transition-all duration-300">
+            <div class="w-14 h-14 rounded-full bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                <img src="{% static 'img/logo-harpia-colorida-modificada.PNG' %}" alt="Harpia Logo" class="w-11 h-11 object-contain">
+            </div>
+            <button type="button" onclick="closeMobileSidebar()" class="sidebar-close-btn hidden text-white/80 hover:text-white text-2xl pr-1">
+                <i class="ph ph-x"></i>
+            </button>
+        </div>
+        <nav class="flex-grow space-y-1 px-2 overflow-y-auto no-scrollbar">
+
+            <!-- Dashboard — todos os perfis -->
+            <a href="{% url 'dashboard' %}"
+                class="sidebar-link flex items-center gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if request.path == '/dashboard/desup/' or request.path == '/dashboard/unidade/' %}bg-white/10{% endif %}">
+                <i class="ph ph-squares-four text-2xl flex-shrink-0"></i>
+                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Dashboard</span>
+            </a>
+
+            {% if user.perfil == 'DESUP' or user.is_superuser %}
+            <!-- Unidades — apenas DESUP -->
+            <a href="{% url 'core:unidade_list' %}"
+                class="sidebar-link flex items-center gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if '/core/unidades' in request.path %}bg-white/10{% endif %}">
+                <i class="ph ph-tree-structure text-2xl flex-shrink-0"></i>
+                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Unidades</span>
+            </a>
+            {% endif %}
+
+            <!-- Professores — DESUP e Coordenador de Unidade -->
+            <a href="{% url 'professors:professor_list' %}"
+                class="sidebar-link flex items-center gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'professores' in request.path %}bg-white/10{% endif %}">
+                <i class="ph ph-chalkboard-teacher text-2xl flex-shrink-0"></i>
+                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Professores</span>
+            </a>
+
+            <!-- Alocação — DESUP e Coordenador de Unidade -->
+            <a href="{% url 'alloc_curricular' %}"
+                class="sidebar-link flex items-center gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'alocacao-curricular' in request.path %}bg-white/10{% endif %}">
+                <i class="ph ph-calendar-check text-2xl flex-shrink-0"></i>
+                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Alocação</span>
+            </a>
+
+            <!-- Extracurriculares — DESUP e Coordenador de Unidade -->
+            <a href="{% url 'extra_curricular:pendencia_list' %}"
+                class="sidebar-link flex items-center gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'extracurriculares' in request.path %}bg-white/10{% endif %}">
+                <i class="ph ph-books text-2xl flex-shrink-0"></i>
+                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Extracurriculares</span>
+            </a>
+
+            <!-- Matrizes — DESUP e Coordenador de Unidade -->
+            <a href="{% url 'courses:matrix_list' %}"
+                class="sidebar-link flex items-center gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'courses/matrices' in request.path %}bg-white/10{% endif %}">
+                <i class="ph ph-file-text text-2xl flex-shrink-0"></i>
+                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Matrizes</span>
+            </a>
+
+            {% if user.perfil == 'DESUP' or user.is_superuser %}
+            <!-- Componentes Curriculares — apenas DESUP -->
+            <a href="{% url 'courses:component_list' %}"
+                class="sidebar-link flex items-center gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'courses/componentes' in request.path %}bg-white/10{% endif %}">
+                <i class="ph ph-book-open text-2xl flex-shrink-0"></i>
+                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Componentes</span>
+            </a>
+
+            <!-- Entrega — apenas DESUP -->
+            <a href="{% url 'core:janela_list' %}"
+                class="sidebar-link flex items-center gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if '/core/entregas' in request.path %}bg-white/10{% endif %}">
+                <i class="ph ph-clock-countdown text-2xl flex-shrink-0"></i>
+                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Entrega</span>
+            </a>
+            {% endif %}
+
+        </nav>
+
+        <div class="p-4 border-t border-white/10">
+            <form action="{% url 'logout' %}" method="post" class="w-full m-0 p-0">
+                {% csrf_token %}
+                <button type="submit"
+                    class="w-full flex items-center gap-4 p-3 text-red-400 hover:bg-red-900/20 rounded-lg text-left transition-colors">
+                    <i class="ph ph-sign-out text-2xl flex-shrink-0"></i>
+                    <span class="sidebar-label hidden group-hover:block text-sm font-semibold">Sair</span>
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <main class="main-content flex-grow p-4 md:p-8">
+
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
+            <div class="flex items-center gap-4">
+                <button type="button" id="mobileMenuButton" onclick="toggleMobileSidebar()" class="lg:hidden text-3xl text-[#025c9f]"><i class="ph ph-list"></i></button>
+                <h1 class="text-2xl md:text-4xl font-black text-[#025c9f] uppercase tracking-tighter">
+                    {% block header_title %}HARPIA{% endblock %}
+                </h1>
+            </div>
+
+            <div class="flex items-center gap-4 self-end md:self-auto">
+                <div class="relative">
+                    <button onclick="toggleElement('notificationMenu')" class="relative text-[#025c9f] p-1">
+                        <i class="ph ph-bell text-3xl"></i>
+                        {% if total_notificacoes_nao_lidas > 0 %}
+                        <span id="notif-badge" class="absolute top-0 right-0 inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-red-500 rounded-full border-2 border-slate-50">
+                            {{ total_notificacoes_nao_lidas }}
+                        </span>
+                        {% endif %}
+                    </button>
+
+                    <div id="notificationMenu" class="menu-hidden absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border z-50 overflow-hidden">
+                        <div class="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                            <span class="text-xs font-black text-[#025c9f] uppercase">Notificações</span>
+                            {% if total_notificacoes_nao_lidas > 0 %}
+                            <span id="notif-count-header" class="text-[10px] bg-[#025c9f] text-white px-2 py-0.5 rounded-full font-bold">{{ total_notificacoes_nao_lidas }} novas</span>
+                            {% endif %}
+                        </div>
+                        <div class="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                            {% for notif in notificacoes_nao_lidas %}
+                            <div id="notif-item-{{ notif.pk }}" class="p-4 hover:bg-slate-50 transition-colors">
+                                <div class="flex justify-between items-start mb-1">
+                                    <p class="text-xs font-black text-[#025c9f]">{{ notif.titulo }}</p>
+                                    <span class="text-[9px] text-slate-400 font-semibold whitespace-nowrap">{{ notif.data_criacao|timesince }} atrás</span>
+                                </div>
+                                <p class="text-xs text-slate-600 leading-relaxed mb-2">{{ notif.mensagem }}</p>
+                                <div class="flex items-center justify-between">
+                                    {% if notif.url_acao %}
+                                    <a href="{% url 'core:marcar_notificacao_lida' notif.pk %}" class="text-[10px] font-bold text-[#025c9f] hover:underline flex items-center gap-1">
+                                        Acessar <i class="ph ph-arrow-right"></i>
+                                    </a>
+                                    {% else %}<div></div>{% endif %}
+                                    <form class="m-0"
+                                          hx-post="{% url 'core:marcar_notificacao_lida' notif.pk %}"
+                                          hx-target="#notif-item-{{ notif.pk }}"
+                                          hx-swap="delete">
+                                        {% csrf_token %}
+                                        <button type="submit" class="text-[10px] font-bold text-slate-400 hover:text-emerald-600 transition-colors flex items-center gap-1">
+                                            <i class="ph ph-check-circle"></i> Marcar lida
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="p-6 text-center text-slate-400">
+                                <i class="ph ph-bell-slash text-3xl mb-2"></i>
+                                <p class="text-xs font-bold">Nenhuma notificação nova.</p>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="relative">
+                    <div onclick="toggleElement('userMenu')" class="flex items-center gap-3 bg-white p-2 px-4 rounded-full shadow-sm border cursor-pointer select-none">
+                        <div class="text-right hidden sm:block">
+                            <p class="text-xs font-black text-[#025c9f]">{{ user.get_full_name|default:user.email|upper }}</p>
+                            <p class="text-[10px] text-slate-400 uppercase">{{ user.get_perfil_display }}</p>
+                        </div>
+                        <i class="ph ph-user-circle text-4xl text-slate-400"></i>
+                    </div>
+                    <div id="userMenu" class="menu-hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border z-50 py-2 font-bold text-sm">
+                        {% if user.is_superuser %}
+                        <a href="{% url 'password_change' %}" class="block px-4 py-2 hover:bg-slate-50"><i class="ph ph-key mr-2"></i> Alterar senha</a>
+                        {% else %}
+                        <a href="{% url 'password_change' %}" class="block px-4 py-2 hover:bg-slate-50"><i class="ph ph-user mr-2"></i> Meu Perfil</a>
+                        {% endif %}
+                        {% if user.is_superuser %}
+                        <a href="/admin/" class="block px-4 py-2 hover:bg-slate-50"><i class="ph ph-shield-check mr-2"></i> Administração</a>
+                        {% endif %}
+                        <hr class="my-2">
+                        <form action="{% url 'logout' %}" method="post" class="m-0 p-0">
+                            {% csrf_token %}
+                            <button type="submit" class="w-full block px-4 py-2 text-red-600 text-left hover:bg-slate-50"><i class="ph ph-sign-out mr-2"></i> Sair</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        {% if messages %}
+        <div class="mb-6 space-y-2">
+            {% for message in messages %}
+            <div class="p-4 rounded-lg text-sm font-semibold {% if message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% else %}bg-green-50 text-green-700 border border-green-200{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if '/alocacao-curricular' in request.path or '/extracurriculares' in request.path or '/professores' in request.path or '/courses' in request.path %}
+        {% if janela_ativa %}
+        <div id="windowOpenNotice"
+             class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 flex items-start gap-3">
+            <i class="ph ph-clock text-2xl text-emerald-600 mt-0.5"></i>
+            <div class="min-w-0">
+                <p class="font-black">Janela de entrega aberta</p>
+                <p class="text-xs mt-0.5">Fechamento: {{ janela_data_fim }}</p>
+            </div>
+            <button type="button"
+                    class="ml-auto px-3 py-1.5 rounded-lg text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    onclick="document.getElementById('windowOpenNotice')?.remove()">
+                Entendi
+            </button>
+        </div>
+        {% elif janela_fechada %}
+        <div id="windowClosedNotice"
+             class="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 flex items-start gap-3">
+            <i class="ph ph-lock-key text-2xl text-amber-600 mt-0.5"></i>
+            <div class="min-w-0 flex-1">
+                <p class="font-black">Janela de entrega fechada</p>
+                <p class="text-xs mt-0.5">Alterações estão bloqueadas no momento.</p>
+            </div>
+            <form method="post" action="{% url 'core:solicitar_chamado_alteracao' %}" class="ml-auto m-0 flex-shrink-0">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <input type="hidden" name="area_label" value="Janela de Entrega">
+                <input type="hidden" name="action_label" value="solicitar abertura de janela">
+                <input type="hidden" name="target_label" value="janela de entrega">
+                <button type="submit"
+                        class="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-600 text-white hover:bg-amber-700 transition-colors whitespace-nowrap">
+                    Solicitar abertura
+                </button>
+            </form>
+        </div>
+        {% endif %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+
+    </main>
+
+    <div id="windowLockModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-950/60 backdrop-blur-sm px-4">
+        <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl border border-slate-200">
+            <div class="flex items-start gap-3 border-b border-slate-100 bg-slate-50 px-6 py-5">
+                <div class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+                    <i class="ph ph-lock-key text-2xl"></i>
+                </div>
+                <div class="min-w-0">
+                    <h2 id="windowLockTitle" class="text-base font-black text-[#025c9f] uppercase tracking-wide">Janela de entrega fechada</h2>
+                    <p id="windowLockMessage" class="mt-1 text-sm text-slate-600"></p>
+                </div>
+            </div>
+            <form id="windowLockTicketForm" method="post" action="{% url 'core:solicitar_chamado_alteracao' %}" class="px-6 py-5 space-y-4">
+                {% csrf_token %}
+                <input type="hidden" name="next" id="windowLockNext">
+                <input type="hidden" name="area_label" id="windowLockArea">
+                <input type="hidden" name="action_label" id="windowLockAction">
+                <input type="hidden" name="target_label" id="windowLockTarget">
+                <input type="hidden" name="details" id="windowLockDetails">
+
+                <div class="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    Deseja abrir um chamado para a DESUP registrar e tratar esta solicitação?
+                </div>
+
+                <div class="flex items-center justify-end gap-3">
+                    <button type="button" onclick="closeWindowLockModal()"
+                        class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-50">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                        class="inline-flex items-center gap-2 rounded-xl bg-[#025c9f] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[#153e70]">
+                        <i class="ph ph-paper-plane-right"></i>
+                        Abrir chamado
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function toggleMobileSidebar() {
+            document.getElementById('sidebar').classList.toggle('sidebar-mobile-open');
+            document.getElementById('sidebarBackdrop').classList.toggle('active');
+        }
+
+        function closeMobileSidebar() {
+            document.getElementById('sidebar').classList.remove('sidebar-mobile-open');
+            document.getElementById('sidebarBackdrop').classList.remove('active');
+        }
+
+        function toggleElement(id) {
+            const el = document.getElementById(id);
+            if (el.classList.contains('menu-hidden')) {
+                el.classList.remove('menu-hidden');
+            } else {
+                el.classList.add('menu-hidden');
+            }
+        }
+
+        // Fechar ao clicar fora
+        window.onclick = function(event) {
+            if (!event.target.closest('#userMenu') && !event.target.closest('[onclick*="userMenu"]')) {
+                const el = document.getElementById('userMenu');
+                if (el) el.classList.add('menu-hidden');
+            }
+        }
+        
+        // Inicialização do Lucide
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        });
+
+        // HTMX: Adicionar CSRF token automaticamente em todas as requisições POST
+        document.body.addEventListener('htmx:configRequest', function(event) {
+            // Buscar o token do cookie
+            var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+            if (csrfToken) {
+                event.detail.headers['X-CSRFToken'] = csrfToken.value;
+            } else {
+                // Fallback: ler do cookie
+                var cookies = document.cookie.split(';');
+                for (var i = 0; i < cookies.length; i++) {
+                    var cookie = cookies[i].trim();
+                    if (cookie.startsWith('csrftoken=')) {
+                        event.detail.headers['X-CSRFToken'] = cookie.substring('csrftoken='.length);
+                        break;
+                    }
+                }
+            }
+        });
+
+        document.addEventListener('focusin', function(event) {
+            const el = event.target;
+            if (el.matches && el.matches('select') && el.closest('[data-window-lock="true"]')) {
+                el.dataset.previousValue = el.value;
+            }
+        });
+
+        document.addEventListener('change', function(event) {
+            const el = event.target;
+            const lockRoot = el.closest && el.closest('[data-window-lock="true"]');
+            if (!lockRoot || lockRoot.dataset.windowBypass === 'true') return;
+
+            if (el.matches && el.matches('select[hx-post], select[hx-get], select[htmx-post]')) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                if (Object.prototype.hasOwnProperty.call(el.dataset, 'previousValue')) {
+                    el.value = el.dataset.previousValue;
+                }
+                openWindowLockModal(getWindowLockPayload(el));
+            }
+        }, true);
+
+        function closeWindowLockModal() {
+            const modal = document.getElementById('windowLockModal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function openWindowLockModal(payload) {
+            const modal = document.getElementById('windowLockModal');
+            if (!modal) return;
+
+            document.getElementById('windowLockTitle').textContent = payload.title || 'Janela de entrega fechada';
+            document.getElementById('windowLockMessage').textContent = payload.message || 'A alteração foi bloqueada fora da janela de entrega.';
+            document.getElementById('windowLockArea').value = payload.area || '';
+            document.getElementById('windowLockAction').value = payload.action || '';
+            document.getElementById('windowLockTarget').value = payload.target || '';
+            document.getElementById('windowLockDetails').value = payload.details || '';
+            document.getElementById('windowLockNext').value = payload.next || window.location.pathname + window.location.search;
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function getWindowLockPayload(source) {
+            const root = source.closest('[data-window-lock="true"]');
+            const title = root?.dataset.windowTitle || 'Janela de entrega fechada';
+            const message = root?.dataset.windowMessage || 'A alteração foi bloqueada porque a janela de entrega está fechada.';
+            const area = root?.dataset.windowArea || 'Alterações';
+            const action = source.dataset.windowAction || root?.dataset.windowAction || 'alterar dados';
+            const target = source.dataset.windowTarget || root?.dataset.windowTarget || source.name || source.id || 'registro';
+            const details = source.dataset.windowDetails || root?.dataset.windowDetails || window.location.pathname;
+            return {
+                title,
+                message,
+                area,
+                action,
+                target,
+                details,
+                next: window.location.pathname + window.location.search,
+            };
+        }
+
+        document.addEventListener('submit', function(event) {
+            const form = event.target;
+            const lockRoot = form.closest('[data-window-lock="true"]');
+            if (!lockRoot) return;
+            if (lockRoot.dataset.windowBypass === 'true') return;
+
+            event.preventDefault();
+            const source = event.submitter || form;
+            openWindowLockModal(getWindowLockPayload(source));
+        }, true);
+
+        document.body.addEventListener('htmx:beforeRequest', function(event) {
+            const source = event.target;
+            const lockRoot = source.closest('[data-window-lock="true"]');
+            if (!lockRoot) return;
+            if (lockRoot.dataset.windowBypass === 'true') return;
+
+            event.preventDefault();
+            openWindowLockModal(getWindowLockPayload(source));
+        });
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeWindowLockModal();
+                closeMobileSidebar();
+            }
+        });
+
+        // Atualiza o badge de notificações após marcar como lida via HTMX
+        document.body.addEventListener('notifCountUpdate', function(event) {
+            const count = typeof event.detail === 'number' ? event.detail : 0;
+            const badge = document.getElementById('notif-badge');
+            const headerCount = document.getElementById('notif-count-header');
+            if (count > 0) {
+                if (badge) badge.textContent = count;
+                if (headerCount) headerCount.textContent = count + ' novas';
+            } else {
+                if (badge) badge.remove();
+                if (headerCount) headerCount.remove();
+            }
+        });
+
+        // Global Form Submit Debouncer
+        document.addEventListener('submit', function(event) {
+            if (event.defaultPrevented) return;
+            
+            const form = event.target;
+            const submitButtons = form.querySelectorAll('button[type="submit"], input[type="submit"], button:not([type])');
+            
+            // Use setTimeout to allow the submit event to propagate fully and capture the submitter button
+            setTimeout(function() {
+                submitButtons.forEach(function(btn) {
+                    if (btn.disabled) return;
+                    
+                    const originalText = btn.tagName === 'INPUT' ? btn.value : btn.innerHTML;
+                    btn.disabled = true;
+                    btn.classList.add('opacity-50', 'cursor-not-allowed');
+                    
+                    if (btn.tagName === 'INPUT') {
+                        btn.value = "Enviando...";
+                    } else {
+                        btn.innerText = "Enviando...";
+                    }
+                    
+                    // Re-enable after 3 seconds
+                    setTimeout(function() {
+                        btn.disabled = false;
+                        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                        if (btn.tagName === 'INPUT') {
+                            btn.value = originalText;
+                        } else {
+                            btn.innerHTML = originalText;
+                        }
+                    }, 3000);
+                });
+            }, 0);
+        });
+
+        // ── Autocomplete Global ──
+        document.addEventListener('DOMContentLoaded', function() {
+            const autocompletes = document.querySelectorAll('.js-autocomplete');
+            
+            autocompletes.forEach(input => {
+                // Certifica que o elemento pai tem position relative
+                const parent = input.parentElement;
+                if (parent) {
+                    parent.classList.add('relative');
+                }
+                
+                // Cria elemento de dropdown
+                const dropdown = document.createElement('div');
+                dropdown.className = 'autocomplete-dropdown hidden';
+                input.after(dropdown);
+                
+                let timeout = null;
+                
+                input.addEventListener('input', function() {
+                    clearTimeout(timeout);
+                    const query = input.value.trim();
+                    
+                    if (query.length < 2) {
+                        dropdown.innerHTML = '';
+                        dropdown.classList.add('hidden');
+                        return;
+                    }
+                    
+                    timeout = setTimeout(() => {
+                        let url = `/alocacao-curricular/buscar-professores/?q=${encodeURIComponent(query)}`;
+                        const unitFilter = document.querySelector('select[name="unidade_id"], select[name="unidade"]');
+                        if (unitFilter && unitFilter.value) {
+                            url += `&unidade_id=${unitFilter.value}`;
+                        }
+                        
+                        fetch(url)
+                            .then(response => response.json())
+                            .then(data => {
+                                dropdown.innerHTML = '';
+                                if (!data.results || data.results.length === 0) {
+                                    dropdown.innerHTML = '<div class="autocomplete-empty">Nenhum professor parecido</div>';
+                                    dropdown.classList.remove('hidden');
+                                    return;
+                                }
+                                
+                                data.results.forEach(item => {
+                                    const option = document.createElement('div');
+                                    option.className = 'autocomplete-option';
+                                    option.innerHTML = `
+                                        <div>${item.nome}</div>
+                                        <div class="autocomplete-option-sub">${item.unidade || 'Sem Unidade'}</div>
+                                    `;
+                                    option.addEventListener('click', function(e) {
+                                        e.stopPropagation();
+                                        input.value = item.nome;
+                                        dropdown.innerHTML = '';
+                                        dropdown.classList.add('hidden');
+                                        
+                                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                                        input.dispatchEvent(new Event('keyup', { bubbles: true }));
+                                        
+                                        const form = input.closest('form');
+                                        if (form && !input.hasAttribute('hx-get') && input.id !== 'search-docente' && input.name === 'q') {
+                                            form.submit();
+                                        }
+                                    });
+                                    dropdown.appendChild(option);
+                                });
+                                dropdown.classList.remove('hidden');
+                            })
+                            .catch(err => {
+                                console.error('Erro ao buscar autocomplete:', err);
+                            });
+                    }, 300);
+                });
+                
+                // Ocultar dropdown ao clicar fora
+                document.addEventListener('click', function(e) {
+                    if (e.target !== input && e.target !== dropdown && !dropdown.contains(e.target)) {
+                        dropdown.classList.add('hidden');
+                    }
+                });
+                
+                // Mostrar dropdown novamente se focado e com resultados
+                input.addEventListener('focus', function() {
+                    if (dropdown.children.length > 0) {
+                        dropdown.classList.remove('hidden');
+                    }
+                });
+            });
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

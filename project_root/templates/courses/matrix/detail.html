@@ -1,0 +1,123 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Visualizar Matriz Curricular — Harpia-DESUP{% endblock %}
+{% block header_title %}Matriz Curricular{% endblock %}
+
+{% block extra_head %}
+<style>
+  .field-label {
+    display: block;
+    font-size: .625rem;
+    font-weight: 800;
+    color: #025c9f;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-bottom: .25rem;
+  }
+  .data-value {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #334155;
+    padding: 0.5rem;
+    background-color: #f8fafc;
+    border-radius: 0.5rem;
+    border: 1px solid #e2e8f0;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="p-2 md:p-0 max-w-7xl">
+
+  {# ── Breadcrumb ── #}
+  <nav class="breadcrumb-container mb-6" aria-label="Breadcrumb">
+    <a href="{% url 'courses:matrix_list' %}" class="breadcrumb-item-link">Matrizes</a>
+    <i class="ph ph-caret-right breadcrumb-separator"></i>
+    <span class="breadcrumb-item-active">Visualizar Matriz</span>
+  </nav>
+
+  <div class="space-y-6">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+      <h3 class="text-sm font-black text-[#025c9f] uppercase tracking-wide">
+        <i class="ph ph-file-text mr-1"></i> Identificação da Matriz
+      </h3>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="space-y-1">
+          <label class="field-label">Unidade(s)</label>
+          <div class="data-value">
+            {% for unidade in matrix.unidades.all %}{{ unidade.sigla }} - {{ unidade.nome }}{% if not forloop.last %}; {% endif %}{% empty %}—{% endfor %}
+          </div>
+        </div>
+
+        <div class="space-y-1">
+          <label class="field-label">Curso</label>
+          <div class="data-value">{{ matrix.curso.sigla }} - {{ matrix.curso.nome }}</div>
+        </div>
+
+        <div class="space-y-1">
+          <label class="field-label">Código da Matriz</label>
+          <div class="data-value flex items-center gap-2">
+            {{ matrix.nome|default:"—" }}
+            {% if matrix.is_rascunho %}
+            <span class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-black uppercase">Rascunho</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/60">
+        <div>
+          <h3 class="text-sm font-black text-[#025c9f] uppercase tracking-wide">
+            <i class="ph ph-list-bullets mr-1"></i> Componentes Curriculares
+          </h3>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto w-full">
+        <table class="w-full text-left text-sm text-slate-600 whitespace-nowrap">
+          <thead class="bg-slate-100/50 text-xs font-bold text-[#025c9f] uppercase tracking-wider border-b border-slate-200">
+            <tr>
+              <th class="px-4 py-3">Período</th>
+              <th class="px-4 py-3">Cód</th>
+              <th class="px-4 py-3">Disciplina</th>
+              <th class="px-4 py-3">Crédito</th>
+              <th class="px-4 py-3">HA</th>
+              <th class="px-4 py-3">HR</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for comp in componentes %}
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-3 font-semibold">{{ comp.periodo|default:"—" }}</td>
+              <td class="px-4 py-3">{{ comp.codigo }}</td>
+              <td class="px-4 py-3 font-bold text-slate-800">{{ comp.componente_curricular.nome }}</td>
+              <td class="px-4 py-3">{{ comp.creditos }}</td>
+              <td class="px-4 py-3">{{ comp.carga_horaria }}h</td>
+              <td class="px-4 py-3">{% widthratio comp.carga_horaria 6 5 %}h</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="px-4 py-8 text-center text-slate-400">Nenhum componente cadastrado nesta matriz.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="flex flex-col sm:flex-row gap-3 pb-4">
+      <a
+        href="{% url 'courses:matrix_list' %}"
+        class="sm:w-40 flex items-center justify-center gap-2 bg-[#025c9f] text-white font-bold py-3.5 px-6 rounded-xl text-sm hover:bg-[#153e70] transition-colors"
+      >
+        <i class="ph ph-arrow-left"></i> Voltar
+      </a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,399 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+  {% if form.instance.pk %}Editar{% else %}Nova{% endif %} Matriz Curricular — Harpia-DESUP
+{% endblock %}
+{% block header_title %}Dashboard DESUP{% endblock %}
+
+{% block extra_head %}
+{# Alpine.js para interações declarativas (toggle compartilhado, etc) #}
+<script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+<style>
+  /* Labels e erros padronizados */
+  .field-label {
+    display: block;
+    font-size: .625rem;
+    font-weight: 800;
+    color: #025c9f;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-bottom: .25rem;
+  }
+  .field-error {
+    font-size: .625rem;
+    font-weight: 600;
+    color: #dc2626;
+    margin-top: .2rem;
+  }
+
+  /* Status badge colorido no select */
+  select[name*="status"] option[value="COMPLETO"]      { background:#dcfce7; }
+  select[name*="status"] option[value="INCOMPLETO"]    { background:#fef9c3; }
+  select[name*="status"] option[value="SEM_PROFESSOR"] { background:#fee2e2; }
+  select[name*="status"] option[value="NAO_OFERECIDA"] { background:#f1f5f9; }
+
+  /* Linha do formset: animação de entrada */
+  @keyframes row-slide-in {
+    from { opacity:0; transform:translateY(-8px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+  .formset-row { animation: row-slide-in .25s ease; }
+
+  /* Pulse no spinner HTMX */
+  #htmx-spinner { display:none; }
+  .htmx-request #htmx-spinner { display:flex; }
+
+  /* Bloqueio de formulário (janela fechada) */
+  .form-locked fieldset { opacity:.6; pointer-events:none; }
+
+  /* Pré-requisitos multiselect mais compacto */
+  select[multiple] { min-height: 5rem; max-height: 8rem; }
+
+  /* Textarea compacta */
+  textarea.compact { resize: vertical; min-height: 3.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="p-2 md:p-0 max-w-7xl">
+
+  {# ── Breadcrumb ── #}
+  <nav class="breadcrumb-container mb-6" aria-label="Breadcrumb">
+    <a href="{% url 'courses:matrix_list' %}" class="breadcrumb-item-link">Matrizes</a>
+    <i class="ph ph-caret-right breadcrumb-separator"></i>
+    <span class="breadcrumb-item-active">{% if form.instance.pk %}Editar{% else %}Nova{% endif %} Matriz</span>
+  </nav>
+
+
+
+  {# ── Erros globais do formulário ── #}
+  {% if form.non_field_errors %}
+  <div class="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+    <p class="font-black mb-1 flex items-center gap-2"><i class="ph ph-warning-circle"></i> Erro no formulário</p>
+    <ul class="list-disc list-inside space-y-0.5">
+      {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {# ── Erros do formset ── #}
+  {% if component_formset.non_form_errors %}
+  <div class="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+    <p class="font-black mb-1 flex items-center gap-2"><i class="ph ph-warning-circle"></i> Erro nos componentes</p>
+    <ul class="list-disc list-inside space-y-0.5">
+      {% for error in component_formset.non_form_errors %}<li>{{ error }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <form
+    method="POST"
+    id="matrix-form"
+    class="space-y-6"
+    hx-boost="false"
+  >
+    {% csrf_token %}
+
+   
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4 mt-10">
+      <h3 class="text-sm font-black text-[#025c9f] uppercase tracking-wide">
+        <i class="ph ph-file-text mr-1"></i> Identificação da Matriz
+      </h3>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+        {# Unidade #}
+        <div class="space-y-1">
+          <label for="{{ form.unidade.id_for_label }}" class="field-label">{{ form.unidade.label }}</label>
+          {{ form.unidade }}
+          {% if form.unidade.errors %}<p class="field-error">{{ form.unidade.errors.0 }}</p>{% endif %}
+        </div>
+
+        {# Curso #}
+        <div class="space-y-1">
+          <label for="{{ form.curso.id_for_label }}" class="field-label">{{ form.curso.label }}</label>
+          {{ form.curso }}
+          {% if form.curso.errors %}<p class="field-error">{{ form.curso.errors.0 }}</p>{% endif %}
+          {% if form.curso.help_text %}<p class="text-[10px] text-slate-400">{{ form.curso.help_text }}</p>{% endif %}
+        </div>
+
+        {# Código da Matriz #}
+        <div class="space-y-1">
+          <label for="{{ form.nome.id_for_label }}" class="field-label">Código da Matriz</label>
+          {{ form.nome }}
+          {% if form.nome.errors %}<p class="field-error">{{ form.nome.errors.0 }}</p>{% endif %}
+          <p class="text-[10px] text-slate-400">Ex: MC-ADS-2026</p>
+        </div>
+
+        {# Período Letivo #}
+        <div class="space-y-1">
+          <label for="{{ form.periodo_letivo.id_for_label }}" class="field-label">{{ form.periodo_letivo.label }}</label>
+          {{ form.periodo_letivo }}
+          {% if form.periodo_letivo.errors %}<p class="field-error">{{ form.periodo_letivo.errors.0 }}</p>{% endif %}
+          {% if form.periodo_letivo.help_text %}<p class="text-[10px] text-slate-400">{{ form.periodo_letivo.help_text }}</p>{% endif %}
+        </div>
+
+      </div>
+
+      {# Importar Matriz #}
+      <div id="import-matrix-container" class="hidden mt-4 pt-4 border-t border-slate-100 flex justify-end">
+        <button type="button" onclick="promptImportMatrix()" class="flex items-center gap-2 bg-blue-50 text-[#025c9f] hover:bg-blue-100 px-4 py-2 rounded-lg text-sm font-bold transition-colors">
+          <i class="ph ph-copy text-lg"></i> Importar dados da última matriz deste curso
+        </button>
+      </div>
+    </div>
+
+   
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/60">
+        <div>
+          <h3 class="text-sm font-black text-[#025c9f] uppercase tracking-wide">
+            <i class="ph ph-list-bullets mr-1"></i> Componentes Curriculares
+          </h3>
+          <p class="text-[10px] text-slate-400 mt-0.5">Cada linha é um componente desta matriz. Mínimo 1 obrigatório.</p>
+        </div>
+        {# Spinner HTMX p/ adicionar linha #}
+        <div id="htmx-spinner" class="items-center gap-2 text-xs text-slate-500 font-semibold" aria-live="polite">
+          <svg class="animate-spin w-4 h-4 text-[#025c9f]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+          </svg>
+          Adicionando...
+        </div>
+      </div>
+
+      {# Management form — CRÍTICO: Django valida TOTAL_FORMS e INITIAL_FORMS #}
+      {{ component_formset.management_form }}
+
+      {# Container das linhas — alvo dos swaps HTMX #}
+      <div class="overflow-x-auto w-full">
+        <table class="w-full text-left text-sm text-slate-600 whitespace-nowrap">
+          <thead class="bg-slate-100/50 text-xs font-bold text-[#025c9f] uppercase tracking-wider border-b border-slate-200">
+            <tr>
+              <th class="px-4 py-3">Período</th>
+              <th class="px-4 py-3">Cód</th>
+              <th class="px-4 py-3 w-full">Disciplina</th>
+              <th class="px-4 py-3">Crédito</th>
+              <th class="px-4 py-3">CH</th>
+              <th class="px-4 py-3">HA</th>
+              <th class="px-4 py-3 w-10"></th>
+            </tr>
+          </thead>
+          <tbody id="formset-container" class="divide-y divide-slate-100">
+            {% for component_form in component_formset %}
+              {% include 'courses/matrix/partials/_formset_row.html' with form_row=component_form row_index=forloop.counter0 %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {# Botão Adicionar Componente via HTMX #}
+      <div class="px-4 pb-4 mt-4">
+        <button
+          type="button"
+          id="btn-add-row"
+          class="w-full flex items-center justify-center gap-2 border-2 border-dashed border-slate-200 rounded-xl py-3 text-xs font-black text-slate-400 hover:border-[#025c9f] hover:text-[#025c9f] hover:bg-blue-50/30 transition-all group"
+          onclick="addFormsetRow()"
+        >
+          <i class="ph ph-plus-circle text-xl group-hover:scale-110 transition-transform"></i>
+          Adicionar Componente
+        </button>
+      </div>
+
+    </div>
+
+
+    <div class="flex flex-col sm:flex-row gap-3 pb-4">
+      <button
+        type="button"
+        onclick="confirmMatrixSave()"
+        class="flex-1 flex items-center justify-center gap-2 bg-[#ffb800] hover:bg-yellow-500 text-[#025c9f] font-black py-3.5 px-6 rounded-xl shadow-md text-sm transition-all hover:scale-[1.01] active:scale-[.99]"
+      >
+        <i class="ph ph-floppy-disk text-lg"></i>
+        SALVAR MATRIZ
+      </button>
+
+      <a
+        href="{% url 'courses:matrix_list' %}"
+        class="px-5 py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl text-xs transition-colors text-center uppercase shadow-sm flex items-center justify-center gap-2"
+      >
+        Cancelar
+      </a>
+    </div>
+
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  /**
+   * Adiciona uma nova linha via HTMX usando JS puro para garantir a ordem correta.
+   */
+  function addFormsetRow() {
+    const prefix = '{{ component_formset.prefix }}';
+    const totalInput = document.getElementById('id_' + prefix + '-TOTAL_FORMS');
+    const currentIndex = parseInt(totalInput.value, 10);
+    
+    // Mostra o spinner manual se necessário, ou confia no HTMX indicator se configurado via htmx.ajax
+    const spinner = document.getElementById('htmx-spinner');
+    if(spinner) spinner.style.display = 'flex';
+
+    htmx.ajax('GET', '{% url "courses:matrix_add_row" %}', {
+      target: '#formset-container',
+      swap: 'beforeend',
+      values: { row_index: currentIndex, prefix: prefix }
+    }).then(() => {
+      if(spinner) spinner.style.display = 'none';
+      // Incrementa o formset APÓS adicionar a linha
+      totalInput.value = currentIndex + 1;
+    });
+  }
+
+  /**
+   * Remove uma linha do formset adicionada dinamicamente (sem instância salva).
+   * Para linhas com DELETE checkbox, marcamos o checkbox em vez de remover o DOM.
+   */
+  function removeFormsetRow(btn) {
+    const row = btn.closest('.formset-row');
+    if (row) {
+      // Animação de saída
+      row.style.transition = 'opacity .2s, transform .2s';
+      row.style.opacity = '0';
+      row.style.transform = 'translateY(-6px)';
+      setTimeout(() => row.remove(), 200);
+
+      // Ajusta TOTAL_FORMS
+      const prefix = '{{ component_formset.prefix }}';
+      const totalInput = document.getElementById('id_' + prefix + '-TOTAL_FORMS');
+      totalInput.value = Math.max(0, parseInt(totalInput.value, 10) - 1);
+    }
+  }
+
+  function confirmarRemocaoComponente(btn) {
+    Swal.fire({
+      title: 'Remover componente?',
+      text: 'Tem certeza que deseja remover este componente da matriz?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Sim, remover',
+      cancelButtonText: 'Cancelar'
+    }).then(function(result) {
+      if (result.isConfirmed) {
+        const row = btn.closest('.formset-row');
+        if (row) {
+          const checkbox = row.querySelector('input[type="checkbox"]');
+          if (checkbox) checkbox.checked = true;
+          row.style.transition = 'opacity .2s, transform .2s';
+          row.style.opacity = '0';
+          row.style.transform = 'translateY(-6px)';
+          setTimeout(() => row.style.display = 'none', 200);
+        }
+      }
+    });
+  }
+
+  function confirmarRemocaoComponenteNovo(btn) {
+    Swal.fire({
+      title: 'Remover linha?',
+      text: 'Tem certeza que deseja remover esta linha?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Sim, remover',
+      cancelButtonText: 'Cancelar'
+    }).then(function(result) {
+      if (result.isConfirmed) {
+        removeFormsetRow(btn);
+      }
+    });
+  }
+
+  // Reinicializa ícones Lucide após swap HTMX
+  document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (window.lucide) lucide.createIcons();
+    // Reinicia Alpine nos novos elementos
+    if (window.Alpine) Alpine.initTree(evt.detail.target);
+  });
+
+  // SweetAlert: Confirmação de salvar
+  function confirmMatrixSave() {
+    Swal.fire({
+      title: 'Salvar Matriz?',
+      text: "Você deseja realmente salvar esta matriz com os componentes atuais?",
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#ffb800',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: '<span class="text-[#025c9f] font-bold">Sim, salvar!</span>',
+      cancelButtonText: 'Cancelar'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        document.getElementById('matrix-form').submit();
+      }
+    });
+  }
+
+  // Lógica para exibir botão de importar e fazer request
+  document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (window.lucide) lucide.createIcons();
+    // Se o swap foi no #id_curso, checamos se ele tem valor
+    if (evt.detail.target.id === 'id_curso') {
+      checkImportButton();
+    }
+  });
+
+  document.getElementById('id_curso').addEventListener('change', function() {
+    checkImportButton();
+    {% if not form.instance.pk %}
+    if (this.value) {
+      promptImportMatrix();
+    }
+    {% endif %}
+  });
+
+  function checkImportButton() {
+    const cursoSelect = document.getElementById('id_curso');
+    const container = document.getElementById('import-matrix-container');
+    if (cursoSelect.value) {
+      container.classList.remove('hidden');
+    } else {
+      container.classList.add('hidden');
+    }
+  }
+  // Checa no carregamento da página
+  checkImportButton();
+
+  function promptImportMatrix() {
+    const cursoId = document.getElementById('id_curso').value;
+    if (!cursoId) return;
+
+    Swal.fire({
+      title: 'Importar Matriz?',
+      text: "Isso irá preencher a tabela com os componentes da última matriz deste curso. Os dados atuais na tabela não salvos serão ignorados.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#025c9f',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Sim, importar',
+      cancelButtonText: 'Cancelar'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        const prefix = '{{ component_formset.prefix }}';
+        htmx.ajax('GET', '{% url "courses:matrix_import_previous" %}?curso_id=' + cursoId + '&prefix=' + prefix, {
+          target: '#formset-container',
+          swap: 'innerHTML'
+        }).then(() => {
+          Swal.fire('Pronto!', 'Componentes importados. Você pode editar antes de salvar.', 'success');
+        });
+      }
+    });
+  }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+{% endblock %}

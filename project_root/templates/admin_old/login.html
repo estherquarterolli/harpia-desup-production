@@ -1,0 +1,68 @@
+﻿{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    body { background: #f1f5f9 !important; }
+    #header, .breadcrumbs, #footer { display: none !important; }
+    #content { padding: 0 !important; margin: 0 !important; width: 100% !important; }
+    .login #container { background: transparent !important; border: none !important; width: 100% !important; max-width: 450px !important; margin: 10vh auto !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-center min-h-[80vh]">
+    <div class="w-full max-w-md bg-white p-10 rounded-3xl shadow-2xl border border-slate-100">
+        <div class="text-center mb-10">
+            <div class="inline-flex items-center justify-center w-20 h-20 bg-slate-50 rounded-2xl mb-6">
+                <i class="ph ph-shield-check text-5xl text-[#1e3a5f]"></i>
+            </div>
+            <h2 class="text-3xl font-black text-[#1e3a5f] tracking-tighter uppercase">HARPIA Admin</h2>
+            <p class="text-slate-400 font-bold text-xs uppercase tracking-widest mt-2">Acesso Restrito ao NÃºcleo de TI da DESUP</p>
+        </div>
+
+        <form action="{{ app_path }}" method="post" id="login-form" class="space-y-6">
+            {% csrf_token %}
+            {% if form.errors and not form.non_field_errors %}
+                <p class="text-red-500 text-xs font-bold bg-red-50 p-3 rounded-lg">
+                    {% if form.errors.items|length == 1 %}{% trans "Please correct the error below." %}{% else %}{% trans "Please correct the errors below." %}{% endif %}
+                </p>
+            {% endif %}
+
+            {% if form.non_field_errors %}
+                {% for error in form.non_field_errors %}
+                    <p class="text-red-500 text-xs font-bold bg-red-50 p-3 rounded-lg">{{ error }}</p>
+                {% endfor %}
+            {% endif %}
+
+            <div class="space-y-2">
+                <label for="id_username" class="block text-[10px] font-black text-slate-400 uppercase ml-1">{% trans 'Username' %}</label>
+                <div class="relative">
+                    <i class="ph ph-user absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl"></i>
+                    <input type="text" name="username" id="id_username" required
+                        class="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-[#1e3a5f] transition-all"
+                        placeholder="Seu usuÃ¡rio">
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <label for="id_password" class="block text-[10px] font-black text-slate-400 uppercase ml-1">{% trans 'Password' %}</label>
+                <div class="relative">
+                    <i class="ph ph-lock absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl"></i>
+                    <input type="password" name="password" id="id_password" required
+                        class="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-[#1e3a5f] transition-all"
+                        placeholder="Sua senha">
+                </div>
+            </div>
+
+            <div class="pt-4">
+                <button type="submit" 
+                    class="w-full bg-[#1e3a5f] text-white font-black py-4 rounded-2xl shadow-lg hover:bg-[#1e4e8c] hover:-translate-y-1 transition-all uppercase tracking-widest text-xs">
+                    {% trans 'Log in' %}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

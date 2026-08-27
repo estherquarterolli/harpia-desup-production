@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block title %}Cursos — {{ unidade.sigla }} | Harpia{% endblock %}
+{% block header_title %}{{ unidade.sigla }} — Cursos{% endblock %}
+
+{% block content %}
+<div class="p-0">
+
+  <!-- Breadcrumb -->
+  <nav class="breadcrumb-container mb-6" aria-label="Breadcrumb">
+    <a href="{% url 'core:unidade_list' %}" class="breadcrumb-item-link">Unidades</a>
+    <i class="ph ph-caret-right breadcrumb-separator"></i>
+    <span class="text-slate-500 font-semibold">{{ unidade.nome }}</span>
+    <i class="ph ph-caret-right breadcrumb-separator"></i>
+    <span class="breadcrumb-item-active">Cursos</span>
+  </nav>
+
+  <div class="flex justify-between items-center mb-6">
+    <div>
+      <h2 class="text-xl font-black text-[#025c9f]">Cursos cadastrados</h2>
+      <p class="text-sm text-slate-500">Gerencie os cursos da unidade <strong>{{ unidade.nome }}</strong>.</p>
+    </div>
+    <a href="{% url 'core:curso_create' unidade_pk=unidade.pk %}"
+       class="flex items-center gap-2 bg-[#025c9f] hover:bg-[#153e70] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+      <i class="ph ph-plus"></i> Adicionar Curso
+    </a>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-x-auto">
+    <table class="w-full text-left border-collapse min-w-[520px]">
+      <thead class="bg-slate-50 border-b border-slate-100">
+        <tr>
+          <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Sigla</th>
+          <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Nome</th>
+          <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Ações</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-50">
+        {% for curso in cursos %}
+        <tr class="hover:bg-slate-50/50 transition-colors">
+          <td class="px-6 py-4">
+            <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-[#e8f0fb] text-[#025c9f] font-black text-xs">
+              {{ curso.sigla|slice:":3" }}
+            </span>
+          </td>
+          <td class="px-6 py-4 font-semibold text-slate-800">{{ curso.nome }}</td>
+          <td class="px-6 py-4 text-right flex justify-end gap-2">
+            <a href="{% url 'core:curso_update' unidade_pk=unidade.pk pk=curso.pk %}"
+               class="p-2 text-slate-400 hover:text-[#025c9f] hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
+              <i class="ph ph-pencil-simple text-lg"></i>
+            </a>
+            <a href="{% url 'core:curso_delete' unidade_pk=unidade.pk pk=curso.pk %}"
+               class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Excluir">
+              <i class="ph ph-trash text-lg"></i>
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="3" class="px-6 py-12 text-center text-slate-400">
+            <i class="ph ph-graduation-cap text-4xl opacity-20 mb-2 block"></i>
+            Nenhum curso cadastrado para esta unidade.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

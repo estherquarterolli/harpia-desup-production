@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: allocgest-api
+    runtime: python
+    runtimeVersion: "3.11"
+    plan: free
+
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r project_root/requirements.txt
+      cd project_root && python manage.py collectstatic --noinput
+
+    startCommand: |
+      cd project_root && python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: DATABASE_URL
+        sync: false   # preencher no dashboard com a URL do POOLER do Supabase
+      - key: SECRET_KEY
+        sync: false
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: DEBUG
+        value: "False"
+      - key: DISABLE_COLLECTSTATIC
+        value: "1"

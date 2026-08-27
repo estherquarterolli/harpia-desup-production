@@ -1,0 +1,192 @@
+/* Variáveis de Cores e Padrões */
+:root {
+    --azul-escuro: #1e3a5f;
+    --azul-medio: #1e4e8c;
+    --amarelo-faetec: #ffb800;
+    --cinza-grid: #e2e8f0;
+}
+
+/* Fonte Global para Títulos e Destaques */
+h1, h2, h3, h4, h5, h6, .font-black {
+    font-family: 'Myriad Pro', 'Inter', sans-serif !important;
+}
+
+/* Fundo Quadriculado com Imagem */
+.bg-dashboard {
+    background-color: #f8fafc;
+    background-image: 
+        linear-gradient(to right, var(--cinza-grid) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--cinza-grid) 1px, transparent 1px);
+    background-size: 20px 20px, 20px 20px;
+    background-position: center;
+    background-attachment: fixed;
+}
+
+/* Esconder scrollbar lateral */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+/* Ajustes de Responsividade do Menu Lateral */
+@media (max-width: 768px) {
+    .sidebar-desktop {
+        display: none; /* Esconde o menu lateral no mobile */
+    }
+    .main-content {
+        padding: 1rem !important;
+    }
+}
+
+/* Efeito de Tooltip (Unidades não conformes) */
+.tooltip-unidades {
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.group-hover-card:hover .tooltip-unidades {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Menu Dropdown e Modais */
+.menu-hidden {
+    display: none;
+}
+
+/* ─── Campos de Formulário (padrão Prisma) ─────────── */
+.field-label {
+    display: block;
+    font-size: .625rem;
+    font-weight: 800;
+    color: var(--azul-escuro);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-bottom: .25rem;
+}
+.field-error {
+    font-size: .625rem;
+    font-weight: 600;
+    color: #dc2626;
+    margin-top: .2rem;
+}
+
+/* Inputs e selects herdando estilo base */
+.form-field {
+    width: 100%;
+    padding: .45rem .6rem;
+    border: 1px solid #e2e8f0;
+    border-radius: .5rem;
+    font-size: .8rem;
+    font-weight: 600;
+    color: #334155;
+    outline: none;
+    transition: box-shadow .15s, border-color .15s;
+}
+.form-field:focus {
+    border-color: var(--azul-medio);
+    box-shadow: 0 0 0 3px rgba(30,78,140,.15);
+}
+.form-field[disabled], .form-field[readonly] {
+    background: #f8fafc;
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+/* ─── Badges de Status MatrixComponent ────────────────── */
+.badge-completo      { background: #dcfce7; color: #166534; }
+.badge-incompleto    { background: #fef9c3; color: #854d0e; }
+.badge-sem_professor { background: #fee2e2; color: #991b1b; }
+.badge-nao_oferecida { background: #f1f5f9; color: #64748b; }
+
+/* ─── Sombras Globais Mais Escuras (Contraste Aprimorado) ─── */
+.shadow-sm {
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.12), 0 1px 3px 0 rgba(0, 0, 0, 0.18) !important;
+}
+.shadow, .shadow-md {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.18), 0 2px 4px -2px rgba(0, 0, 0, 0.18) !important;
+}
+.shadow-lg {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.22), 0 4px 6px -4px rgba(0, 0, 0, 0.22) !important;
+}
+.shadow-xl {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.25) !important;
+}
+.shadow-2xl {
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* ─── Autocomplete Dropdown Estilos ─── */
+.autocomplete-dropdown {
+    position: absolute;
+    left: 0;
+    right: 0;
+    margin-top: 4px;
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
+    z-index: 9999;
+    max-height: 240px;
+    overflow-y: auto;
+}
+.autocomplete-option {
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e3a5f;
+    cursor: pointer;
+    transition: background-color 0.15s;
+    border-bottom: 1px solid #f1f5f9;
+}
+.autocomplete-option:last-child {
+    border-bottom: none;
+}
+.autocomplete-option:hover {
+    background-color: #f8fafc;
+}
+.autocomplete-option-sub {
+    font-size: 10px;
+    color: #94a3b8;
+    margin-top: 2px;
+    font-weight: 500;
+}
+.autocomplete-empty {
+    padding: 14px;
+    font-size: 12px;
+    color: #94a3b8;
+    text-align: center;
+    font-weight: 600;
+}
+
+/* ─── Premium Breadcrumbs Styling ─── */
+.breadcrumb-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: rgba(248, 250, 252, 0.85);
+    border: 1px solid rgba(226, 232, 240, 0.7);
+    padding: 0.45rem 1.15rem;
+    border-radius: 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+}
+.breadcrumb-item-active {
+    color: #1e3a5f;
+    font-weight: 800;
+}
+.breadcrumb-item-link {
+    color: #64748b;
+    transition: color 0.15s;
+    font-weight: 600;
+    text-decoration: none;
+}
+.breadcrumb-item-link:hover {
+    color: #1e4e8c;
+}
+.breadcrumb-separator {
+    color: #94a3b8;
+    font-size: 0.75rem;
+}
+

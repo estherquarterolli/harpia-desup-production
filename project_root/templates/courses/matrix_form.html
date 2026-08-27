@@ -1,0 +1,553 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if form.instance.pk %}Editar Matriz{% else %}Nova Matriz Curricular{% endif %} | Harpia{% endblock %}
+{% block header_title %}{% if form.instance.pk %}Editar Matriz{% else %}Nova Matriz Curricular{% endif %}{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+
+  <!-- Breadcrumb -->
+  <nav class="breadcrumb-container mb-6" aria-label="Breadcrumb">
+    <a href="{% url 'courses:matrix_list' %}" class="breadcrumb-item-link">Matrizes</a>
+    <i class="ph ph-caret-right breadcrumb-separator"></i>
+    <span class="breadcrumb-item-active">{% if form.instance.pk %}Editar{% else %}Nova Matriz{% endif %}</span>
+  </nav>
+
+  <form method="POST" id="form-matriz" class="space-y-6">
+    {% csrf_token %}
+
+    <!-- Seção 1: Identificação -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/70">
+        <h2 class="text-sm font-black text-[#025c9f] uppercase tracking-widest">Identificação</h2>
+      </div>
+      <div class="p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Curso</label>
+            {{ form.curso }}
+            {% if form.curso.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.curso.errors.0 }}</p>{% endif %}
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Código da Matriz</label>
+            {{ form.nome }}
+            {% if form.nome.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.nome.errors.0 }}</p>{% endif %}
+            <p class="text-[10px] text-slate-400 mt-0.5">Ex: MC-ADS-2026</p>
+          </div>
+
+          <div class="md:col-span-2">
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Unidades desta Matriz</label>
+            <div class="flex flex-wrap gap-x-6 gap-y-2 mt-1">
+              {{ form.unidades }}
+            </div>
+            {% if form.unidades.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.unidades.errors.0 }}</p>{% endif %}
+            <p class="text-[10px] text-slate-400 mt-0.5">Selecione as unidades onde esta matriz será aplicada.</p>
+          </div>
+
+          {% if not form.instance.pk %}
+          <div class="md:col-span-2">
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Duplicar a partir de outra Matriz</label>
+            {{ form.duplicar_de }}
+            <p class="text-[10px] text-slate-400 mt-0.5">Opcional. Selecione uma matriz existente para copiar seus componentes automaticamente.</p>
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Seção 2: Componentes Curriculares -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/70 flex justify-between items-center">
+        <div>
+          <h2 class="text-sm font-black text-[#025c9f] uppercase tracking-widest">Componentes Curriculares</h2>
+          <p class="text-[11px] text-slate-400 mt-0.5">Cada linha é um componente desta matriz. Selecione a disciplina para preencher o código correspondente.</p>
+        </div>
+      </div>
+
+      {{ component_formset.management_form }}
+
+      {% if component_formset.non_form_errors %}
+      <div class="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+        {{ component_formset.non_form_errors.0 }}
+      </div>
+      {% endif %}
+
+      <!-- Cabeçalho da tabela de componentes -->
+      <div class="hidden md:grid grid-cols-12 gap-3 px-6 pt-4 pb-2">
+        <div class="col-span-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Disciplina</div>
+        <div class="col-span-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Código</div>
+        <div class="col-span-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Período</div>
+        <div class="col-span-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">CH Total</div>
+        <div class="col-span-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Créditos</div>
+        <div class="col-span-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">CH Sem.</div>
+        <div class="col-span-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Remover</div>
+      </div>
+
+      <div id="components-container" class="divide-y divide-slate-50 px-6">
+        {% for component_form in component_formset %}
+        <div class="component-row py-4 {% if component_form.instance.pk and component_form.DELETE.value %}opacity-40{% endif %}">
+          {{ component_form.id }}
+          {% for hidden in component_form.hidden_fields %}{{ hidden }}{% endfor %}
+
+          <div class="grid grid-cols-12 gap-3 items-center">
+
+            <!-- Disciplina — autocomplete -->
+            <div class="col-span-12 md:col-span-4 relative">
+              <label class="md:hidden text-[10px] font-bold text-slate-400 uppercase mb-1 block">Disciplina</label>
+
+              {# Campo hidden que armazena o ID real do componente #}
+              <div class="hidden">{{ component_form.componente_curricular }}</div>
+
+              {# Input visível para o usuário pesquisar #}
+              <input
+                type="text"
+                class="form-field cc-search-input"
+                placeholder="Pesquisar disciplina..."
+                autocomplete="off"
+                data-hidden-id="{{ component_form.componente_curricular.html_name }}"
+                value="{% if component_form.instance.pk and component_form.instance.componente_curricular %}{{ component_form.instance.componente_curricular.nome }}{% endif %}"
+              >
+              {# Dropdown de resultados #}
+              <div class="cc-dropdown hidden absolute z-20 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg mt-1 max-h-56 overflow-y-auto text-sm"></div>
+            </div>
+
+            <!-- Código -->
+            <div class="col-span-6 md:col-span-1">
+              <label class="md:hidden text-[10px] font-bold text-slate-400 uppercase mb-1 block">Código</label>
+              {{ component_form.codigo }}
+            </div>
+
+            <!-- Período -->
+            <div class="col-span-6 md:col-span-2">
+              <label class="md:hidden text-[10px] font-bold text-slate-400 uppercase mb-1 block">Período</label>
+              {{ component_form.periodo }}
+            </div>
+
+            <!-- CH Total -->
+            <div class="col-span-4 md:col-span-2">
+              <label class="md:hidden text-[10px] font-bold text-slate-400 uppercase mb-1 block">CH Total</label>
+              {{ component_form.carga_horaria }}
+            </div>
+
+            <!-- Créditos -->
+            <div class="col-span-4 md:col-span-1 text-center">
+              <label class="md:hidden text-[10px] font-bold text-slate-400 uppercase mb-1 block text-left">Créditos</label>
+              {{ component_form.creditos }}
+            </div>
+
+            <!-- CH Semanal -->
+            <div class="col-span-4 md:col-span-1 text-center">
+              <label class="md:hidden text-[10px] font-bold text-slate-400 uppercase mb-1 block text-left">CH Sem.</label>
+              {{ component_form.carga_horaria_semanal }}
+            </div>
+
+            <!-- Remover -->
+            <div class="col-span-12 md:col-span-1 flex md:justify-end items-center">
+              {% if component_form.DELETE %}
+              <div class="hidden">{{ component_form.DELETE }}</div>
+              <button type="button"
+                      onclick="confirmarRemocaoComponenteMatriz(this)"
+                      class="flex items-center justify-center w-8 h-8 rounded-full text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                      title="Remover componente">
+                <i class="ph ph-trash text-xl"></i>
+              </button>
+              {% endif %}
+            </div>
+
+          </div>
+          {% if component_form.errors %}
+          <div class="mt-2">
+            {% for field, errors in component_form.errors.items %}
+            <p class="text-red-500 text-[11px]">{{ field }}: {{ errors.0 }}</p>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+
+
+      <!-- Adicionar linha -->
+      <div class="px-6 pb-4 pt-2">
+        <button type="button" id="add-component" onclick="addComponent()"
+          class="flex items-center gap-2 text-[#025c9f] hover:text-blue-800 text-sm font-bold hover:bg-blue-50 px-3 py-2 rounded-lg transition-colors">
+          <i class="ph ph-plus-circle text-lg"></i> Adicionar componente
+        </button>
+      </div>
+    </div>
+
+    <!-- Botões de Ação -->
+    <input type="hidden" name="salvar_rascunho" id="id_salvar_rascunho" value="false">
+    <div class="flex flex-col sm:flex-row gap-3 mt-6">
+      <a href="{% url 'courses:matrix_list' %}"
+        class="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-black py-3.5 rounded-xl text-xs transition-colors uppercase shadow-sm">
+        <i class="ph ph-x-circle text-base"></i> Cancelar
+      </a>
+      <button type="submit" onclick="document.getElementById('id_salvar_rascunho').value='true';"
+        class="flex-1 flex items-center justify-center bg-slate-500 hover:bg-slate-600 text-white font-bold py-3.5 rounded-xl text-sm transition-all hover:scale-105 uppercase">
+        Salvar como Rascunho
+      </button>
+      <button type="submit" onclick="document.getElementById('id_salvar_rascunho').value='false';"
+        class="flex-1 flex items-center justify-center bg-[#025c9f] hover:bg-[#153e70] text-white font-bold py-3.5 rounded-xl text-sm transition-all hover:scale-105 uppercase">
+        Salvar e Publicar
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- Modal: Copiar Matriz Anterior -->
+<div id="modal-copiar" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-sm">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-8 text-center">
+    <div class="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+      <i class="ph ph-copy text-2xl text-[#025c9f]"></i>
+    </div>
+    <h3 class="text-lg font-black text-[#025c9f] mb-2">Copiar Matriz Anterior?</h3>
+    <p class="text-sm text-slate-500 mb-6" id="modal-texto">
+      Encontramos uma matriz existente para este curso. Deseja copiá-la como base para esta nova matriz?
+    </p>
+    <div class="flex gap-3">
+      <button id="btn-nao-copiar" onclick="fecharModal()"
+        class="flex-1 py-2.5 border border-slate-200 text-slate-600 font-bold rounded-xl text-sm hover:bg-slate-50 transition-colors">
+        Não, criar do zero
+      </button>
+      <button id="btn-sim-copiar" onclick="copiarMatriz()"
+        class="flex-1 py-2.5 bg-[#025c9f] hover:bg-[#153e70] text-white font-bold rounded-xl text-sm transition-colors">
+        Sim, copiar
+      </button>
+    </div>
+  </div>
+</div>
+
+{{ component_codes_json|json_script:"component-codes-data" }}
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+// Mapeamento global de componentes e códigos/CH padrão
+const COMPONENT_CODES = JSON.parse(document.getElementById('component-codes-data').textContent);
+
+// Event delegation para mudanças na tabela de componentes
+const container = document.getElementById('components-container');
+if (container) {
+  container.addEventListener('change', function(e) {
+    // 1. Mudança na disciplina -> preenche código e ch padrão, calcula créditos/ch semanal
+    if (e.target && e.target.name && e.target.name.endsWith('-componente_curricular')) {
+      const select = e.target;
+      const row = select.closest('.component-row');
+      const compId = select.value;
+      const codeInput = row.querySelector('input[name$="-codigo"]');
+      const chInput = row.querySelector('input[name$="-carga_horaria"]');
+      const creditosInput = row.querySelector('input[name$="-creditos"]');
+      const chSemanalInput = row.querySelector('input[name$="-carga_horaria_semanal"]');
+      
+      if (compId && COMPONENT_CODES[compId]) {
+        const info = COMPONENT_CODES[compId];
+        if (codeInput) codeInput.value = info.codigo || '';
+        if (chInput) {
+          chInput.value = info.carga_horaria || '';
+          
+          // Calcular creditos e ch semanal
+          const ch = parseInt(info.carga_horaria || 0);
+          const creds = Math.floor(ch / 20);
+          if (creditosInput) creditosInput.value = creds;
+          if (chSemanalInput) chSemanalInput.value = creds;
+        }
+      } else {
+        if (codeInput) codeInput.value = '';
+        if (chInput) chInput.value = '';
+        if (creditosInput) creditosInput.value = '';
+        if (chSemanalInput) chSemanalInput.value = '';
+      }
+    }
+    
+    // 2. Mudança na Carga Horária -> recalcula créditos e ch semanal
+    if (e.target && e.target.name && e.target.name.endsWith('-carga_horaria') && !e.target.name.endsWith('-carga_horaria_semanal')) {
+      const chInput = e.target;
+      const row = chInput.closest('.component-row');
+      const creditosInput = row.querySelector('input[name$="-creditos"]');
+      const chSemanalInput = row.querySelector('input[name$="-carga_horaria_semanal"]');
+      
+      const ch = parseInt(chInput.value || 0);
+      const creds = Math.floor(ch / 20);
+      if (creditosInput) creditosInput.value = creds;
+      if (chSemanalInput) chSemanalInput.value = creds;
+    }
+  });
+}
+
+// ── Lógica de duplicação ou cópia de matriz ─────────────────────────────────────────────
+let matrizParaCopiar = null;
+const cursoSelect = document.getElementById('id_curso');
+const duplicarSelect = document.getElementById('id_duplicar_de');
+
+if (duplicarSelect) {
+  duplicarSelect.addEventListener('change', function() {
+    const val = this.value;
+    if (!val) return;
+    fetch(`/courses/matrices/dados-copiar/${val}/`)
+      .then(r => r.json())
+      .then(data => {
+        preencherFormsetComCopia(data.componentes);
+      })
+      .catch(() => alert('Erro ao duplicar a matriz.'));
+  });
+}
+
+function verificarMatrizExistente() {
+  const cursoId = cursoSelect?.value;
+  if (!cursoId) return;
+
+  fetch(`/courses/matrices/buscar-existente/?curso_id=${cursoId}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.existe && data.matriz_id) {
+        matrizParaCopiar = data.matriz_id;
+        document.getElementById('modal-texto').textContent =
+          `Existe a matriz "${data.nome}" para este curso. Deseja copiá-la como base?`;
+        document.getElementById('modal-copiar').classList.remove('hidden');
+        document.getElementById('modal-copiar').classList.add('flex');
+      }
+    })
+    .catch(() => {});
+}
+
+if (cursoSelect && !duplicarSelect) {
+  // Apenas verifica se não houver o dropdown de duplicação explícita
+  cursoSelect.addEventListener('change', verificarMatrizExistente);
+}
+
+function fecharModal() {
+  document.getElementById('modal-copiar').classList.add('hidden');
+  document.getElementById('modal-copiar').classList.remove('flex');
+  matrizParaCopiar = null;
+}
+
+function copiarMatriz() {
+  if (!matrizParaCopiar) return;
+  fecharModal();
+  fetch(`/courses/matrices/dados-copiar/${matrizParaCopiar}/`)
+    .then(r => r.json())
+    .then(data => {
+      preencherFormsetComCopia(data.componentes);
+    })
+    .catch(() => alert('Erro ao copiar a matriz.'));
+}
+
+function preencherFormsetComCopia(componentes) {
+  const container = document.getElementById('components-container');
+  const totalForms = document.getElementById('id_componentes-TOTAL_FORMS');
+
+  let rows = container.querySelectorAll('.component-row');
+
+  // Adicionar linhas extras caso necessário
+  while (rows.length < componentes.length) {
+    addComponent();
+    rows = container.querySelectorAll('.component-row');
+  }
+
+  // Remover linhas extras caso sobrem
+  while (rows.length > componentes.length) {
+    rows[rows.length - 1].remove();
+    rows = container.querySelectorAll('.component-row');
+    totalForms.value = rows.length;
+  }
+
+  // Preencher valores
+  componentes.forEach((comp, idx) => {
+    const row = rows[idx];
+    const inputs = row.querySelectorAll('input, select');
+    inputs.forEach(input => {
+      const name = input.name;
+      if (!name) return;
+      if (name.includes('componente_curricular') && input.tagName === 'SELECT') {
+        // Garante que a option existe no select hidden
+        if (comp.componente_curricular) {
+          let opt = input.querySelector(`option[value="${comp.componente_curricular}"]`);
+          if (!opt) {
+            opt = document.createElement('option');
+            opt.value = comp.componente_curricular;
+            opt.textContent = comp.componente_curricular_nome || '';
+            input.appendChild(opt);
+          }
+          input.value = comp.componente_curricular;
+        }
+        // Atualiza o input visível de busca com o nome do componente
+        const ccInput = row.querySelector(`.cc-search-input[data-hidden-id="${name}"]`);
+        if (ccInput) ccInput.value = comp.componente_curricular_nome || '';
+        return;
+      }
+      if (name.includes('codigo')) input.value = comp.codigo || '';
+      if (name.includes('periodo')) input.value = comp.periodo || '';
+      if (name.includes('carga_horaria') && !name.includes('semanal')) input.value = comp.carga_horaria || '';
+      if (name.includes('creditos')) input.value = comp.creditos || '';
+      if (name.includes('carga_horaria_semanal')) input.value = comp.carga_horaria_semanal || '';
+    });
+  });
+}
+
+// ── Confirmação de remoção com SweetAlert2 ─────────────────────────────────
+function confirmarRemocaoComponenteMatriz(btn) {
+  Swal.fire({
+    title: 'Remover componente?',
+    text: 'Tem certeza que deseja remover este componente da matriz?',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#dc2626',
+    cancelButtonColor: '#64748b',
+    confirmButtonText: 'Sim, remover',
+    cancelButtonText: 'Cancelar'
+  }).then(function(result) {
+    if (result.isConfirmed) {
+      const row = btn.closest('.component-row');
+      if (row) {
+        const checkbox = row.querySelector('input[type="checkbox"]');
+        if (checkbox) checkbox.checked = true;
+        row.style.transition = 'opacity .2s, transform .2s';
+        row.style.opacity = '0';
+        row.style.transform = 'translateY(-6px)';
+        setTimeout(() => row.style.display = 'none', 200);
+      }
+    }
+  });
+}
+
+// ── Adicionar componente dinamicamente ────────────────────────────────────
+function addComponent() {
+  const container = document.getElementById('components-container');
+  const totalForms = document.getElementById('id_componentes-TOTAL_FORMS');
+  const currentTotal = parseInt(totalForms.value);
+  const firstRow = container.querySelector('.component-row');
+  if (!firstRow) return;
+
+  const newRow = firstRow.cloneNode(true);
+  
+  // Reindexar campos
+  newRow.innerHTML = newRow.innerHTML.replace(/componentes-\d+/g, `componentes-${currentTotal}`);
+  
+  // Limpar valores dos campos copiados
+  newRow.querySelectorAll('input[type=text], input[type=number]').forEach(i => i.value = '');
+  newRow.querySelectorAll('select').forEach(s => s.selectedIndex = 0);
+  newRow.querySelectorAll('input[type=checkbox]').forEach(c => c.checked = false);
+  newRow.querySelectorAll('input[type=hidden][name*="id"]').forEach(h => h.value = '');
+
+  container.appendChild(newRow);
+  totalForms.value = currentTotal + 1;
+}
+
+// Sem carregamento dinâmico de cursos — a lista é carregada diretamente pelo Django
+</script>
+
+<script>
+// ── Autocomplete de Componente Curricular ─────────────────────────────────
+(function() {
+  const SEARCH_URL = '/courses/componentes/buscar/';
+
+  // Inicializa autocomplete em um input
+  function initCCAutocomplete(input) {
+    if (input._ccInit) return;
+    input._ccInit = true;
+
+    const dropdown = input.nextElementSibling; // .cc-dropdown
+    let debounceTimer = null;
+
+    input.addEventListener('input', function() {
+      clearTimeout(debounceTimer);
+      const q = this.value.trim();
+      if (q.length < 2) {
+        dropdown.innerHTML = '';
+        dropdown.classList.add('hidden');
+        return;
+      }
+      debounceTimer = setTimeout(() => {
+        fetch(`${SEARCH_URL}?q=${encodeURIComponent(q)}`)
+          .then(r => r.json())
+          .then(data => {
+            dropdown.innerHTML = '';
+            if (!data.resultados || data.resultados.length === 0) {
+              dropdown.innerHTML = '<div class="px-4 py-3 text-slate-400 text-xs">Nenhum componente encontrado.</div>';
+              dropdown.classList.remove('hidden');
+              return;
+            }
+            data.resultados.forEach(item => {
+              const opt = document.createElement('div');
+              opt.className = 'px-4 py-2.5 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0';
+              opt.innerHTML = `<p class="font-semibold text-[#025c9f] text-xs">${item.nome}</p>
+                <p class="text-[10px] text-slate-400">${item.codigo ? item.codigo + ' · ' : ''}${item.carga_horaria}h · ${item.creditos} crédito(s)</p>`;
+              opt.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                selecionarComponente(input, dropdown, item);
+              });
+              dropdown.appendChild(opt);
+            });
+            dropdown.classList.remove('hidden');
+          })
+          .catch(() => {
+            dropdown.classList.add('hidden');
+          });
+      }, 280);
+    });
+
+    input.addEventListener('blur', function() {
+      setTimeout(() => { dropdown.classList.add('hidden'); }, 200);
+    });
+
+    input.addEventListener('focus', function() {
+      if (dropdown.children.length > 0) dropdown.classList.remove('hidden');
+    });
+  }
+
+  function selecionarComponente(input, dropdown, item) {
+    input.value = item.nome;
+    dropdown.classList.add('hidden');
+
+    // Preenche o campo hidden (select) com o id
+    const hiddenName = input.dataset.hiddenId;
+    const hiddenSelect = document.querySelector(`select[name="${hiddenName}"]`);
+    if (hiddenSelect) {
+      // Verifica se já existe a option; se não, cria
+      let opt = hiddenSelect.querySelector(`option[value="${item.id}"]`);
+      if (!opt) {
+        opt = document.createElement('option');
+        opt.value = item.id;
+        opt.textContent = item.nome;
+        hiddenSelect.appendChild(opt);
+      }
+      hiddenSelect.value = item.id;
+    }
+
+    // Preenche código, CH, créditos automaticamente
+    const row = input.closest('.component-row');
+    if (!row) return;
+    const codeInput   = row.querySelector('input[name$="-codigo"]');
+    const chInput     = row.querySelector('input[name$="-carga_horaria"]');
+    const credInput   = row.querySelector('input[name$="-creditos"]');
+    const chSemInput  = row.querySelector('input[name$="-carga_horaria_semanal"]');
+
+    if (codeInput) codeInput.value = item.codigo || item.sigla || '';
+    if (chInput && item.carga_horaria) {
+      chInput.value = item.carga_horaria;
+      const creds = Math.floor(item.carga_horaria / 20);
+      if (credInput) credInput.value = creds;
+      if (chSemInput) chSemInput.value = creds;
+    }
+  }
+
+  // Inicializa nos inputs já existentes
+  function inicializarTodos() {
+    document.querySelectorAll('.cc-search-input').forEach(initCCAutocomplete);
+  }
+
+  document.addEventListener('DOMContentLoaded', inicializarTodos);
+
+  // Reitera quando addComponent() clonar uma nova linha
+  const _addComponent = window.addComponent;
+  window.addComponent = function() {
+    if (_addComponent) _addComponent();
+    setTimeout(inicializarTodos, 100);
+  };
+})();
+</script>
+{% endblock %}

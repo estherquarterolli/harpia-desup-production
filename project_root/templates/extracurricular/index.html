@@ -1,0 +1,157 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Atividades Extracurriculares — Harpia-DESUP{% endblock %}
+{% block header_title %}Dashboard DESUP{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/extracurricular.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="p-2 md:p-0">
+
+  {# ── Cabeçalho da seção com abas ── #}
+  <div class="mb-6">
+    <div class="flex items-center gap-6 border-b border-slate-200 pb-0">
+      <a href="?status=ativas{% if request.GET.unidade_id %}&unidade_id={{ request.GET.unidade_id }}{% endif %}"
+         class="pb-3 text-sm font-black uppercase tracking-wide border-b-2 transition-colors
+           {% if request.GET.status != 'inativas' %}border-[#025c9f] text-[#025c9f]{% else %}border-transparent text-slate-400 hover:text-slate-600{% endif %}">
+        <i class="ph ph-check-circle mr-1"></i> Atividades Vigentes
+      </a>
+      <a href="?status=inativas{% if request.GET.unidade_id %}&unidade_id={{ request.GET.unidade_id }}{% endif %}"
+         class="pb-3 text-sm font-black uppercase tracking-wide border-b-2 transition-colors
+           {% if request.GET.status == 'inativas' %}border-[#025c9f] text-[#025c9f]{% else %}border-transparent text-slate-400 hover:text-slate-600{% endif %}">
+        <i class="ph ph-archive mr-1"></i> Atividades Anteriores
+      </a>
+    </div>
+    <p class="text-xs text-slate-400 mt-2">
+      {% if request.GET.status == 'inativas' %}
+        Atividades extracurriculares encerradas ou de períodos anteriores. Apenas visualização.
+      {% else %}
+        Gerencie as atividades extracurriculares por unidade e período letivo.
+      {% endif %}
+    </p>
+  </div>
+
+  {# ── Barra de ferramentas ── #}
+  <div class="flex flex-wrap items-center gap-3 mb-5">
+
+    {# Dropdown Selecionar Unidade — Admin vê todas; Unidade vê somente a própria (bloqueada) #}
+    {% if user.perfil == 'DESUP' or user.is_superuser %}
+      <div class="relative">
+        <select
+          id="select-unidade"
+          name="unidade_id"
+          class="select-unidade bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer pr-10 appearance-none"
+          hx-get="{% url 'extracurricular_index' %}"
+          hx-target="#table-container"
+          hx-trigger="change"
+          hx-indicator="#loading-spinner"
+          hx-include="[name='unidade_id']"
+        >
+          <option value="">Selecionar Unidade</option>
+          {% for unidade in unidades %}
+            <option value="{{ unidade.pk }}" {% if unidade_selecionada_id == unidade.pk|stringformat:"s" %}selected{% endif %}>
+              {{ unidade.sigla }} — {{ unidade.nome }}
+            </option>
+          {% endfor %}
+        </select>
+        <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
+      </div>
+    {% else %}
+      {# Unidade: exibe somente a própria, campo bloqueado #}
+      <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm opacity-75 cursor-not-allowed select-none">
+        <i class="ph ph-lock text-slate-400"></i>
+        {{ user.unidade.sigla }} — {{ user.unidade.nome }}
+      </div>
+    {% endif %}
+
+    {# Botão filtro (funil) #}
+    <button
+      onclick="toggleElement('filterPanel')"
+      id="btn-filter"
+      class="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm hover:bg-slate-50 transition-colors"
+      title="Filtros"
+    >
+      <i class="ph ph-funnel text-lg"></i>
+      <span class="hidden sm:inline">Filtrar</span>
+    </button>
+
+    {# Spinner de loading HTMX #}
+    <div id="loading-spinner" class="items-center gap-2 text-sm text-slate-500 font-semibold" aria-live="polite" style="display:none;">
+      <svg class="animate-spin w-4 h-4 text-[#025c9f]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+      </svg>
+      Carregando...
+    </div>
+
+    {# Spacer #}
+    <div class="flex-1"></div>
+
+    {# Botão Inserir Atividade #}
+    <a
+      href="{% url 'extracurricular_index' %}criar/"
+      id="btn-new-activity"
+      class="flex items-center gap-2 bg-[#ffb800] hover:bg-yellow-500 text-[#025c9f] font-black text-sm px-5 py-2.5 rounded-xl shadow-md transition-all hover:scale-105 active:scale-100"
+    >
+      <i class="ph ph-plus text-lg"></i>
+      Nova Atividade
+    </a>
+
+  </div>
+
+  {# ── Painel de filtros avançados (oculto por padrão) ── #}
+  <div id="filterPanel" class="menu-hidden mb-4 bg-white border border-slate-200 rounded-xl shadow-lg p-4">
+    <h4 class="text-xs font-black text-[#025c9f] uppercase mb-3">Filtros Avançados</h4>
+    <div class="flex flex-wrap gap-3">
+      <select
+        name="tipo_atividade"
+        class="border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-[#025c9f]"
+      >
+        <option value="">Todas as Categorias</option>
+        <option value="PROJETO_EXTENSAO">Projeto de Extensão</option>
+        <option value="MONITORIA">Monitoria</option>
+        <option value="ESTAGIO">Estágio</option>
+        <option value="PESQUISA">Pesquisa</option>
+        <option value="EVENTO">Evento Acadêmico</option>
+        <option value="COMISSAO">Comissão/Colegiado</option>
+        <option value="TCC">Orientação TCC</option>
+        <option value="OUTRO">Outro</option>
+      </select>
+      <select
+        name="status"
+        class="border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-[#025c9f]"
+      >
+        <option value="">Todos os Status</option>
+        <option value="ATIVA">Ativa</option>
+        <option value="PENDENTE">Pendente Aprovação</option>
+        <option value="ENCERRADA">Encerrada</option>
+        <option value="CANCELADA">Cancelada</option>
+      </select>
+    </div>
+  </div>
+
+  {# ── Tabela principal ── #}
+  <div id="table-container" class="relative">
+    {% include 'extracurricular/partials/_table_body.html' %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Exibir / ocultar o spinner durante requisições HTMX
+  document.body.addEventListener('htmx:beforeRequest', function() {
+    var s = document.getElementById('loading-spinner');
+    if (s) s.style.display = 'flex';
+  });
+  document.body.addEventListener('htmx:afterSwap', function() {
+    var s = document.getElementById('loading-spinner');
+    if (s) s.style.display = 'none';
+    if (window.lucide) lucide.createIcons();
+  });
+</script>
+{% endblock %}

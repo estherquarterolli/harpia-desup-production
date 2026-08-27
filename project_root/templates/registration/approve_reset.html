@@ -1,0 +1,87 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Aprovar Reset de Senha — HARPIA{% endblock %}
+{% block header_title %}Aprovação de Segurança{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto p-4 sm:p-0">
+    
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+        <header class="bg-slate-50 border-b border-slate-100 p-6">
+            <div class="flex items-center gap-3">
+                <div class="bg-[#025c9f] text-white p-3 rounded-xl">
+                    <i class="ph ph-shield-check text-2xl"></i>
+                </div>
+                <div>
+                    <h2 class="text-xl font-black text-[#025c9f] uppercase tracking-wide">Solicitação de Reset</h2>
+                    <p class="text-xs text-slate-400 font-bold uppercase tracking-widest mt-0.5">Protocolo: {{ reset_req.token }}</p>
+                </div>
+            </div>
+        </header>
+
+        <div class="p-8">
+            {% if success %}
+                <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center mb-6">
+                    <i class="ph ph-check-circle text-5xl text-emerald-500 mb-3"></i>
+                    <h3 class="text-lg font-black text-emerald-800">Sucesso!</h3>
+                    <p class="text-sm text-emerald-700 mt-2">{{ success }}</p>
+                    <a href="{% url 'dashboard' %}" class="mt-6 inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 px-6 rounded-xl transition-all shadow-md">
+                        Ir para o Dashboard <i class="ph ph-arrow-right"></i>
+                    </a>
+                </div>
+            {% elif error %}
+                <div class="bg-red-50 border border-red-200 rounded-2xl p-6 text-center mb-6">
+                    <i class="ph ph-warning-circle text-5xl text-red-500 mb-3"></i>
+                    <h3 class="text-lg font-black text-red-800">Atenção</h3>
+                    <p class="text-sm text-red-700 mt-2">{{ error }}</p>
+                    <a href="{% url 'dashboard' %}" class="mt-6 inline-flex items-center gap-2 border border-slate-200 text-slate-600 font-black py-2.5 px-6 rounded-xl transition-all">
+                        Voltar
+                    </a>
+                </div>
+            {% else %}
+                <div class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-1">
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Solicitante</span>
+                            <p class="text-base font-bold text-[#025c9f]">{{ reset_req.user.get_full_name|default:reset_req.user.email }}</p>
+                        </div>
+                        <div class="space-y-1">
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">E-mail</span>
+                            <p class="text-base font-bold text-[#025c9f]">{{ reset_req.user.email }}</p>
+                        </div>
+                        <div class="space-y-1">
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unidade</span>
+                            <p class="text-base font-bold text-[#025c9f]">{{ reset_req.user.unidade.nome|default:"Administração Central" }}</p>
+                        </div>
+                        <div class="space-y-1">
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data da Solicitação</span>
+                            <p class="text-base font-bold text-[#025c9f]">{{ reset_req.criado_em|date:"d/m/Y H:i" }}</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-amber-50 border border-amber-100 rounded-xl p-4 flex items-start gap-3 mt-8">
+                        <i class="ph ph-warning text-2xl text-amber-500 mt-0.5"></i>
+                        <p class="text-xs text-amber-800 leading-relaxed font-semibold">
+                            Ao aprovar esta solicitação, a senha do usuário será redefinida para a senha padrão do sistema (<span class="bg-amber-200 px-1 rounded">Faetec@123</span>) e ele será obrigado a cadastrar uma nova senha no próximo acesso.
+                        </p>
+                    </div>
+
+                    <form method="POST" class="mt-8">
+                        {% csrf_token %}
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <button type="submit" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-black py-4 rounded-xl shadow-lg transition-all transform hover:scale-[1.02] flex justify-center items-center gap-2">
+                                <i class="ph ph-check-circle text-xl"></i>
+                                APROVAR E RESETAR AGORA
+                            </button>
+                            <a href="{% url 'dashboard' %}" class="flex-1 border border-slate-200 text-slate-500 font-bold py-4 rounded-xl text-center hover:bg-slate-50 transition-colors">
+                                CANCELAR
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,101 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard DESUP - Harpia{% endblock %}
+
+{% block header_title %}Dashboard DESUP{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+
+    <!-- Cards de Visão Geral -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 border-b-4 border-b-blue-500">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Total Corpo Docente</p>
+            <h3 class="text-3xl font-black text-slate-800">{{ total_professores|default:"0" }}</h3>
+        </div>
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 border-b-4 border-b-indigo-500">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Conformidade</p>
+            <h3 class="text-3xl font-black text-slate-800">{{ conformidade }}</h3>
+        </div>
+        <div class="relative bg-white p-6 rounded-2xl shadow-sm border border-slate-100 border-b-4 border-b-emerald-500 group/card cursor-default">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Unidades Conformes</p>
+            <h3 class="text-3xl font-black text-slate-800">{{ unidades_conformes_count }}/{{ total_unidades }}</h3>
+            {% if unidades_nao_conformes %}
+            <div class="hidden group-hover/card:block absolute bottom-full mb-2 left-0 w-full bg-slate-800 text-white p-3 rounded-lg text-xs z-10 shadow-xl">
+                <strong class="block mb-1">⚠ Unidades com pendências:</strong>
+                <ul class="space-y-0.5">
+                    {% for uni in unidades_nao_conformes %}
+                    <li>
+                        <a href="{% url 'alloc_curricular' %}?unidade_id={{ uni.id }}" class="flex items-center gap-1.5 hover:text-amber-300 transition-colors">
+                            <i class="ph ph-warning-circle text-amber-400"></i>
+                            {{ uni.nome }}
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+        <a href="{% url 'extra_curricular:pendencia_list' %}"
+           class="inline-flex items-center gap-2 rounded-xl bg-[#025c9f] px-4 py-3 text-sm font-black text-white shadow-sm transition-colors hover:bg-[#153e70]">
+            <i class="ph ph-books text-lg"></i>
+            Pendências Extracurriculares
+        </a>
+    </div>
+
+    <!-- Tabela de Professores com filtros HTMX -->
+    <div>
+        <div class="flex flex-wrap justify-between items-center gap-4 mb-4">
+            <h2 class="text-sm font-bold text-slate-500 uppercase tracking-widest">Consulta de Professores</h2>
+            <div class="flex flex-wrap gap-3 items-end">
+                <div class="relative">
+                    <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input type="text" name="q" placeholder="Buscar..."
+                        class="pl-9 pr-4 py-2 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-400 w-48 js-autocomplete"
+                        hx-get="{% url 'dashboard_professores_partial' %}"
+                        hx-target="#dashboard-professor-table"
+                        hx-trigger="keyup changed delay:400ms"
+                        hx-include="[name='unidade_id'],[name='eixo']"
+                        autocomplete="off">
+                </div>
+                <select name="unidade_id"
+                    class="px-3 py-2 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                    hx-get="{% url 'dashboard_professores_partial' %}"
+                    hx-target="#dashboard-professor-table"
+                    hx-trigger="change"
+                    hx-include="[name='q'],[name='eixo']">
+                    <option value="">Todas Unidades</option>
+                    {% for u in unidades %}
+                    <option value="{{ u.id }}">{{ u.sigla }}</option>
+                    {% endfor %}
+                </select>
+                <select name="eixo"
+                    class="px-3 py-2 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                    hx-get="{% url 'dashboard_professores_partial' %}"
+                    hx-target="#dashboard-professor-table"
+                    hx-trigger="change"
+                    hx-include="[name='q'],[name='unidade_id']">
+                    <option value="">Todos os Eixos</option>
+                    {% for value, label in eixo_choices %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-x-auto">
+            <div id="dashboard-professor-table">
+                {% include 'dashboard/partials/_professor_table.html' %}
+            </div>
+        </div>
+    </div>
+
+    <a href="{% url 'core:exportar_logs' %}" class="inline-flex items-center bg-[#ffb800] text-[#025c9f] font-black py-3 px-8 rounded-xl shadow-sm uppercase text-xs hover:bg-yellow-400 transition-colors text-center">
+        <i class="ph ph-file-csv mr-2 text-lg"></i>Gerar LOG
+    </a>
+
+</div>
+{% endblock %}

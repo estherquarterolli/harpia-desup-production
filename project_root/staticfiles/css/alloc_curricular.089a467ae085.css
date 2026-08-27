@@ -1,0 +1,76 @@
+/* Configuração do Fundo Quadriculado */
+.bg-grid {
+    background-color: #f8fafc;
+    background-image: 
+        linear-gradient(to right, #e2e8f0 1px, transparent 1px),
+        linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
+    background-size: 30px 30px;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 80px;
+    background-color: #1e3a5f;
+    color: white;
+    transition: width 0.3s;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+.sidebar:hover { width: 240px; }
+.logo-container { padding: 20px; display: flex; align-items: center; }
+.logo-text { display: none; font-weight: 900; margin-left: 15px; text-transform: uppercase; }
+.sidebar:hover .logo-text { display: block; }
+.nav-links a { padding: 15px 25px; display: flex; align-items: center; gap: 15px; transition: 0.2s; }
+.nav-links a i { font-size: 24px; }
+.nav-links a span { display: none; }
+.sidebar:hover .nav-links a span { display: block; }
+.nav-links a.active { background-color: #1e4e8c; border-left: 4px solid #ffb800; }
+
+/* Header e Tipografia */
+.header-title { font-size: 32px; font-weight: 900; color: #1e3a5f; letter-spacing: -1px; }
+.section-title { font-size: 24px; font-weight: 800; color: #1e3a5f; }
+.profile-card { display: flex; align-items: center; gap: 12px; background: white; padding: 5px 15px; border-radius: 50px; border: 1px solid #e2e8f0; }
+
+/* Controles */
+.custom-select {
+    appearance: none;
+    width: 100%;
+    background: #e2e8f0;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-weight: 700;
+    color: #1e3a5f;
+    cursor: pointer;
+}
+.filter-btn {
+    background: #e2e8f0;
+    padding: 10px 15px;
+    border-radius: 12px;
+    color: #1e3a5f;
+    font-size: 20px;
+}
+
+/* Tabela */
+.table-container {
+    background: white;
+    border-radius: 15px 15px 0 0;
+    border: 2px solid #1e3a5f;
+    overflow: hidden;
+}
+thead { background-color: #e2e8f0; }
+th {
+    padding: 12px 8px;
+    font-size: 11px;
+    font-weight: 900;
+    color: #1e3a5f;
+    text-transform: uppercase;
+    border-bottom: 2px solid #1e3a5f;
+}
+td {
+    height: 40px;
+    border-bottom: 1px solid #1e3a5f;
+    border-right: 1px solid #1e3a5f;
+}
+.br-r { border-right: 2px solid #1e3a5f; }

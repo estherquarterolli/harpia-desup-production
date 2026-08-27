@@ -1,0 +1,106 @@
+/* ═══════════════════════════════════════════════════════════
+   Extracurricular Module — Estilos Específicos
+   Prisma
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Status Badges ─────────────────────────────────────── */
+.badge-ativa {
+  background: #dcfce7;
+  color: #166534;
+}
+.badge-pendente {
+  background: #fef9c3;
+  color: #854d0e;
+}
+.badge-encerrada {
+  background: #f1f5f9;
+  color: #64748b;
+}
+.badge-cancelada {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* ─── Toolbar Select (Unidade) ──────────────────────────── */
+.select-unidade {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%231e3a5f'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right .6rem center;
+  background-size: 1rem;
+  padding-right: 2rem;
+}
+
+/* ─── HTMX Loading Indicator ───────────────────────────── */
+#table-container.htmx-request::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,.6);
+  z-index: 10;
+  border-radius: .75rem;
+}
+
+/* ─── Animated Row Highlight ───────────────────────────── */
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+tbody tr {
+  animation: row-in .2s ease;
+}
+
+/* ─── Category Badges (Cores por Tipo) ─────────────────── */
+.cat-projeto_extensao { background: #eef2ff; color: #4338ca; }
+.cat-monitoria        { background: #ecfdf5; color: #047857; }
+.cat-estagio          { background: #fffbeb; color: #b45309; }
+.cat-pesquisa         { background: #ecfeff; color: #0e7490; }
+.cat-evento           { background: #fff1f2; color: #be123c; }
+.cat-comissao         { background: #f5f3ff; color: #6d28d9; }
+.cat-tcc              { background: #f0fdfa; color: #0f766e; }
+.cat-outro            { background: #f8fafc; color: #64748b; }
+
+/* ─── Card Hover Effects ───────────────────────────────── */
+.card-extracurricular {
+  transition: box-shadow .2s ease, transform .15s ease;
+}
+.card-extracurricular:hover {
+  box-shadow: 0 8px 25px -5px rgba(30, 58, 95, .08);
+  transform: translateY(-1px);
+}
+
+/* ─── Form Locked State ────────────────────────────────── */
+.form-locked fieldset {
+  opacity: .6;
+  pointer-events: none;
+}
+.form-locked .btn-save {
+  cursor: not-allowed;
+  opacity: .5;
+}
+
+/* ─── Responsive table scroll ──────────────────────────── */
+@media (max-width: 768px) {
+  #table-container .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+  #table-container table {
+    min-width: 700px;
+  }
+}
+
+/* ─── Pulse Animation for Pending Status ───────────────── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .4; }
+}
+.pulse-pending::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #eab308;
+  margin-right: 4px;
+  animation: pulse-dot 1.5s infinite;
+}

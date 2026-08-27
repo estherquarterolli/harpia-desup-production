@@ -1,0 +1,154 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Matrizes Curriculares | Harpia{% endblock %}
+{% block header_title %}Matrizes Curriculares{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+    <form method="get" class="flex flex-wrap items-end gap-4" id="matrix-filter-form">
+
+      {% if is_desup %}
+      <div class="flex-grow min-w-[160px]">
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Unidade</label>
+        <div class="relative">
+          <select name="unidade_id" id="id_unidade_select"
+            hx-get="{% url 'courses:load_courses_by_unit' %}?global=1"
+            hx-target="#id_curso_select"
+            hx-trigger="change"
+            class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition pr-10 appearance-none select-custom font-semibold text-[#025c9f]">
+            <option value="">Todas as Unidades</option>
+            {% for u in unidades %}
+            <option value="{{ u.id }}" {% if request.GET.unidade_id == u.id|stringformat:"s" %}selected{% endif %}>
+              {{ u.sigla }} — {{ u.nome }}
+            </option>
+            {% endfor %}
+          </select>
+          <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
+        </div>
+      </div>
+      {% else %}
+      {% if request.user.unidade %}
+      <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm mb-0.5">
+        <i class="ph ph-buildings text-[#025c9f] text-base"></i>
+        {{ request.user.unidade.sigla }} — {{ request.user.unidade.nome }}
+      </div>
+      {% endif %}
+      {% endif %}
+
+      <div class="flex-grow min-w-[160px]">
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Curso</label>
+        <div class="relative">
+          <select name="curso_id" id="id_curso_select"
+            class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition pr-10 appearance-none select-custom font-semibold text-[#025c9f]">
+            <option value="">Todos os Cursos</option>
+            {% for c in cursos %}
+            <option value="{{ c.id }}" {% if request.GET.curso_id == c.id|stringformat:"s" %}selected{% endif %}>
+              {{ c.sigla }} — {{ c.nome }}
+            </option>
+            {% endfor %}
+          </select>
+          <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
+        </div>
+      </div>
+
+      <div class="flex-grow min-w-[160px]">
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Status</label>
+        <div class="relative">
+          <select name="status"
+            class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition pr-10 appearance-none select-custom font-semibold text-[#025c9f]">
+            <option value="">Todos os Status</option>
+            <option value="vigente" {% if request.GET.status == 'vigente' or not request.GET.status and request.GET.status != '' %}selected{% endif %}>Vigentes</option>
+            <option value="rascunho" {% if request.GET.status == 'rascunho' %}selected{% endif %}>Rascunhos</option>
+            <option value="historico" {% if request.GET.status == 'historico' %}selected{% endif %}>Histórico (Anteriores)</option>
+          </select>
+          <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
+        </div>
+      </div>
+
+      <div class="flex gap-2">
+        <button type="submit"
+          class="px-5 py-2.5 bg-[#025c9f] hover:bg-[#153e70] text-white text-sm font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm uppercase tracking-wider text-xs">
+          <i class="ph ph-funnel text-base"></i> Filtrar
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+    <div class="flex justify-between items-center px-6 py-4 border-b border-slate-100">
+      <p class="text-sm font-semibold text-slate-500">{{ matrices|length }} matriz(es) encontrada(s)</p>
+      {% if is_desup %}
+      <a href="{% url 'courses:matrix_create' %}{% if request.GET.unidade_id %}?unidade_id={{ request.GET.unidade_id }}{% endif %}"
+        class="flex items-center gap-2 bg-[#ffb800] hover:bg-yellow-400 text-[#025c9f] px-4 py-2.5 rounded-xl text-sm font-black transition-colors shadow-md">
+        <i class="ph ph-plus"></i> Nova Matriz
+      </a>
+      {% endif %}
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse min-w-[700px]">
+        <thead class="bg-[#025c9f] text-white text-[10px] font-black uppercase tracking-widest">
+          <tr>
+            {% if is_desup %}
+            <th class="px-5 py-3">Unidade</th>
+            {% endif %}
+            <th class="px-5 py-3">Curso</th>
+            <th class="px-5 py-3">Código da Matriz</th>
+            <th class="px-5 py-3 text-center">Componentes</th>
+            <th class="px-5 py-3 text-center">CH Total</th>
+            <th class="px-5 py-3 text-center">Status</th>
+            <th class="px-5 py-3 text-center">Ações</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 text-sm">
+          {% for matrix in matrices %}
+          <tr class="hover:bg-slate-50 transition-colors">
+            {% if is_desup %}
+            <td class="px-5 py-3 text-slate-600 font-semibold text-xs max-w-[180px]">
+              {% for u in matrix.unidades.all %}{{ u.nome }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}
+            </td>
+            {% endif %}
+            <td class="px-5 py-3 font-bold text-slate-800 cursor-pointer" onclick="window.location='{% url 'courses:matrix_detail' matrix.pk %}'">{{ matrix.curso.sigla }}</td>
+            <td class="px-5 py-3 text-slate-600 font-semibold cursor-pointer" onclick="window.location='{% url 'courses:matrix_detail' matrix.pk %}'">{{ matrix.nome|default:"—" }}</td>
+            <td class="px-5 py-3 text-center font-semibold text-slate-600">{{ matrix.qtd_componentes|default:0 }}</td>
+            <td class="px-5 py-3 text-center font-semibold text-slate-600">{{ matrix.ch_total|default:0 }}h</td>
+            <td class="px-5 py-3 text-center">
+              {% if matrix.is_rascunho %}
+              <span class="px-2.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-bold">Rascunho</span>
+              {% elif matrix.is_vigente %}
+              <span class="px-2.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold">Vigente</span>
+              {% else %}
+              <span class="px-2.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-bold">Histórico</span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-3 text-center">
+              {% if matrix.is_rascunho %}
+              <a href="{% url 'courses:matrix_update' matrix.pk %}"
+                class="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-xs font-bold transition-colors border border-amber-200">
+                <i class="ph ph-pencil-simple"></i> Editar Rascunho
+              </a>
+              {% else %}
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-50 text-slate-300 rounded-lg text-[10px] font-bold border border-slate-100" title="Apenas rascunhos podem ser editados">
+                <i class="ph ph-lock-simple"></i> Bloqueado
+              </span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="px-6 py-16 text-center text-slate-400 font-semibold">
+              <i class="ph ph-file-text text-5xl opacity-20 mb-3 block"></i>
+              Nenhuma matriz encontrada.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
