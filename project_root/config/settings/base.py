@@ -5,8 +5,6 @@ Django settings for config project.
 from pathlib import Path
 from decouple import config
 from django.templatetags.static import static
-from django.urls import reverse_lazy
-from django.utils.translation import gettext_lazy as _
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -305,129 +303,136 @@ UNFOLD = {
     "SIDEBAR": {
         "show_search": True,
         "show_all_applications": False,
+        # Títulos e links abaixo são strings literais (não gettext_lazy /
+        # reverse_lazy) de propósito: o build do Vercel serializa
+        # django.conf.settings com json.dumps antes dos apps do Django
+        # estarem prontos, e forçar a avaliação de um lazy object nesse
+        # momento quebra com "AppRegistryNotReady". Como o app não tem
+        # troca de idioma (LANGUAGE_CODE fixo em pt-br), gettext_lazy não
+        # tinha efeito prático aqui mesmo.
         "navigation": [
             {
-                "title": _("Pessoas"),
+                "title": "Pessoas",
                 "separator": True,
                 "collapsible": True,
                 "items": [
                     {
-                        "title": _("Professores"),
+                        "title": "Professores",
                         "icon": "school",
-                        "link": reverse_lazy("alloc_admin:professors_professor_changelist"),
+                        "link": "/admin/professors/professor/",
                     },
                     {
-                        "title": _("Tipos de Contrato"),
+                        "title": "Tipos de Contrato",
                         "icon": "badge",
-                        "link": reverse_lazy("alloc_admin:professors_contracttype_changelist"),
+                        "link": "/admin/professors/contracttype/",
                     },
                     {
-                        "title": _("Disponibilidades"),
+                        "title": "Disponibilidades",
                         "icon": "event_available",
-                        "link": reverse_lazy("alloc_admin:professors_availability_changelist"),
+                        "link": "/admin/professors/availability/",
                     },
                     {
-                        "title": _("Ausências"),
+                        "title": "Ausências",
                         "icon": "event_busy",
-                        "link": reverse_lazy("alloc_admin:professors_absencerecord_changelist"),
+                        "link": "/admin/professors/absencerecord/",
                     },
                 ],
             },
             {
-                "title": _("Gestão Acadêmica"),
+                "title": "Gestão Acadêmica",
                 "separator": True,
                 "collapsible": True,
                 "items": [
                     {
-                        "title": _("Cursos"),
+                        "title": "Cursos",
                         "icon": "menu_book",
-                        "link": reverse_lazy("alloc_admin:courses_course_changelist"),
+                        "link": "/admin/courses/course/",
                     },
                     {
-                        "title": _("Cursos por Unidade"),
+                        "title": "Cursos por Unidade",
                         "icon": "domain",
-                        "link": reverse_lazy("alloc_admin:courses_courseunit_changelist"),
+                        "link": "/admin/courses/courseunit/",
                     },
                     {
-                        "title": _("Componentes Curriculares"),
+                        "title": "Componentes Curriculares",
                         "icon": "book_4",
-                        "link": reverse_lazy("alloc_admin:courses_curricularcomponent_changelist"),
+                        "link": "/admin/courses/curricularcomponent/",
                     },
                     {
-                        "title": _("Matrizes Curriculares"),
+                        "title": "Matrizes Curriculares",
                         "icon": "account_tree",
-                        "link": reverse_lazy("alloc_admin:courses_curriculummatrix_changelist"),
+                        "link": "/admin/courses/curriculummatrix/",
                     },
                     {
-                        "title": _("Componentes da Matriz"),
+                        "title": "Componentes da Matriz",
                         "icon": "view_list",
-                        "link": reverse_lazy("alloc_admin:courses_matrixcomponent_changelist"),
+                        "link": "/admin/courses/matrixcomponent/",
                     },
                     {
-                        "title": _("Turmas"),
+                        "title": "Turmas",
                         "icon": "groups",
-                        "link": reverse_lazy("alloc_admin:courses_classgroup_changelist"),
+                        "link": "/admin/courses/classgroup/",
                     },
                 ],
             },
             {
-                "title": _("Alocação & Extracurricular"),
+                "title": "Alocação & Extracurricular",
                 "separator": True,
                 "collapsible": True,
                 "items": [
                     {
-                        "title": _("Alocações Curriculares"),
+                        "title": "Alocações Curriculares",
                         "icon": "calendar_month",
-                        "link": reverse_lazy("alloc_admin:allocations_alocacaocurricular_changelist"),
+                        "link": "/admin/allocations/alocacaocurricular/",
                     },
                     {
-                        "title": _("Pendências Extracurriculares"),
+                        "title": "Pendências Extracurriculares",
                         "icon": "assignment_late",
-                        "link": reverse_lazy("alloc_admin:extra_curricular_pendenciaextra_changelist"),
+                        "link": "/admin/extra_curricular/pendenciaextra/",
                     },
                 ],
             },
             {
-                "title": _("Configurações do Sistema"),
+                "title": "Configurações do Sistema",
                 "separator": True,
                 "collapsible": True,
                 "items": [
                     {
-                        "title": _("Unidades"),
+                        "title": "Unidades",
                         "icon": "account_balance",
-                        "link": reverse_lazy("alloc_admin:core_unidade_changelist"),
+                        "link": "/admin/core/unidade/",
                     },
                     {
-                        "title": _("Janelas de Entrega"),
+                        "title": "Janelas de Entrega",
                         "icon": "lock_clock",
-                        "link": reverse_lazy("alloc_admin:core_janelaentrega_changelist"),
+                        "link": "/admin/core/janelaentrega/",
                     },
                     {
-                        "title": _("Notificações"),
+                        "title": "Notificações",
                         "icon": "notifications",
-                        "link": reverse_lazy("alloc_admin:core_notificacao_changelist"),
+                        "link": "/admin/core/notificacao/",
                     },
                     {
-                        "title": _("Auditoria Global"),
+                        "title": "Auditoria Global",
                         "icon": "history",
-                        "link": reverse_lazy("alloc_admin:core_auditoriaglobal_changelist"),
+                        "link": "/admin/core/auditoriaglobal/",
                     },
                 ],
             },
             {
-                "title": _("Usuários & Permissões"),
+                "title": "Usuários & Permissões",
                 "separator": True,
                 "collapsible": True,
                 "items": [
                     {
-                        "title": _("Usuários"),
+                        "title": "Usuários",
                         "icon": "person",
-                        "link": reverse_lazy("alloc_admin:accounts_user_changelist"),
+                        "link": "/admin/accounts/user/",
                     },
                     {
-                        "title": _("Grupos"),
+                        "title": "Grupos",
                         "icon": "group",
-                        "link": reverse_lazy("alloc_admin:auth_group_changelist"),
+                        "link": "/admin/auth/group/",
                     },
                 ],
             },
