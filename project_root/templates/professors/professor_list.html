@@ -124,14 +124,14 @@
             {% endfor %}
           {% endif %}
 
-          <td class="px-5 py-4 text-center border-l border-slate-100 font-semibold text-slate-700" data-label="CH Justificada">{{ prof.ch_justificada|floatformat:0 }}h</td>
+          <td class="px-5 py-4 text-center border-l border-slate-100 font-semibold text-slate-700" data-label="CH Justificada">{{ prof.ch_justificada_total|floatformat:0 }}h</td>
           <td class="px-5 py-4 text-center font-bold text-slate-800" data-label="Total de Horas">{{ prof.soma_horas|floatformat:0 }}h</td>
-          <td class="px-5 py-4 text-center font-semibold {% if prof.ch_nao_alocada > 0 %}text-red-500{% else %}text-emerald-500{% endif %}" data-label="Não Alocado">
-            {{ prof.ch_nao_alocada|floatformat:0 }}h
+          <td class="px-5 py-4 text-center font-semibold {% if prof.ch_nao_alocada_total > 0 %}text-red-500{% else %}text-emerald-500{% endif %}" data-label="Não Alocado">
+            {{ prof.ch_nao_alocada_total|floatformat:0 }}h
           </td>
           <td class="px-5 py-4 text-center" data-label="% Alocado">
-            <span class="px-2 py-1 rounded text-[10px] font-black {% if prof.percentual_alocado >= 100 %}bg-emerald-100 text-emerald-700{% elif prof.percentual_alocado > 0 %}bg-amber-100 text-amber-700{% else %}bg-slate-100 text-slate-500{% endif %}">
-              {{ prof.percentual_alocado }}%
+            <span class="px-2 py-1 rounded text-[10px] font-black {% if prof.percentual_alocado_total >= 100 %}bg-emerald-100 text-emerald-700{% elif prof.percentual_alocado_total > 0 %}bg-amber-100 text-amber-700{% else %}bg-slate-100 text-slate-500{% endif %}">
+              {{ prof.percentual_alocado_total }}%
             </span>
           </td>
 

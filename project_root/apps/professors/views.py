@@ -12,6 +12,64 @@ from .forms import ProfessorForm
 from .models import Professor
 
 
+def _bulk_ch_alocada(professor_ids):
+    """
+    `Professor.ch_alocada` pra vários professores numa query só, em vez de N.
+
+    ch_alocada é @property (soma de MatrixComponent com dedup por
+    "compartilhado"); chamá-la por professor num loop de listagem abre uma
+    query por professor — com ~190 professores isso sozinho já estourava os
+    30s de timeout do Vercel. Mesma lógica de dedup, calculada em lote.
+    """
+    from apps.courses.models import MatrixComponent
+
+    componentes = MatrixComponent.objects.filter(
+        docente_id__in=professor_ids,
+        matriz__is_vigente=True,
+    ).values("docente_id", "componente_curricular_id", "compartilhado", "carga_horaria", "pk")
+
+    mapa = {}
+    vistos = {}
+    for comp in componentes:
+        pid = comp["docente_id"]
+        vistos.setdefault(pid, set())
+        chave = comp["componente_curricular_id"] if comp["compartilhado"] else comp["pk"]
+        if chave in vistos[pid]:
+            continue
+        vistos[pid].add(chave)
+        ha_semanal = (comp["carga_horaria"] or 0) / 20.0
+        mapa[pid] = mapa.get(pid, 0) + ha_semanal
+    return mapa
+
+
+def _bulk_ch_justificada(professor_ids):
+    """
+    `Professor.ch_justificada` (via `PendenciaExtra.ch_total_justificada`) pra
+    vários professores numa query só, em vez de N + N*3 (cada pendência abria
+    3 queries pra somar TCC/extensão/redução aprovados).
+    """
+    from apps.extra_curricular.models import ParecerChoices, PendenciaExtra
+    from apps.extra_curricular.utils import semestre_atual
+
+    pendencias = PendenciaExtra.objects.filter(
+        professor_id__in=professor_ids,
+        semestre=semestre_atual(),
+    ).prefetch_related("orientacoes_tcc", "atividades_extensao", "reducoes_ch")
+
+    mapa = {}
+    for p in pendencias:
+        if p.status not in PendenciaExtra.STATUS_FINALIZADOS:
+            continue
+        total = 0.0
+        for itens in (p.orientacoes_tcc.all(), p.atividades_extensao.all(), p.reducoes_ch.all()):
+            total += sum(
+                float(item.ch_aprovada) for item in itens
+                if item.parecer_desup == ParecerChoices.APROVADO
+            )
+        mapa[p.professor_id] = mapa.get(p.professor_id, 0.0) + total
+    return mapa
+
+
 def _perfil_desup(user):
     """Critério único de "enxerga todas as unidades" usado no app inteiro.
 
@@ -82,11 +140,27 @@ class ProfessorListView(LoginRequiredMixin, ListView):
             ).first()
             ctx['unidade_atual'] = unidade_atual
 
-        # Garantir que os atributos dinâmicos existam mesmo sem unidade selecionada
+        # ch_alocada/ch_justificada são @property calculadas por query — chamá-las
+        # por professor (inclusive indiretamente, via ch_nao_alocada/percentual_alocado
+        # no template) multiplicava por N professores. Calculado em lote uma vez só
+        # e exposto como atributo simples (_total) que o template usa no lugar da
+        # property crua.
         professores_list = list(ctx['professores'])
+        professor_ids = [p.pk for p in professores_list]
+        ch_alocada_map = _bulk_ch_alocada(professor_ids)
+        ch_justificada_map = _bulk_ch_justificada(professor_ids)
         for prof in professores_list:
             prof.alocacao_map = {}
-            prof.soma_horas = 0
+            ch_alocada_total = ch_alocada_map.get(prof.pk, 0)
+            ch_justificada_total = ch_justificada_map.get(prof.pk, 0.0)
+            prof.ch_alocada_total = ch_alocada_total
+            prof.ch_justificada_total = ch_justificada_total
+            prof.soma_horas = ch_alocada_total + ch_justificada_total
+            prof.ch_nao_alocada_total = max(prof.ch_total - prof.soma_horas, 0)
+            prof.percentual_alocado_total = (
+                round(min((prof.soma_horas / prof.ch_total) * 100, 100.0), 2)
+                if prof.ch_total else 0.0
+            )
         ctx['professores'] = professores_list
 
         if unidade_atual:
@@ -134,10 +208,8 @@ class ProfessorListView(LoginRequiredMixin, ListView):
 
                     for prof in professores_list:
                         prof.alocacao_map = alocacao_map_por_prof.get(prof.id, {})
-                        try:
-                            prof.soma_horas = prof.ch_alocada + prof.ch_justificada
-                        except Exception:
-                            prof.soma_horas = 0
+                        # soma_horas/ch_*_total já vêm calculados em lote acima;
+                        # este bloco só adiciona o detalhamento por matriz (alocacao_map).
             except Exception:
                 import logging
                 logging.getLogger(__name__).exception("Erro ao montar contexto de professores")
@@ -290,7 +362,26 @@ def htmx_tabela_alocacao(request):
             queryset = queryset.filter(unidade_principal_id=unidade_id)
     else:
         queryset = queryset.filter(unidade_principal=user.unidade)
-    return render(request, 'professors/partials/_linhas_alocacao.html', {'professores': queryset})
+
+    # Mesmo motivo do ProfessorListView: ch_justificada/ch_nao_alocada/
+    # percentual_alocado como property por linha vira N+1 (essa tabela carrega
+    # sozinha via hx-trigger="load" assim que a página abre).
+    professores = list(queryset)
+    professor_ids = [p.pk for p in professores]
+    ch_alocada_map = _bulk_ch_alocada(professor_ids)
+    ch_justificada_map = _bulk_ch_justificada(professor_ids)
+    for prof in professores:
+        ch_alocada_total = ch_alocada_map.get(prof.pk, 0)
+        ch_justificada_total = ch_justificada_map.get(prof.pk, 0.0)
+        prof.ch_justificada_total = ch_justificada_total
+        soma = ch_alocada_total + ch_justificada_total
+        prof.ch_nao_alocada_total = max(prof.ch_total - soma, 0)
+        prof.percentual_alocado_total = (
+            round(min((soma / prof.ch_total) * 100, 100.0), 2)
+            if prof.ch_total else 0.0
+        )
+
+    return render(request, 'professors/partials/_linhas_alocacao.html', {'professores': professores})
 
 
 class ProfessorCursosPartialView(LoginRequiredMixin, View):

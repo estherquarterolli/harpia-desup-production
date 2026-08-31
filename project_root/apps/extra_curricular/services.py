@@ -147,13 +147,12 @@ def get_professores_com_pendencia(unidade_id: int, semestre: str, q: str = "") -
     (ch_alocada < max_class_hours do contrato).
 
     A verificação é feita em Python porque ch_alocada é uma @property
-    calculada a partir de agregações relacionadas.
+    calculada a partir de agregações relacionadas — mas usando `_bulk_ch_alocada`
+    (uma query só pra todos os professores) em vez de acessar a property por
+    professor, que abria uma query por professor (N+1 — chegava a travar/dar
+    timeout no Vercel com o banco remoto).
     """
-    professores = (
-        Professor.objects
-        .select_related("tipo_contrato")
-        .prefetch_related("componentes_matriz")
-    )
+    professores = Professor.objects.select_related("tipo_contrato")
     if unidade_id:
         professores = professores.filter(unidade_principal_id=unidade_id)
 
@@ -163,12 +162,47 @@ def get_professores_com_pendencia(unidade_id: int, semestre: str, q: str = "") -
             Q(rh_nome__icontains=q) | Q(desup_nome__icontains=q)
         )
 
+    professores = list(professores)
+    ch_map = _bulk_ch_alocada([p.pk for p in professores])
+
     pendentes = []
     for prof in professores:
         meta = prof.tipo_contrato.max_class_hours if prof.tipo_contrato else 20
-        if prof.ch_alocada < meta:
+        if ch_map.get(prof.pk, 0) < meta:
             pendentes.append(prof.pk)
     return Professor.objects.filter(pk__in=pendentes).select_related("tipo_contrato")
+
+
+def _bulk_ch_alocada(professor_ids):
+    """
+    Calcula `Professor.ch_alocada` (CH alocada, componentes compartilhados
+    contam uma única vez) pra vários professores numa query só, em vez de N.
+
+    Mesma lógica de dedup da property (`apps/professors/models.py`), só que
+    em lote — evita reabrir a query por professor, que é o que causava os
+    timeouts nas telas de professores/extracurricular no Vercel.
+    """
+    from apps.courses.models import MatrixComponent
+
+    # ha_semanal é @property (carga_horaria / 20.0), não dá pra pedir direto no
+    # .values() — busca o campo real (carga_horaria) e calcula igual à property.
+    componentes = MatrixComponent.objects.filter(
+        docente_id__in=professor_ids,
+        matriz__is_vigente=True,
+    ).values("docente_id", "componente_curricular_id", "compartilhado", "carga_horaria", "pk")
+
+    mapa = {}
+    vistos = {}
+    for comp in componentes:
+        pid = comp["docente_id"]
+        vistos.setdefault(pid, set())
+        chave = comp["componente_curricular_id"] if comp["compartilhado"] else comp["pk"]
+        if chave in vistos[pid]:
+            continue
+        vistos[pid].add(chave)
+        ha_semanal = (comp["carga_horaria"] or 0) / 20.0
+        mapa[pid] = mapa.get(pid, 0) + ha_semanal
+    return mapa
 
 
 def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
@@ -177,7 +211,8 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
     professores com pendência + seus registros de PendenciaExtra (se existirem).
     Se um professor tiver múltiplas justificativas, elas retornam como linhas separadas.
     """
-    professores_pendentes = get_professores_com_pendencia(unidade_id, semestre, q)
+    professores_pendentes = list(get_professores_com_pendencia(unidade_id, semestre, q))
+    ch_alocada_map = _bulk_ch_alocada([p.pk for p in professores_pendentes])
 
     # Buscar todas as pendências extras deste semestre
     filters = {"semestre": semestre}
@@ -198,7 +233,7 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
     result = []
     for prof in professores_pendentes:
         meta = prof.tipo_contrato.max_class_hours if prof.tipo_contrato else 20
-        ch_alocada = prof.ch_alocada
+        ch_alocada = ch_alocada_map.get(prof.pk, 0)
         ch_pendente = max(meta - ch_alocada, 0)
         pendencia = pendencias_existentes.get(prof.pk)
 
