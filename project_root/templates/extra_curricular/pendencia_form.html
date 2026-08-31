@@ -7,15 +7,13 @@
 {% block content %}
 <div class="p-2 md:p-0 max-w-3xl">
 
-  {% if window_fechada %}
-  <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 flex items-start gap-3 mb-4">
-    <i class="ph ph-lock-key text-2xl text-amber-600"></i>
-    <div>
-      <p class="font-black">Janela de entrega fechada</p>
-      <p class="text-xs mt-0.5">{{ window_message }}</p>
-    </div>
-  </div>
-  {% endif %}
+  {% comment %}
+  CORR-014: o aviso "Janela de entrega fechada" fica SÓ no base.html (o ramo de
+  janela_fechada), que é o único com o botão "Solicitar abertura". O banner inline
+  que existia aqui era o segundo pop-up duplicado para o perfil unidade —
+  janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo público
+  (COORDENADOR_UNIDADE; DESUP/superuser fazem bypass da janela).
+  {% endcomment %}
 
   {# Breadcrumb #}
   <nav class="breadcrumb-container mb-5" aria-label="Breadcrumb">
