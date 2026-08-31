@@ -2,9 +2,9 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Sum
 from django.http import HttpResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from django.views import View
 from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 
@@ -70,6 +70,9 @@ class CurriculumMatrixListView(MatrixBaseView, ListView):
                 qs = qs.filter(unidades=user.unidade)
             else:
                 qs = qs.none()
+            # Rascunhos são visíveis somente para a DESUP até a publicação —
+            # a unidade nunca enxerga matrizes em rascunho (nem forçando ?status=rascunho).
+            qs = qs.exclude(is_rascunho=True)
 
         # Filtro de unidade (Admin DESUP pode selecionar)
         unidade_id = self.request.GET.get('unidade_id')
@@ -202,11 +205,9 @@ class CurriculumMatrixFormsetMixin:
         else:
             self.object.is_rascunho = False
             self.object.is_vigente = True
-            # Auto-archive: arquiva outras matrizes do mesmo curso
-            CurriculumMatrix.objects.filter(
-                curso=self.object.curso,
-                is_vigente=True
-            ).exclude(pk=self.object.pk).update(is_vigente=False)
+            # CORR-011: sem auto-arquivamento. Publicar/duplicar uma matriz NÃO arquiva mais
+            # as demais do mesmo curso — matrizes de turnos diferentes coexistem como vigentes.
+            # O arquivamento passa a ser manual (CORR-012) ou em massa na virada de semestre.
 
         self.object.save()
         form.save_m2m()
@@ -223,6 +224,11 @@ class CurriculumMatrixCreateView(CurriculumMatrixFormsetMixin, MatrixBaseView, C
     success_url = reverse_lazy('courses:matrix_list')
 
     def dispatch(self, request, *args, **kwargs):
+        # Quem cuida do anônimo é o LoginRequiredMixin, e ele só age dentro do
+        # super().dispatch() — ler `perfil` antes disso estoura AttributeError em
+        # AnonymousUser (500 em vez do redirecionamento para o login).
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
         if not (request.user.is_superuser or request.user.perfil == 'DESUP'):
             messages.error(request, 'Somente a DESUP pode cadastrar nova matriz.')
             return redirect('courses:matrix_list')
@@ -251,6 +257,16 @@ class CurriculumMatrixUpdateView(CurriculumMatrixFormsetMixin, MatrixBaseView, U
     success_url = reverse_lazy('courses:matrix_list')
 
     def dispatch(self, request, *args, **kwargs):
+        # Anônimo é problema do LoginRequiredMixin (dentro do super().dispatch()):
+        # tocar em `perfil` antes disso quebra com AnonymousUser.
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
+
+        # Somente a DESUP (ou super admin) pode editar matriz — a unidade não edita.
+        if not (request.user.is_superuser or request.user.perfil == 'DESUP'):
+            messages.error(request, 'Somente a DESUP pode editar matrizes.')
+            return redirect('courses:matrix_list')
+
         obj = self.get_object()
 
         # Regra principal: APENAS matrizes em rascunho podem ser editadas
@@ -280,8 +296,78 @@ class CurriculumMatrixDetailView(MatrixBaseView, DetailView):
         if user.is_superuser or user.perfil == 'DESUP':
             return qs
         if user.unidade:
-            return qs.filter(unidades=user.unidade)
+            # Unidade vê só as suas matrizes já publicadas; rascunho é exclusivo da DESUP.
+            return qs.filter(unidades=user.unidade).exclude(is_rascunho=True)
         return qs.none()
+
+
+# ─────────────────────────────────────────────
+# CORR-012: Arquivar / Reativar matriz (ação manual, DESUP-only)
+# ─────────────────────────────────────────────
+
+class _MatrixDesupActionView(MatrixBaseView, View):
+    """Base das ações de status de matriz — só DESUP/superuser, via POST."""
+
+    def dispatch(self, request, *args, **kwargs):
+        # Rota de escrita: sem sessão, o LoginRequiredMixin (dentro do super().dispatch())
+        # manda para o login. Checar `perfil` antes disso estouraria em AnonymousUser.
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
+        if not (request.user.is_superuser or request.user.perfil == 'DESUP'):
+            messages.error(request, 'Somente a DESUP pode alterar o status de matrizes.')
+            return redirect('courses:matrix_list')
+        return super().dispatch(request, *args, **kwargs)
+
+    def _redirect_back(self, request):
+        return redirect(request.META.get('HTTP_REFERER') or 'courses:matrix_list')
+
+
+class ArquivarMatrizView(_MatrixDesupActionView):
+    """Arquiva uma matriz vigente → Histórico (não toca nas demais do curso)."""
+
+    def post(self, request, pk):
+        from apps.accounts.views import registrar_auditoria
+        matriz = get_object_or_404(CurriculumMatrix, pk=pk)
+        if matriz.is_rascunho:
+            messages.error(request, 'Rascunhos não podem ser arquivados.')
+            return self._redirect_back(request)
+        if not matriz.is_vigente:
+            messages.info(request, 'Esta matriz já está no histórico.')
+            return self._redirect_back(request)
+        matriz.is_vigente = False
+        matriz.is_rascunho = False
+        matriz.save(update_fields=['is_vigente', 'is_rascunho'])
+        sigla = matriz.curso.sigla if matriz.curso_id else '?'
+        registrar_auditoria(
+            request, acao='MATRIZ_ARQUIVADA', usuario=request.user,
+            detalhes=f'Matriz #{matriz.pk} "{matriz.nome}" ({sigla}) arquivada.',
+        )
+        messages.success(request, f'Matriz "{matriz.nome or matriz.pk}" arquivada.')
+        return self._redirect_back(request)
+
+
+class ReativarMatrizView(_MatrixDesupActionView):
+    """Reativa uma matriz arquivada → Vigente. Não arquiva as demais do curso (CORR-011)."""
+
+    def post(self, request, pk):
+        from apps.accounts.views import registrar_auditoria
+        matriz = get_object_or_404(CurriculumMatrix, pk=pk)
+        if matriz.is_rascunho:
+            messages.error(request, 'Rascunhos não são reativados por aqui — use o fluxo de publicação.')
+            return self._redirect_back(request)
+        if matriz.is_vigente:
+            messages.info(request, 'Esta matriz já está vigente.')
+            return self._redirect_back(request)
+        matriz.is_vigente = True
+        matriz.is_rascunho = False
+        matriz.save(update_fields=['is_vigente', 'is_rascunho'])
+        sigla = matriz.curso.sigla if matriz.curso_id else '?'
+        registrar_auditoria(
+            request, acao='MATRIZ_REATIVADA', usuario=request.user,
+            detalhes=f'Matriz #{matriz.pk} "{matriz.nome}" ({sigla}) reativada.',
+        )
+        messages.success(request, f'Matriz "{matriz.nome or matriz.pk}" reativada.')
+        return self._redirect_back(request)
 
 
 # ─────────────────────────────────────────────
@@ -362,13 +448,16 @@ class LoadCoursesByUnitView(LoginRequiredMixin, View):
         
         # Se HTMX, retorna options HTML; se fetch JSON, retorna JSON
         if request.headers.get('HX-Request'):
-            parts = [format_html('<option value="">Todos os Cursos</option>')]
-            for c in cursos:
-                parts.append(format_html(
-                    '<option value="{}">{} - {}</option>',
-                    c["id"], c["sigla"], c["nome"],
-                ))
-            return HttpResponse(''.join(str(p) for p in parts))
+            # O Django 6.0 removeu `format_html()` sem argumentos. O rótulo fixo entra
+            # como argumento (em vez de mark_safe) e a lista sai por format_html_join,
+            # que escapa sigla/nome do curso — nada de HTML cru vindo do banco.
+            opcoes = format_html('<option value="">{}</option>', 'Todos os Cursos')
+            opcoes += format_html_join(
+                '',
+                '<option value="{}">{} - {}</option>',
+                ((c['id'], c['sigla'], c['nome']) for c in cursos),
+            )
+            return HttpResponse(opcoes)
         
         from django.http import JsonResponse
         return JsonResponse(cursos, safe=False)
@@ -390,23 +479,31 @@ class LoadMatricesForDuplicateView(LoginRequiredMixin, PerfilRequiredMixin, View
                 qs = qs.filter(unidades=request.user.unidade)
             else:
                 qs = qs.none()
+            # CORR-008: rascunho é exclusivo da DESUP até a publicação. Sem isto o
+            # <select> ofereceria à unidade uma matriz que ela não lista nem abre.
+            qs = qs.exclude(is_rascunho=True)
         if unidade_id and (request.user.perfil == 'DESUP' or request.user.is_superuser):
             qs = qs.filter(unidades__id=unidade_id)
         if curso_id:
             qs = qs.filter(curso_id=curso_id)
         qs = qs.order_by('curso__nome', 'nome').distinct()
 
-        parts = [format_html('<option value="">Nao duplicar (criar em branco)</option>')]
-        for matriz in qs:
-            unidade_siglas = ', '.join(u.sigla for u in matriz.unidades.all())
-            parts.append(format_html(
-                '<option value="{}">{} - {} ({})</option>',
-                matriz.pk,
-                matriz.curso.sigla if matriz.curso_id else '?',
-                matriz.nome or 'Matriz',
-                unidade_siglas or 'Global',
-            ))
-        return HttpResponse(''.join(str(p) for p in parts))
+        def _linhas():
+            for matriz in qs:
+                unidade_siglas = ', '.join(u.sigla for u in matriz.unidades.all())
+                yield (
+                    matriz.pk,
+                    matriz.curso.sigla if matriz.curso_id else '?',
+                    matriz.nome or 'Matriz',
+                    unidade_siglas or 'Global',
+                )
+
+        # `format_html()` sem argumentos deixou de existir no Django 6.0; o rótulo fixo
+        # vira argumento e as linhas saem por format_html_join, que escapa nome de
+        # curso/matriz vindo do banco.
+        opcoes = format_html('<option value="">{}</option>', 'Nao duplicar (criar em branco)')
+        opcoes += format_html_join('', '<option value="{}">{} - {} ({})</option>', _linhas())
+        return HttpResponse(opcoes)
 
 
 _ALLOWED_FORMSET_PREFIXES = {'componentes'}
@@ -507,8 +604,19 @@ class BuscarMatrizExistenteView(LoginRequiredMixin, View):
         curso_id = request.GET.get('curso_id')
         if not curso_id:
             return JsonResponse({'existe': False})
-        
-        matriz = CurriculumMatrix.objects.filter(curso_id=curso_id).order_by('-id').first()
+
+        qs = CurriculumMatrix.objects.filter(curso_id=curso_id)
+        # CORR-008: o endpoint devolve id e nome da matriz — sem escopo, qualquer
+        # logado descobriria matrizes de outras unidades e rascunhos ainda não
+        # publicados. Mesmo recorte da listagem (_apply_filters).
+        if not (request.user.perfil == 'DESUP' or request.user.is_superuser):
+            if request.user.unidade:
+                qs = qs.filter(unidades=request.user.unidade)
+            else:
+                qs = qs.none()
+            qs = qs.exclude(is_rascunho=True)
+
+        matriz = qs.order_by('-id').first()
         if matriz:
             return JsonResponse({
                 'existe': True,
@@ -531,6 +639,9 @@ class DadosMatrizCopiarView(LoginRequiredMixin, PerfilRequiredMixin, View):
                 qs = qs.filter(unidades=request.user.unidade)
             else:
                 return JsonResponse({'componentes': []}, status=403)
+            # CORR-008: sem isto a unidade lê a composição de um rascunho cujo
+            # detalhe (CurriculumMatrixDetailView) já devolve 404 para ela.
+            qs = qs.exclude(is_rascunho=True)
         try:
             matriz = qs.get(pk=pk)
         except CurriculumMatrix.DoesNotExist:
@@ -564,14 +675,13 @@ class BuscarComponenteView(LoginRequiredMixin, View):
 
         from django.db.models import Q
         qs = CurricularComponent.objects.filter(
-            Q(nome__icontains=q) | Q(sigla__icontains=q) | Q(codigo__icontains=q)
+            Q(nome__icontains=q) | Q(codigo__icontains=q)
         ).order_by('nome')[:30]
 
         resultados = [
             {
                 'id': c.id,
                 'nome': c.nome,
-                'sigla': c.sigla,
                 'codigo': c.codigo,
                 'carga_horaria': c.carga_horaria_padrao,
                 'creditos': c.creditos,
@@ -611,7 +721,6 @@ class CurricularComponentListView(DesupOnlyMixin, ListView):
             from django.db.models import Q
             qs = qs.filter(
                 Q(nome__icontains=q) |
-                Q(sigla__icontains=q) |
                 Q(codigo__icontains=q)
             )
         return qs
@@ -630,7 +739,7 @@ class CurricularComponentCreateView(DesupOnlyMixin, CreateView):
             messages.success(self.request, 'Componente curricular criado com sucesso.')
             return response
         except IntegrityError:
-            form.add_error('nome', 'Já existe um componente curricular com este nome ou sigla.')
+            form.add_error('nome', 'Já existe um componente curricular com este nome.')
             return self.form_invalid(form)
 
 
@@ -647,7 +756,7 @@ class CurricularComponentUpdateView(DesupOnlyMixin, UpdateView):
             messages.success(self.request, 'Componente curricular atualizado com sucesso.')
             return response
         except IntegrityError:
-            form.add_error('nome', 'Já existe um componente curricular com este nome ou sigla.')
+            form.add_error('nome', 'Já existe um componente curricular com este nome.')
             return self.form_invalid(form)
 
 
@@ -657,7 +766,10 @@ class CurricularComponentDeleteView(DesupOnlyMixin, DeleteView):
     success_url = reverse_lazy('courses:component_list')
 
     def form_valid(self, form):
-        from django.db import ProtectedError
+        # `ProtectedError` mora em django.db.models (django.db.models.deletion) e nunca
+        # foi exportado por django.db — o import errado estourava ImportError antes do
+        # try, quebrando TODA exclusão de disciplina, inclusive as legítimas.
+        from django.db.models import ProtectedError
         try:
             nome = self.object.nome
             response = super().form_valid(form)

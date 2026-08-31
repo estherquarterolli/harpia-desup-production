@@ -1,25 +1,27 @@
 {% extends 'base.html' %}
 {% load static %}
 
+{# CORR-016: sem estes blocos a aba/cabeçalho caíam no default "HARPIA" do base.html. #}
+{% block title %}Alocação Curricular — Harpia-DESUP{% endblock %}
+{% block header_title %}Alocação Curricular{% endblock %}
+
 {% block content %}
 <div class="space-y-6">
   {% csrf_token %}
 
-  {% if window_fechada %}
-  <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 flex items-start gap-3">
-    <i class="ph ph-lock-key text-2xl text-amber-600"></i>
-    <div>
-      <p class="font-black">Janela de entrega fechada</p>
-      <p class="text-xs mt-0.5">{{ window_message }}</p>
-    </div>
-  </div>
-  {% endif %}
+  {% comment %}
+  CORR-014: o aviso "Janela de entrega fechada" fica SÓ no base.html (o ramo de
+  janela_fechada), que é o único com o botão "Solicitar abertura". O banner inline
+  que existia aqui era o segundo pop-up duplicado para o perfil unidade —
+  janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo público
+  (COORDENADOR_UNIDADE; DESUP/superuser fazem bypass da janela).
+  {% endcomment %}
 
   <!-- Topo: Filtros -->
   <div class="flex flex-wrap items-end gap-4 bg-white rounded-xl shadow-sm border border-slate-100 p-5">
     <form method="get" class="flex flex-wrap items-end gap-4 flex-1">
       {% if user.perfil == 'DESUP' or user.is_superuser %}
-      <div class="w-64">
+      <div class="w-full sm:w-64">
         <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Unidade</label>
         <select name="unidade_id" onchange="this.form.submit()"
           class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition">
@@ -38,12 +40,12 @@
     </form>
 
     {% if unidade_selecionada_id and user.perfil == 'DESUP' %}
-    <form method="POST" action="{% url 'aprovar_alocacao_unidade' unidade_id=unidade_selecionada_id %}" class="ml-auto m-0">
+    <form method="POST" action="{% url 'aprovar_alocacao_unidade' unidade_id=unidade_selecionada_id %}" class="w-full sm:w-auto sm:ml-auto m-0">
       {% csrf_token %}
       <button type="submit"
         {% if not alocacao_curricular_preenchida %}disabled title="Ainda existem componentes sem docente"{% endif %}
         onclick="if(!confirm('Deseja aprovar a alocação curricular desta unidade para este semestre?')) return false;"
-        class="flex items-center gap-2 text-white font-black text-sm px-5 py-2.5 rounded-xl shadow-md transition-all {% if alocacao_curricular_preenchida %}bg-emerald-600 hover:bg-emerald-700 hover:scale-105{% else %}bg-slate-300 cursor-not-allowed{% endif %}">
+        class="w-full sm:w-auto flex items-center justify-center gap-2 text-white font-black text-sm px-5 py-2.5 rounded-xl shadow-md transition-all {% if alocacao_curricular_preenchida %}bg-emerald-600 hover:bg-emerald-700 hover:scale-105{% else %}bg-slate-300 cursor-not-allowed{% endif %}">
         <i class="ph ph-check-circle text-lg"></i>
         Aprovar Alocação
       </button>
@@ -54,8 +56,8 @@
     {% endif %}
 
     {% if matrizes_data and user.perfil != 'DESUP' and not window_fechada %}
-    <div class="ml-auto">
-      <a href="{% url 'alloc_curricular' %}?unidade_id={{ unidade_selecionada_id }}" class="flex items-center gap-2 bg-[#025c9f] hover:bg-[#153e70] text-white font-bold px-5 py-2.5 rounded-xl shadow-md transition-all hover:-translate-y-0.5 text-sm">
+    <div class="w-full sm:w-auto sm:ml-auto">
+      <a href="{% url 'alloc_curricular' %}?unidade_id={{ unidade_selecionada_id }}" class="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#025c9f] hover:bg-[#153e70] text-white font-bold px-5 py-2.5 rounded-xl shadow-md transition-all hover:-translate-y-0.5 text-sm">
           <i class="ph ph-floppy-disk text-lg"></i>
           Salvar Alocações
       </a>
@@ -78,7 +80,7 @@
     </div>
     
     <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
-      <table class="w-full text-left border-collapse whitespace-nowrap min-w-max">
+      <table class="w-full text-left border-collapse whitespace-nowrap min-w-max stack-table">
         <thead class="bg-[#025c9f] text-white">
           <tr>
             <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider text-center w-16">Período</th>
@@ -86,17 +88,17 @@
             <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider min-w-[200px]">Nome Disciplina</th>
             <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider min-w-[300px]">Docente</th>
             <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider text-center w-20">Crédito</th>
-            <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider text-center w-16">HA</th>
-            <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider text-center w-16">HR</th>
+            <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider text-center w-16">HA/sem</th>
+            <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider text-center w-16">HR/sem</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
           {% for comp in item.componentes %}
           <tr class="hover:bg-slate-50 transition-colors" id="row-comp-{{ comp.id }}">
-            <td class="px-4 py-3 text-center font-bold text-slate-700">{{ comp.periodo|default:"-" }}</td>
-            <td class="px-4 py-3 font-mono text-xs text-slate-500">{{ comp.codigo|default:"-" }}</td>
+            <td class="px-4 py-3 text-center font-bold text-slate-700" data-label="Período">{{ comp.periodo|default:"-" }}</td>
+            <td class="px-4 py-3 font-mono text-xs text-slate-500" data-label="Código">{{ comp.codigo|default:"-" }}</td>
             <td class="px-4 py-3 font-bold text-slate-800">{{ comp.componente_curricular.nome }}</td>
-            <td class="px-4 py-2">
+            <td class="px-4 py-2" data-label="Docente">
               <!-- Autocomplete Docente -->
               <div class="ac-docente relative"
                    data-comp-id="{{ comp.id }}"
@@ -106,13 +108,16 @@
                    {% if window_fechada and user.perfil != 'DESUP' %}data-window-lock="true" data-window-area="{{ window_area_label }}" data-window-action="{{ window_action_label }}" data-window-target="{{ comp.componente_curricular.nome }}" data-window-message="{{ window_message }}"{% endif %}
               >
                 <div class="ac-input-wrap flex items-center gap-1.5 w-full px-3 py-1.5 border rounded text-sm transition cursor-pointer
-                  {% if comp.docente %}border-emerald-300 bg-emerald-50{% elif comp.status == 'NAO_OFERECIDA' %}border-slate-300 bg-slate-100{% else %}border-slate-200 bg-slate-50{% endif %}"
+                  {% if comp.docente %}border-emerald-300 bg-emerald-50{% elif comp.status == 'NAO_OFERECIDA' %}border-slate-300 bg-slate-100{% elif comp.status == 'SEM_PROFESSOR' %}border-slate-300 bg-slate-50{% else %}border-slate-200 bg-slate-50{% endif %}"
                 >
+                  {% if not comp.docente and comp.status == 'SEM_PROFESSOR' %}
+                  <i class="ph ph-user-minus text-base text-slate-400 flex-shrink-0"></i>
+                  {% endif %}
                   <input type="text"
                          class="ac-input flex-1 bg-transparent outline-none
-                           {% if comp.docente %}text-emerald-800 font-semibold{% elif comp.status == 'NAO_OFERECIDA' %}text-slate-500 font-semibold{% else %}text-slate-600{% endif %}"
-                         placeholder="Escolha uma opção"
-                         value="{% if comp.docente %}{{ comp.docente.rh_nome }}{% elif comp.status == 'NAO_OFERECIDA' %}Não oferecido{% else %}{% endif %}"
+                           {% if comp.docente %}text-emerald-800 font-semibold{% elif comp.status == 'NAO_OFERECIDA' %}text-slate-500 font-semibold{% else %}text-slate-400{% endif %}"
+                         placeholder="{% if comp.status == 'NAO_OFERECIDA' %}Não oferecido{% else %}Sem professor{% endif %}"
+                         value="{% if comp.docente %}{{ comp.docente.rh_nome }}{% elif comp.status == 'NAO_OFERECIDA' %}Não oferecido{% endif %}"
                          autocomplete="off"
                          {% if user.perfil != 'DESUP' and user.perfil != 'COORDENADOR_UNIDADE' %}disabled{% endif %}
                   >
@@ -125,8 +130,8 @@
                 </div>
 
                 <!-- Dropdown -->
-                <div class="ac-dropdown hidden absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 overflow-hidden"
-                     style="max-height: 256px;">
+                <div class="ac-dropdown hidden absolute z-50 bg-white border border-slate-200 rounded-lg shadow-xl mt-1 overflow-hidden"
+                     style="max-height: 320px; min-width: 280px;">
                   <!-- Opções fixas -->
                   <div class="ac-fixed-options border-b border-slate-100">
                     <div class="ac-option px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 flex items-center gap-2 text-slate-500 transition-colors"
@@ -148,9 +153,9 @@
                 </div>
               </div>
             </td>
-            <td class="px-4 py-3 text-center text-slate-600">{{ comp.creditos }}</td>
-            <td class="px-4 py-3 text-center font-semibold text-slate-700">{{ comp.ha_semanal|floatformat:0 }}h</td>
-            <td class="px-4 py-3 text-center font-semibold text-slate-700">{{ comp.hr_semanal|floatformat:1 }}h</td>
+            <td class="px-4 py-3 text-center text-slate-600" data-label="Crédito">{{ comp.creditos }}</td>
+            <td class="px-4 py-3 text-center font-semibold text-slate-700" data-label="HA/sem">{{ comp.ha_semanal|floatformat:0 }}h</td>
+            <td class="px-4 py-3 text-center font-semibold text-slate-700" data-label="HR/sem">{{ comp.hr_semanal|floatformat:1 }}h</td>
           </tr>
           {% empty %}
           <tr>
@@ -258,7 +263,7 @@
             this._triggerWindowLock();
             return;
           }
-          const label = opt.dataset.value === 'SEM_PROFESSOR' ? '' : opt.textContent.trim();
+          const label = opt.textContent.trim();
           this._selectValue(opt.dataset.value, label);
         });
       });
@@ -271,7 +276,7 @@
             this._triggerWindowLock();
             return;
           }
-          this._selectValue('SEM_PROFESSOR', '');
+          this._selectValue('SEM_PROFESSOR', 'Sem professor');
         });
       }
 
@@ -295,16 +300,60 @@
 
     _open() {
       this.dropdown.classList.remove('hidden');
+      this._position();
       if (this.caret) this.caret.style.transform = 'rotate(180deg)';
+      // Keep the dropdown anchored to the input while it is open, even when
+      // the table container or the window is scrolled/resized.
+      if (!this._reposition) this._reposition = this._position.bind(this);
+      window.addEventListener('scroll', this._reposition, true);
+      window.addEventListener('resize', this._reposition);
     }
 
     _close() {
       this.dropdown.classList.add('hidden');
       if (this.caret) this.caret.style.transform = '';
-      // Restore current name if input was cleared without selection
-      if (!this.input.value.trim()) {
-        this.input.value = this.currentNome;
+      if (this._reposition) {
+        window.removeEventListener('scroll', this._reposition, true);
+        window.removeEventListener('resize', this._reposition);
       }
+      // Restaura o valor atual apenas se houver um nome salvo (docente ou "Não oferecido").
+      // Quando currentNome é vazio (status SEM_PROFESSOR sem docente) deixa o campo
+      // vazio para o placeholder "Sem professor" aparecer — nunca escreve no campo.
+      if (!this.input.value.trim() && this.currentNome) {
+        this.input.value = this.currentNome;
+      } else if (!this.currentNome) {
+        // Garante que o campo fique vazio para exibir o placeholder
+        this.input.value = '';
+      }
+    }
+
+    // CORR-003: the table container uses `overflow-hidden overflow-x-auto`,
+    // which turns the Y axis into a scroll/clip context and crops an
+    // `absolute` dropdown on the bottom rows. We render the dropdown as
+    // `position: fixed` anchored to the input so it escapes that container,
+    // and flip it above the input when there is not enough room below.
+    _position() {
+      const dd = this.dropdown;
+      if (dd.classList.contains('hidden')) return;
+      const rect = this.wrap.getBoundingClientRect();
+      const gap = 4; // matches the original mt-1 (0.25rem)
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+      const ddHeight = dd.offsetHeight;
+      const spaceBelow = vh - rect.bottom;
+      const spaceAbove = rect.top;
+      const openUp = spaceBelow < ddHeight + gap && spaceAbove > spaceBelow;
+
+      dd.style.position = 'fixed';
+      dd.style.margin = '0';
+      // Garante largura mínima de 280 px para que nomes longos não sejam cortados,
+      // independentemente da largura da coluna da tabela.
+      const minW = 280;
+      const dropW = Math.max(rect.width, minW);
+      dd.style.left = rect.left + 'px';
+      dd.style.width = dropW + 'px';
+      dd.style.top = openUp
+        ? Math.max(gap, rect.top - ddHeight - gap) + 'px'
+        : (rect.bottom + gap) + 'px';
     }
 
     async _doSearch(q) {
@@ -357,6 +406,10 @@
           this._selectValue(el.dataset.id, el.dataset.nome);
         });
       });
+
+      // CORR-003: results load asynchronously and change the dropdown height,
+      // so recompute the anchor/flip once the real content is rendered.
+      this._position();
     }
 
     async _selectValue(value, label) {

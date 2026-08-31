@@ -44,7 +44,10 @@ class UserManager(BaseUserManager):
     def create_superuser(self, email, password=None, **extra_fields):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
-        extra_fields.setdefault("perfil", "DESUP")
+        # CORR-021: quem cria superusuário é o time de TI/DEV — o perfil padrão passou
+        # a ser ADMIN (antes era DESUP, o que misturava TI com a operação da DESUP).
+        # Ainda dá para passar `perfil=` explicitamente quando a conta também operar.
+        extra_fields.setdefault("perfil", "ADMIN")
         extra_fields.setdefault("forcar_troca_senha", False)
         if extra_fields.get("is_staff") is not True:
             raise ValueError("Superuser must have is_staff=True.")
@@ -60,7 +63,16 @@ class User(AbstractUser):
     """
 
     class Perfil(models.TextChoices):
-        DESUP = "DESUP", _("DESUP")
+        """
+        CORR-021 — os três perfis oficiais do sistema.
+
+        `ADMIN` é o time de TI/DEV: cuida do desenvolvimento e usa o **admin do
+        Django** para testes e ajustes. Não é um perfil operacional e não precisa
+        dos dashboards — a operação do dia a dia é dividida apenas entre
+        `DESUP` (Coordenação DESUP) e `COORDENADOR_UNIDADE`.
+        """
+        ADMIN = "ADMIN", _("Administrador (TI DESUP)")
+        DESUP = "DESUP", _("Coordenador DESUP")
         COORDENADOR_UNIDADE = "COORDENADOR_UNIDADE", _("Coordenador de Unidade")
 
     email = models.EmailField(unique=True, verbose_name=_("E-mail"))
@@ -109,6 +121,11 @@ class User(AbstractUser):
             self.username = self.__class__.objects.generate_unique_username(
                 self.username or self.email
             )
+        # CORR-021: o perfil ADMIN opera exclusivamente pelo admin do Django, que
+        # exige `is_staff`. Sem isso seria possível criar um ADMIN sem acesso à
+        # única tela que o perfil usa.
+        if self.perfil == self.Perfil.ADMIN:
+            self.is_staff = True
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -133,10 +150,33 @@ class PasswordResetRequest(models.Model):
         related_name="aprovacoes_reset",
     )
 
+    # SEC-004: rate-limit do "esqueci minha senha". O endpoint é PÚBLICO (não
+    # exige sessão), e sem limite cada POST criava uma solicitação, uma
+    # notificação por destinatário e um e-mail para toda a DESUP — em laço, vira
+    # e-mail bombing e a aprovação legítima se perde no ruído. Igual ao cooldown
+    # que a CORR-020 aplicou no fluxo autenticado.
+    COOLDOWN = timedelta(hours=24)
+
     class Meta:
         verbose_name = "Solicitacao de Reset"
         verbose_name_plural = "Solicitacoes de Reset"
         ordering = ["-criado_em"]
+
+    @classmethod
+    def pedido_pendente(cls, user):
+        """
+        Solicitação ainda válida e não aprovada para este usuário, ou `None`.
+
+        Como a janela do cooldown é igual à validade do token (24h), isso é o
+        mesmo que "existe pedido em aberto": aprovado (`finalizado`) ou expirado
+        libera um pedido novo.
+        """
+        return (
+            cls.objects
+            .filter(user=user, finalizado=False, criado_em__gte=timezone.now() - cls.COOLDOWN)
+            .order_by("-criado_em")
+            .first()
+        )
 
     @property
     def is_expirado(self):
@@ -158,10 +198,29 @@ class SelfPasswordChangeRequest(models.Model):
     usado_em = models.DateTimeField(null=True, blank=True)
     solicitado_ip = models.GenericIPAddressField(null=True, blank=True)
 
+    # CORR-020: rate-limit — no máximo um pedido de link por usuário a cada 24h.
+    # A view ignora o limite quando `settings.DEBUG` (ambiente de desenvolvimento).
+    COOLDOWN = timedelta(days=1)
+
     class Meta:
         verbose_name = "Solicitacao de Troca de Senha"
         verbose_name_plural = "Solicitacoes de Troca de Senha"
         ordering = ["-criado_em"]
+
+    @classmethod
+    def pedido_recente(cls, user):
+        """Último pedido do usuário ainda dentro da janela de cooldown, ou `None`."""
+        return (
+            cls.objects
+            .filter(user=user, criado_em__gte=timezone.now() - cls.COOLDOWN)
+            .order_by("-criado_em")
+            .first()
+        )
+
+    @property
+    def liberado_em(self):
+        """Momento em que o usuário poderá pedir um novo link."""
+        return self.criado_em + self.COOLDOWN
 
     @property
     def is_expirado(self):

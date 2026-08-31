@@ -8,6 +8,10 @@
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- flatpickr: date picker com formato dd/mm/aaaa fixo (independe do idioma do navegador) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/pt.js"></script>
     {% load static %}
     <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
     {% block extra_head %}{% endblock %}
@@ -30,7 +34,7 @@
 
             <!-- Dashboard — todos os perfis -->
             <a href="{% url 'dashboard' %}"
-                class="sidebar-link flex items-center gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if request.path == '/dashboard/desup/' or request.path == '/dashboard/unidade/' %}bg-white/10{% endif %}">
+                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if request.path == '/dashboard/desup/' or request.path == '/dashboard/unidade/' %}bg-white/10{% endif %}">
                 <i class="ph ph-squares-four text-2xl flex-shrink-0"></i>
                 <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Dashboard</span>
             </a>
@@ -38,7 +42,7 @@
             {% if user.perfil == 'DESUP' or user.is_superuser %}
             <!-- Unidades — apenas DESUP -->
             <a href="{% url 'core:unidade_list' %}"
-                class="sidebar-link flex items-center gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if '/core/unidades' in request.path %}bg-white/10{% endif %}">
+                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if '/core/unidades' in request.path %}bg-white/10{% endif %}">
                 <i class="ph ph-tree-structure text-2xl flex-shrink-0"></i>
                 <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Unidades</span>
             </a>
@@ -46,28 +50,28 @@
 
             <!-- Professores — DESUP e Coordenador de Unidade -->
             <a href="{% url 'professors:professor_list' %}"
-                class="sidebar-link flex items-center gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'professores' in request.path %}bg-white/10{% endif %}">
+                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'professores' in request.path %}bg-white/10{% endif %}">
                 <i class="ph ph-chalkboard-teacher text-2xl flex-shrink-0"></i>
                 <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Professores</span>
             </a>
 
             <!-- Alocação — DESUP e Coordenador de Unidade -->
             <a href="{% url 'alloc_curricular' %}"
-                class="sidebar-link flex items-center gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'alocacao-curricular' in request.path %}bg-white/10{% endif %}">
+                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'alocacao-curricular' in request.path %}bg-white/10{% endif %}">
                 <i class="ph ph-calendar-check text-2xl flex-shrink-0"></i>
                 <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Alocação</span>
             </a>
 
             <!-- Extracurriculares — DESUP e Coordenador de Unidade -->
             <a href="{% url 'extra_curricular:pendencia_list' %}"
-                class="sidebar-link flex items-center gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'extracurriculares' in request.path %}bg-white/10{% endif %}">
+                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'extracurriculares' in request.path %}bg-white/10{% endif %}">
                 <i class="ph ph-books text-2xl flex-shrink-0"></i>
                 <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Extracurriculares</span>
             </a>
 
             <!-- Matrizes — DESUP e Coordenador de Unidade -->
             <a href="{% url 'courses:matrix_list' %}"
-                class="sidebar-link flex items-center gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'courses/matrices' in request.path %}bg-white/10{% endif %}">
+                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'courses/matrices' in request.path %}bg-white/10{% endif %}">
                 <i class="ph ph-file-text text-2xl flex-shrink-0"></i>
                 <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Matrizes</span>
             </a>
@@ -75,14 +79,14 @@
             {% if user.perfil == 'DESUP' or user.is_superuser %}
             <!-- Componentes Curriculares — apenas DESUP -->
             <a href="{% url 'courses:component_list' %}"
-                class="sidebar-link flex items-center gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'courses/componentes' in request.path %}bg-white/10{% endif %}">
+                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'courses/componentes' in request.path %}bg-white/10{% endif %}">
                 <i class="ph ph-book-open text-2xl flex-shrink-0"></i>
                 <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Componentes</span>
             </a>
 
             <!-- Entrega — apenas DESUP -->
             <a href="{% url 'core:janela_list' %}"
-                class="sidebar-link flex items-center gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if '/core/entregas' in request.path %}bg-white/10{% endif %}">
+                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if '/core/entregas' in request.path %}bg-white/10{% endif %}">
                 <i class="ph ph-clock-countdown text-2xl flex-shrink-0"></i>
                 <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Entrega</span>
             </a>
@@ -94,7 +98,7 @@
             <form action="{% url 'logout' %}" method="post" class="w-full m-0 p-0">
                 {% csrf_token %}
                 <button type="submit"
-                    class="w-full flex items-center gap-4 p-3 text-red-400 hover:bg-red-900/20 rounded-lg text-left transition-colors">
+                    class="sidebar-link w-full flex items-center justify-center group-hover:justify-start gap-4 p-3 text-red-400 hover:bg-red-900/20 rounded-lg text-left transition-colors">
                     <i class="ph ph-sign-out text-2xl flex-shrink-0"></i>
                     <span class="sidebar-label hidden group-hover:block text-sm font-semibold">Sair</span>
                 </button>
@@ -167,18 +171,27 @@
                 
                 <div class="relative">
                     <div onclick="toggleElement('userMenu')" class="flex items-center gap-3 bg-white p-2 px-4 rounded-full shadow-sm border cursor-pointer select-none">
+                        {% comment %}
+                        CORR-017: mostra o E-MAIL do usuário. Antes era
+                        `get_full_name|default:email|upper` + `get_perfil_display`, o que
+                        rendia coisas como "ADMIN Alberto" (nome do first_name + perfil cru
+                        de conta legada, já que get_perfil_display devolve o valor bruto
+                        quando ele não está em Perfil.choices).
+                        {% endcomment %}
                         <div class="text-right hidden sm:block">
-                            <p class="text-xs font-black text-[#025c9f]">{{ user.get_full_name|default:user.email|upper }}</p>
+                            <p class="text-xs font-black text-[#025c9f] break-all">{{ user.email }}</p>
                             <p class="text-[10px] text-slate-400 uppercase">{{ user.get_perfil_display }}</p>
                         </div>
                         <i class="ph ph-user-circle text-4xl text-slate-400"></i>
                     </div>
                     <div id="userMenu" class="menu-hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border z-50 py-2 font-bold text-sm">
-                        {% if user.is_superuser %}
+                        {% comment %}
+                        CORR-017: "Meu Perfil" e "Alterar senha" são itens SEPARADOS. Antes
+                        os dois apontavam para `password_change` — o link de senha se
+                        disfarçava de "Meu Perfil" para quem não era superuser.
+                        {% endcomment %}
+                        <a href="{% url 'profile' %}" class="block px-4 py-2 hover:bg-slate-50"><i class="ph ph-user mr-2"></i> Meu Perfil</a>
                         <a href="{% url 'password_change' %}" class="block px-4 py-2 hover:bg-slate-50"><i class="ph ph-key mr-2"></i> Alterar senha</a>
-                        {% else %}
-                        <a href="{% url 'password_change' %}" class="block px-4 py-2 hover:bg-slate-50"><i class="ph ph-user mr-2"></i> Meu Perfil</a>
-                        {% endif %}
                         {% if user.is_superuser %}
                         <a href="/admin/" class="block px-4 py-2 hover:bg-slate-50"><i class="ph ph-shield-check mr-2"></i> Administração</a>
                         {% endif %}
@@ -193,13 +206,40 @@
         </header>
 
         {% if messages %}
+        {# Erros/avisos: banner fixo no topo (não some sozinho) #}
         <div class="mb-6 space-y-2">
             {% for message in messages %}
-            <div class="p-4 rounded-lg text-sm font-semibold {% if message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% else %}bg-green-50 text-green-700 border border-green-200{% endif %}">
+            {% if message.tags == 'error' or message.tags == 'warning' %}
+            <div class="p-4 rounded-lg text-sm font-semibold {% if message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% else %}bg-amber-50 text-amber-800 border border-amber-200{% endif %}">
                 {{ message }}
             </div>
+            {% endif %}
             {% endfor %}
         </div>
+
+        {# Sucesso/info: toast centralizado que some em ~1s #}
+        <div id="successToast" class="fixed inset-0 z-[130] flex items-start justify-center pt-24 px-4 pointer-events-none">
+            {% for message in messages %}
+            {% if message.tags != 'error' and message.tags != 'warning' %}
+            <div class="toast-success pointer-events-auto max-w-md rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm font-semibold px-5 py-4 shadow-2xl flex items-center gap-3 transition-opacity duration-300">
+                <i class="ph ph-check-circle text-xl flex-shrink-0"></i>
+                <span>{{ message }}</span>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        <script>
+        (function () {
+            var toast = document.getElementById('successToast');
+            if (!toast) return;
+            var items = toast.querySelectorAll('.toast-success');
+            if (!items.length) { toast.remove(); return; }
+            setTimeout(function () {
+                items.forEach(function (el) { el.style.opacity = '0'; });
+                setTimeout(function () { toast.remove(); }, 300);
+            }, 1000);
+        })();
+        </script>
         {% endif %}
 
         {% if '/alocacao-curricular' in request.path or '/extracurriculares' in request.path or '/professores' in request.path or '/courses' in request.path %}
@@ -314,6 +354,24 @@
         document.addEventListener("DOMContentLoaded", function() {
             if (window.lucide) {
                 lucide.createIcons();
+            }
+            // Date picker pt-BR: exibe dd/mm/aaaa e envia ISO (Y-m-d) num input oculto,
+            // garantindo o formato independentemente do idioma do navegador.
+            if (window.flatpickr) {
+                document.querySelectorAll('.js-date-ptbr').forEach(function (el) {
+                    var opts = {
+                        altInput: true,
+                        altFormat: 'd/m/Y',
+                        dateFormat: 'Y-m-d',
+                        locale: (flatpickr.l10ns && flatpickr.l10ns.pt) ? 'pt' : 'default',
+                        allowInput: true,
+                    };
+                    // data-min-today: impede escolher datas anteriores ao dia atual.
+                    if (el.dataset.minToday !== undefined) {
+                        opts.minDate = 'today';
+                    }
+                    flatpickr(el, opts);
+                });
             }
         });
 

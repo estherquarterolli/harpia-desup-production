@@ -9,9 +9,9 @@
 
   <div class="flex flex-wrap items-end gap-4 bg-white rounded-xl shadow-sm border border-slate-100 p-5">
     <form method="get" class="flex flex-wrap items-end gap-4 flex-1">
-      
+
       {% if is_desup %}
-      <div class="w-64">
+      <div class="w-full sm:w-64">
         <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Unidade</label>
         <select name="unidade_id" onchange="this.form.submit()"
           class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition">
@@ -29,7 +29,7 @@
       {% endif %}
 
       <!-- Search Box (Optional if they want to search by name) -->
-      <div class="w-64">
+      <div class="w-full sm:w-64">
         <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Buscar</label>
         <div class="relative">
           <input type="text" name="q" value="{{ request.GET.q }}" placeholder="Nome do professor..."
@@ -37,13 +37,13 @@
           <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
         </div>
       </div>
-      
+
     </form>
 
     {% if pode_criar %}
-    <div class="ml-auto">
+    <div class="w-full sm:w-auto sm:ml-auto">
       <a href="{% url 'professors:professor_create' %}"
-        class="flex items-center gap-2 bg-[#ffb800] hover:bg-yellow-400 text-[#025c9f] px-4 py-2.5 rounded-xl text-sm font-black transition-colors shadow-md">
+        class="flex items-center justify-center gap-2 bg-[#ffb800] hover:bg-yellow-400 text-[#025c9f] px-4 py-2.5 rounded-xl text-sm font-black transition-colors shadow-md w-full sm:w-auto">
         <i class="ph ph-plus"></i> Novo Professor
       </a>
     </div>
@@ -51,7 +51,7 @@
   </div>
 
   <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-x-auto">
-    <table class="w-full text-left border-collapse min-w-[720px]">
+    <table class="w-full text-left border-collapse min-w-[720px] stack-table">
       <thead class="bg-slate-50 border-b border-slate-100">
         <tr>
           <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider w-24">ID</th>
@@ -79,7 +79,7 @@
       <tbody class="divide-y divide-slate-50">
         {% for prof in professores %}
         <tr class="hover:bg-slate-50/50 transition-colors group">
-          <td class="px-5 py-4 text-xs text-slate-400 font-mono">{{ prof.id_funcional }}</td>
+          <td class="px-5 py-4 text-xs text-slate-400 font-mono" data-label="ID">{{ prof.id_funcional }}</td>
           <td class="px-5 py-4">
             <div class="flex items-center gap-3">
               <div class="w-8 h-8 rounded-full bg-[#e8f0fb] text-[#025c9f] flex items-center justify-center text-xs font-black flex-shrink-0">
@@ -91,25 +91,25 @@
               </div>
             </div>
           </td>
-          <td class="px-5 py-4 text-sm text-slate-600">
+          <td class="px-5 py-4 text-sm text-slate-600" data-label="Regime">
             {% if prof.tipo_contrato %}
               <span class="font-semibold">{{ prof.tipo_contrato.regime_trabalho }}</span>
             {% else %}<span class="text-slate-300">—</span>{% endif %}
           </td>
-          <td class="px-5 py-4">
+          <td class="px-5 py-4" data-label="Tipo">
             <span class="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-bold">{{ prof.categoria_contrato }}</span>
           </td>
           {% if is_desup and not unidade_atual %}
-          <td class="px-5 py-4 text-sm text-slate-600">
+          <td class="px-5 py-4 text-sm text-slate-600" data-label="Unidade">
             {% if prof.unidade_principal %}
               <span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">{{ prof.unidade_principal.sigla }}</span>
             {% else %}<span class="text-slate-300">—</span>{% endif %}
           </td>
           {% endif %}
-          
+
           {% if colunas_cursos %}
             {% for col in colunas_cursos %}
-            <td class="px-5 py-4 text-center border-l border-slate-100 text-sm font-semibold text-slate-700">
+            <td class="px-5 py-4 text-center border-l border-slate-100 text-sm font-semibold text-slate-700" data-label="{{ col.nome }}">
               {% for matriz_id, carga in prof.alocacao_map.items %}
                 {% if matriz_id == col.id %}
                   {{ carga|floatformat:0 }}h
@@ -123,18 +123,18 @@
             </td>
             {% endfor %}
           {% endif %}
-          
-          <td class="px-5 py-4 text-center border-l border-slate-100 font-semibold text-slate-700">{{ prof.ch_justificada|floatformat:0 }}h</td>
-          <td class="px-5 py-4 text-center font-bold text-slate-800">{{ prof.soma_horas|floatformat:0 }}h</td>
-          <td class="px-5 py-4 text-center font-semibold {% if prof.ch_nao_alocada > 0 %}text-red-500{% else %}text-emerald-500{% endif %}">
+
+          <td class="px-5 py-4 text-center border-l border-slate-100 font-semibold text-slate-700" data-label="CH Justificada">{{ prof.ch_justificada|floatformat:0 }}h</td>
+          <td class="px-5 py-4 text-center font-bold text-slate-800" data-label="Total de Horas">{{ prof.soma_horas|floatformat:0 }}h</td>
+          <td class="px-5 py-4 text-center font-semibold {% if prof.ch_nao_alocada > 0 %}text-red-500{% else %}text-emerald-500{% endif %}" data-label="Não Alocado">
             {{ prof.ch_nao_alocada|floatformat:0 }}h
           </td>
-          <td class="px-5 py-4 text-center">
+          <td class="px-5 py-4 text-center" data-label="% Alocado">
             <span class="px-2 py-1 rounded text-[10px] font-black {% if prof.percentual_alocado >= 100 %}bg-emerald-100 text-emerald-700{% elif prof.percentual_alocado > 0 %}bg-amber-100 text-amber-700{% else %}bg-slate-100 text-slate-500{% endif %}">
               {{ prof.percentual_alocado }}%
             </span>
           </td>
-          
+
         </tr>
         {% empty %}
         <tr>

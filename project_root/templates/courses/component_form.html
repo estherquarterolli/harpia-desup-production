@@ -63,14 +63,6 @@
           {% if form.nome.errors %}<p class="field-error">{{ form.nome.errors.0 }}</p>{% endif %}
         </div>
 
-        <!-- Sigla -->
-        <div class="space-y-1">
-          <label for="{{ form.sigla.id_for_label }}" class="field-label">Sigla *</label>
-          {{ form.sigla }}
-          {% if form.sigla.errors %}<p class="field-error">{{ form.sigla.errors.0 }}</p>{% endif %}
-          <p class="text-[10px] text-slate-400">Ex: ADS, POO, CALG</p>
-        </div>
-
         <!-- Código -->
         <div class="space-y-1">
           <label for="{{ form.codigo.id_for_label }}" class="field-label">Código</label>

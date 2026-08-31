@@ -58,29 +58,44 @@ class ProfessorForm(forms.ModelForm):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
+        is_gestor_unidade = False
         if self.user:
             is_gestor_unidade = (
                 self.user.perfil == 'COORDENADOR_UNIDADE'
                 and not self.user.is_superuser
             )
             if is_gestor_unidade:
+                # CORR: esconder o widget NÃO protege o campo — o valor do POST continuava
+                # sendo aceito e o coordenador conseguia (a) empurrar o docente para outra
+                # unidade e (b) esticar o próprio teto de horas extras (que alimenta
+                # `limite_horas_extra_efetivo`, usado no parecer da DESUP). Com
+                # `disabled=True` o Django ignora o que vier no POST e usa sempre o valor
+                # inicial (o da instância na edição), fechando a escrita cruzada.
                 self.fields['unidade_principal'].widget = forms.HiddenInput()
+                self.fields['unidade_principal'].disabled = True
                 if self.user.unidade:
                     self.fields['unidade_principal'].initial = self.user.unidade
                 self.fields['limite_horas_extra'].widget = forms.HiddenInput()
+                self.fields['limite_horas_extra'].disabled = True
                 self.fields['limite_horas_extra'].required = False
 
         # Configurar queryset de cursos baseado na unidade selecionada (para edição ou erro de form)
         unidade_id = None
-        if 'unidade_principal' in self.data:
+        if is_gestor_unidade:
+            # Mesmo motivo do `disabled` acima: para o gestor de unidade a unidade nunca
+            # vem do POST. Se viesse, um `unidade_principal` adulterado liberaria os cursos
+            # da outra unidade na checklist e o vínculo cruzado entraria pelos `cursos`.
+            if self.instance.pk and self.instance.unidade_principal_id:
+                unidade_id = self.instance.unidade_principal_id
+            elif self.user.unidade:
+                unidade_id = self.user.unidade.id
+        elif 'unidade_principal' in self.data:
             try:
                 unidade_id = int(self.data.get('unidade_principal'))
             except (ValueError, TypeError):
                 pass
         elif self.instance.pk and self.instance.unidade_principal:
             unidade_id = self.instance.unidade_principal.id
-        elif self.user and not self.user.is_superuser and self.user.perfil == 'COORDENADOR_UNIDADE':
-            unidade_id = self.user.unidade.id if self.user.unidade else None
 
         if unidade_id:
             self.fields['cursos'].queryset = Course.objects.filter(

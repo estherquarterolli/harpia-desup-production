@@ -25,6 +25,13 @@ _SELECT = _INPUT + " cursor-pointer"
 _TEXTAREA = _INPUT + " resize-none"
 _READONLY = "w-full rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-500 cursor-not-allowed select-none"
 
+# `AtividadeExtensionista.carga_horaria` é DecimalField(max_digits=6,
+# decimal_places=1) → cabe no máximo 99999,9h. Como a CH é `num_estudantes × 0,5`,
+# a partir de 200.000 estudantes o próprio `save()` estoura com
+# `decimal.InvalidOperation` (HTTP 500) em vez de recusar a entrada. Não é regra
+# de negócio (a extensão não tem teto de alunos), é o limite físico do campo.
+MAX_ESTUDANTES_EXTENSAO = 199_999
+
 # ════════════════════════════════════════════════════════════════════
 # Base FormSet com Validações Globais (40h Máximas / BTT)
 # ════════════════════════════════════════════════════════════════════
@@ -46,13 +53,15 @@ class BasePendenciaFormSet(BaseInlineFormSet):
         # Calcula a CH dos outros tipos (ignorando o tipo atual que está sendo salvo)
         from apps.extra_curricular.services import get_pendencias_data
         # Para evitar problemas de dependência circular, faremos a soma manualmente:
-        ch_outros = 0
+        # CORR-004: cast explícito para float — `ch_aprovada` já é sempre float,
+        # mas o float(...) blinda a soma contra qualquer resquício Decimal/float.
+        ch_outros = 0.0
         if self.model != OrientacaoTCC:
-            ch_outros += sum(item.ch_aprovada for item in pendencia.orientacoes_tcc.all())
+            ch_outros += sum(float(item.ch_aprovada) for item in pendencia.orientacoes_tcc.all())
         if self.model != AtividadeExtensionista:
-            ch_outros += sum(item.ch_aprovada for item in pendencia.atividades_extensao.all())
+            ch_outros += sum(float(item.ch_aprovada) for item in pendencia.atividades_extensao.all())
         if self.model != ReducaoCargaHoraria:
-            ch_outros += sum(item.ch_aprovada for item in pendencia.reducoes_ch.all())
+            ch_outros += sum(float(item.ch_aprovada) for item in pendencia.reducoes_ch.all())
 
         # Calcula a CH deste formset específico (levando em conta deletes e adições)
         ch_deste_formset = 0
@@ -182,6 +191,14 @@ class AtividadeExtensionistaForm(forms.ModelForm):
             }),
         }
 
+    def clean_num_estudantes(self):
+        valor = self.cleaned_data.get("num_estudantes")
+        if valor and valor > MAX_ESTUDANTES_EXTENSAO:
+            raise forms.ValidationError(
+                f"Valor acima do suportado: informe no máximo {MAX_ESTUDANTES_EXTENSAO} estudantes."
+            )
+        return valor
+
 
 AtividadeExtensionistaFormSet = inlineformset_factory(
     PendenciaExtra,
@@ -214,6 +231,15 @@ class ReducaoCargaHorariaForm(forms.ModelForm):
                 "placeholder": "Horas",
             }),
         }
+
+    def clean_horas_reduzidas(self):
+        valor = self.cleaned_data.get("horas_reduzidas")
+        # Redução negativa (ou zerada) não é justificativa: além de não fazer
+        # sentido, um valor negativo ABATE a CH já aprovada do docente e libera
+        # aprovações que estourariam o limite de horas extras.
+        if valor is not None and valor <= 0:
+            raise forms.ValidationError("Informe um valor de horas maior que zero.")
+        return valor
 
 
 ReducaoCargaHorariaFormSet = inlineformset_factory(
@@ -260,6 +286,21 @@ class ParecerTCCForm(forms.ModelForm):
             for field in self.fields.values():
                 field.widget.attrs['form'] = f"form-{self.prefix}"
 
+    def clean(self):
+        cleaned = super().clean()
+        aprovados = cleaned.get("num_orientandos_aprovados")
+        # O nº solicitado não está no form (é campo da unidade); vem da instância.
+        solicitados = self.instance.num_orientandos
+        # A DESUP defere, no máximo, o que foi pedido: aprovar mais orientandos
+        # do que os solicitados inventa CH que ninguém pediu (o `ch_aprovada` é
+        # recalculado a partir do nº aprovado).
+        if aprovados is not None and solicitados is not None and aprovados > solicitados:
+            self.add_error(
+                "num_orientandos_aprovados",
+                f"Não é possível aprovar {aprovados} orientandos: foram solicitados apenas {solicitados}.",
+            )
+        return cleaned
+
 
 class ParecerExtensaoForm(forms.ModelForm):
     class Meta:
@@ -290,8 +331,22 @@ class ParecerExtensaoForm(forms.ModelForm):
             for field in self.fields.values():
                 field.widget.attrs['form'] = f"form-{self.prefix}"
 
+    def clean(self):
+        cleaned = super().clean()
+        aprovados = cleaned.get("num_estudantes_aprovados")
+        # Mesma regra do TCC: o deferimento é limitado ao que a unidade pediu.
+        solicitados = self.instance.num_estudantes
+        if aprovados is not None and solicitados is not None and aprovados > solicitados:
+            self.add_error(
+                "num_estudantes_aprovados",
+                f"Não é possível aprovar {aprovados} estudantes: foram solicitados apenas {solicitados}.",
+            )
+        return cleaned
+
 
 class ParecerReducaoForm(forms.ModelForm):
+    """Parecer da DESUP sobre uma redução de carga horária."""
+
     class Meta:
         model  = ReducaoCargaHoraria
         fields = ["parecer_desup", "horas_aprovadas", "motivo_parecer"]
@@ -314,3 +369,18 @@ class ParecerReducaoForm(forms.ModelForm):
         if self.prefix:
             for field in self.fields.values():
                 field.widget.attrs['form'] = f"form-{self.prefix}"
+
+    def clean(self):
+        cleaned = super().clean()
+        aprovadas = cleaned.get("horas_aprovadas")
+        # As horas solicitadas não estão no form (é campo da unidade); vêm da
+        # instância. Mesma regra dos pareceres de TCC e Extensão: a DESUP defere
+        # no máximo o que foi pedido — aprovar mais horas do que as solicitadas
+        # inventa CH que ninguém pediu e ainda consome o limite do docente.
+        solicitadas = self.instance.horas_reduzidas
+        if aprovadas is not None and solicitadas is not None and aprovadas > solicitadas:
+            self.add_error(
+                "horas_aprovadas",
+                f"Não é possível aprovar {aprovadas}h: foram solicitadas apenas {solicitadas}h.",
+            )
+        return cleaned

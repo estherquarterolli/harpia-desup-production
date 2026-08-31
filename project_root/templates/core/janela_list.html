@@ -1,14 +1,18 @@
 {% extends 'base.html' %}
 {% load static %}
 
+{# CORR-016: sem estes blocos a aba/cabeçalho caíam no default "HARPIA" do base.html. #}
+{% block title %}Janelas de Entrega — Harpia-DESUP{% endblock %}
+{% block header_title %}Janelas de Entrega{% endblock %}
+
 {% block content %}
 <div class="p-6">
-    <div class="flex justify-between items-center mb-6">
+    <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
         <div>
             <h1 class="text-2xl font-bold text-[#025c9f]">Janelas de Entrega</h1>
             <p class="text-sm text-slate-500">Gestão dos prazos para preenchimento da alocação pelas unidades.</p>
         </div>
-        <a href="{% url 'core:janela_create' %}" class="bg-[#025c9f] hover:bg-[#153e70] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2">
+        <a href="{% url 'core:janela_create' %}" class="w-full sm:w-auto justify-center bg-[#025c9f] hover:bg-[#153e70] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2">
             <i data-lucide="plus" class="w-4 h-4"></i>
             Nova Janela
         </a>
@@ -47,7 +51,7 @@
     </div>
 
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
-        <table class="w-full text-left border-collapse min-w-[640px]">
+        <table class="w-full text-left border-collapse min-w-[640px] stack-table">
             <thead class="bg-slate-50 border-b border-slate-200">
                 <tr>
                     <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Semestre</th>
@@ -61,17 +65,17 @@
                 {% for janela in janelas %}
                 <tr class="hover:bg-slate-50/50 transition-colors">
                     <td class="px-6 py-4 font-semibold text-slate-700">{{ janela.semestre }}</td>
-                    <td class="px-6 py-4 text-sm text-slate-600">
+                    <td class="px-6 py-4 text-sm text-slate-600" data-label="Unidade">
                         {% if janela.unidade %}
                             {{ janela.unidade.sigla }} - {{ janela.unidade.nome }}
                         {% else %}
                             <span class="font-bold text-blue-600">Todas as Unidades</span>
                         {% endif %}
                     </td>
-                    <td class="px-6 py-4 text-sm text-slate-600">
+                    <td class="px-6 py-4 text-sm text-slate-600" data-label="Período">
                         {{ janela.data_inicio|date:"d/m/Y" }} até {{ janela.data_fim|date:"d/m/Y" }}
                     </td>
-                    <td class="px-6 py-4">
+                    <td class="px-6 py-4" data-label="Status">
                         <span class="px-2 py-1 rounded-full text-[10px] font-bold uppercase
                             {% if janela.status == 'Aberto' or janela.status == 'Reaberto' %}bg-green-100 text-green-700
                             {% else %}bg-slate-100 text-slate-500{% endif %}">

@@ -16,7 +16,7 @@
       </p>
       <div class="bg-slate-50 border border-slate-200 rounded-lg p-4">
         <p class="text-xs text-slate-500 uppercase font-bold mb-1">Componente</p>
-        <p class="text-sm font-black text-slate-800">{{ object.sigla }} — {{ object.nome }}</p>
+        <p class="text-sm font-black text-slate-800">{{ object.nome }}</p>
         <p class="text-xs text-slate-500 mt-1">CH: {{ object.carga_horaria_padrao }}h &nbsp;|&nbsp; Créditos: {{ object.creditos }}</p>
       </div>
       <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 flex items-start gap-2">
@@ -24,7 +24,7 @@
         Se este componente estiver vinculado a alguma matriz curricular, a exclusão será bloqueada automaticamente.
       </p>
     </div>
-    <div class="px-6 pb-6 flex gap-3">
+    <div class="px-6 pb-6 flex flex-col sm:flex-row gap-3">
       <form method="POST" class="flex-1">
         {% csrf_token %}
         <button type="submit"

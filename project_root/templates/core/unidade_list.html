@@ -1,15 +1,19 @@
 {% extends 'base.html' %}
 {% load static %}
 
+{# CORR-016: sem estes blocos a aba/cabeçalho caíam no default "HARPIA" do base.html. #}
+{% block title %}Unidades de Ensino — Harpia-DESUP{% endblock %}
+{% block header_title %}Unidades de Ensino{% endblock %}
+
 {% block content %}
 <div class="p-6">
-    <div class="flex justify-between items-center mb-6">
+    <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
         <div>
             <h1 class="text-2xl font-bold text-[#025c9f]">Unidades de Ensino</h1>
             <p class="text-sm text-slate-500">Gestão de campus e centros administrativos da FAETEC.</p>
         </div>
         <div class="flex items-center gap-4">
-            <a href="{% url 'core:unidade_create' %}" class="bg-[#025c9f] hover:bg-[#153e70] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2">
+            <a href="{% url 'core:unidade_create' %}" class="w-full sm:w-auto justify-center bg-[#025c9f] hover:bg-[#153e70] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2">
                 <i data-lucide="plus" class="w-4 h-4"></i>
                 Adicionar Unidade
             </a>
@@ -35,7 +39,7 @@
                 </div>
             </div>
 
-            <div class="flex justify-between items-center pt-4 border-t border-slate-50">
+            <div class="flex flex-wrap justify-between items-center gap-2 pt-4 border-t border-slate-50">
                 <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Status: 
                     <span class="{% if unidade.status %}text-green-500{% else %}text-red-400{% endif %}">
                         {% if unidade.status %}Ativo{% else %}Inativo{% endif %}

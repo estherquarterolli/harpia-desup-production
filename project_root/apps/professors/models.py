@@ -167,16 +167,25 @@ class Professor(models.Model):
     @property
     def ch_justificada(self) -> float:
         """
-        Retorna a soma de horas justificadas/extracurriculares que foram aprovadas pela DESUP.
+        Soma de horas justificadas/extracurriculares aprovadas pela DESUP
+        **no semestre atual**.
+
+        Usa as horas efetivamente APROVADAS pela DESUP (``ch_aprovada`` de cada
+        item), não as solicitadas — reaproveitando
+        ``PendenciaExtra.ch_total_justificada``, que já retorna 0 quando a
+        pendência não está APROVADA e já soma o ``ch_aprovada`` de TCC +
+        extensão + redução. Antes esta property somava ``carga_horaria`` /
+        ``horas_reduzidas`` (valores solicitados), o que superestimava o total
+        quando a DESUP aprovava menos horas do que o pedido.
+
+        As justificativas são escopadas por semestre (uma PendenciaExtra por
+        professor + semestre) e não ficam acumuladas no professor: ao virar o
+        semestre, as justificativas de semestres anteriores deixam de contar.
         """
         try:
-            total = 0.0
-            for pendencia in self.pendencias_extra.filter(status='APROVADO'):
-                tcc = pendencia.orientacoes_tcc.aggregate(total=models.Sum('carga_horaria'))['total'] or 0
-                ext = pendencia.atividades_extensao.aggregate(total=models.Sum('carga_horaria'))['total'] or 0
-                red = pendencia.reducoes_ch.aggregate(total=models.Sum('horas_reduzidas'))['total'] or 0
-                total += float(tcc) + float(ext) + float(red)
-            return total
+            from apps.extra_curricular.utils import semestre_atual
+            pendencias = self.pendencias_extra.filter(semestre=semestre_atual())
+            return sum(float(p.ch_total_justificada) for p in pendencias)
         except Exception:
             return 0.0
 

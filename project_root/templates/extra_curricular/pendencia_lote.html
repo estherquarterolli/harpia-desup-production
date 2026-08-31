@@ -138,8 +138,8 @@
 
 
     {# ── SEI da Unidade ── #}
-    <div class="flex items-center justify-between mt-4 text-sm flex-wrap gap-4 pt-4 border-t border-slate-100">
-      <div class="flex items-center gap-3">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mt-4 text-sm pt-4 border-t border-slate-100">
+      <div class="flex items-center gap-3 flex-wrap">
         <i class="ph ph-file-doc text-[#025c9f] text-xl flex-shrink-0"></i>
         {% if sei_numero %}
         <span class="font-bold text-[#025c9f]">SEI (Único p/ Unidade): {{ sei_numero }}</span>
@@ -162,7 +162,7 @@
     {# Form Oculto para Editar SEI Lote #}
     {% if is_coordenador %}
     <div id="seiForm" class="menu-hidden mt-4 pt-4 border-t border-slate-100">
-        <form method="POST" action="{% url 'extra_curricular:editar_sei_lote' %}" class="flex items-end gap-3 max-w-sm" onsubmit="this.querySelector('button[type=submit], input[type=submit]').disabled=true; return true;">
+        <form method="POST" action="{% url 'extra_curricular:editar_sei_lote' %}" class="flex items-end gap-3 flex-wrap max-w-sm" onsubmit="this.querySelector('button[type=submit], input[type=submit]').disabled=true; return true;">
             {% csrf_token %}
             <input type="hidden" name="ids" value="{{ query_string }}">
             <div class="flex-1">

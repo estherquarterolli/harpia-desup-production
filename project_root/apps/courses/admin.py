@@ -13,8 +13,8 @@ class CourseUnitAdmin(ModelAdmin):
     list_filter = ('unidade', 'ativo')
 
 class CurricularComponentAdmin(ModelAdmin):
-    list_display = ('nome', 'sigla', 'codigo', 'carga_horaria_padrao', 'creditos')
-    search_fields = ('nome', 'sigla', 'codigo')
+    list_display = ('nome', 'codigo', 'carga_horaria_padrao', 'creditos')
+    search_fields = ('nome', 'codigo')
     filter_horizontal = ('pre_requisitos',)
 
 class MatrixComponentInline(TabularInline):
@@ -58,7 +58,6 @@ class MatrixComponentAdmin(ModelAdmin):
     list_filter = ('status', 'compartilhado', 'matriz__curso')
     search_fields = (
         'componente_curricular__nome',
-        'componente_curricular__sigla',
         'codigo',
         'matriz__curso__nome',
         'matriz__curso__sigla',

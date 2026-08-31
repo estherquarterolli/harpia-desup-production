@@ -6,12 +6,42 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.conf import settings
 from django.db import transaction
+import logging
+
+_cache_logger = logging.getLogger(__name__)
+
+
+def _cache_get(key, default=None):
+    """cache.get resiliente: se o backend de cache estiver fora, retorna o default."""
+    try:
+        return cache.get(key, default)
+    except Exception:
+        _cache_logger.warning("Cache indisponivel em get(%s); usando default.", key, exc_info=True)
+        return default
+
+
+def _cache_set(key, value, timeout=None):
+    """cache.set resiliente: falha de cache nao interrompe o fluxo."""
+    try:
+        cache.set(key, value, timeout)
+    except Exception:
+        _cache_logger.warning("Cache indisponivel em set(%s).", key, exc_info=True)
+
+
+def _cache_delete(key):
+    """cache.delete resiliente."""
+    try:
+        cache.delete(key)
+    except Exception:
+        _cache_logger.warning("Cache indisponivel em delete(%s).", key, exc_info=True)
+
 
 def get_redirect_url_for_user(user):
     """
     Retorna a URL de redirecionamento com base no perfil do usuário.
     """
-    if user.is_superuser:
+    # CORR-021: ADMIN (TI DESUP) pode existir sem ser superusuário.
+    if user.is_superuser or user.perfil == 'ADMIN':
         return '/admin/'
     return get_dashboard_url_for_user(user)
 
@@ -20,8 +50,14 @@ def get_dashboard_url_for_user(user):
     """
     Retorna a URL do dashboard operacional com base no perfil do usuário.
     """
-    if user.is_superuser:
-        return '/dashboard/desup/'
+    # CORR-019: o superuser (DEV/ADMIN) NÃO é operador DESUP. Antes esta função
+    # devolvia '/dashboard/desup/' para ele; como a raiz '/' e o
+    # LOGIN_REDIRECT_URL='dashboard' passam por aqui, qualquer redirect a
+    # '/'/'dashboard' (inclusive quando o /admin/ exige re-login e não há `next`
+    # válido) jogava o admin no dashboard da DESUP. Agora ele fica no admin Django.
+    # CORR-021: idem para o perfil ADMIN (TI DESUP), que não é perfil operacional.
+    if user.is_superuser or user.perfil == 'ADMIN':
+        return '/admin/'
     if user.perfil == 'DESUP' or user.groups.filter(name='Admin DESUP').exists():
         return '/dashboard/desup/'
     elif user.perfil == 'COORDENADOR_UNIDADE' or user.groups.filter(name='Gestor Unidade').exists():
@@ -41,7 +77,7 @@ def login_view(request):
         
         # Regra #10: Bloqueio após 5 tentativas
         cache_key = f"login_failed_attempts_{email}"
-        attempts = cache.get(cache_key, 0)
+        attempts = _cache_get(cache_key, 0)
         max_attempts = 5
         
         if attempts >= max_attempts:
@@ -59,7 +95,7 @@ def login_view(request):
 
         if user is not None:
             login(request, user)
-            cache.delete(cache_key) # Limpa tentativas ao logar
+            _cache_delete(cache_key) # Limpa tentativas ao logar
 
             redirect_url = get_redirect_url_for_user(user)
             if request.headers.get('HX-Request'):
@@ -70,7 +106,7 @@ def login_view(request):
         else:
             # Incrementa tentativas falhas
             new_attempts = attempts + 1
-            cache.set(cache_key, new_attempts, 900) # Expira em 15 min (900s)
+            _cache_set(cache_key, new_attempts, 900) # Expira em 15 min (900s)
             
             remaining = max_attempts - new_attempts
             warning_msg = ""
@@ -126,6 +162,29 @@ def registrar_auditoria(request, acao, usuario=None, email="", detalhes=""):
     )
 
 
+class ProfileView(LoginRequiredMixin, View):
+    """
+    CORR-017 — página "Meu Perfil" (somente leitura).
+
+    Antes o item "Meu Perfil" do menu de usuário apontava direto para a troca de
+    senha (`password_change`) e não existia nenhuma tela de perfil. Aqui o usuário
+    vê e-mail, tipo de perfil e unidade; a troca de senha virou um item separado.
+    """
+
+    template_name = 'accounts/profile.html'
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        # CORR-021: os três perfis são oficiais, então `get_perfil_display()` sempre
+        # devolve um rótulo legível (antes 'ADMIN' era valor legado fora de
+        # Perfil.choices e saía cru).
+        return render(request, self.template_name, {
+            'perfil_label': user.get_perfil_display(),
+            # A unidade só faz sentido para o perfil de unidade.
+            'mostra_unidade': user.perfil == User.Perfil.COORDENADOR_UNIDADE,
+        })
+
+
 class CustomPasswordChangeView(LoginRequiredMixin, PasswordChangeView):
     template_name = 'registration/password_change_form.html'
     form_class = SetPasswordForm
@@ -135,7 +194,13 @@ class CustomPasswordChangeView(LoginRequiredMixin, PasswordChangeView):
 
     def get(self, request, *args, **kwargs):
         if not request.user.forcar_troca_senha:
-            return render(request, 'registration/password_change_email_prompt.html')
+            # CORR-018: tela de confirmação SEM campo de e-mail — o endereço já é
+            # conhecido (`request.user.email`) e é para ele que o link é enviado.
+            return render(
+                request,
+                'registration/password_change_email_prompt.html',
+                {'user_email': request.user.email},
+            )
         return super().get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
@@ -144,29 +209,52 @@ class CustomPasswordChangeView(LoginRequiredMixin, PasswordChangeView):
         return super().post(request, *args, **kwargs)
 
     def _request_email_confirmation(self, request):
-        email = (request.POST.get("email") or "").strip().lower()
-        user_email = (request.user.email or "").strip().lower()
-
-        if email != user_email:
-            registrar_auditoria(
-                request,
-                "PASSWORD_CHANGE_EMAIL_MISMATCH",
-                usuario=request.user,
-                email=email,
-                detalhes="E-mail informado nao confere com o usuario autenticado.",
-            )
-            return render(
-                request,
-                'registration/password_change_email_prompt.html',
-                {'error': 'Informe o mesmo e-mail utilizado no seu login.'},
-            )
-
+        # CORR-018: usa sempre o e-mail do usuário autenticado. Antes o fluxo lia
+        # `request.POST["email"]` e exigia que fosse idêntico ao do login — passo
+        # redundante (o e-mail já está na sessão) e que parecia uma brecha.
         from .models import SelfPasswordChangeRequest
 
-        change_request = SelfPasswordChangeRequest.objects.create(
-            user=request.user,
-            solicitado_ip=get_client_ip(request),
-        )
+        # CORR-020: rate-limit de 1 pedido por dia. Sem ele, qualquer sessão aberta
+        # podia disparar e-mails sem limite. Em DEBUG o bloqueio não se aplica, para
+        # não atrapalhar o desenvolvimento.
+        #
+        # A checagem e a criação do token ficam na MESMA transação, com a linha do
+        # usuário travada: sem o lock, um duplo clique no botão dispara dois POSTs
+        # que passariam os dois pela checagem e gerariam dois links. Em SQLite o
+        # `select_for_update` é inócuo; em PostgreSQL (produção) ele serializa.
+        with transaction.atomic():
+            User.objects.select_for_update().filter(pk=request.user.pk).first()
+
+            if not settings.DEBUG:
+                recente = SelfPasswordChangeRequest.pedido_recente(request.user)
+                if recente is not None:
+                    registrar_auditoria(
+                        request,
+                        "PASSWORD_CHANGE_RATE_LIMITED",
+                        usuario=request.user,
+                        email=request.user.email,
+                        detalhes="Novo pedido bloqueado: limite de 1 link de troca de senha por dia.",
+                    )
+                    liberado = timezone.localtime(recente.liberado_em)
+                    return render(
+                        request,
+                        'registration/password_change_email_prompt.html',
+                        {
+                            'user_email': request.user.email,
+                            'error': (
+                                'Você já solicitou uma troca de senha nas últimas 24 horas. '
+                                f'Um novo pedido só poderá ser feito a partir de '
+                                f'{liberado.strftime("%d/%m/%Y às %H:%M")}. '
+                                'Verifique sua caixa de entrada (e o spam) — o link anterior '
+                                'vale por 1 hora.'
+                            ),
+                        },
+                    )
+
+            change_request = SelfPasswordChangeRequest.objects.create(
+                user=request.user,
+                solicitado_ip=get_client_ip(request),
+            )
         confirm_url = request.build_absolute_uri(
             reverse('password_change_confirm', kwargs={'token': change_request.token})
         )
@@ -202,7 +290,13 @@ class CustomPasswordChangeView(LoginRequiredMixin, PasswordChangeView):
             return render(
                 request,
                 'registration/password_change_email_prompt.html',
-                {'success': 'Enviamos um link de troca de senha para o seu e-mail.'},
+                {
+                    'user_email': request.user.email,
+                    'success': (
+                        'Enviamos um link de troca de senha para '
+                        f'{request.user.email}.'
+                    ),
+                },
             )
         except Exception as e:
             logger.error(f"Erro ao enviar e-mail de troca de senha: {e}")
@@ -216,7 +310,10 @@ class CustomPasswordChangeView(LoginRequiredMixin, PasswordChangeView):
             return render(
                 request,
                 'registration/password_change_email_prompt.html',
-                {'error': 'Ocorreu um erro ao enviar o e-mail. Por favor, tente novamente mais tarde.'},
+                {
+                    'user_email': request.user.email,
+                    'error': 'Ocorreu um erro ao enviar o e-mail. Por favor, tente novamente mais tarde.',
+                },
             )
 
     def form_valid(self, form):
@@ -263,8 +360,12 @@ class PasswordChangeConfirmView(View):
             email=change_request.user.email,
             detalhes="Tentativa de uso de token de troca de senha usado ou expirado.",
         )
+        # CORR-018: `somente_erro` esconde o botão "Enviar link" — aqui o usuário
+        # pode nem estar autenticado (o link chega por e-mail), então não há
+        # solicitação nova a fazer nesta tela.
         return render(request, 'registration/password_change_email_prompt.html', {
-            'error': 'Este link de troca de senha expirou ou ja foi utilizado.'
+            'error': 'Este link de troca de senha expirou ou ja foi utilizado.',
+            'somente_erro': True,
         })
 
     def get(self, request, token):
@@ -317,17 +418,37 @@ class ForgotPasswordView(View):
         # Buscar usuário pelo e-mail informado
         user = User.objects.filter(email=email).first()
         if user:
+            # SEC-004: já existe pedido em aberto para esta conta → não cria outro,
+            # não notifica de novo e não dispara e-mail. A resposta é a MESMA do
+            # caminho de sucesso: avisar "você já pediu" diria a um terceiro que a
+            # conta existe e que há um reset pendente.
+            if PasswordResetRequest.pedido_pendente(user) is not None:
+                logger.info(
+                    "Pedido de reset ignorado por cooldown.",
+                    extra={"user_id": user.pk, "user_email": user.email},
+                )
+                return render(request, 'registration/forgot_password.html', {
+                    'success': (
+                        "Sua solicitação foi enviada para o administrador do DESUP e para a "
+                        "coordenação acadêmica da sua unidade. Por favor, aguarde o reset."
+                    ),
+                })
+
             # Criar a solicitação de reset no banco
             reset_request = PasswordResetRequest.objects.create(user=user)
             
             # Notificar os usuários do DESUP e superusuários
             destinatarios_qs = User.objects.filter(perfil='DESUP') | User.objects.filter(is_superuser=True)
             
-            # Acrescentar a coordenação acadêmica da unidade do usuário, se houver
-            if user.unidade:
+            # Acrescentar a coordenação acadêmica da unidade do usuário, se houver.
+            # SEC-002: só quando o solicitante É um coordenador de unidade — a
+            # notificação carrega o token de aprovação no `url_acao`, e coordenador
+            # não aprova reset de conta administrativa. Antes, um pedido de reset
+            # do DESUP entregava o token a todos os coordenadores da unidade dele.
+            if user.unidade and user.perfil == User.Perfil.COORDENADOR_UNIDADE:
                 coordenadores_unidade = User.objects.filter(
-                    perfil='COORDENADOR_UNIDADE', 
-                    unidade=user.unidade
+                    perfil=User.Perfil.COORDENADOR_UNIDADE,
+                    unidade=user.unidade,
                 )
                 destinatarios_qs = destinatarios_qs | coordenadores_unidade
             
@@ -374,6 +495,32 @@ class ForgotPasswordView(View):
             return render(request, 'registration/forgot_password.html', {'error': msg})
 
 
+def _pode_aprovar_reset(aprovador, solicitante):
+    """
+    SEC-002 — quem pode aprovar o reset de senha de quem.
+
+    DESUP e superusuário aprovam qualquer um. O coordenador de unidade aprova
+    APENAS coordenadores da **própria** unidade, e nunca contas administrativas.
+
+    O guard anterior era `if reset_req.user.unidade != request.user.unidade: 403`.
+    Como DESUP, ADMIN e superusuário têm `unidade = None` — e um coordenador
+    também pode ter, já que o campo é `null=True` —, a comparação virava
+    `None != None`, que é `False`, e a checagem **passava**. Somado ao vazamento
+    do token pela notificação (SEC-001), isso dava takeover de superusuário.
+    """
+    if aprovador.is_superuser or aprovador.perfil == User.Perfil.DESUP:
+        return True
+    if aprovador.perfil != User.Perfil.COORDENADOR_UNIDADE:
+        return False
+    # Coordenador só aprova par da mesma unidade — e unidade nula nunca casa.
+    if aprovador.unidade_id is None or solicitante.unidade_id != aprovador.unidade_id:
+        return False
+    # Nunca deixar coordenador resetar conta administrativa (escalonamento).
+    if solicitante.is_superuser or solicitante.perfil != User.Perfil.COORDENADOR_UNIDADE:
+        return False
+    return True
+
+
 class ApprovePasswordResetView(View):
     """
     Página de aprovação de reset de senha.
@@ -383,11 +530,9 @@ class ApprovePasswordResetView(View):
     @method_decorator(user_passes_test(is_coordinator_or_desup))
     def get(self, request, token):
         reset_req = get_object_or_404(PasswordResetRequest, token=token)
-        
-        # Verificar se o coordenador é da mesma unidade do solicitante (se não for DESUP/Super)
-        if not (request.user.is_superuser or request.user.perfil == 'DESUP'):
-            if reset_req.user.unidade != request.user.unidade:
-                return HttpResponse("Você não tem permissão para aprovar resets de outras unidades.", status=403)
+
+        if not _pode_aprovar_reset(request.user, reset_req.user):
+            return HttpResponse("Você não tem permissão para aprovar este reset.", status=403)
 
         return render(request, 'registration/approve_reset.html', {'reset_req': reset_req})
 
@@ -395,11 +540,16 @@ class ApprovePasswordResetView(View):
     @method_decorator(user_passes_test(is_coordinator_or_desup))
     def post(self, request, token):
         reset_req = get_object_or_404(PasswordResetRequest, token=token)
-        
-        # Verificação de segurança adicional
-        if not (request.user.is_superuser or request.user.perfil == 'DESUP'):
-            if reset_req.user.unidade != request.user.unidade:
-                return HttpResponse("Permissão negada.", status=403)
+
+        if not _pode_aprovar_reset(request.user, reset_req.user):
+            registrar_auditoria(
+                request,
+                "PASSWORD_RESET_APPROVAL_DENIED",
+                usuario=request.user,
+                email=request.user.email,
+                detalhes=f"Tentativa de aprovar reset de {reset_req.user.email} sem permissão.",
+            )
+            return HttpResponse("Permissão negada.", status=403)
 
         if reset_req.finalizado:
             return render(request, 'registration/approve_reset.html', {'reset_req': reset_req, 'error': "Esta solicitação já foi processada."})

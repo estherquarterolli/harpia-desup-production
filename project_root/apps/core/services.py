@@ -29,7 +29,10 @@ def fechar_janelas_expiradas():
     """
     from django.utils import timezone
 
-    hoje = timezone.now().date()
+    # timezone.localdate() (e não timezone.now().date()): com USE_TZ=True o `now()`
+    # é UTC, então das 21h à meia-noite de Brasília o "hoje" já era o dia seguinte
+    # em UTC — a janela era gravada como Fechado 3h antes do fim do prazo.
+    hoje = timezone.localdate()
     JanelaEntrega.objects.filter(
         status__in=ACTIVE_WINDOW_STATUSES,
         data_fim__lt=hoje,
@@ -37,24 +40,51 @@ def fechar_janelas_expiradas():
 
 
 def get_delivery_window(unidade=None):
+    """
+    Devolve a janela vigente (ativa hoje) para a unidade, ou a global, ou None.
+
+    Fonte de verdade única do bloqueio: views, `enforce_window_or_redirect` e o
+    context processor do banner devem todos passar por aqui, senão a tela e o POST
+    divergem (banner verde + ação bloqueada).
+    """
+    from django.utils import timezone
+
     fechar_janelas_expiradas()
-    qs = JanelaEntrega.objects.filter(status__in=ACTIVE_WINDOW_STATUSES)
+    hoje = timezone.localdate()
+    # O recorte de data entra já no queryset: filtrar antes do order_by é o que
+    # garante que uma janela FUTURA da unidade (data_inicio > hoje) não "roube" a
+    # vez da vigente. Antes pegava-se a de data_inicio mais recente e só depois se
+    # testava `is_ativa` — se a escolhida não estivesse valendo, as demais janelas
+    # da unidade nem eram consideradas e a unidade caía na global (ou em nada).
+    qs = JanelaEntrega.objects.filter(
+        status__in=ACTIVE_WINDOW_STATUSES,
+        data_inicio__lte=hoje,
+        data_fim__gte=hoje,
+    )
 
     if unidade:
-        # Override explícito de fechamento para esta unidade tem prioridade absoluta
+        # Override explícito de fechamento para esta unidade tem prioridade absoluta,
+        # mas SOMENTE se a janela Fechado cobrir hoje. Sem esse recorte, qualquer
+        # janela antiga da unidade — que `fechar_janelas_expiradas` marca como
+        # Fechado ao vencer — virava um bloqueio permanente: nem uma nova janela da
+        # unidade nem a global conseguiam reabrir a unidade.
         fechado_override = JanelaEntrega.objects.filter(
             unidade=unidade,
             status=JanelaEntrega.StatusChoices.FECHADO,
+            data_inicio__lte=hoje,
+            data_fim__gte=hoje,
         ).exists()
         if fechado_override:
             return None
 
+        # A janela da unidade vence a global por ser consultada primeiro — não por
+        # ordenação num queryset misto, que depende do backend do banco.
         janela_unidade = qs.filter(unidade=unidade).order_by("-data_inicio", "-pk").first()
-        if janela_unidade and janela_unidade.is_ativa:
+        if janela_unidade:
             return janela_unidade
 
     janela_global = qs.filter(unidade__isnull=True).order_by("-data_inicio", "-pk").first()
-    if janela_global and janela_global.is_ativa:
+    if janela_global:
         return janela_global
 
     return None

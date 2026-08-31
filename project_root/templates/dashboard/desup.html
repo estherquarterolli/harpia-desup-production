@@ -39,23 +39,120 @@
         </div>
     </div>
 
+    <!-- Atalhos do dashboard -->
     <div class="flex flex-wrap items-center gap-3">
-        <a href="{% url 'extra_curricular:pendencia_list' %}"
-           class="inline-flex items-center gap-2 rounded-xl bg-[#025c9f] px-4 py-3 text-sm font-black text-white shadow-sm transition-colors hover:bg-[#153e70]">
-            <i class="ph ph-books text-lg"></i>
-            Pendências Extracurriculares
-        </a>
+
+        {# Atalhos do usuário (todos azuis, removíveis). Se exceder a largura, quebram para a linha de baixo (flex-wrap). #}
+        {% for atalho in atalhos_user %}
+        <div class="inline-flex items-center rounded-xl bg-[#025c9f] text-white shadow-sm overflow-hidden">
+            <a href="{{ atalho.href }}"
+               class="inline-flex items-center gap-2 px-4 py-3 text-sm font-black transition-colors hover:bg-[#153e70]">
+                <i class="ph {{ atalho.icon }} text-lg"></i>
+                {{ atalho.label }}
+            </a>
+            <button type="button" title="Remover atalho"
+                    onclick="abrirRemoverAtalho('{% url 'core:atalho_remove' atalho.id %}', '{{ atalho.label|escapejs }}')"
+                    class="px-2.5 py-3 text-white/70 hover:text-white hover:bg-[#153e70] transition-colors">
+                <i class="ph ph-x"></i>
+            </button>
+        </div>
+        {% endfor %}
+
+        {# Botão adicionar atalho (cinza) — abre o pop-up de seleção #}
+        <button type="button" onclick="abrirAdicionarAtalho()"
+                class="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-600 border border-slate-200 shadow-sm transition-colors hover:bg-slate-200">
+            <i class="ph ph-plus"></i>
+            Adicionar atalho
+        </button>
     </div>
+
+    {# ── Pop-up: adicionar atalho(s) (multi-seleção) ── #}
+    <div id="modalAddAtalho" class="hidden fixed inset-0 z-[140] flex items-center justify-center p-4 bg-black/40">
+        <div class="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                <h3 class="text-base font-black text-[#025c9f]">Adicionar atalhos</h3>
+                <button type="button" onclick="fecharModal('modalAddAtalho')" class="text-slate-400 hover:text-slate-600">
+                    <i class="ph ph-x text-xl"></i>
+                </button>
+            </div>
+            <form method="post" action="{% url 'core:atalho_add' %}">
+                {% csrf_token %}
+                <div class="px-6 py-4 max-h-[55vh] overflow-y-auto">
+                    <p class="text-xs font-semibold text-slate-500 mb-3">Selecione uma ou mais páginas/ações:</p>
+                    {% for op in atalhos_disponiveis %}
+                    <label class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer">
+                        <input type="checkbox" name="chave" value="{{ op.chave }}"
+                               class="rounded text-[#025c9f] focus:ring-[#025c9f]">
+                        <span class="text-sm font-semibold text-slate-700">{{ op.label }}</span>
+                    </label>
+                    {% empty %}
+                    <p class="text-sm text-slate-400 py-6 text-center font-semibold">Todos os atalhos já foram adicionados.</p>
+                    {% endfor %}
+                </div>
+                <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/50">
+                    <button type="button" onclick="fecharModal('modalAddAtalho')"
+                            class="px-4 py-2.5 rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-100 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                            class="bg-[#025c9f] hover:bg-[#153e70] text-white px-5 py-2.5 rounded-lg text-sm font-black transition-colors shadow-sm">
+                        Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {# ── Pop-up: confirmar remoção de atalho ── #}
+    <div id="modalRemoveAtalho" class="hidden fixed inset-0 z-[140] flex items-center justify-center p-4 bg-black/40">
+        <div class="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div class="px-6 py-5 text-center">
+                <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
+                    <i class="ph ph-trash text-2xl text-red-500"></i>
+                </div>
+                <h3 class="text-base font-black text-slate-800">Remover atalho</h3>
+                <p class="text-sm text-slate-500 mt-1">Deseja remover <span id="removeAtalhoLabel" class="font-bold text-slate-700"></span> dos seus atalhos?</p>
+            </div>
+            <form method="post" id="formRemoveAtalho" action="">
+                {% csrf_token %}
+                <div class="flex items-center justify-center gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/50">
+                    <button type="button" onclick="fecharModal('modalRemoveAtalho')"
+                            class="px-4 py-2.5 rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-100 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                            class="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-lg text-sm font-black transition-colors shadow-sm">
+                        Remover
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function abrirModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function fecharModal(id) { document.getElementById(id).classList.add('hidden'); }
+        function abrirAdicionarAtalho() { abrirModal('modalAddAtalho'); }
+        function abrirRemoverAtalho(action, label) {
+            document.getElementById('formRemoveAtalho').setAttribute('action', action);
+            document.getElementById('removeAtalhoLabel').textContent = label;
+            abrirModal('modalRemoveAtalho');
+        }
+        // Fecha ao clicar no backdrop
+        document.querySelectorAll('#modalAddAtalho, #modalRemoveAtalho').forEach(function (m) {
+            m.addEventListener('click', function (e) { if (e.target === m) m.classList.add('hidden'); });
+        });
+    </script>
 
     <!-- Tabela de Professores com filtros HTMX -->
     <div>
-        <div class="flex flex-wrap justify-between items-center gap-4 mb-4">
+        <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4">
             <h2 class="text-sm font-bold text-slate-500 uppercase tracking-widest">Consulta de Professores</h2>
             <div class="flex flex-wrap gap-3 items-end">
-                <div class="relative">
+                <div class="relative w-full sm:w-auto">
                     <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
                     <input type="text" name="q" placeholder="Buscar..."
-                        class="pl-9 pr-4 py-2 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-400 w-48 js-autocomplete"
+                        class="pl-9 pr-4 py-2 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-400 w-full sm:w-48 js-autocomplete"
                         hx-get="{% url 'dashboard_professores_partial' %}"
                         hx-target="#dashboard-professor-table"
                         hx-trigger="keyup changed delay:400ms"
@@ -63,7 +160,7 @@
                         autocomplete="off">
                 </div>
                 <select name="unidade_id"
-                    class="px-3 py-2 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                    class="w-full sm:w-auto px-3 py-2 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-400 bg-white"
                     hx-get="{% url 'dashboard_professores_partial' %}"
                     hx-target="#dashboard-professor-table"
                     hx-trigger="change"
@@ -74,7 +171,7 @@
                     {% endfor %}
                 </select>
                 <select name="eixo"
-                    class="px-3 py-2 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                    class="w-full sm:w-auto px-3 py-2 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-400 bg-white"
                     hx-get="{% url 'dashboard_professores_partial' %}"
                     hx-target="#dashboard-professor-table"
                     hx-trigger="change"

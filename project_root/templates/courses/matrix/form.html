@@ -147,7 +147,7 @@
 
    
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/60">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/60">
         <div>
           <h3 class="text-sm font-black text-[#025c9f] uppercase tracking-wide">
             <i class="ph ph-list-bullets mr-1"></i> Componentes Curriculares
@@ -169,15 +169,16 @@
 
       {# Container das linhas — alvo dos swaps HTMX #}
       <div class="overflow-x-auto w-full">
-        <table class="w-full text-left text-sm text-slate-600 whitespace-nowrap">
+        <table class="w-full text-left text-sm text-slate-600 whitespace-nowrap stack-table">
           <thead class="bg-slate-100/50 text-xs font-bold text-[#025c9f] uppercase tracking-wider border-b border-slate-200">
             <tr>
               <th class="px-4 py-3">Período</th>
               <th class="px-4 py-3">Cód</th>
               <th class="px-4 py-3 w-full">Disciplina</th>
               <th class="px-4 py-3">Crédito</th>
-              <th class="px-4 py-3">CH</th>
               <th class="px-4 py-3">HA</th>
+              <th class="px-4 py-3">HA/sem</th>
+              <th class="px-4 py-3">HR</th>
               <th class="px-4 py-3 w-10"></th>
             </tr>
           </thead>
@@ -313,6 +314,22 @@
       }
     });
   }
+
+  // HR (hora-relógio total) = HA × 50/60 — read-only, recalcula ao digitar a HA (carga_horaria).
+  function updateHrTotal(input) {
+    const row = input.closest('tr');
+    if (!row) return;
+    const span = row.querySelector('.js-hr-total');
+    if (!span) return;
+    const ha = parseFloat(input.value) || 0;
+    span.textContent = (ha * 50 / 60).toFixed(2);   // ex.: 80 -> "66.67"
+  }
+  document.addEventListener('input', function (e) {
+    const t = e.target;
+    if (t && t.name && t.name.endsWith('-carga_horaria')) {
+      updateHrTotal(t);
+    }
+  });
 
   // Reinicializa ícones Lucide após swap HTMX
   document.body.addEventListener('htmx:afterSwap', function(evt) {

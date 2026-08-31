@@ -76,13 +76,11 @@ class MatrixComponentForm(forms.ModelForm):
             'creditos': forms.NumberInput(attrs={
                 'class': _FIELD_CSS,
                 'min': 0,
-                'readonly': 'readonly',
             }),
             'carga_horaria_semanal': forms.NumberInput(attrs={
                 'class': _FIELD_CSS,
                 'step': '0.5',
                 'min': 0,
-                'readonly': 'readonly',
             }),
             'docente': forms.HiddenInput(),
             'compartilhado': forms.CheckboxInput(attrs={'class': 'rounded text-[#1e4e8c]'}),
@@ -96,26 +94,49 @@ class MatrixComponentForm(forms.ModelForm):
         self.fields['codigo'].required = False
         self.fields['carga_horaria'].required = False
         self.fields['creditos'].required = False
+        self.fields['carga_horaria_semanal'].required = False
         self.fields['componente_curricular'].queryset = CurricularComponent.objects.all().order_by('nome')
+        # CORR-007: na matriz, o usuário só escolhe a **Disciplina** e o **Período**.
+        # Todo o resto ('Código', 'CH Total', 'Créditos', 'CH Sem.') deriva da
+        # disciplina e NÃO pode ser alterado pela DESUP — só via Django admin
+        # (super admin/dev). disabled=True bloqueia a edição na UI e faz o Django
+        # ignorar qualquer valor vindo no POST (à prova de adulteração); o valor
+        # correto é recalculado no clean() a partir da disciplina.
+        self.fields['codigo'].disabled = True
+        self.fields['carga_horaria'].disabled = True
+        self.fields['creditos'].disabled = True
+        self.fields['carga_horaria_semanal'].disabled = True
 
     def clean(self):
         cleaned_data = super().clean()
-        ch = cleaned_data.get('carga_horaria')
-        if ch is not None:
+        cc = cleaned_data.get('componente_curricular')
+        if cc is not None:
+            # Código sempre espelha o da disciplina selecionada.
+            cleaned_data['codigo'] = cc.codigo or ''
+            # CH Total: como o campo é `disabled`, o valor nunca vem do POST — só do
+            # instance ou da disciplina. Preservar o gravado só faz sentido enquanto a
+            # linha continua na MESMA disciplina (matriz legada pode ter CH diferente
+            # do padrão, e isso é legítimo). Trocando a disciplina, o valor herdado é
+            # o da disciplina ANTIGA: aí a CH tem de ser re-derivada do padrão da nova,
+            # senão a linha fica com o código de uma e a carga horária de outra.
+            ch = cleaned_data.get('carga_horaria')
+            trocou_disciplina = self.instance.componente_curricular_id != cc.pk
+            if ch is None or trocou_disciplina:
+                ch = cc.carga_horaria_padrao
+            cleaned_data['carga_horaria'] = ch
+            if ch is None:
+                # `MatrixComponent.carga_horaria` é NOT NULL sem default: sem este
+                # guard o save estouraria com IntegrityError sem explicar a causa.
+                # Só acontece com disciplina de dados inconsistentes no banco.
+                raise forms.ValidationError(
+                    'A disciplina selecionada está sem carga horária padrão. '
+                    'Cadastre a carga horária da disciplina antes de usá-la na matriz.'
+                )
+            # Créditos e CH semanal derivam da CH total, mesma regra de
+            # CurricularComponentForm.clean() e de MatrixComponent.save().
             cleaned_data['creditos'] = ch // 20
-            cleaned_data['carga_horaria_semanal'] = ch // 20
+            cleaned_data['carga_horaria_semanal'] = round(ch / 20, 2)
         return cleaned_data
-
-    def save(self, commit=True):
-        instance = super().save(commit=False)
-        # Garantir o preenchimento de campos calculados no backend
-        if instance.carga_horaria is not None:
-            instance.creditos = instance.carga_horaria // 20
-            instance.carga_horaria_semanal = instance.creditos
-            
-        if commit:
-            instance.save()
-        return instance
 
 
 MatrixComponentFormSet = inlineformset_factory(
@@ -153,15 +174,11 @@ class CurricularComponentForm(forms.ModelForm):
 
     class Meta:
         model = CurricularComponent
-        fields = ['nome', 'sigla', 'codigo', 'carga_horaria_padrao', 'creditos', 'obrigatoria', 'pre_requisitos', 'ementa']
+        fields = ['nome', 'codigo', 'carga_horaria_padrao', 'creditos', 'obrigatoria', 'pre_requisitos', 'ementa']
         widgets = {
             'nome': forms.TextInput(attrs={
                 'class': _FIELD_CSS,
                 'placeholder': 'Ex: Programação Orientada a Objetos',
-            }),
-            'sigla': forms.TextInput(attrs={
-                'class': _FIELD_CSS,
-                'placeholder': 'Ex: POO',
             }),
             'codigo': forms.TextInput(attrs={
                 'class': _FIELD_CSS,

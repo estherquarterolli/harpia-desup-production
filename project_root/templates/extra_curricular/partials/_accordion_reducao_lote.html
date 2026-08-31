@@ -38,7 +38,7 @@
       {# Tabela de itens #}
       {% if red_items %}
       <div class="overflow-x-auto">
-        <table class="w-full text-left min-w-[760px]">
+        <table class="w-full text-left min-w-[760px] stack-table">
           <thead>
             <tr class="bg-slate-50 text-[10px] font-black text-[#025c9f] uppercase tracking-widest border-b border-slate-100">
               <th class="px-5 py-3">Docente</th>
@@ -59,7 +59,7 @@
               </td>
 
               {# CH Aprovada #}
-              <td class="px-5 py-3 text-center">
+              <td class="px-5 py-3 text-center" data-label="CH Aprovada (DESUP) (Aprovar)">
                 {% if is_desup %}
                 {% for par_item, par_form in parecer_red_forms %}
                   {% if par_item.pk == item.pk %}
@@ -75,16 +75,16 @@
               </td>
 
               {# Horas Reduzidas #}
-              <td class="px-5 py-3 text-center">
+              <td class="px-5 py-3 text-center" data-label="Horas Reduzidas (Solicitado)">
                 <span class="ch-preview">{{ item.horas_reduzidas }}h</span>
               </td>
 
-              <td class="px-5 py-3 max-w-xs">
+              <td class="px-5 py-3 max-w-xs" data-label="Motivo da Redução">
                 <p class="text-xs text-slate-600 leading-relaxed">{{ item.motivo_reducao }}</p>
               </td>
 
               {# Parecer DESUP #}
-              <td class="px-5 py-3 text-center">
+              <td class="px-5 py-3 text-center" data-label="Parecer DESUP">
                 {% if is_desup %}
                 {% for par_item, par_form in parecer_red_forms %}
                   {% if par_item.pk == item.pk %}
@@ -98,7 +98,7 @@
                 {% endif %}
               </td>
 
-              <td class="px-5 py-3 max-w-xs">
+              <td class="px-5 py-3 max-w-xs" data-label="Motivo do Parecer">
                 {% if is_desup %}
                   {% for par_item, par_form in parecer_red_forms %}
                     {% if par_item.pk == item.pk %}
@@ -118,12 +118,18 @@
               </td>
 
               <td class="px-5 py-3 text-right">
-                {% if is_coordenador %}
+                {% if item.bloqueado %}
+                <span title="Enviado em definitivo à DESUP — não pode ser alterado" class="inline-flex items-center justify-center w-8 h-8 rounded-full text-slate-400"><i class="ph ph-lock-simple text-base"></i></span>
+                {% elif is_coordenador %}
                 <form method="POST" action="{% url 'extra_curricular:deletar_item_lote' tipo='red' item_pk=item.pk %}" class="m-0 inline" onsubmit="this.querySelector('button[type=submit], input[type=submit]').disabled=true; return true;">
                   <input type="hidden" name="ids" value="{{ query_string }}">
                   {% csrf_token %}
-                  <button type="button"
-                    onclick="if(confirm('Remover este item?')) this.form.submit()"
+                  {# `type="submit"` (e não `type=button` + `form.submit()`): o
+                     `HTMLFormElement.submit()` NÃO dispara o evento `submit`, então o
+                     interceptador global do base.html nunca abria o modal "Janela
+                     fechada" — a exclusão saía silenciosa fora do prazo. #}
+                  <button type="submit"
+                    onclick="return confirm('Remover este item?')"
                     class="flex items-center justify-center w-8 h-8 rounded-full text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors">
                     <i class="ph ph-trash text-base"></i>
                   </button>
@@ -154,7 +160,7 @@
           <input type="hidden" name="ids" value="{{ query_string }}">
 
           <div class="overflow-x-auto">
-            <table class="w-full min-w-[640px]">
+            <table class="w-full min-w-[640px] stack-table">
               <thead>
                 <tr class="text-[10px] font-black text-[#025c9f] uppercase tracking-wide">
                   <th class="pb-2 pr-4">Selecione o Docente</th>
@@ -172,10 +178,10 @@
                       {% endfor %}
                     </select>
                   </td>
-                  <td class="pr-4 pb-2 align-top">
+                  <td class="pr-4 pb-2 align-top" data-label="Motivo da Redução">
                     <input type="text" name="motivo_reducao" required placeholder="Ex: Mandato sindical" class="form-field w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f]">
                   </td>
-                  <td class="pr-4 pb-2 align-top text-center">
+                  <td class="pr-4 pb-2 align-top text-center" data-label="Horas Reduzidas">
                     <input type="number" name="horas_reduzidas" min="0.5" step="0.5" required class="form-field w-full text-center">
                     <p class="text-[9px] text-slate-400 mt-0.5">Incrementos de 0,5h</p>
                   </td>

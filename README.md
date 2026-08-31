@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/HTMX-2.0-3366CC?style=for-the-badge&logo=htmx&logoColor=white"/>
   <img src="https://img.shields.io/badge/Alpine.js-3.x-8BC0D0?style=for-the-badge&logo=alpine.js&logoColor=white"/>
   <img src="https://img.shields.io/badge/TailwindCSS-4.x-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white"/>
-  <img src="https://img.shields.io/badge/PostgreSQL-16-336791?style=for-the-badge&logo=postgresql&logoColor=white"/>
+  <img src="https://img.shields.io/badge/MySQL-8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white"/>
   <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white"/>
 </p>
 
@@ -90,7 +90,7 @@ O foco principal é a **alocação de professores** em disciplinas, turmas e ati
 | **Backend**   | Django 6.0                  | Framework principal, ORM, autenticação          |
 | **Frontend**  | HTMX + Alpine.js            | Interatividade sem SPA, requests parciais       |
 | **Estilo**    | TailwindCSS 4               | Design system utilitário                        |
-| **Banco**     | PostgreSQL 16 / SQLite (dev)| Persistência com suporte a multi-tenant lógico  |
+| **Banco**     | MySQL 8 / SQLite (dev)      | Persistência com suporte a multi-tenant lógico  |
 | **Cache/Fila**| Redis + Celery              | Cache compartilhado e tarefas assíncronas       |
 | **Templates** | Django Templates            | Renderização server-side com componentes HTMX   |
 
@@ -141,7 +141,7 @@ erDiagram
 ### Pré-requisitos
 
 - Python 3.12+
-- PostgreSQL 16+ (ou SQLite para desenvolvimento)
+- MySQL 8+ (ou SQLite para desenvolvimento)
 - Node.js 18+ (para TailwindCSS)
 - Git
 
@@ -303,11 +303,11 @@ O projeto utiliza um workflow multi-agente para desenvolvimento assistido:
 
 | Agente        | Papel                           | Arquivo de Contexto                    |
 |---------------|---------------------------------|----------------------------------------|
-| **Gemini**    | Coder — implementação rápida    | [`docs/gemini.md`](docs/gemini.md)     |
-| **Claude Opus** | Reviewer — QA e code review  | [`docs/claude-opus.md`](docs/claude-opus.md) |
-| **Arquiteto** | Especificação técnica           | [`docs/prompt-arquiteto-regras-negocio.md`](docs/prompt-arquiteto-regras-negocio.md) |
+| **Coder** (Gemini / Claude / Codex) | Implementação / desenvolvimento | [`docs/ia/coder.md`](docs/ia/coder.md) |
+| **Claude Opus** | Reviewer — QA e code review  | [`docs/ia/claude-opus.md`](docs/ia/claude-opus.md) |
+| **Arquiteto** | Especificação técnica           | [`ia_workflow/prompts/prompt-arquiteto-regras-negocio.md`](ia_workflow/prompts/prompt-arquiteto-regras-negocio.md) |
 
-Todos os agentes estão obrigados a seguir as [`agentes_strict_rules.md`](agentes_strict_rules.md).
+Todos os agentes estão obrigados a seguir as [`docs/ia/agentes_strict_rules.md`](docs/ia/agentes_strict_rules.md).
 
 ---
 

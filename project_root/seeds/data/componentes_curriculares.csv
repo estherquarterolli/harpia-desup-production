@@ -1,0 +1,508 @@
+﻿codigo;componente_curricular;ch
+TEC_ACC_0001;Atividades Acadêmico-Científico-Culturais;40.0
+TEC_ACC_0002;Atividades Acadêmico-Científico-Culturais;60.0
+TEC_ACC_0003;Atividades Acadêmico-Científico-Culturais;80.0
+TEC_ACC_0004;Atividades Acadêmico-Científico-Culturais;100.0
+TEC_ACC_0005;Atividades Acadêmico-Científico-Culturais;120.0
+TEC_ACC_0006;Atividades Acadêmico-Científico-Culturais;140.0
+TEC_ACC_0007;Atividades Acadêmico-Científico-Culturais;160.0
+TEC_ACC_0008;Atividades Acadêmico-Científico-Culturais;180.0
+TEC_ACC_0009;Atividades Acadêmico-Científico-Culturais;200.0
+TEC_DSI_0001;Programação e Design para Web 1;80.0
+TEC_DSI_0002;Arquitetura de Computadores;80.0
+TEC_DSI_0003;Fundamentos de Sistemas de Informação;40.0
+TEC_DSI_0004;Programação Estruturada;80.0
+TEC_DSI_0005;Ambiente de Edição Web;80.0
+TEC_DSI_0006;Modelo Relacional e Projeto Lógico de Banco de Dados;80.0
+TEC_DSI_0007;Fundamentos de Engenharia de Software;80.0
+TEC_DSI_0008;Modelo e Programação Oreintados a Objetos;80.0
+TEC_DSI_0009;Fundamentos de Redes e Sistemas Distribuiídos;80.0
+TEC_DSI_0010;Sistemas Operacionais e Serviços de Virtualização;80.0
+TEC_DSI_0011;Desenvolvimento Frontend;80.0
+TEC_DSI_0012;Interface Humano-Máquina e UI Design;40.0
+TEC_DSI_0013;Técnicas de Análise e Projeto de Sistemas;80.0
+TEC_DSI_0014;Fundamentos de Estruturas de Dados;60.0
+TEC_DSI_0015;Métodos Ágeis;40.0
+TEC_DSI_0016;Desenvolvimento Backend;80.0
+TEC_DSI_0017;Arquitetura de Software;60.0
+TEC_DSI_0018;Gestão de Processos de Negócios (BPM);60.0
+TEC_DSI_0019;Padrões de Projetos;60.0
+TEC_DSI_0020;Testes de Softwares;60.0
+TEC_DSI_0021;Qualidade de Software;40.0
+TEC_DSI_0022;Projeto de Sistemas;80.0
+TEC_DSI_0023;Abordagem Devops e Entregas Contínuas;80.0
+TEC_DSI_0024;Gestão e Governança de TI;80.0
+TEC_DSI_0025;Estatística e Probabilidade;80.0
+TEC_DSI_0026;Métodos Quantitativos Aplicados à TIC;80.0
+TEC_DSI_0027;Organização de Computadores;80.0
+TEC_DSI_0028;Fundamentos de Algoritmos de Computação;80.0
+TEC_DSI_0029;Matemática Básica;80.0
+TEC_DSI_0030;Introdução à Análise de Sistemas;80.0
+TEC_DSI_0031;Interface Humano-Máquina;40.0
+TEC_DSI_0032;Técnicas e Paradigmas Humanos;80.0
+TEC_DSI_0033;Engenharia de Requisitos;80.0
+TEC_DSI_0034;Fundamentos de Programação;80.0
+TEC_DSI_0035;Construção de Aplicações Web;80.0
+TEC_DSI_0036;Algoritmos e Linguagens de Programação 2;60.0
+TEC_DSI_0037;Cálculo;80.0
+TEC_DSI_0038;Programação Orientada à Objetos Básica;80.0
+TEC_DSI_0039;Projeto de Banco de Dados;80.0
+TEC_DSI_0040;Desenvolvimento de Tecnologias Web;80.0
+TEC_DSI_0041;Álgebra;80.0
+TEC_DSI_0042;Programação Orientada à Objetos Avançada;80.0
+TEC_DSI_0043;Tópicos em Análise e Desenvolvimento;80.0
+TEC_DSI_0044;Utilização de Banco de Dados e SQL;80.0
+TEC_DSI_0045;Modelagem de Sistemas;80.0
+TEC_DSI_0046;Tópicos Avançados;80.0
+TEC_DSI_0047;Programação de Scripts de Banco de Dados e SQL;80.0
+TEC_DSI_0048;Programação e Estruturas de Dados em C;120.0
+TEC_DSI_0049;Organização de Computadores 1;120.0
+TEC_DSI_0050;Laboratório de Fundamentos em TIC;80.0
+TEC_DSI_0051;Programação Orientada à Objeto e Algoritmos em C++;120.0
+TEC_DSI_0052;Organização de Computadores 2;120.0
+TEC_DSI_0053;Banco de Dados 1;60.0
+TEC_DSI_0054;Inglês Técnico;80.0
+TEC_DSI_0055;Programação em Java;120.0
+TEC_DSI_0056;Rede de Computadores 1;100.0
+TEC_DSI_0057;Sistemas Operacionais 1;100.0
+TEC_DSI_0058;Banco de Dados 2;80.0
+TEC_DSI_0059;Princípios de Comunicações de Dados;100.0
+TEC_DSI_0060;Rede de Computadores 2;80.0
+TEC_DSI_0061;Tecnologias de Comunicação de Dados;80.0
+TEC_DSI_0062;Introdução à Computação Gráfica;100.0
+TEC_DSI_0063;Sistemas Operacionais 2;80.0
+TEC_DSI_0064;Comércio Eletrônico;40.0
+TEC_DSI_0065;Segurança e Auditoria de Sistemas;80.0
+TEC_DSI_0066;Sistemas Multimídia e Hipermídia;40.0
+TEC_DSI_0067;Psicologia Aplicada à Informática;40.0
+TEC_DSI_0068;Planejamento Estratégico Aplicado à TIC;40.0
+TEC_DSI_0069;Sistemas de Apoio à Decisão;60.0
+TEC_DSI_0070;Algoritmos e Linguagem de Programação 1;120.0
+TEC_DSI_0071;Introdução à Lógica;60.0
+TEC_DSI_0072;Organização de Computadores;60.0
+TEC_DSI_0073;Engenharia de Software e da Usabilidade;80.0
+TEC_DSI_0074;Programação e Design para Web 2;80.0
+TEC_DSI_0075;Mídias e Marketing Digital;60.0
+TEC_DSI_0076;Gestão de Projeto de Banco de Dados;60.0
+TEC_DSI_0077;Análise e Projeto de Sistemas;120.0
+TEC_DSI_0078;Programação Cliente/Servidor;80.0
+TEC_DSI_0079;Gestão de Sistemas Digitais na Web;80.0
+TEC_DSI_0080;Segurança em Sistemas Computacionais;80.0
+TEC_DSI_0081;Programação para Dispositivos Móveis;120.0
+TEC_DSI_0083;Logística e Comércio Eletrônico;60.0
+TEC_DSI_0084;Governança em TI;60.0
+TEC_DSI_0085;Qualidade e Testes de Software;80.0
+TEC_DSI_0089;Álgebra Linear;80.0
+TEC_DSI_0090;Modelagem Matemática e Computacional;80.0
+TEC_DSI_0091;Programação I;80.0
+TEC_DSI_0092;Introdução à IA;40.0
+TEC_DSI_0093;Pesquisa e Inovação;40.0
+TEC_DSI_0094;Estrutura de Dados e Algoritmos;80.0
+TEC_DSI_0095;Programação II;80.0
+TEC_DSI_0096;Computação em Nuvem;40.0
+TEC_DSI_0097;Projeto e Análise de Algorítmos;40.0
+TEC_DSI_0098;Segurança em IA;40.0
+TEC_DSI_0099;Aprendizado de Máquina I;80.0
+TEC_DSI_0100;Internet das Coisas;40.0
+TEC_DSI_0101;Computação de Alto Desempenho;40.0
+TEC_DSI_0102;Desenvolvimento de APIS’s para IA;40.0
+TEC_DSI_0103;Redes Neurais Generativas e Deep Learning;80.0
+TEC_DSI_0104;Aprendizado de Máquina II;80.0
+TEC_DSI_0105;Cibersegurança;40.0
+TEC_DSI_0106;Tópicos Avançados em IA;80.0
+TEC_DSI_0107;Técnicas de Big Data;40.0
+TEC_DSI_0108;Processamento de Linguagem Natural;80.0
+TEC_DSI_0109;Ciência de Dados;80.0
+TEC_DSI_0110;Programação em Ambiente Visual;80.0
+TEC_DSI_0111;Programação e Design para web 3;80.0
+TEC_ELE_0001;Disciplina Eletiva 1;60.0
+TEC_ELE_0002;Disciplina Eletiva 2;60.0
+TEC_ELE_0003;Disciplina Eletiva 3;60.0
+TEC_ELE_0004;Disciplina Eletiva 4;60.0
+TEC_ELE_0005;Disciplina Eletiva 5;60.0
+TEC_EST_0001;Estágio Supervisionado;100.0
+TEC_EST_0002;Estágio Supervisionado;120.0
+TEC_EST_0003;Estágio Supervisionado;140.0
+TEC_EST_0004;Estágio Supervisionado;160.0
+TEC_EST_0005;Estágio Supervisionado;180.0
+TEC_EST_0006;Estágio Supervisionado;200.0
+TEC_EST_0007;Estágio Supervisionado;240.0
+TEC_EST_0008;Estágio Supervisionado;300.0
+TEC_EST_0009;Estágio Supervisionado;360.0
+TEC_EXT_0001;Projeto de Extensão 1;60.0
+TEC_EXT_0002;Projeto de Extensão 2;60.0
+TEC_EXT_0003;Projeto de Extensão 3;60.0
+TEC_EXT_0004;Projeto de Extensão 4;60.0
+TEC_EXT_0005;Projeto de Extensão 5;60.0
+TEC_EXT_0006;Atividade Extensionista;40.0
+TEC_EXT_0007;Atividade Extensionista;60.0
+TEC_EXT_0008;Atividade Extensionista;80.0
+TEC_EXT_0009;Atividade Extensionista;120.0
+TEC_EXT_0010;Atividade Extensionista;160.0
+TEC_EXT_0011;Atividade Extensionista;240.0
+TEC_GER_0001;Gestão de Marketing;60.0
+TEC_GER_0002;Planejamento e Gestão Estratégica;60.0
+TEC_GER_0003;Sistemas de Informações Gerenciais;60.0
+TEC_GER_0004;Gestão da Produção e Qualidade;60.0
+TEC_GER_0005;Pesquisa de Marketing;60.0
+TEC_GER_0006;Gestão Financeira e Tributária;60.0
+TEC_GER_0007;Orçamento Empresarial e Análise de Investimentos;60.0
+TEC_GER_0008;Gestão de Vendas e Negociações;60.0
+TEC_GER_0009;Gestão de Custos e Formação de Preços;60.0
+TEC_GER_0010;Comportamento Organizacional;60.0
+TEC_GER_0011;Gestão de Serviços;60.0
+TEC_GER_0012;Legislação Tributária;60.0
+TEC_GER_0013;Ética e Cidadania Aplicadas às Organizações;60.0
+TEC_GER_0014;Sustentabilidade Empresarial;60.0
+TEC_GER_0015;Empreendedorismo Individual, Social e Empresarial;60.0
+TEC_GER_0016;Direito Trabalhista e Previdenciário;60.0
+TEC_GER_0017;Gestão da Diversidade nas Organizações;60.0
+TEC_GER_0018;Pedagogia Empresarial 1;60.0
+TEC_GER_0019;Saúde, Segurança e Qualidade de Vida no Trabalho;60.0
+TEC_GER_0020;Gestão de Cargos e Salários;60.0
+TEC_GER_0021;Gestão Estratégica de Pessoas;60.0
+TEC_GER_0022;Cálculos Trabalhistas;60.0
+TEC_GER_0023;Recrutamento e Seleção 1;60.0
+TEC_GER_0024;Pedagogia Empresarial 2;60.0
+TEC_GER_0025;Avaliação de Desempenho e Gestão de Carreira;60.0
+TEC_GER_0026;Gestão de Benefícios;60.0
+TEC_GER_0027;Sistemas de Informações em RH;60.0
+TEC_GER_0028;Recrutamento e Seleção 2;60.0
+TEC_GER_0029;Comportamento, Clima e Cultura Organizacional;60.0
+TEC_GER_0030;Negociação e Comportamento Humano;60.0
+TEC_GER_0031;Avaliação e Gestão de Custos e Investimentos em RH;60.0
+TEC_GER_0032;Desenvolvimento, Análise e Mapeamento de Processos;60.0
+TEC_GER_0033;Fundamentos da Logística Empresarial;60.0
+TEC_GER_0034;Fundamentos do Marketing;60.0
+TEC_GER_0035;Tecnologias Aplicadas ao Gerenciamento de Processos;60.0
+TEC_GER_0036;Fundamentos da Gestão da Produção;60.0
+TEC_GER_0037;Fundamentos da Gestão Financeira;60.0
+TEC_GER_0038;Utilização da IA nos Processos Gerenciais;60.0
+TEC_GER_0039;Análise de Problemas e Tomada de Decisões;60.0
+TEC_GER_0040;Fundamentos da Gestão da Qualidade;60.0
+TEC_GER_0041;Tópicos Avançados em Processos Gerenciais;60.0
+TEC_GER_0042;Sistemas de Informações Empresariais;60.0
+TEC_GER_0043;Análise de Desempenho Empresarial;60.0
+TEC_GER_0044;Liderança de Equipes;60.0
+TEC_GER_0045;Legislação Aplicada ao uso de Tecnologias;60.0
+TEC_GER_0046;Desenvolvimento de Bens e Serviços;60.0
+TEC_GER_0047;Gestão de Preços;60.0
+TEC_GER_0048;Princípios da Comunicação Mercadológica;60.0
+TEC_GER_0049;Tecnologias Aplicadas ao Marketing;60.0
+TEC_GER_0050;Análise Ambiental Aplicada às Organizações Empresariais;60.0
+TEC_GER_0051;Gestão da Distribuição de Bens e Serviços;60.0
+TEC_GER_0052;Gestão de Serviços e Marketing de Relacionamento;60.0
+TEC_GER_0053;Gestão de Marcas;60.0
+TEC_GER_0054;Utilização da IA na Gestão Estratégica de Marketing;60.0
+TEC_GER_0055;Pesquisa de Mercado;60.0
+TEC_GER_0056;Sistemas de Informações em Marketing;60.0
+TEC_GER_0057;Gestão da Publicidade e da Propaganda;60.0
+TEC_GER_0058;Comportamento do Consumidor;60.0
+TEC_GER_0059;Marketing Social, Cultural e Ambiental;60.0
+TEC_GER_0060;Gestão de Suprimentos;60.0
+TEC_GER_0061;Gestão de Transportes e Distribuição;60.0
+TEC_GER_0062;Gestão de Armazenagem;60.0
+TEC_GER_0063;Gestão de Custos em Logística;60.0
+TEC_GER_0064;Sistemas de Informações em Logística;60.0
+TEC_GER_0065;Utilização da IA nas Operações Logísticas;60.0
+TEC_GER_0066;Operações logísticas no E-commerce;60.0
+TEC_GER_0067;Gestão de Compras;60.0
+TEC_GER_0068;Logística Reversa;60.0
+TEC_GER_0069;Logística Internacional;60.0
+TEC_GER_0070;Gestão de Estoques;60.0
+TEC_GER_0071;Fundamentos da Gestão Comercial;60.0
+TEC_GER_0072;Tecnologias Aplicadas às Vendas;60.0
+TEC_GER_0073;Técnicas de Vendas;60.0
+TEC_GER_0074;Legislação Aplicada à Vendas;60.0
+TEC_GER_0075;Inovação e Criatividade;60.0
+TEC_GER_0076;Planejamento Estratégico de Vendas;60.0
+TEC_GER_0077;Criatividade Organizacional;60.0
+TEC_GER_0078;Gestão de Equipe de Vendas;60.0
+TEC_OPT_0001;Disciplina Optativa 1;60.0
+TEC_OPT_0002;Disciplina Optativa 2;60.0
+TEC_OPT_0003;Disciplina Optativa 3;60.0
+TEC_OPT_0004;Disciplina Optativa 4;60.0
+TEC_OPT_0005;Disciplina Optativa 5;60.0
+TEC_PRE_0001;Química Geral;40.0
+TEC_PRE_0002;Noções de Direito;40.0
+TEC_PRE_0003;Segurança do Trabalho e Meio Ambiente;40.0
+TEC_PRE_0004;Geometria Aplicada ao Meio Ambiente;60.0
+TEC_PRE_0005;Energia e Sustentabilidade;60.0
+TEC_PRE_0006;Economia dos Recursos Naturais e Ambiente;60.0
+TEC_PRE_0007;Química Inorgânica;40.0
+TEC_PRE_0008;Biologia e Biotecnologia Aplicada;60.0
+TEC_PRE_0009;Botânica Geral;40.0
+TEC_PRE_0010;Geociência Ambiental;40.0
+TEC_PRE_0011;Zoologia Geral;60.0
+TEC_PRE_0012;Ecologia;60.0
+TEC_PRE_0013;Política e Legislação Ambiental;60.0
+TEC_PRE_0014;Gerenciamento de Resíduos;60.0
+TEC_PRE_0015;Gestão pela Qualidade de Equipes;40.0
+TEC_PRE_0016;Georreferenciamento;60.0
+TEC_PRE_0017;Química Analítica;60.0
+TEC_PRE_0018;Microbiologia Ambiental;40.0
+TEC_PRE_0019;Química Orgânica Ambiental;40.0
+TEC_PRE_0020;Limnologia;40.0
+TEC_PRE_0021;Controle de Poluíção da Água;60.0
+TEC_PRE_0022;Recuperação de Áreas Degradadas;60.0
+TEC_PRE_0023;Controle de Poluição Atmosférica;60.0
+TEC_PRE_0024;Manejo e Gerenciamento de Bacias Hidrográficas;60.0
+TEC_PRE_0025;Controle de Poluição de Solo;60.0
+TEC_PRE_0026;Saúde Pública e Questão Ambiental;60.0
+TEC_PRE_0027;Licenciamento, Certificação e Auditoria Ambiental;100.0
+TEC_PRE_0028;Gestão de Unidades de Conservação;40.0
+TEC_TCC_0001;Trabalho de Conclusão de Curso;60.0
+TEC_TCC_0002;Trabalho de Conclusão de Curso;80.0
+TEC_TCC_0003;Trabalho de Conclusão de Curso;120.0
+TEC_TCC_0004;Trabalho de Conclusão de Curso;160.0
+TEC_TCC_0005;Trabalho de Conclusão de Curso;200.0
+TEC_TCC_0006;Trabalho de Conclusão de Curso;240.0
+TEC_TCC_0007;Trabalho de Conclusão de Curso;280.0
+TEC_TCC_0008;Trabalho de Conclusão de Curso;320.0
+TEC_TCC_0009;Trabalho de Conclusão de Curso;400.0
+TEC_TOT_0001;Métodos para Produção do Conhecimento;60.0
+TEC_TOT_0002;Saúde e Segurança no Trabalho;60.0
+TEC_TOT_0003;Planejamento e Administração de Cargas;60.0
+TEC_TOT_0004;Operação de Terminais e Armazéns;60.0
+TEC_TOT_0005;Sistemática do Comércio Exterior;60.0
+TEC_TOT_0006;Gestão da Logística de Transportes Multimodais;60.0
+TEC_TOT_0007;Legislação Portuária e Aduaneira;60.0
+TEC_TOT_0008;Organização e Estrutura Portuária;60.0
+TEC_TOT_0009;Simulação em Operações Portuárias;60.0
+TEC_TOT_0010;Gestão de Curstos e Tributos Portuários;60.0
+TEC_TOT_0011;Gestão de Manutenção;60.0
+TEC_TOT_0012;Sistemas de Armazenagem e Movimentação de Cargas;60.0
+TEC_UNI_0001;Contabilidade;60.0
+TEC_UNI_0002;Transporte e Logística;60.0
+TEC_UNI_0003;Logística e Distribuição;60.0
+TEC_UNI_0004;Direito Empresarial;60.0
+TEC_UNI_0005;Matemática Aplicada;60.0
+TEC_UNI_0006;Estatística Aplicada;60.0
+TEC_UNI_0007;Introdução à Economia;60.0
+TEC_UNI_0008;Gestão de Projetos;60.0
+TEC_UNI_0009;Gestão da Cadeia de Suprimentos;60.0
+TEC_UNI_0010;Informática Instrumental;60.0
+TEC_UNI_0011;Ética e Responsabilidade Social;60.0
+TEC_UNI_0012;Empreendedorismo e Inovação;60.0
+TEC_UNI_0013;Gestão de Compras de Suprimentos;60.0
+TEC_UNI_0014;Modelos de Gestão;60.0
+TEC_UNI_0015;Gestão de Processos;60.0
+TEC_UNI_0016;Gestão Ambiental e Responsabilidade Social;60.0
+TEC_UNI_0017;Gestão da Qualidade;60.0
+TEC_UNI_0018;Metodologia da Pesquisa Científica;60.0
+TEC_UNI_0019;Ingês Instrumental;60.0
+TEC_UNI_0020;Português Instrumental;60.0
+TEC_UNI_0021;Matemática Financeira;60.0
+TEC_UNI_0022;Matemática Discreta;80.0
+TEC_UNI_0023;Gestão de Pessoas;60.0
+TEC_UNI_0024;Estruturas de Dados;80.0
+TEC_UNI_0026;Desenvolvimento Mobile;80.0
+TEC_UNI_0027;Segurança da Informação;80.0
+TEC_UNI_0028;Legislação de Informática;40.0
+TEC_UNI_0029;Fundamentos de Sistemas Operacionais;80.0
+TEC_UNI_0030;Modelagem Conceitual de Dados;80.0
+TEC_UNI_0031;Rede de Computadores;80.0
+TEC_UNI_0032;Ética;40.0
+TEC_UNI_0033;Projeto Integrador 1;80.0
+TEC_UNI_0034;Projeto Integrador 2;60.0
+TEC_UNI_0036;Sustentabilidade Organizacional;60.0
+TEC_UNI_0038;Gestão Estratégica Empresarial;60.0
+TEC_UNI_0039;Práticas Gerenciais;60.0
+TEC_UNI_0040;Libras;60.0
+TEC_UNI_0041;Projeto Integrador 1;60.0
+TEC_DSI_0112;Laboratório de Projeto Integrador II;60.0
+LIC_ACC_0001;Atividades Acadêmico-Científico-Culturais;25.0
+LIC_ACC_0002;Atividades Acadêmico-Científico-Culturais;50.0
+LIC_ACC_0003;Atividades Acadêmico-Científico-Culturais;80.0
+LIC_ACC_0004;Atividades Acadêmico-Científico-Culturais;100.0
+LIC_ACC_0005;Atividades Acadêmico-Científico-Culturais;120.0
+LIC_ACC_0006;Atividades Acadêmico-Científico-Culturais;140.0
+LIC_ACC_0007;Atividades Acadêmico-Científico-Culturais;160.0
+LIC_ACC_0008;Atividades Acadêmico-Científico-Culturais;180.0
+LIC_ACC_0009;Atividades Acadêmico-Científico-Culturais;200.0
+LIC_ELE_0001;Disciplina Eletiva 1;60.0
+LIC_ELE_0002;Disciplina Eletiva 2;60.0
+LIC_ELE_0003;Disciplina Eletiva 3;60.0
+LIC_ELE_0004;Disciplina Eletiva 4;60.0
+LIC_ELE_0005;Disciplina Eletiva 5;60.0
+LIC_ELE_0006;Disciplina Eletiva 1;40.0
+LIC_ELE_0007;Disciplina Eletiva 2;40.0
+LIC_ELE_0008;Disciplina Eletiva 3;40.0
+LIC_ELE_0009;Disciplina Eletiva 4;40.0
+LIC_ELE_0010;Disciplina Eletiva 5;40.0
+LIC_ELE_0011;Disciplina Eletiva 6;40.0
+LIC_EST_0001;Estágio Supervisionado;100.0
+LIC_EST_0002;Estágio Supervisionado;120.0
+LIC_EST_0003;Estágio Supervisionado;140.0
+LIC_EST_0004;Estágio Supervisionado;160.0
+LIC_EST_0005;Estágio Supervisionado;180.0
+LIC_EST_0006;Estágio Supervisionado;200.0
+LIC_EST_0007;Estágio Supervisionado;240.0
+LIC_EST_0008;Estágio Supervisionado;300.0
+LIC_EST_0009;Estágio Supervisionado;360.0
+LIC_EST_0010;Estágio: Educação Infantil;100.0
+LIC_EST_0011;Estágio: Ensino Fundamental- Regular e EJA;100.0
+LIC_EST_0012;Estágio: Ensino Médio, na modalidade Normal e Educação Profissional na área de serviços e apoio escolar;100.0
+LIC_EST_0013;Estágio: Gestão;100.0
+LIC_EST_0014;Estágio Supervisionado I – Docência Na Educação Infantil I;100.0
+LIC_EST_0015;Estágio Supervisionado Ii – Docência Nos Anos Iniciais Do Ensino Fundamental;100.0
+LIC_EST_0016;Estágio Supervisionado Iii – Docência Nas Disciplinas Pedagógicas Do Ensino Médio;100.0
+LIC_EST_0017;Estágio Supervisionado Iv – Gestão Nas Organizações Escolares E Não Escolares;100.0
+LIC_EST_0018;Estágio Supervisionado- Docência Na Educação Infantil;100.0
+LIC_EST_0019;Estef- Estágio Supervisionado- Docência No Ensino Fundamental;100.0
+LIC_EST_0020;Estem- Estágio Supervisionado- Docência No Ensino Médio;60.0
+LIC_EST_0021;Estoe- Estágio Supervisionado- Gestão De Organizações Escolares E Não-Escolares;80.0
+LIC_EST_0022;Eja83- Práticas Pedagógicas Na EJA;60.0
+LIC_EST_0023;Estágio Supervisionado EJA;60.0
+LIC_EXT_0001;Projeto de Extensão 1;60.0
+LIC_EXT_0002;Projeto de Extensão 2;60.0
+LIC_EXT_0003;Projeto de Extensão 3;60.0
+LIC_EXT_0004;Projeto de Extensão 4;60.0
+LIC_EXT_0005;Projeto de Extensão 5;60.0
+LIC_EXT_0006;Atividade Extensionista;40.0
+LIC_EXT_0007;Atividade Extensionista;60.0
+LIC_EXT_0008;Atividade Extensionista;80.0
+LIC_EXT_0009;Atividade Extensionista;120.0
+LIC_EXT_0010;Atividade Extensionista;160.0
+LIC_EXT_0011;Atividade Extensionista;240.0
+LIC_OPT_0001;Disciplina Optativa 1;60.0
+LIC_OPT_0002;Disciplina Optativa 2;60.0
+LIC_OPT_0003;Disciplina Optativa 3;60.0
+LIC_OPT_0004;Disciplina Optativa 4;60.0
+LIC_OPT_0005;Disciplina Optativa 5;60.0
+LIC_PED_0001;Filosofia e Educação;60.0
+LIC_PED_0002;Fundamentos para o ensino de Língua Portuguesa;40.0
+LIC_PED_0003;Arte e Educação;40.0
+LIC_PED_0004;Introdução à Metodologia da Pesquisa;40.0
+LIC_PED_0005;Didática e Práticas Pedagógicas;60.0
+LIC_PED_0006;Movimento e Expressão Corporal;60.0
+LIC_PED_0007;História da Educação;60.0
+LIC_PED_0008;Antropologia e Educação;60.0
+LIC_PED_0009;Metodologias para o ensino de Língua Portuguesa;40.0
+LIC_PED_0010;Filosofia e Questões Contemporâneas;40.0
+LIC_PED_0011;Planejamento e Prática Pedagógica;40.0
+LIC_PED_0012;Educação e Movimentos Sociais;40.0
+LIC_PED_0013;Psicologia na Educação;60.0
+LIC_PED_0014;História da Educação II;60.0
+LIC_PED_0015;Intertextualidades: linguagem verbal e não verbal;40.0
+LIC_PED_0016;Currículo e Educação;40.0
+LIC_PED_0017;Tópicos especiais em educação não formal;40.0
+LIC_PED_0018;Fundamentos e Metodologias para o ensino de Matemática I;40.0
+LIC_PED_0019;Fundamentos e Metodologias para o ensino de Ciências Naturais I;40.0
+LIC_PED_0020;Fundamentos e Metodologias para o ensino de Geografia I;40.0
+LIC_PED_0021;Psicologia do Desenvolvimento e da Aprendizagem;60.0
+LIC_PED_0022;Sociologia da Educação;60.0
+LIC_PED_0023;Tecnologias digitais na educação;60.0
+LIC_PED_0024;Fundamentos e Metodologias para a Educação Infantil;40.0
+LIC_PED_0025;Introdução à literatura Infanto-Juvenil;40.0
+LIC_PED_0026;Fundamentos e Metodologias para o ensino de Geografia II;40.0
+LIC_PED_0027;Fundamentos e Metodologias para o ensino de Matemática II;40.0
+LIC_PED_0028;Fundamentos e Metodologias para o ensino de Ciências Naturais II;40.0
+LIC_PED_0029;Avaliação da Aprendizagem: questões teóricas e práticas;40.0
+LIC_PED_0030;Língua Brasileira de Sinais-LIBRAS;60.0
+LIC_PED_0031;Alfabetização I;60.0
+LIC_PED_0032;Fundamentos e Metodologias para o ensino de História I;40.0
+LIC_PED_0033;Práticas Pedagógicas na Educação Infantil;40.0
+LIC_PED_0034;Fundamentos e Metodologias para Educação de Jovens e Adultos;40.0
+LIC_PED_0035;Fundamentos e Metodologias para o Ensino Fundamental;40.0
+LIC_PED_0036;Fundamentos e Metodologias para Educação Especial e Inclusão;60.0
+LIC_PED_0037;Alfabetização II;60.0
+LIC_PED_0038;Práticas Pedagógicas na Educação Especial e Inclusão;60.0
+LIC_PED_0039;Práticas Pedagógicas no Ensino Fundamental;40.0
+LIC_PED_0040;Fundamentos e Metodologias para o ensino de História II;40.0
+LIC_PED_0041;Música e Educação;40.0
+LIC_PED_0042;Práticas Pedagógicas na Educação de Jovens e Adultos;60.0
+LIC_PED_0043;Pesquisa I;60.0
+LIC_PED_0044;Fundamentos e Metodologias para o Ensino Médio;40.0
+LIC_PED_0045;Tópicos especiais na Educação do Campo/Quilombola/Indígena;40.0
+LIC_PED_0046;Tópicos especiais na Educação a Distância;40.0
+LIC_PED_0047;Pesquisa II;60.0
+LIC_PED_0048;Fundamentos e Princípios da Gestão da Educação;40.0
+LIC_PED_0049;Gestão e Organização do Trabalho na Educação;60.0
+LIC_PED_0050;Política, Estado e Educação;60.0
+LIC_PED_0051;Educação das Relações Étnico-Raciais;60.0
+LIC_PED_0052;Fundamentos Da Pesquisa Pedagógica I;60.0
+LIC_PED_0055;Fundamentos Psicológicos Da Educação;60.0
+LIC_PED_0056;Português Instrumental;60.0
+LIC_PED_0057;Didática Geral E Prática Educativa;60.0
+LIC_PED_0058;Fundamentos Da Pesquisa Pedagógica Ii;60.0
+LIC_PED_0059;Pedagogia Institucional;60.0
+LIC_PED_0060;Legislação Do Ensino No Brasil;40.0
+LIC_PED_0061;Fundamentos Sociológicos Da Educação;60.0
+LIC_PED_0062;Didática E Teorias Da Aprendizagem;40.0
+LIC_PED_0063;Fundamentos Da Pesquisa Pedagógica Iii;60.0
+LIC_PED_0064;Fundamentos Antropológicos Da Educação;60.0
+LIC_PED_0065;Políticas Públicas E Gestão Da Educação Básica;60.0
+LIC_PED_0066;Teorias Do Currículo;60.0
+LIC_PED_0067;Relações Étnico-Raciais;60.0
+LIC_PED_0068;Fundamentos E Metodologias Da Educação Inclusiva;60.0
+LIC_PED_0069;Ensino-Aprendizagem A Partir Das Tecnologias Digitais Da Informação E Comunicação;40.0
+LIC_PED_0070;Pesquisa E Prática Aplicada À Educação Infantil;60.0
+LIC_PED_0071;Corpo E Movimento Na Educação Infantil;40.0
+LIC_PED_0072;Processos De Aprendizagem Da Leitura E Da Escrita;60.0
+LIC_PED_0073;Pedagogia Da Educação Infantil;60.0
+LIC_PED_0074;Gestão E Orientação Do Trabalho Pedagógico Na Educação Infantil;60.0
+LIC_PED_0075;Pesquisa E Prática Aplicada Ao Ensino Fundamental;60.0
+LIC_PED_0077;Leitura E Produção De Texto;60.0
+LIC_PED_0078;Fundamentos E Metodologia Do Ensino De Língua Portuguesa;60.0
+LIC_PED_0079;Fundamentos E Medodologia Do Ensino De Matemática;60.0
+LIC_PED_0080;Gestão E Orientação Do Trabalho Pedagógico No Ensino Fundamental;60.0
+LIC_PED_0081;Pesquisa E Prática Aplicada Ao Ensino Médio;60.0
+LIC_PED_0082;Fundamentos E Metodologia Do Ensino De Geografia;60.0
+LIC_PED_0083;Fundamentos E Metodologia Do Ensino De História;60.0
+LIC_PED_0084;Fundamentos E Metodologia Do Ensino De Ciências;60.0
+LIC_PED_0085;Educação Profissional Tecnica De Nível Médio;60.0
+LIC_PED_0086;Gestão E Orientação Do Trabalho Pedagógico No Ensino Médio;60.0
+LIC_PED_0087;Pesquisa E Prática Aplicada À Gestão Escolar E Não Escolar;60.0
+LIC_PED_0088;Educação Do Campo, Indígena E Quilombola;60.0
+LIC_PED_0089;Fundamentos E Metodologia Na Educação De Jovens E Adultos;60.0
+LIC_PED_0090;Avaliação Da Aprendizagem E Avaliação Institucional;60.0
+LIC_PED_0091;Gestão E Planejamento Nas Instituições Escolares E Não Escolares;60.0
+LIC_PED_0092;Seminário De Pesquisa;20.0
+LIC_PED_0093;Supervisão Escolar;60.0
+LIC_PED_0094;Fundamentos E Metodologias Da Educação À Distância;40.0
+LIC_PED_0095;História Da Educação Brasileira;60.0
+LIC_PED_0096;Leitura E Produção De Textos Acadêmicos;60.0
+LIC_PED_0097;Educação Para As Relações Étnico-Raciais E Diversidades;60.0
+LIC_PED_0099;Culturas Tecnológicas Educativas;60.0
+LIC_PED_0100;Didática Educacional;60.0
+LIC_PED_0102;Psicologia Da Educação E Do Desenvolvimento Humano;60.0
+LIC_PED_0103;Planejamento Educacional;60.0
+LIC_PED_0104;Currículo E Organização Pedagógica;60.0
+LIC_PED_0105;Estudo Da Língua Brasileira De Sinais;60.0
+LIC_PED_0106;Sociologia E Antropologia Na Educação;60.0
+LIC_PED_0107;Fundamentos Da Educação Infantil;60.0
+LIC_PED_0108;Arte E Educação;60.0
+LIC_PED_0109;Alfabetização E Letramento;60.0
+LIC_PED_0110;Avaliação Da Aprendizagem E Dos Processos De Ensino;60.0
+LIC_PED_0111;Práticas Pedagógicas Na Educação Inclusiva;60.0
+LIC_PED_0112;Legislação E Políticas Públicas Da Educação Básica;60.0
+LIC_PED_0113;Corpo E Movimento;60.0
+LIC_PED_0114;Metodologia Do Ensino Da Língua Portuguesa;60.0
+LIC_PED_0116;Metodologia Do Ensino De História E Geografia;60.0
+LIC_PED_0117;Metodologia Do Ensino Da Matemática;60.0
+LIC_PED_0118;Metodologia Do Ensino De Ciências E Educação Ambiental;60.0
+LIC_PED_0120;Fundamentos Da Orientação Educacional;60.0
+LIC_PED_0121;Gestão E Organização Da Educação Básica;60.0
+LIC_PED_0122;Metodologia Da Pesquisa;60.0
+LIC_PED_0123;Práticas Pedagógicas No Ensino Médio;60.0
+LIC_PED_0124;Fundamentos Da Supervisão Educacional;60.0
+LIC_PED_0125;Educação Profissional E Trabalho;60.0
+LIC_PED_0126;Educação Quilombola, Indígena E No Campo;60.0
+LIC_PED_0127;Práticas Pedagógicas Em Contextos Não Escolares;60.0
+LIC_PED_0128;Fundamentos Da Inspeção Escolar;60.0
+LIC_PED_0129;Orientação Escolar;60.0
+LIC_PED_0130;Práticas Pedagógicas na Educação Infantil;80.0
+LIC_PED_0131;Metodologia da Educação Inclusiva;60.0
+LIC_PED_0132;Práticas Pedagógicas no Ensino Fundamental;80.0
+LIC_TCC_0001;Trabalho de Conclusão de Curso;60.0
+LIC_TCC_0002;Trabalho de Conclusão de Curso;80.0
+LIC_TCC_0003;Trabalho de Conclusão de Curso;120.0
+LIC_TCC_0004;Trabalho de Conclusão de Curso;160.0
+LIC_TCC_0005;Trabalho de Conclusão de Curso;200.0
+LIC_TCC_0006;Trabalho de Conclusão de Curso;240.0
+LIC_TCC_0007;Trabalho de Conclusão de Curso;280.0
+LIC_TCC_0008;Trabalho de Conclusão de Curso;320.0
+LIC_TCC_0009;Trabalho de Conclusão de Curso;400.0
+LIC_TCC_0010;TCC I;60.0
+LIC_TCC_0011;TCC II;60.0

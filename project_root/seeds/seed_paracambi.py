@@ -205,11 +205,12 @@ def seed_paracambi():
 
     print("Criando Matriz TGA...")
     matriz_tga, _ = CurriculumMatrix.objects.get_or_create(
-        curso=curso_tga,
+        curso=curso_tga_global,
         periodo_letivo="2026.1",
         turno="N",
         defaults={"nome": "Matriz TGA 2026", "is_vigente": True}
     )
+    matriz_tga.unidades.add(unidade)
 
     tga_disciplinas = [
         (1, "QUG", "Química geral", 2, 40),
@@ -267,11 +268,12 @@ def seed_paracambi():
 
     print("Criando Matriz ADS...")
     matriz_ads, _ = CurriculumMatrix.objects.get_or_create(
-        curso=curso_ads,
+        curso=curso_ads_global,
         periodo_letivo="2026.1",
         turno="N",
         defaults={"nome": "Matriz ADS 2026", "is_vigente": True}
     )
+    matriz_ads.unidades.add(unidade)
 
     ads_disciplinas = [
         (1, "PRG-1", "Programação Estruturada", 4, 80),

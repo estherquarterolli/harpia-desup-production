@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Meu Perfil — Harpia-DESUP{% endblock %}
+{% block header_title %}Meu Perfil{% endblock %}
+
+{% block content %}
+{# CORR-017: tela somente leitura. Alterações de senha ficam em "Alterar senha". #}
+<div class="max-w-2xl mx-auto p-2 md:p-0">
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+
+    <div class="flex items-center gap-4 border-b border-slate-100 bg-slate-50/60 px-6 py-5">
+      <i class="ph ph-user-circle text-5xl text-slate-400"></i>
+      <div class="min-w-0">
+        <p class="text-sm font-black text-[#025c9f] break-all">{{ user.email }}</p>
+        <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{{ perfil_label }}</p>
+      </div>
+    </div>
+
+    <dl class="divide-y divide-slate-100">
+      <div class="flex flex-col gap-1 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <dt class="text-[10px] font-black uppercase tracking-wide text-slate-400">E-mail</dt>
+        <dd class="text-sm font-semibold text-slate-700 break-all">{{ user.email }}</dd>
+      </div>
+
+      <div class="flex flex-col gap-1 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <dt class="text-[10px] font-black uppercase tracking-wide text-slate-400">Tipo de perfil</dt>
+        <dd class="text-sm font-semibold text-slate-700">{{ perfil_label }}</dd>
+      </div>
+
+      {% if mostra_unidade %}
+      <div class="flex flex-col gap-1 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <dt class="text-[10px] font-black uppercase tracking-wide text-slate-400">Unidade</dt>
+        <dd class="text-sm font-semibold text-slate-700">
+          {% if user.unidade %}{{ user.unidade.sigla }} — {{ user.unidade.nome }}{% else %}—{% endif %}
+        </dd>
+      </div>
+      {% endif %}
+    </dl>
+
+    <div class="flex flex-col gap-2 border-t border-slate-100 bg-slate-50/60 px-6 py-4 sm:flex-row sm:justify-end">
+      <a href="{% url 'password_change' %}"
+         class="flex items-center justify-center gap-2 rounded-xl bg-[#025c9f] px-5 py-2.5 text-sm font-black text-white shadow-md transition-all hover:bg-[#153e70]">
+        <i class="ph ph-key text-lg"></i>
+        Alterar senha
+      </a>
+    </div>
+
+  </div>
+
+  <p class="mt-4 text-center text-[11px] text-slate-400">
+    Para corrigir e-mail, perfil ou unidade, procure a DESUP.
+  </p>
+
+</div>
+{% endblock %}

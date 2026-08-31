@@ -1,6 +1,7 @@
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
+from django.db.models import ProtectedError
 from django.shortcuts import redirect, get_object_or_404, render
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, ListView, UpdateView, DeleteView, View
@@ -11,7 +12,26 @@ from .forms import ProfessorForm
 from .models import Professor
 
 
-class CoordenadorOnlyMixin(PerfilRequiredMixin):
+def _perfil_desup(user):
+    """Critério único de "enxerga todas as unidades" usado no app inteiro.
+
+    O grupo "Admin DESUP" continua valendo porque o projeto ainda está migrando
+    de Groups para `perfil` (ver `PerfilRequiredMixin`), mas o perfil é a fonte
+    principal — decidir só pelo grupo deixava o usuário DESUP sem grupo caindo no
+    ramo de unidade, com `unidade_principal=None`.
+    """
+    return (
+        user.is_superuser
+        or user.perfil == 'DESUP'
+        or user.groups.filter(name='Admin DESUP').exists()
+    )
+
+
+# CORR: `PerfilRequiredMixin` apenas delega ao `super().dispatch()` quando o usuário
+# não está autenticado (apps/accounts/mixins.py), ou seja, sozinho ele NÃO barra o
+# anônimo: a request chegava no corpo da view e estourava 500 em `AnonymousUser.perfil`
+# / `.unidade`. Com o `LoginRequiredMixin` na frente, o anônimo é mandado para o login.
+class CoordenadorOnlyMixin(LoginRequiredMixin, PerfilRequiredMixin):
     """CRUD de professores: somente coordenador da unidade."""
     allowed_profiles = ['COORDENADOR_UNIDADE']
 
@@ -123,7 +143,9 @@ class ProfessorListView(LoginRequiredMixin, ListView):
                 logging.getLogger(__name__).exception("Erro ao montar contexto de professores")
 
         return ctx
-class DesupOnlyMixin(PerfilRequiredMixin):
+class DesupOnlyMixin(LoginRequiredMixin, PerfilRequiredMixin):
+    # Mesmo motivo do `CoordenadorOnlyMixin`: sem o `LoginRequiredMixin` o anônimo
+    # entrava na view e quebrava em `AnonymousUser.perfil` (500 em vez de login).
     allowed_profiles = ['DESUP']
 
 class ProfessorCreateView(DesupOnlyMixin, CreateView):
@@ -177,10 +199,43 @@ class ProfessorDeleteView(CoordenadorOnlyMixin, DeleteView):
             return Professor.objects.all()
         return Professor.objects.filter(unidade_principal=user.unidade)
 
-    def delete(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        messages.success(request, 'Professor excluído com sucesso.')
-        return super().delete(request, *args, **kwargs)
+    # CORR: `DeleteView.delete()` virou código morto no Django 4.0 (a view passou a usar
+    # `FormMixin`, e o POST cai em `form_valid()`) — por isso a mensagem de sucesso nunca
+    # chegava na tela. Além disso a exclusão precisa tratar `ProtectedError`: o docente
+    # alocado é protegido por `MatrixComponent.docente` (on_delete=PROTECT) e o POST
+    # estourava 500 em vez de explicar o motivo para o usuário.
+    def form_valid(self, form):
+        professor = self.object
+        try:
+            resposta = super().form_valid(form)
+        except ProtectedError:
+            messages.error(
+                self.request,
+                f'Não é possível excluir {professor.nome}: o docente ainda está alocado '
+                'em componentes curriculares. Libere as alocações antes de excluir.',
+            )
+            return redirect(self.get_success_url())
+
+        messages.success(self.request, 'Professor excluído com sucesso.')
+        return resposta
+
+
+def _identificador_unico_de_copia(campo, valor_base):
+    """Monta um identificador de cópia que não colide com os já existentes.
+
+    `id_funcional` e `rh_matricula` são `unique` (models.py), então o prefixo fixo
+    "COPIA-" quebrava com IntegrityError/500 na segunda duplicação do MESMO professor.
+    A primeira cópia continua sendo "COPIA-<valor>" (formato já conhecido pelos
+    usuários) e as seguintes ganham um contador: "COPIA-2-<valor>", "COPIA-3-<valor>"…
+    O corte por `max_length` evita estourar o tamanho da coluna.
+    """
+    max_length = Professor._meta.get_field(campo).max_length
+    candidato = f'COPIA-{valor_base}'[:max_length]
+    contador = 2
+    while Professor.objects.filter(**{campo: candidato}).exists():
+        candidato = f'COPIA-{contador}-{valor_base}'[:max_length]
+        contador += 1
+    return candidato
 
 
 class ProfessorDuplicarView(CoordenadorOnlyMixin, View):
@@ -193,8 +248,8 @@ class ProfessorDuplicarView(CoordenadorOnlyMixin, View):
             qs = qs.filter(unidade_principal=user.unidade)
         original = get_object_or_404(qs, pk=pk)
         cursos = list(original.cursos.all())
-        novo_id_funcional = f"COPIA-{original.id_funcional}"
-        nova_matricula = f"COPIA-{original.rh_matricula}"
+        novo_id_funcional = _identificador_unico_de_copia('id_funcional', original.id_funcional)
+        nova_matricula = _identificador_unico_de_copia('rh_matricula', original.rh_matricula)
 
         original.pk = None
         original.id_funcional = novo_id_funcional
@@ -213,7 +268,7 @@ class ProfessorDuplicarView(CoordenadorOnlyMixin, View):
 @login_required
 def alloc_curricular_view(request):
     user = request.user
-    is_admin = user.is_superuser or user.groups.filter(name='Admin DESUP').exists()
+    is_admin = _perfil_desup(user)
     unidades = Unidade.objects.all().order_by('nome') if is_admin else []
     return render(request, 'professors/alloc_curricular.html', {
         'is_admin': is_admin,
@@ -225,7 +280,10 @@ def alloc_curricular_view(request):
 def htmx_tabela_alocacao(request):
     user = request.user
     queryset = Professor.objects.select_related('tipo_contrato', 'unidade_principal')
-    is_admin = user.is_superuser or user.groups.filter(name='Admin DESUP').exists()
+    # CORR: antes o escopo saía só do grupo "Admin DESUP"; o usuário com perfil DESUP
+    # (que não tem unidade) caía no ramo de baixo e filtrava por `unidade_principal=None`,
+    # enxergando apenas professores sem unidade em vez da base inteira.
+    is_admin = _perfil_desup(user)
     if is_admin:
         unidade_id = request.GET.get('unidade')
         if unidade_id:

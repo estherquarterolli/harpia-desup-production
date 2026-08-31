@@ -1,6 +1,10 @@
 {% extends 'base.html' %}
 {% load static %}
 
+{# CORR-016: sem estes blocos a aba/cabeçalho caíam no default "HARPIA" do base.html. #}
+{% block title %}{% if form.instance.pk %}Editar{% else %}Nova{% endif %} Unidade — Harpia-DESUP{% endblock %}
+{% block header_title %}{% if form.instance.pk %}Editar{% else %}Nova{% endif %} Unidade{% endblock %}
+
 {% block content %}
 <div class="p-6 max-w-xl mx-auto">
     <div class="mb-6">

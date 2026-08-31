@@ -39,7 +39,7 @@
       {# ── Tabela de itens existentes ── #}
       {% if tcc_items %}
       <div class="overflow-x-auto">
-        <table class="w-full text-left min-w-[700px]">
+        <table class="w-full text-left min-w-[700px] stack-table">
           <thead>
             <tr class="bg-slate-50 text-[10px] font-black text-[#025c9f] uppercase tracking-widest border-b border-slate-100">
               <th class="px-5 py-3">Docente</th>
@@ -61,7 +61,7 @@
               </td>
 
               {# Aprovar (Nº Orientandos) #}
-              <td class="px-5 py-3 text-center">
+              <td class="px-5 py-3 text-center" data-label="Aprovar (Nº Orientandos)">
                 {% if is_desup and object %}
                 {% for par_item, par_form in parecer_tcc_forms %}
                   {% if par_item.pk == item.pk %}
@@ -77,17 +77,17 @@
               </td>
 
               {# Nº Orientandos (Solicitado) #}
-              <td class="px-5 py-3 text-center">
+              <td class="px-5 py-3 text-center" data-label="Solicitado (Nº)">
                 <span class="text-sm font-bold text-slate-400">{{ item.num_orientandos }}</span>
               </td>
 
               {# CH Aprovada #}
-              <td class="px-5 py-3 text-center">
+              <td class="px-5 py-3 text-center" data-label="CH Aprovada">
                 <span class="text-sm font-bold text-slate-700">{{ item.ch_aprovada }}h</span>
               </td>
 
               {# Parecer DESUP #}
-              <td class="px-5 py-3 text-center">
+              <td class="px-5 py-3 text-center" data-label="Parecer DESUP">
                 {% if is_desup and object %}
                 {% for par_item, par_form in parecer_tcc_forms %}
                   {% if par_item.pk == item.pk %}
@@ -103,7 +103,7 @@
               </td>
 
               {# Motivo do Parecer #}
-              <td class="px-5 py-3 max-w-xs">
+              <td class="px-5 py-3 max-w-xs" data-label="Motivo do Parecer">
                 {% if is_desup and object %}
                   {% for par_item, par_form in parecer_tcc_forms %}
                     {% if par_item.pk == item.pk %}
@@ -124,12 +124,18 @@
 
               {# Ações #}
               <td class="px-5 py-3 text-right">
-                {% if is_coordenador %}
+                {% if item.bloqueado %}
+                <span title="Enviado em definitivo à DESUP — não pode ser alterado" class="inline-flex items-center justify-center w-8 h-8 rounded-full text-slate-400"><i class="ph ph-lock-simple text-base"></i></span>
+                {% elif is_coordenador %}
                 <form method="POST" action="{% if object %}{% url 'extra_curricular:deletar_item' pk=object.pk tipo='tcc' item_pk=item.pk %}{% else %}{% url 'extra_curricular:deletar_item_lote' tipo='tcc' item_pk=item.pk %}{% endif %}" class="m-0 inline" onsubmit="this.querySelector('button[type=submit], input[type=submit]').disabled=true; return true;">
                   {% csrf_token %}
                   {% if not object %}<input type="hidden" name="ids" value="{{ query_string }}">{% endif %}
-                  <button type="button"
-                    onclick="if(confirm('Remover este item?')) this.form.submit()"
+                  {# `type="submit"` (e não `type=button` + `form.submit()`): o
+                     `HTMLFormElement.submit()` NÃO dispara o evento `submit`, então o
+                     interceptador global do base.html nunca abria o modal "Janela
+                     fechada" — a exclusão saía silenciosa fora do prazo. #}
+                  <button type="submit"
+                    onclick="return confirm('Remover este item?')"
                     class="flex items-center justify-center w-8 h-8 rounded-full text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors">
                     <i class="ph ph-trash text-base"></i>
                   </button>
@@ -163,7 +169,7 @@
             {{ tcc_form.management_form }}
 
             <div class="overflow-x-auto">
-              <table class="w-full min-w-[640px]">
+              <table class="w-full min-w-[640px] stack-table">
                 <thead>
                   <tr class="text-[10px] font-black text-[#025c9f] uppercase tracking-wide">
                     <th class="pb-2 pr-4">Docente</th>
@@ -179,14 +185,14 @@
                     <td class="pr-4 pb-2 align-top">
                       <div class="field-blocked">{{ object.professor.nome }}</div>
                     </td>
-                    <td class="pr-4 pb-2 align-top text-center">
+                    <td class="pr-4 pb-2 align-top text-center" data-label="Nº de Orientandos">
                       {{ tcc_row.num_orientandos }}
                       {% if tcc_row.num_orientandos.errors %}
                       <p class="text-[10px] text-red-600 font-semibold mt-0.5">{{ tcc_row.num_orientandos.errors.0 }}</p>
                       {% endif %}
                       <p class="text-[9px] text-slate-400 mt-0.5">Máx. 8</p>
                     </td>
-                    <td class="pr-4 pb-2 align-top text-center">
+                    <td class="pr-4 pb-2 align-top text-center" data-label="CH Calculada">
                       <span class="ch-preview" data-ch-preview>—</span>
                       <p class="text-[9px] text-slate-400 mt-0.5">Automático</p>
                     </td>
@@ -201,7 +207,7 @@
             </div>
           {% else %}
             <div class="overflow-x-auto">
-              <table class="w-full min-w-[640px]">
+              <table class="w-full min-w-[640px] stack-table">
                 <thead>
                   <tr class="text-[10px] font-black text-[#025c9f] uppercase tracking-wide">
                     <th class="pb-2 pr-4">Docente</th>
@@ -220,11 +226,11 @@
                         {% endfor %}
                       </select>
                     </td>
-                    <td class="pr-4 pb-2 align-top text-center">
+                    <td class="pr-4 pb-2 align-top text-center" data-label="Nº de Orientandos">
                       <input type="number" name="num_orientandos" min="1" max="8" required class="form-field text-center" data-ch-tcc>
                       <p class="text-[9px] text-slate-400 mt-0.5">Máx. 8</p>
                     </td>
-                    <td class="pr-4 pb-2 align-top text-center">
+                    <td class="pr-4 pb-2 align-top text-center" data-label="CH Calculada">
                       <span class="ch-preview" data-ch-preview>—</span>
                       <p class="text-[9px] text-slate-400 mt-0.5">Automático</p>
                     </td>

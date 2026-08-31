@@ -165,14 +165,12 @@ class Command(BaseCommand):
                         nome=nome_materia,
                         defaults={
                             'codigo': codigo_materia,
-                            'sigla': codigo_materia[:20],
                             'carga_horaria_padrao': 0,
                         },
                     )
                     if not created and comp.codigo != codigo_materia:
                         comp.codigo = codigo_materia
-                        comp.sigla = codigo_materia[:20]
-                        comp.save(update_fields=['codigo', 'sigla'])
+                        comp.save(update_fields=['codigo'])
                     if created:
                         stats['componentes'] += 1
 

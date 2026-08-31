@@ -1,3 +1,7 @@
 {
-  "python.terminal.useEnvFile": true
+  "python.terminal.useEnvFile": true,
+  "files.associations": {
+    "**/seed_componentes_curriculares_supabase.sql": "plaintext",
+    "**/wipe_matrizes_supabase.sql": "plaintext"
+  }
 }

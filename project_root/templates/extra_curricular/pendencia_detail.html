@@ -9,6 +9,8 @@
   /* ── Badges de Parecer ─────────────────────────────────────────── */
   .badge-PENDENTE   { background:#fef9c3; color:#854d0e; border:1px solid #fde68a; }
   .badge-APROVADO   { background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
+  .badge-INDEFERIDO { background:#fee2e2; color:#991b1b; border:1px solid #fecaca; }
+  .badge-indeferido { background:#fee2e2; color:#991b1b; }
 
   /* ── Accordion ─────────────────────────────────────────────────── */
   .accordion-body {
@@ -124,10 +126,12 @@
           {% if object.status == 'RASCUNHO' %}bg-slate-100 text-slate-500
           {% elif object.status == 'ENVIADO' %}bg-blue-50 text-blue-700
           {% elif object.status == 'APROVADO' %}bg-green-50 text-green-700
+          {% elif object.status == 'INDEFERIDO' %}badge-indeferido
           {% endif %}">
-          <i class="ph ph-circle-dashed mr-1"></i>
+          {% if object.status == 'INDEFERIDO' %}<i class="ph ph-x-circle mr-1"></i>{% else %}<i class="ph ph-circle-dashed mr-1"></i>{% endif %}
           {% if object.status == 'ENVIADO' %}Pendente
           {% elif object.status == 'APROVADO' %}Finalizado
+          {% elif object.status == 'INDEFERIDO' %}Indeferido
           {% else %}{{ object.get_status_display }}{% endif %}
         </span>
 
@@ -172,8 +176,8 @@
     </div>
     {% endif %}
 
-    <div class="flex items-center justify-between mt-4 text-sm flex-wrap gap-4">
-      <div class="flex items-center gap-3">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mt-4 text-sm">
+      <div class="flex items-center gap-3 flex-wrap">
         <i class="ph ph-file-doc text-[#025c9f] text-xl flex-shrink-0"></i>
         {% if object.sei_numero %}
         <span class="font-bold text-[#025c9f]">SEI: {{ object.sei_numero }}</span>
@@ -192,14 +196,43 @@
         {% endif %}
       </div>
 
-      {# Botão Avisar Unidade (DESUP) #}
+      {# Ações DESUP (Avisar Unidade + Finalizar) #}
       {% if is_desup %}
-      <form method="POST" action="{% url 'extra_curricular:avisar_unidade' pk=object.pk %}" class="m-0" onsubmit="this.querySelector('button[type=submit], input[type=submit]').disabled=true; return true;">
-          {% csrf_token %}
-          <button type="submit" class="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black text-xs px-4 py-2 rounded-xl transition-colors border border-indigo-200">
-              <i class="ph ph-bell-ringing"></i> Avisar Unidade sobre Pendência
-          </button>
-      </form>
+      <div class="flex items-end gap-3 flex-wrap">
+        <form method="POST" action="{% url 'extra_curricular:avisar_unidade' pk=object.pk %}" class="m-0" onsubmit="this.querySelector('button[type=submit], input[type=submit]').disabled=true; return true;">
+            {% csrf_token %}
+            <button type="submit" class="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black text-xs px-4 py-2 rounded-xl transition-colors border border-indigo-200">
+                <i class="ph ph-bell-ringing"></i> Avisar Unidade sobre Pendência
+            </button>
+        </form>
+
+        {# Reabrir (somente quando já finalizada) — permite revisar pareceres e horas aprovadas #}
+        {% if object.status == 'APROVADO' %}
+        <form method="POST" action="{% url 'extra_curricular:reabrir_pendencia' pk=object.pk %}" class="m-0" onsubmit="this.querySelector('button[type=submit], input[type=submit]').disabled=true; return true;">
+            {% csrf_token %}
+            <button type="submit"
+                onclick="return confirm('Reabrir esta pendência? Os pareceres por item voltarão para Pendente e você poderá ajustar as horas aprovadas antes de finalizar novamente.');"
+                class="flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 font-black text-xs px-4 py-2 rounded-xl transition-colors border border-amber-200">
+                <i class="ph ph-arrow-counter-clockwise"></i> Reabrir
+            </button>
+        </form>
+        {% endif %}
+
+        {# Finalizar (consolida a decisão a partir dos pareceres por item) #}
+        <form method="POST" action="{% url 'extra_curricular:atualizar_status' pk=object.pk %}" class="m-0 flex items-end gap-2" onsubmit="this.querySelector('button[type=submit], input[type=submit]').disabled=true; return true;">
+            {% csrf_token %}
+            <div class="flex flex-col">
+              <label class="text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Motivo da decisão</label>
+              <textarea name="motivo_status_desup" rows="1"
+                class="w-full sm:w-56 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-[#025c9f] focus:ring-2 focus:ring-[#025c9f]/20"
+                placeholder="Motivo geral (opcional)">{{ object.motivo_status_desup }}</textarea>
+            </div>
+            <button type="submit"
+              class="flex items-center gap-2 bg-[#025c9f] hover:bg-[#153e70] text-white font-black text-xs px-4 py-2 rounded-xl transition-colors">
+                <i class="ph ph-check-circle"></i> Finalizar
+            </button>
+        </form>
+      </div>
       {% endif %}
     </div>
 
@@ -235,7 +268,7 @@
     {# Form Oculto para Editar SEI #}
     {% if is_coordenador %}
     <div id="seiForm" class="menu-hidden mt-4 pt-4 border-t border-slate-100">
-        <form method="POST" action="{% url 'extra_curricular:editar_sei' pk=object.pk %}" class="flex items-end gap-3 max-w-sm" onsubmit="this.querySelector('button[type=submit], input[type=submit]').disabled=true; return true;">
+        <form method="POST" action="{% url 'extra_curricular:editar_sei' pk=object.pk %}" class="flex items-end gap-3 flex-wrap max-w-sm" onsubmit="this.querySelector('button[type=submit], input[type=submit]').disabled=true; return true;">
             {% csrf_token %}
             <div class="flex-1">
                 <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Número SEI</label>

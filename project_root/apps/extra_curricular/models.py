@@ -16,8 +16,9 @@ from django.core.exceptions import ValidationError
 # Choices reutilizáveis
 # ────────────────────────────────────────────────────────────────────────────────
 class ParecerChoices(models.TextChoices):
-    PENDENTE  = "PENDENTE",  "Pendente"
-    APROVADO  = "APROVADO",  "Aprovado"
+    PENDENTE   = "PENDENTE",   "Pendente"
+    APROVADO   = "APROVADO",   "Aprovado"
+    INDEFERIDO = "INDEFERIDO", "Indeferido"
 
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -30,9 +31,18 @@ class PendenciaExtra(models.Model):
     """
 
     class StatusChoices(models.TextChoices):
-        RASCUNHO  = "RASCUNHO",  "Rascunho"
-        ENVIADO   = "ENVIADO",   "Enviado para DESUP"
-        APROVADO  = "APROVADO",  "Finalizado"
+        RASCUNHO   = "RASCUNHO",   "Rascunho"
+        ENVIADO    = "ENVIADO",    "Enviado para DESUP"
+        APROVADO   = "APROVADO",   "Finalizado"
+        # CORR-023: análise concluída com resultado misto — ao menos um item
+        # aprovado e ao menos um indeferido. Antes o agregado era binário e
+        # `any(INDEFERIDO)` derrubava a pendência inteira para INDEFERIDO, o que
+        # zerava a CH dos itens que a DESUP tinha aprovado.
+        PARCIAL    = "PARCIAL",    "Finalizado parcialmente"
+        INDEFERIDO = "INDEFERIDO", "Indeferido"
+
+    #: Estados em que a análise da DESUP terminou e a CH aprovada vale.
+    STATUS_FINALIZADOS = ("APROVADO", "PARCIAL")
 
     professor = models.ForeignKey(
         "professors.Professor",
@@ -96,19 +106,58 @@ class PendenciaExtra(models.Model):
 
     @property
     def ch_total_justificada(self):
-        """Soma de toda CH justificada nesta pendência (usa horas aprovadas pela DESUP)."""
-        if self.status != self.StatusChoices.APROVADO:
+        """Soma de toda CH justificada nesta pendência (usa horas aprovadas pela DESUP).
+
+        `ch_aprovada` é sempre `float` (CORR-004), então a soma nunca mistura
+        Decimal/float. O `float(...)` no acumulador é defensivo.
+
+        Só entram na conta os itens com parecer APROVADO. O gate pelo status do
+        cabeçalho não basta: `ch_aprovada` cai no valor SOLICITADO enquanto a
+        DESUP não opina (o `save()` dos três models já copia o solicitado para
+        `horas_aprovadas`), e a unidade pode incluir justificativas depois da
+        aprovação — sem o filtro por item, uma redução recém-criada (PENDENTE,
+        sem nenhum parecer) passava a contar como CH aprovada no mesmo instante.
+        Itens INDEFERIDOS, que também mantêm `horas_aprovadas` preenchido, ficam
+        de fora pelo mesmo motivo.
+
+        CORR-023: `PARCIAL` conta igual a `APROVADO` — o que foi deferido vale, o
+        indeferido só não entra na soma. O gate pelo status do cabeçalho continua
+        existindo porque é ele que faz a CH parar de contar depois de uma
+        REABERTURA (o status volta a ENVIADO enquanto os itens seguem marcados
+        como aprovados).
+        """
+        if self.status not in self.STATUS_FINALIZADOS:
             return 0.0
-        tcc     = sum(t.ch_aprovada for t in self.orientacoes_tcc.all())
-        ext     = sum(e.ch_aprovada for e in self.atividades_extensao.all())
-        red     = sum(r.ch_aprovada for r in self.reducoes_ch.all())
-        return float(tcc) + float(ext) + float(red)
+
+        def _aprovados(queryset):
+            return sum(
+                float(item.ch_aprovada)
+                for item in queryset
+                if item.parecer_desup == ParecerChoices.APROVADO
+            )
+
+        tcc = _aprovados(self.orientacoes_tcc.all())
+        ext = _aprovados(self.atividades_extensao.all())
+        red = _aprovados(self.reducoes_ch.all())
+        return tcc + ext + red
 
     @property
     def ch_faltante(self):
         """CH que ainda falta cobrir após as justificativas."""
         limite = self.professor.limite_horas_extra_efetivo
         return max(limite - self.ch_total_justificada, 0)
+
+    def bloquear_itens_enviados(self):
+        """
+        Marca como bloqueadas todas as justificativas atuais desta pendência.
+
+        Chamado no envio definitivo à DESUP (botão vermelho): a partir daí a
+        unidade não pode mais editar ou excluir esses itens. Novas justificativas
+        adicionadas depois começam desbloqueadas e só travam num próximo envio.
+        """
+        self.orientacoes_tcc.update(bloqueado=True)
+        self.atividades_extensao.update(bloqueado=True)
+        self.reducoes_ch.update(bloqueado=True)
 
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -164,6 +213,11 @@ class OrientacaoTCC(models.Model):
         blank=True,
         verbose_name="Motivo do Parecer",
     )
+    bloqueado = models.BooleanField(
+        default=False,
+        verbose_name="Bloqueado (enviado à DESUP)",
+        help_text="Se True, a unidade não pode mais editar/excluir este item (já enviado em definitivo).",
+    )
     data_atualizacao = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -172,12 +226,16 @@ class OrientacaoTCC(models.Model):
 
     @property
     def ch_aprovada(self):
-        """Retorna horas aprovadas pela DESUP, ou o valor calculado se não definido."""
+        """Retorna horas aprovadas pela DESUP, ou o valor calculado se não definido.
+
+        Sempre `float` (CORR-004): nunca misturar float/Decimal nos consumidores
+        (ex.: soma em BasePendenciaFormSet.clean e ch_total_justificada).
+        """
         if self.num_orientandos_aprovados is not None:
             return min(round(self.num_orientandos_aprovados * 0.5, 1), 4.0)
         if self.horas_aprovadas is not None:
-            return self.horas_aprovadas
-        return self.carga_horaria
+            return float(self.horas_aprovadas)
+        return float(self.carga_horaria or 0)
 
     def clean(self):
         if self.num_orientandos and self.num_orientandos > 8:
@@ -254,6 +312,11 @@ class AtividadeExtensionista(models.Model):
         blank=True,
         verbose_name="Motivo do Parecer",
     )
+    bloqueado = models.BooleanField(
+        default=False,
+        verbose_name="Bloqueado (enviado à DESUP)",
+        help_text="Se True, a unidade não pode mais editar/excluir este item (já enviado em definitivo).",
+    )
     data_atualizacao = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -262,12 +325,15 @@ class AtividadeExtensionista(models.Model):
 
     @property
     def ch_aprovada(self):
-        """Retorna horas aprovadas pela DESUP, ou o valor calculado se não definido."""
+        """Retorna horas aprovadas pela DESUP, ou o valor calculado se não definido.
+
+        Sempre `float` (CORR-004): tipo consistente para as somas de CH.
+        """
         if self.num_estudantes_aprovados is not None:
             return round(self.num_estudantes_aprovados * 0.5, 1)
         if self.horas_aprovadas is not None:
-            return self.horas_aprovadas
-        return self.carga_horaria
+            return float(self.horas_aprovadas)
+        return float(self.carga_horaria or 0)
 
     def save(self, *args, **kwargs):
         if self.num_estudantes:
@@ -328,6 +394,11 @@ class ReducaoCargaHoraria(models.Model):
         blank=True,
         verbose_name="Motivo do Parecer",
     )
+    bloqueado = models.BooleanField(
+        default=False,
+        verbose_name="Bloqueado (enviado à DESUP)",
+        help_text="Se True, a unidade não pode mais editar/excluir este item (já enviado em definitivo).",
+    )
     data_atualizacao = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -336,10 +407,13 @@ class ReducaoCargaHoraria(models.Model):
 
     @property
     def ch_aprovada(self):
-        """Retorna horas aprovadas pela DESUP, ou o valor solicitado se não definido."""
+        """Retorna horas aprovadas pela DESUP, ou o valor solicitado se não definido.
+
+        Sempre `float` (CORR-004): tipo consistente para as somas de CH.
+        """
         if self.horas_aprovadas is not None:
-            return self.horas_aprovadas
-        return self.horas_reduzidas
+            return float(self.horas_aprovadas)
+        return float(self.horas_reduzidas or 0)
 
     def save(self, *args, **kwargs):
         if self.horas_aprovadas is None and self.horas_reduzidas:

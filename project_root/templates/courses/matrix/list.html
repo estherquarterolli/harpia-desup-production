@@ -48,7 +48,7 @@
 
   {# ── Cabeçalho da seção com abas ── #}
   <div class="mb-6">
-    <div class="flex items-center gap-6 border-b border-slate-200 pb-0">
+    <div class="flex flex-wrap items-center gap-4 sm:gap-6 border-b border-slate-200 pb-0">
       <a href="?status=ativas{% if request.GET.unidade_id %}&unidade_id={{ request.GET.unidade_id }}{% endif %}"
          class="pb-3 text-sm font-black uppercase tracking-wide border-b-2 transition-colors
            {% if request.GET.status != 'inativas' %}border-[#025c9f] text-[#025c9f]{% else %}border-transparent text-slate-400 hover:text-slate-600{% endif %}">

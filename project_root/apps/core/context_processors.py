@@ -46,53 +46,51 @@ def delivery_window_context(request):
     if not request.user.is_authenticated:
         return {}
 
-    # O indicador de janela de entrega só é relevante nas áreas de Alocação
-    # Curricular e Extracurricular — nas demais telas (professores, matrizes, etc.)
-    # a janela não se aplica mais. As rotas de alocação curricular não usam
-    # namespace, então o escopo é decidido pelo prefixo da URL.
+    # ESCOPO DA JANELA DE ENTREGA (decisão do cliente, 2026-08-01 — CORR-024):
+    # a janela controla o que o COORDENADOR DE UNIDADE pode alterar em duas áreas,
+    # e só nelas — **alocação curricular** e **justificativas extracurriculares**.
+    #
+    # O **cadastro de professor passa fora da janela**, de propósito: editar,
+    # excluir e duplicar docente continuam liberados com a janela fechada. Isso
+    # NÃO é um furo — é a regra vigente até o cliente final mudar de ideia. Se uma
+    # auditoria futura apontar "rotas de professor sem enforce", confirme a decisão
+    # antes de "corrigir".
+    #
+    # O CRUD de matriz em si é DESUP-only, e DESUP faz bypass da janela
+    # (`user_can_bypass_window`), então na prática a janela nunca o alcança; o que
+    # a unidade faz sobre a matriz é a alocação, coberta acima.
+    #
+    # As rotas de alocação curricular não usam namespace, então o escopo é decidido
+    # pelo prefixo da URL.
     areas_com_janela = ('/alocacao-curricular/', '/extracurriculares/')
     if not request.path.startswith(areas_com_janela):
         return {}
 
     try:
-        from apps.core.models import JanelaEntrega
-        from apps.core.services import fechar_janelas_expiradas
-        from django.utils import timezone
+        from apps.core.services import get_delivery_window, user_can_bypass_window
 
-        fechar_janelas_expiradas()
-
-        hoje = timezone.now().date()
         user = request.user
         unidade = getattr(user, 'unidade', None)
 
-        if user.perfil == 'COORDENADOR_UNIDADE' and unidade:
-            # Se existe override FECHADO para esta unidade, janela está fechada
-            if JanelaEntrega.objects.filter(unidade=unidade, status='Fechado').exists():
-                return {'janela_fechada': True}
-            janela = JanelaEntrega.objects.filter(
-                Q(status='Aberto') | Q(status='Reaberto'),
-                data_inicio__lte=hoje,
-                data_fim__gte=hoje,
-            ).filter(Q(unidade=unidade) | Q(unidade__isnull=True)).order_by('-unidade').first()
-            if janela and janela.is_ativa:
-                return {
-                    'janela_ativa': janela,
-                    'janela_data_fim': janela.data_fim.strftime('%d/%m/%Y'),
-                }
-            return {'janela_fechada': True}
-        else:
-            janela = JanelaEntrega.objects.filter(
-                Q(status='Aberto') | Q(status='Reaberto'),
-                data_inicio__lte=hoje,
-                data_fim__gte=hoje,
-                unidade__isnull=True,
-            ).first()
+        # O banner precisa dizer exatamente o que o POST vai fazer. Antes este
+        # processor reimplementava a regra da janela (override Fechado sem recorte
+        # de data, ordenação `-unidade` que na verdade ordenava por nome e invertia
+        # no PostgreSQL, etc.) e divergia de `get_delivery_window` — dava o cenário
+        # "banner verde na tela, ação bloqueada no POST". Agora existe uma única
+        # fonte de verdade; `get_delivery_window` já roda `fechar_janelas_expiradas`.
+        escopo = unidade if (user.perfil == 'COORDENADOR_UNIDADE' and unidade) else None
+        janela = get_delivery_window(escopo)
 
         if janela:
             return {
                 'janela_ativa': janela,
                 'janela_data_fim': janela.data_fim.strftime('%d/%m/%Y'),
             }
+
+        # DESUP/superusuário fazem bypass da janela, então nunca veem o aviso de
+        # "fechada". Quem não tem unidade também não tem escopo a bloquear.
+        if escopo and not user_can_bypass_window(user):
+            return {'janela_fechada': True}
     except Exception:
         logger.exception("Erro ao carregar contexto da janela de entrega")
 

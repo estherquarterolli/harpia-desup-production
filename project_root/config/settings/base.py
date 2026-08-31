@@ -130,6 +130,130 @@ EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=False, cast=bool)
 EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="no-reply@harpia.local")
 
+# ---------------------------------------------------------------------------
+# Observabilidade de erros 500 (CORR-005)
+# ---------------------------------------------------------------------------
+# Sem ADMINS + LOGGING o e-mail padrão de erro 500 do Django nunca dispara.
+# Aqui configuramos:
+#   - ADMINS: destinatários do e-mail automático de erro (o DEV / super admin).
+#   - SERVER_EMAIL: remetente desse e-mail de erro.
+#   - LOGGING: AdminEmailHandler (e-mail no 500, só quando DEBUG=False) +
+#     handlers de console e arquivo rotativo para os loggers `django` e
+#     `django.request` (traceback sempre acessível localmente/em produção).
+#
+# NUNCA hardcode e-mail pessoal no repositório — defina por variável de ambiente:
+#   ADMINS_EMAILS="Dev Harpia <dev@exemplo.com>,outra.pessoa@exemplo.com"
+# (aceita "Nome <email>" ou apenas "email", separados por vírgula). Vazio => sem
+# admins (fallback seguro: nenhum e-mail é enviado, apenas console/arquivo).
+
+def _parse_admins(raw):
+    """Converte "Nome <email>,email2" em [("Nome", "email"), ("Admin", "email2")]."""
+    parsed = []
+    for entry in raw.split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        if "<" in entry and ">" in entry:
+            name = entry.split("<", 1)[0].strip() or "Admin"
+            email = entry.split("<", 1)[1].split(">", 1)[0].strip()
+        else:
+            name, email = "Admin", entry
+        if email:
+            parsed.append((name, email))
+    return parsed
+
+
+ADMINS = _parse_admins(config("ADMINS_EMAILS", default=""))
+MANAGERS = ADMINS
+
+# Remetente do e-mail de erro do servidor (500). Cai no DEFAULT_FROM_EMAIL se
+# não for definido explicitamente por ambiente.
+SERVER_EMAIL = config("SERVER_EMAIL", default=DEFAULT_FROM_EMAIL)
+
+# include_html no e-mail de erro traz o traceback interativo completo (mais dados
+# sensíveis). Padrão False (traceback em texto puro já basta e é mais seguro);
+# habilite via ADMIN_EMAIL_INCLUDE_HTML=True se precisar do relatório completo.
+ADMIN_EMAIL_INCLUDE_HTML = config("ADMIN_EMAIL_INCLUDE_HTML", default=False, cast=bool)
+
+DJANGO_LOG_LEVEL = config("DJANGO_LOG_LEVEL", default="INFO")
+
+LOG_DIR = BASE_DIR / "logs"
+try:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    # Filesystem somente-leitura (ambientes efêmeros): segue só com console.
+    LOG_DIR = None
+
+_error_handlers = ["console"] + (["file"] if LOG_DIR else [])
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {
+        "require_debug_false": {
+            "()": "django.utils.log.RequireDebugFalse",
+        },
+        "require_debug_true": {
+            "()": "django.utils.log.RequireDebugTrue",
+        },
+    },
+    "formatters": {
+        "verbose": {
+            "format": "[{asctime}] {levelname} {name} {process:d}/{thread:d} {message}",
+            "style": "{",
+        },
+        "simple": {
+            "format": "[{asctime}] {levelname} {name}: {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "level": "DEBUG",
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+        },
+        # AdminEmailHandler só envia quando DEBUG=False (filtro require_debug_false)
+        # e quando há ADMINS definidos — em dev fica inerte automaticamente.
+        "mail_admins": {
+            "level": "ERROR",
+            "class": "django.utils.log.AdminEmailHandler",
+            "filters": ["require_debug_false"],
+            "include_html": ADMIN_EMAIL_INCLUDE_HTML,
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": DJANGO_LOG_LEVEL,
+    },
+    "loggers": {
+        "django": {
+            "handlers": _error_handlers,
+            "level": DJANGO_LOG_LEVEL,
+            "propagate": False,
+        },
+        # django.request loga todo erro 500 (uncaught) em nível ERROR — é aqui
+        # que o e-mail ao super admin dispara em produção.
+        "django.request": {
+            "handlers": _error_handlers + ["mail_admins"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
+
+# Handler de arquivo rotativo — só adicionado se houver diretório de logs gravável.
+if LOG_DIR:
+    LOGGING["handlers"]["file"] = {
+        "level": "ERROR",
+        "class": "logging.handlers.RotatingFileHandler",
+        "filename": str(LOG_DIR / "errors.log"),
+        "maxBytes": 5 * 1024 * 1024,
+        "backupCount": 5,
+        "formatter": "verbose",
+        "encoding": "utf-8",
+    }
+
 # Celery
 CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=REDIS_URL or "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default=REDIS_URL or "redis://localhost:6379/0")

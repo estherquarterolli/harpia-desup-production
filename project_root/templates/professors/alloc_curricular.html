@@ -68,7 +68,7 @@
 
     <main class="flex-grow p-8">
         <!-- HEADER MANTIDO -->
-        <header class="flex justify-between items-center mb-10">
+        <header class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-10">
             <!-- Aqui você pode usar {{ request.user.nome }} e o grupo dele dinamicamente depois -->
             <!-- ... seu código do header ... -->
         </header>
@@ -78,12 +78,12 @@
         </section>
 
         <!-- CONTROLES (SELECT E FILTRO) COM SEGURANÇA DE PERFIL -->
-        <div class="flex gap-4 mb-6">
+        <div class="flex flex-wrap gap-4 mb-6">
 
             {% if is_admin %}
             <!-- Visão do ADMIN DESUP: Vê o Select com HTMX -->
-            <div class="relative w-64">
-                <!-- 
+            <div class="relative w-full sm:w-64">
+                <!--
                       hx-get: Qual URL o HTMX vai chamar
                       hx-target: Onde ele vai jogar a resposta (no id tableBody)
                       hx-trigger: Quando disparar (ao mudar o valor do select)
@@ -114,7 +114,8 @@
 
         <!-- TABELA DE ALOCAÇÃO -->
         <div class="table-container bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
-            <table class="w-full border-collapse text-sm">
+            <div class="overflow-x-auto">
+            <table class="w-full border-collapse text-sm min-w-[720px] stack-table">
                 <thead class="bg-slate-50 border-b border-slate-200 text-[#025c9f]">
                     <tr>
                         <th class="p-3 border-r border-slate-200 text-left">ID</th>
@@ -139,6 +140,7 @@
                     </tr>
                 </tbody>
             </table>
+            </div>
         </div>
     </main>
 </body>

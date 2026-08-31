@@ -1,0 +1,990 @@
+DISCIPLINAS ENCONTRADAS
+======================================================================
+
+FILE: Matrizes-Desup (COMPILADO-DISCIPLINAS).docx
+  Course: (Compilado Geral)
+  Disciplines found: 363
+    • [] PROGRAMAÇÃO E ESTRUTURAS DE DADOS EM C
+    • [] ORGANIZAÇÃO DE COMPUTADORES 1
+    • [] MATEMÁTICA DISCRETA
+    • [] INGLÊS TÉCNICO 1
+    • [] LABORATÓRIO DE FUNDAMENTOS EM TIC
+    • [] PROJETO DE EXTENSÃO 1
+    • [] PROGRAMAÇÃO ORIENTADA A OBJETO E ALGORITMOS EM C++
+    • [] MATEMÁTICA
+    • [] ORGANIZAÇÃO DE COMPUTADORES 2
+    • [] BANCO DE DADOS 1
+    • [] PORTUGUÊS INSTRUMENTAL
+    • [] INGLÊS TÉCNICO 2
+    • [] PROJETO DE EXTENSÃO 2
+    • [] PROGRAMAÇÃO EM JAVA
+    • [] REDES DE COMPUTADORES 1
+    • [] SISTEMAS OPERACIONAIS 1
+    • [] BANCO DE DADOS 2
+    • [] PRINCÍPIOS DE COMUNICAÇÕES DE DADOS
+    • [] PROJETO DE EXTENSÃO 3
+    • [] REDES DE COMPUTADORES 2
+    • [] TECNOLOGIAS DE COMUNICAÇÃO DE DADOS
+    • [] INTRODUÇÃO A COMPUTAÇÃO GRÁFICA
+    • [] SISTEMAS OPERACIONAIS 2
+    • [] SEGURANÇA DA INFORMAÇÃO
+    • [] PROGRAMAÇÃO EM AMBIENTE VISUAL
+    • [] PROJETO DE EXTENSÃO 4
+    • [] LEGISLAÇÃO EM INFORMÁTICA
+    • [] MÉTODOS QUANTITATIVOS APLICADOS A TIC
+    • [] COMÉRCIO ELETRÔNICO
+    • [] SEGURANÇA E AUDITORIA DE SISTEMAS
+    • [] SISTEMAS MULTIMÍDIA E HIPERMÍDIA
+    • [] PSICOLOGIA APLICADA A INFORMÁTICA
+    • [] EMPREENDEDORISMO
+    • [] PLANEJAMENTO ESTRATÉGICO APLICADO A TIC
+    • [] SISTEMAS DE APOIO À DECISÃO
+    • [] MODELAGEM CONCEITUAL DE DADOS
+    • [] ARQUITETURA DE COMPUTADORES
+    • [] FUNDAMENTOS DE SISTEMAS DE INFORMAÇÃO
+    • [] PROGRAMAÇÃO ESTRUTURADA
+    • [] AMBIENTE DE EDIÇÃO WEB
+    • [] MODELO RELACIONAL E PROJETO LÓGICO DE BANCO DE DADOS
+    • [] FUNDAMENTOS DE ENGENHARIA DE SOFTWARE
+    • [] MODELO E PROGRAMAÇÃO ORIENTADOS A OBJETOS
+    • [] ESTRUTURAS DE DADOS
+    • [] SISTEMAS OPERACIONAIS E SERVIÇOS DE VIRTUALIZAÇÃO
+    • [] ESTATÍSTICA
+    • [] INGLÊS INSTRUMENTAL
+    • [] DESENVOLVIMENTO FRONTEND
+    • [] INTERFACE HUMANO-MÁQUINA E UI DESIGN
+    • [] METODOLOGIA DA PESQUISA
+    • [] TÉCNICAS DE ANÁLISE E PROJETO DE SISTEMAS
+    • [] REDES DE COMPUTADORES
+    • [] MÉTODOS ÁGEIS
+    • [] PROJETO DE EXTENSÃO I
+    • [] DESENVOLVIMENTO BACKEND
+    • [] ARQUITETURA DE SOFTWARE
+    • [] GESTÃO DE PROCESSOS DE NEGÓCIOS
+    • [] PADRÕES DE PROJETO
+    • [] TESTES DE SOFTWARE
+    • [] QUALIDADE DE SOFTWARE
+    • [] PROJETO DE EXTENSÃO II
+    • [] DESENVOLVIMENTO MOBILE
+    • [] ABORDAGEM DEVOPS E ENTREGAS CONTÍNUAS
+    • [] EMPREENDEDORISMO E COMPUTAÇÃO
+    • [] GESTÃO E GOVERNANÇA DE TI
+    • [] GESTÃO DE PROJETOS
+    • [] DIREITO E LEGISLAÇÃO DE INFORMÁTICA
+    • [] PROJETO DE EXTENSÃO III
+    • [] QUÍMICA GERAL
+    • [] NOÇÕES DE DIREITO
+    • [] LÍNGUA PORTUGUESA
+    • [] SEGURANÇA DO TRABALHO E MEIO AMBIENTE
+    • [] ÉTICA
+    • [] EDUCAÇÃO AMBIENTAL E SUSTENTABILIDADE
+    • [] GEOMETRIA APLICADA AO MEIO AMBIENTE
+    • [] ENERGIA E SUSTENTABILIDADE
+    • [] METODOLOGIA DA PESQUISA CIENTÍFICA
+    • [] ESTATÍSTICA APLICADA
+    • [] ECONOMIA DOS RECURSOS NATURAIS E AMBIENTE
+    • [] QUÍMICA INORGÂNICA
+    • [] BIOLOGIA E BIOTECNOLOGIA APLICADA
+    • [] BOTÂNICA GERAL
+    • [] GEOCIÊNCIA AMBIENTAL
+    • [] ZOOLOGIA GERAL
+    • [] ECOLOGIA
+    • [] POLÍTICA E LEGISLAÇÃO AMBIENTAL
+    • [] ADMINISTRAÇÃO E GERENCIAMENTO DE PROJETOS
+    • [] GERENCIAMENTO DE RESÍDUOS
+    • [] GESTÃO PELA QUALIDADE DE EQUIPES
+    • [] GEORREFERENCIAMENTO
+    • [] QUÍMICA ANALÍTICA
+    • [] MICROBIOLOGIA AMBIENTAL
+    • [] QUÍMICA ORGÂNICA AMBIENTAL
+    • [] LIMNOLOGIA
+    • [] CONTROLE POLUIÇÃO DA ÁGUA
+    • [] RECUPERAÇÃO DE ÁREAS DEGRADADAS
+    • [] CONTROLE DA POLUIÇÃO ATMOSFÉRICA
+    • [] MANEJO E GERENCIAMENTO DE BACIAS HIDROGRÁFICAS
+    • [] CONTROLE DA POLUIÇÃO DO SOLO
+    • [] SAÚDE PÚBLICA E A QUESTÃO AMBIENTAL
+    • [] LICENCIAMENTO, CERTIFICAÇÃO E AUDITORIA AMBIENTAL
+    • [] GESTÃO DE UNIDADES DE CONSERVAÇÃO
+    • [] GESAM GESTÃO AMBIENTAL E RESPONSABILIDADE SOCIAL
+    • [] INGL INGLÊS INSTRUMENTAL
+    • [] ALGORITMOS E LINGUAGEM DE PROGRAMAÇÃO I
+    • [] INTRODUÇÃO À LÓGICA
+    • [] ORGANIZAÇÃO DE COMPUTADORES
+    • [] MATEMÁTICA APLICADA
+    • [] FUNDAMENTOS DE SISTEMAS OPERACIONAIS
+    • [] ALGORITMOS E LINGUAGEM DE PROGRAMAÇÃO II
+    • [] ENGENHARIA DE SOFTWARE E DA USABILIDADE
+    • [] PROGRAMAÇÃO E DESIGN PARA WEB I
+    • [] METODOLOGIA DA PESQUISA CIENTÍFICO-TECNOLÓGICA
+    • [] FUNDAMENTOS DE REDES DE COMPUTADORES
+    • [] FUNDAMENTOS DE ESTRUTURAS DE DADOS
+    • [] PROGRAMAÇÃO E DESIGN PARA WEB II
+    • [] MÍDIAS E MARKETING DIGITAL
+    • [] GESTÃO DE PROJETOS INOVADORES
+    • [] GESTÃO DE PROJETO DE BANCO DE DADOS
+    • [] ANÁLISE E PROJETO DE SISTEMAS
+    • [] GESTÃO DE PROCESSOS
+    • [] ÉTICA E CIDADANIA
+    • [] EMPREENDEDORISMO DIGITAL
+    • [] PROGRAMAÇÃO CLIENTE/SERVIDOR
+    • [] OPTATIVA I
+    • [] GESTÃO DE SISTEMAS DIGITAIS NA WEB
+    • [] PROJETO INTEGRADOR I
+    • [] PROGRAMAÇÃO PARA DISPOSITIVOS MÓVEIS
+    • [] PROGRAMAÇÃO E DESIGN PARA WEB III
+    • [] LEGISLAÇÃO EM NEGÓCIOS DIGITAIS
+    • [] LOGÍSTICA E COMÉRCIO ELETRÔNICO
+    • [] GOVERNANÇA DE TI
+    • [] PROJETO INTEGRADOR II
+    • [] LABORATÓRIO DE PROJETO INTEGRADOR II
+    • [] OPTATIVA II
+    • [] SEGURANÇA EM SISTEMAS COMPUTACIONAIS
+    • [] QUALIDADE E TESTES DE SOFTWARE
+    • [] MATEMÁTICA PARA COMPUTAÇÃO
+    • [] FUNDAMENTOS DE ALGORITMOS DE COMPUTAÇÃO
+    • [] MATEMÁTICA BÁSICA
+    • [] INTRODUÇÃO À ANÁLISE DE SISTEMAS
+    • [] INTERFACE HOMEM-MÁQUINA
+    • [] TÉCNICAS E PARADIGMAS HUMANOS
+    • [] ENGENHARIA DE REQUISITOS
+    • [] FUNDAMENTOS DE PROGRAMAÇÃO
+    • [] CONSTRUÇÃO DE APLICAÇÕES WEB
+    • [] LÍNGUA ESTRANGEIRA
+    • [] MÉTODOS E PROCESSOS ADMINISTRATIVOS
+    • [] CÁLCULO
+    • [] PROGRAMAÇÃO ORIENTADA A OBJETOS BÁSICA
+    • [] PROJETO DE BANCO DE DADOS
+    • [] DESENVOLVIMENTO DE TECNOLOGIAS WEB
+    • [] ÁLGEBRA
+    • [] ESTRUTURA DE DADOS
+    • [] FUNDAMENTOS DE REDES E SISTEMAS DISTRIBUÍDOS
+    • [] PROGRAMAÇÃO ORIENTADA A OBJETOS AVANÇADA
+    • [] EMPREENDEDORISMO E INOVAÇÃO
+    • [] TÓPICOS EM ANÁLISE E DESENVOLVIMENTO
+    • [] UTILIZAÇÃO DE BANCO DE DADOS E SQL
+    • [] MODELAGEM DE SISTEMAS
+    • [] ESTATÍSTICA E PROBABILIDADE
+    • [] LINGUAGEM BRASILEIRA DE SINAIS
+    • [] PROJETO DE EXTENSÃO IV
+    • [] TÓPICOS AVANÇADOS
+    • [] GERÊNCIA DE PROJETOS DE SOFTWARE
+    • [] PROGRAMAÇÃO DE DISPOSITIVOS MÓVEIS
+    • [] PROJETO DE SISTEMAS
+    • [] PROGRAMAÇÃO DE SCRIPTS DE BANCO DE DADOS E SQL
+    • [] HISTÓRIA DA EDUCAÇÃO BRASILEIRA
+    • [] EDUCAÇÃO PARA AS RELAÇÕES ÉTNICO-RACIAIS E DIVERSIDADES
+    • [] FUNDAMENTOS E METODOLOGIAS DA EDUCAÇÃO INCLUSIVA
+    • [] CULTURAS TECNOLÓGICAS EDUCATIVAS
+    • [] DIDÁTICA EDUCACIONAL
+    • [] LEITURA E PRODUÇÃO DE TEXTOS ACADÊMICOS
+    • [] FILOSOFIA DA EDUCAÇÃO
+    • [] PSICOLOGIA DA EDUCAÇÃO E DO DESENVOLVIMENTO HUMANO
+    • [] PLANEJAMENTO EDUCACIONAL
+    • [] CURRÍCULO E ORGANIZAÇÃO PEDAGÓGICA
+    • [] ESTUDO DA LÍNGUA BRASILEIRA DE SINAIS
+    • [] SOCIOLOGIA E ANTROPOLOGIA NA EDUCAÇÃO
+    • [] FUNDAMENTOS DA EDUCAÇÃO INFANTIL
+    • [] ARTE E EDUCAÇÃO
+    • [] ALFABETIZAÇÃO E LETRAMENTO
+    • [] AVALIAÇÃO DA APRENDIZAGEM E DOS PROCESSOS DE ENSINO
+    • [] PRÁTICAS PEDAGÓGICAS NA EDUCAÇÃO INCLUSIVA
+    • [] EXTENSÃO INTEGRADA I
+    • [] LEGISLAÇÃO E POLÍTICAS PÚBLICAS DA EDUCAÇÃO BÁSICA
+    • [] CORPO E MOVIMENTO
+    • [] METODOLOGIA DO ENSINO DA LÍNGUA PORTUGUESA
+    • [] PRÁTICAS PEDAGÓGICAS NA EDUCAÇÃO INFANTIL
+    • [] METODOLOGIA DO ENSINO DE HISTÓRIA E GEOGRAFIA
+    • [] EXTENSÃO INTEGRADA II
+    • [] ESTÁGIO SUPERVISIONADO- DOCÊNCIA NA EDUCAÇÃO INFANTIL
+    • [] ATIVIDADES COMPLEMENTARES
+    • [] METODOLOGIA DO ENSINO DA MATEMÁTICA
+    • [] METODOLOGIA DO ENSINO DE CIÊNCIAS E EDUCAÇÃO AMBIENTAL
+    • [] ELETIVA
+    • [] PRÁTICAS PEDAGÓGICAS NO ENSINO FUNDAMENTAL
+    • [] EXTENSÃO INTEGRADA III
+    • [] ESTEF- ESTÁGIO SUPERVISIONADO- DOCÊNCIA NO ENSINO FUNDAMENTAL
+    • [] FUNDAMENTOS DA ORIENTAÇÃO EDUCACIONAL
+    • [] GESTÃO E ORGANIZAÇÃO DA EDUCAÇÃO BÁSICA
+    • [] PRÁTICAS PEDAGÓGICAS NO ENSINO MÉDIO
+    • [] EXTENSÃO INTEGRADA IV
+    • [] ESTEM- ESTÁGIO SUPERVISIONADO- DOCÊNCIA NO ENSINO MÉDIO
+    • [] FUNDAMENTOS DA SUPERVISÃO EDUCACIONAL
+    • [] EDUCAÇÃO PROFISSIONAL E TRABALHO
+    • [] EDUCAÇÃO QUILOMBOLA, INDÍGENA E NO CAMPO
+    • [] TCC I
+    • [] PRÁTICAS PEDAGÓGICAS EM CONTEXTOS NÃO ESCOLARES
+    • [] ESTOE- ESTÁGIO SUPERVISIONADO- GESTÃO DE ORGANIZAÇÕES ESCOLARES E NÃO-ESCOLARES
+    • [] ATIVIDADES ACADÊMICO-CIENTÍFICO-CULTURAIS
+    • [] FUNDAMENTOS DA INSPEÇÃO ESCOLAR
+    • [] TCC II
+    • [] PRÁTICAS PEDAGÓGICAS NA EJA
+    • [] FILOSOFIA E EDUCAÇÃO
+    • [] FUNDAMENTOS PARA O ENSINO DE LÍNGUA PORTUGUESA
+    • [] INTRODUÇÃO À METODOLOGIA DA PESQUISA
+    • [] DIDÁTICA E PRÁTICAS PEDAGÓGICAS
+    • [] MOVIMENTO E EXPRESSÃO CORPORAL
+    • [] HISTÓRIA DA EDUCAÇÃO
+    • [] ANTROPOLOGIA E EDUCAÇÃO
+    • [] METODOLOGIAS PARA O ENSINO DE LÍNGUA PORTUGUESA
+    • [] FILOSOFIA E QUESTÕES CONTEMPORÂNEAS
+    • [] PLANEJAMENTO E PRÁTICA PEDAGÓGICA
+    • [] EDUCAÇÃO E MOVIMENTOS SOCIAIS
+    • [] TECNOLOGIAS DIGITAIS NA EDUCAÇÃO
+    • [] PSICOLOGIA NA EDUCAÇÃO
+    • [] HISTÓRIA DA EDUCAÇÃO II
+    • [] INTERTEXTUALIDADES: LINGUAGEM VERBAL E NÃO VERBAL
+    • [] CURRÍCULO E EDUCAÇÃO
+    • [] TÓPICOS ESPECIAIS EM EDUCAÇÃO NÃO FORMAL
+    • [] FUNDAMENTOS E METODOLOGIAS PARA O ENSINO DE MATEMÁTICA I
+    • [] FUNDAMENTOS E METODOLOGIAS PARA O ENSINO DE CIÊNCIAS NATURAIS I
+    • [] FUNDAMENTOS E METODOLOGIAS PARA O ENSINO DE GEOGRAFIA I
+    • [] PSICOLOGIA DO DESENVOLVIMENTO E DA APRENDIZAGEM
+    • [] SOCIOLOGIA DA EDUCAÇÃO
+    • [] FUNDAMENTOS E METODOLOGIAS PARA A EDUCAÇÃO INFANTIL
+    • [] INTRODUÇÃO À LITERATURA INFANTO-JUVENIL
+    • [] FUNDAMENTOS E METODOLOGIAS PARA O ENSINO DE GEOGRAFIA II
+    • [] FUNDAMENTOS E METODOLOGIAS PARA O ENSINO DE MATEMÁTICA II
+    • [] FUNDAMENTOS E METODOLOGIAS PARA O ENSINO DE CIÊNCIAS NATURAIS II
+    • [] AVALIAÇÃO DA APRENDIZAGEM: QUESTÕES TEÓRICAS E PRÁTICAS
+    • [] LÍNGUA BRASILEIRA DE SINAIS-LIBRAS
+    • [] ALFABETIZAÇÃO I
+    • [] FUNDAMENTOS E METODOLOGIAS PARA O ENSINO DE HISTÓRIA I
+    • [] FUNDAMENTOS E METODOLOGIAS PARA EDUCAÇÃO DE JOVENS E ADULTOS
+    • [] FUNDAMENTOS E METODOLOGIAS PARA O ENSINO FUNDAMENTAL
+    • [] FUNDAMENTOS E METODOLOGIAS PARA EDUCAÇÃO ESPECIAL E INCLUSÃO
+    • [] ALFABETIZAÇÃO II
+    • [] ESTÁGIO: EDUCAÇÃO INFANTIL
+    • [] PRÁTICAS PEDAGÓGICAS NA EDUCAÇÃO ESPECIAL E INCLUSÃO
+    • [] FUNDAMENTOS E METODOLOGIAS PARA O ENSINO DE HISTÓRIA II
+    • [] MÚSICA E EDUCAÇÃO
+    • [] PRÁTICAS PEDAGÓGICAS NA EDUCAÇÃO DE JOVENS E ADULTOS
+    • [] PESQUISA I
+    • [] ESTÁGIO: ENSINO FUNDAMENTAL- REGULAR E EJA
+    • [] FUNDAMENTOS E METODOLOGIAS PARA O ENSINO MÉDIO
+    • [] TÓPICOS ESPECIAIS NA EDUCAÇÃO DO CAMPO/QUILOMBOLA/INDÍGENA
+    • [] TÓPICOS ESPECIAIS NA EDUCAÇÃO A DISTÂNCIA
+    • [] PESQUISA II
+    • [] FUNDAMENTOS E PRINCÍPIOS DA GESTÃO DA EDUCAÇÃO
+    • [] ESTÁGIO: ENSINO MÉDIO, NA MODALIDADE NORMAL E EDUCAÇÃO PROFISSIONAL NA ÁREA DE SERVIÇOS E APOIO ESCOLAR
+    • [] GESTÃO E ORGANIZAÇÃO DO TRABALHO NA EDUCAÇÃO
+    • [] POLÍTICA, ESTADO E EDUCAÇÃO
+    • [] EDUCAÇÃO DAS RELAÇÕES ÉTNICO-RACIAIS
+    • [] ESTÁGIO: GESTÃO
+    • [] FUNDAMENTOS DE LOGÍSTICA
+    • [] DIREITO EMPRESARIAL E LOGÍSTICO
+    • [] ECONOMIA
+    • [] MODELOS DE GESTÃO
+    • [] COMPORTAMENTO ORGANIZACIONAL
+    • [] INGLÊS INSTRUMENTAL I
+    • [] CONTABILIDADE
+    • [] PLANEJAMENTO DE MARKETING
+    • [] SISTEMAS DE ARMAZENAGEM E DISTRIBUIÇÃO DE CARGAS
+    • [] GESTÃO DA QUALIDADE
+    • [] TRANSPORTES NA LOGÍSTICA
+    • [] INGLÊS INSTRUMENTAL II
+    • [] INTEGRADO À LOGÍSTICA
+    • [] LOGÍSTICA REVERSA
+    • [] ADMINISTRAÇÃO DE MATERIAIS
+    • [] ÉTICA E RESPONSABILIDADE SOCIAL
+    • [] GESTÃO DA CADEIA DE SUPRIMENTOS
+    • [] COMÉRCIO EXTERIOR I
+    • [] MATEMÁTICA FINANCEIRA
+    • [] CUSTOS E TARIFAS LOGÍSTICAS
+    • [] COMÉRCIO EXTERIOR II
+    • [] LOGÍSTICA INTERNACIONAL
+    • [] ASPECTOS AMBIENTAIS DOS TRANSPORTES
+    • [] SISTEMAS DE INFORMAÇÃO LOGÍSTICO
+    • [] GESTÃO AMBIENTAL
+    • [] TRANSPORTE DE CARGAS ESPECIAIS E PERIGOSAS
+    • [] TRANSPORTE DE PASSAGEIROS
+    • [] PROJETOS EM LOGÍSTICA E TRANSPORTES
+    • [] SAÚDE E SEGURANÇA NO TRABALHO
+    • [] GESTÃO DA LOGÍSTICA DE DISTRIBUIÇÃO
+    • [] GESTÃO DE PESSOAS
+    • [] INTRODUÇÃO À ADMINISTRAÇÃO 3 60 50
+    • [] INTRODUÇÃO À ECONOMIA
+    • [] CONTABILIDADE GERENCIAL
+    • [] GESTÃO DE PROCESSOS ORGANIZACIONAIS
+    • [] GESTÃO DE MARKETING
+    • [] MATEMÁTICA APLICADA À ADMINISTRAÇÃO
+    • [] PLANEJAMENTO E GESTÃO ESTRATÉGICA
+    • [] SISTEMA DE INFORMAÇÕES GERENCIAIS
+    • [] GESTÃO ESTRATÉGICA DE PESSOAS
+    • [] PROJETO DE EXTENSÃO
+    • [] RESPONSABILIDADE AMBIENTAL, SOCIAL E GOVERNANÇA CORPORATIVA
+    • [] GESTÃO DA PRODUÇÃO E QUALIDADE
+    • [] GESTÃO DE COMPRAS E SUPRIMENTOS
+    • [] PESQUISA DE MARKETING
+    • [] GESTÃO FINANCEIRA E TRIBUTÁRIA
+    • [] DIREITO EMPRESARIAL
+    • [] ORÇAMENTO EMPRESARIAL E ANÁLISE DE INVESTIMENTOS
+    • [] LOGÍSTICA E DISTRIBUIÇÃO
+    • [] GESTÃO DE VENDAS E NEGOCIAÇÕES
+    • [] GESTÃO DE CUSTOS E FORMAÇÃO DE PREÇOS
+    • [] GESTÃO DE SERVIÇOS
+    • [] LEGISLAÇÃO TRIBUTÁRIA
+    • [] OPTATIVA
+    • [] FUNDAMENTOS DA PESQUISA PEDAGÓGICA I
+    • [] FUNDAMENTOS PSICOLÓGICOS DA EDUCAÇÃO
+    • [] DIDÁTICA GERAL E PRÁTICA EDUCATIVA
+    • [] FUNDAMENTOS DA PESQUISA PEDAGÓGICA II
+    • [] PEDAGOGIA INSTITUCIONAL
+    • [] LEGISLAÇÃO DO ENSINO NO BRASIL
+    • [] FUNDAMENTOS SOCIOLÓGICOS DA EDUCAÇÃO
+    • [] DIDÁTICA E TEORIAS DA APRENDIZAGEM
+    • [] FUNDAMENTOS DA PESQUISA PEDAGÓGICA III
+    • [] FUNDAMENTOS ANTROPOLÓGICOS DA EDUCAÇÃO
+    • [] POLÍTICAS PÚBLICAS E GESTÃO DA EDUCAÇÃO BÁSICA
+    • [] TEORIAS DO CURRÍCULO
+    • [] RELAÇÕES ÉTNICO-RACIAIS
+    • [] LIBRAS
+    • [] PESQUISA E PRÁTICA APLICADA À EDUCAÇÃO INFANTIL
+    • [] CORPO E MOVIMENTO NA EDUCAÇÃO INFANTIL
+    • [] PROCESSOS DE APRENDIZAGEM DA LEITURA E DA ESCRITA
+    • [] PEDAGOGIA DA EDUCAÇÃO INFANTIL
+    • [] GESTÃO E ORIENTAÇÃO DO TRABALHO PEDAGÓGICO NA EDUCAÇÃO INFANTIL
+    • [] ESTÁGIO SUPERVISIONADO I – DOCÊNCIA NA EDUCAÇÃO INFANTIL I
+    • [] PESQUISA E PRÁTICA APLICADA AO ENSINO FUNDAMENTAL
+    • [] LEITURA E PRODUÇÃO DE TEXTO
+    • [] FUNDAMENTOS E METODOLOGIA DO ENSINO DE LÍNGUA PORTUGUESA
+    • [] FUNDAMENTOS E MEDODOLOGIA DO ENSINO DE MATEMÁTICA
+    • [] GESTÃO E ORIENTAÇÃO DO TRABALHO PEDAGÓGICO NO ENSINO FUNDAMENTAL
+    • [] ESTÁGIO SUPERVISIONADO II – DOCÊNCIA NOS ANOS INICIAIS DO ENSINO FUNDAMENTAL
+    • [] PESQUISA E PRÁTICA APLICADA AO ENSINO MÉDIO
+    • [] FUNDAMENTOS E METODOLOGIA DO ENSINO DE GEOGRAFIA
+    • [] FUNDAMENTOS E METODOLOGIA DO ENSINO DE HISTÓRIA
+    • [] FUNDAMENTOS E METODOLOGIA DO ENSINO DE CIÊNCIAS
+    • [] EDUCAÇÃO PROFISSIONAL TECNICA DE NÍVEL MÉDIO
+    • [] GESTÃO E ORIENTAÇÃO DO TRABALHO PEDAGÓGICO NO ENSINO MÉDIO
+    • [] ESTÁGIO SUPERVISIONADO III – DOCÊNCIA NAS DISCIPLINAS PEDAGÓGICAS DO ENSINO MÉDIO
+    • [] EDU19071- PESQUISA E PRÁTICA APLICADA À GESTÃO ESCOLAR E NÃO ESCOLAR 60 3 EDU19072- EDUCAÇÃO DO CAMPO, INDÍGENA E QUILOMBOLA 60 3 FUNDAMENTOS E METODOLOGIA NA EDUCAÇÃO DE JOVENS E ADULTOS
+    • [] AVALIAÇÃO DA APRENDIZAGEM E AVALIAÇÃO INSTITUCIONAL
+    • [] GESTÃO E PLANEJAMENTO NAS INSTITUIÇÕES ESCOLARES E NÃO ESCOLARES
+    • [] ENSINO-APRENDIZAGEM A PARTIR DAS TECNOLOGIAS DIGITAIS DA INFORMAÇÃO E COMUNICAÇÃO (TDIC)
+    • [] ESTÁGIO SUPERVISIONADO IV – GESTÃO NAS ORGANIZAÇÕES ESCOLARES E NÃO ESCOARES
+    • [] SEMINÁRIO DE PESQUISA
+    • [] SUPERVISÃO ESCOLAR
+    • [] ORIENTAÇÃO ESCOLAR
+    • [] FUNDAMENTOS E METODOLOGIAS DA EDUCAÇÃO À DISTÂNCIA
+
+FILE: PPPC_FAETERJ_Petropolis_TIC_v7.docx
+  Course: TIC - Tecnologia da Informação e Comunicação
+  Disciplines found: 37
+    • [OC1] Organização de Computadores 1  CH=120h
+    • [IT1] Inglês Técnico 1  CH=80h
+    • [AT1] Projeto de Extensão 1  CH=80h
+    • [OC2] Organização de Computadores 2  CH=120h
+    • [BD1] Banco de Dados 1  CH=60h
+    • [IT2] Inglês Técnico 2  CH=60h
+    • [AT2] Projeto de Extensão 2  CH=80h
+    • [RD1] Redes de Computadores 1  CH=100h
+    • [SO1] Sistemas Operacionais 1  CH=100h
+    • [BD2] Banco de Dados 2  CH=80h
+    • [AT3] Projeto de Extensão 3  CH=60h
+    • [RD2] Redes de Computadores 2  CH=80h
+    • [SO2] Sistemas Operacionais 2  CH=80h
+    • [AT4] Projeto de Extensão 4  CH=60h
+    • [] Programação e Estruturas de Dados em C Organização de Computadores 1 Matemática Discreta Laboratório de Fundamentos em TIC Programação Orientada a Objeto e Algoritmos em C++ Matemática Organização de Computadores 2 Banco de Dados 1 Programação em Java Redes de Computadores 1 Sistemas Operacionais 1 Banco de Dados 2 Princípios de Comunicações de Dados Redes de Computadores 2 Tecnologias de Comunicação de Dados Introdução a Computação Gráfica Sistemas Operacionais 2 Segurança da Informação Programação em Ambiente Visual Métodos Quantitativos Aplicados a TIC Sistemas de Apoio à Decisão Segurança e Auditoria de Sistemas Sistemas Multimídia e Hipermídia
+    • [] Empreendedorismo Planejamento Estratégico Aplicado a TIC Comércio Eletrônico
+    • [] Inglês Técnico 1 Português Instrumental Inglês Técnico 2 Legislação em Informática Psicologia Aplicada a Informática Projeto de Extensão 1 Projeto de Extensão 2 Projeto de Extensão 3 Projeto de Extensão 4
+    • [] Alberto Torres Angonese  CH=22h
+    • [] Amarildo Micoski Luz  CH=4h
+    • [] Augusto Frederico Burle Neto  CH=13h
+    • [] Bruno Clemente Guingo  CH=0h
+    • [] Chessman Kennedy Faria Correa  CH=20h
+    • [] Douglas Ericson Marcelino de Oliveira  CH=23h
+    • [] Gerson Nunes da Cunha  CH=12h
+    • [] Leonardo da Silva Gomes  CH=19h
+    • [] Lucimar Souza Cunha  CH=0h
+    • [] Marcelo Armony  CH=4h
+    • [] Mozar Baptista da Silva  CH=24h
+    • [] Paulo Silas Belém da Silva  CH=14h
+    • [] Paulo Cesar Pieroni Guedes  CH=12h
+    • [] Ricardo Baía Leite  CH=16h
+    • [] Roberto Bitencourt da Silva  CH=4h
+    • [] Thiago Braga Dias Lima  CH=4h
+    • [] NOME PESQUISADOR: Bruno Clemente Guingo
+    • [] ENDEREÇO DO ESPELHO: http://dgp.cnpq.br/dgp/espelhogrupo/38104
+    • [] REPERCUSSÕES DOS TRABALHOS DO GRUPO:
+    • [] LINHAS DE PESQUISA DE ATUAÇÃO: Mineração de dados e de textos Processamento de Imagens
+
+FILE: Projeto Pedagógico de Curso - PED - FAETERJ Bom Jesus.docx
+  Course: Pedagogia
+  Disciplines found: 12
+    • [] CH Disciplinas Optativas - apagar esta linha se não houver
+    • [] CH Estágio Supervisionado - apagar esta linha se não houver
+    • [] Atividades Acadêmico-Científico- Culturais (ACC) - apagar esta linha se não houver
+    • [] Trabalho de Conclusão de Curso (TCC) - apagar esta linha se não houver
+    • [] CH Total do Curso
+    • [] Xº Período
+    • [] Xº período e Xº Período
+    • [] xxxx xxxx xxxx xxxx
+    • [] NOME PESQUISADOR:
+    • [] ENDEREÇO DO ESPELHO:
+    • [] REPERCUSSÕES DOS TRABALHOS DO GRUPO:
+    • [] LINHAS DE PESQUISA DE ATUAÇÃO:
+
+FILE: Projeto Pedagógico de Curso - PED - FAETERJ Itaperuna.docx
+  Course: Pedagogia
+  Disciplines found: 12
+    • [] CH Disciplinas Optativas - apagar esta linha se não houver
+    • [] CH Estágio Supervisionado - apagar esta linha se não houver
+    • [] Atividades Acadêmico-Científico- Culturais (ACC) - apagar esta linha se não houver
+    • [] Trabalho de Conclusão de Curso (TCC) - apagar esta linha se não houver
+    • [] CH Total do Curso
+    • [] Xº Período
+    • [] Xº período e Xº Período
+    • [] xxxx xxxx xxxx xxxx
+    • [] NOME PESQUISADOR:
+    • [] ENDEREÇO DO ESPELHO:
+    • [] REPERCUSSÕES DOS TRABALHOS DO GRUPO:
+    • [] LINHAS DE PESQUISA DE ATUAÇÃO:
+
+FILE: Projeto Pedagógico de Curso - PED - FAETERJ Pádua (1).docx
+  Course: Pedagogia
+  Disciplines found: 17
+    • [] CH Disciplinas Optativas
+    • [] CH Estágio Supervisionado
+    • [] Atividades Acadêmico-Científico- Culturais (ACC)
+    • [] CH Disciplinas de Extensão
+    • [] CH Disciplinas de Práticas
+    • [] CH Total do Curso
+    • [] Kamilla Vogas Romualdo  CH=40h
+    • [] Arthur Rezende da Silva  CH=20h
+    • [] Luiz Carlos Câmara  CH=40h
+    • [] Maria Cecília Daher Rocha Souza  CH=40h
+    • [] Alcyanne de Aguiar Cunha Santos  CH=40h
+    • [] Eva de Fátima Chiapini de Souza Pereira  CH=40h
+    • [] Júlio Cesar Correa de Oliveira  CH=40h
+    • [] NOME PESQUISADOR:
+    • [] ENDEREÇO DO ESPELHO:
+    • [] REPERCUSSÕES DOS TRABALHOS DO GRUPO:
+    • [] LINHAS DE PESQUISA DE ATUAÇÃO:
+
+FILE: Projeto Pedagógico de Curso - PED - FAETERJ Pádua.docx
+  Course: Pedagogia
+  Disciplines found: 17
+    • [] CH Disciplinas Optativas
+    • [] CH Estágio Supervisionado
+    • [] Atividades Acadêmico-Científico- Culturais (ACC)
+    • [] CH Disciplinas de Extensão
+    • [] CH Disciplinas de Práticas
+    • [] CH Total do Curso
+    • [] Kamilla Vogas Romualdo  CH=40h
+    • [] Arthur Rezende da Silva  CH=20h
+    • [] Luiz Carlos Câmara  CH=40h
+    • [] Maria Cecília Daher Rocha Souza  CH=40h
+    • [] Alcyanne de Aguiar Cunha Santos  CH=40h
+    • [] Eva de Fátima Chiapini de Souza Pereira  CH=40h
+    • [] Júlio Cesar Correa de Oliveira  CH=40h
+    • [] NOME PESQUISADOR:
+    • [] ENDEREÇO DO ESPELHO:
+    • [] REPERCUSSÕES DOS TRABALHOS DO GRUPO:
+    • [] LINHAS DE PESQUISA DE ATUAÇÃO:
+
+FILE: Projeto Pedagógico de Curso - PED - FAETERJ Três Rios.docx
+  Course: Pedagogia
+  Disciplines found: 12
+    • [] CH Disciplinas Optativas - apagar esta linha se não houver
+    • [] CH Estágio Supervisionado - apagar esta linha se não houver
+    • [] Atividades Acadêmico-Científico- Culturais (ACC) - apagar esta linha se não houver
+    • [] Trabalho de Conclusão de Curso (TCC) - apagar esta linha se não houver
+    • [] CH Total do Curso
+    • [] Xº Período
+    • [] Xº período e Xº Período
+    • [] xxxx xxxx xxxx xxxx
+    • [] NOME PESQUISADOR:
+    • [] ENDEREÇO DO ESPELHO:
+    • [] REPERCUSSÕES DOS TRABALHOS DO GRUPO:
+    • [] LINHAS DE PESQUISA DE ATUAÇÃO:
+
+FILE: Projeto Pedagógico de Curso - PED - ISEPAM.docx
+  Course: Pedagogia
+  Disciplines found: 12
+    • [] CH Disciplinas Optativas - apagar esta linha se não houver
+    • [] CH Estágio Supervisionado - apagar esta linha se não houver
+    • [] Atividades Acadêmico-Científico- Culturais (ACC) - apagar esta linha se não houver
+    • [] Trabalho de Conclusão de Curso (TCC) - apagar esta linha se não houver
+    • [] CH Total do Curso
+    • [] Xº Período
+    • [] Xº período e Xº Período
+    • [] xxxx xxxx xxxx xxxx
+    • [] NOME PESQUISADOR:
+    • [] ENDEREÇO DO ESPELHO:
+    • [] REPERCUSSÕES DOS TRABALHOS DO GRUPO:
+    • [] LINHAS DE PESQUISA DE ATUAÇÃO:
+
+FILE: Matrizes-Desup (COMPILADO-DISCIPLINAS).pdf
+  Course: (Compilado Geral)
+  Disciplines found: 220
+    • [] PROGRAMAÇÃO E ESTRUTURAS DE DADOS EM C
+    • [] ORGANIZAÇÃO DE COMPUTADORES 1
+    • [] MATEMÁTICA DISCRETA
+    • [] INGLÊS TÉCNICO 1
+    • [] LABORATÓRIO DE FUNDAMENTOS EM TIC
+    • [] PROJETO DE EXTENSÃO 1
+    • [] PROGRAMAÇÃO ORIENTADA A OBJETO E ALGORITMOS EM C++
+    • [] MATEMÁTICA
+    • [] ORGANIZAÇÃO DE COMPUTADORES 2
+    • [] BANCO DE DADOS 1
+    • [] PORTUGUÊS INSTRUMENTAL
+    • [] INGLÊS TÉCNICO 2
+    • [] PROJETO DE EXTENSÃO 2
+    • [] PROGRAMAÇÃO EM JAVA
+    • [] REDES DE COMPUTADORES 1
+    • [] SISTEMAS OPERACIONAIS 1
+    • [] BANCO DE DADOS 2
+    • [] PRINCÍPIOS DE COMUNICAÇÕES DE DADOS
+    • [] PROJETO DE EXTENSÃO 3
+    • [] REDES DE COMPUTADORES 2
+    • [] TECNOLOGIAS DE COMUNICAÇÃO DE DADOS
+    • [] INTRODUÇÃO A COMPUTAÇÃO GRÁFICA
+    • [] SISTEMAS OPERACIONAIS 2
+    • [] SEGURANÇA DA INFORMAÇÃO
+    • [] PROGRAMAÇÃO EM AMBIENTE VISUAL
+    • [] MODELAGEM CONCEITUAL DE DADOS
+    • [] ARQUITETURA DE COMPUTADORES
+    • [] FUNDAMENTOS DE SISTEMAS DE INFORMAÇÃO
+    • [] PROGRAMAÇÃO ESTRUTURADA
+    • [] AMBIENTE DE EDIÇÃO WEB
+    • [] MODELO RELACIONAL E PROJETO LÓGICO DE BANCO DE DADOS
+    • [] FUNDAMENTOS DE ENGENHARIA DE SOFTWARE
+    • [] MODELO E PROGRAMAÇÃO ORIENTADOS A OBJETOS
+    • [] ESTRUTURAS DE DADOS
+    • [] SISTEMAS OPERACIONAIS E SERVIÇOS DE VIRTUALIZAÇÃO
+    • [] ESTATÍSTICA
+    • [] INGLÊS INSTRUMENTAL
+    • [] DESENVOLVIMENTO FRONTEND
+    • [] INTERFACE HUMANO-MÁQUINA E UI DESIGN
+    • [] METODOLOGIA DA PESQUISA
+    • [] TÉCNICAS DE ANÁLISE E PROJETO DE SISTEMAS
+    • [] REDES DE COMPUTADORES
+    • [] MÉTODOS ÁGEIS
+    • [] PROJETO DE EXTENSÃO I
+    • [] DESENVOLVIMENTO BACKEND
+    • [] ARQUITETURA DE SOFTWARE
+    • [] GESTÃO DE PROCESSOS DE NEGÓCIOS
+    • [] PADRÕES DE PROJETO
+    • [] QUÍMICA GERAL
+    • [] NOÇÕES DE DIREITO
+    • [] LÍNGUA PORTUGUESA
+    • [] SEGURANÇA DO TRABALHO E MEIO AMBIENTE
+    • [] ÉTICA
+    • [] EDUCAÇÃO AMBIENTAL E SUSTENTABILIDADE
+    • [] GEOMETRIA APLICADA AO MEIO AMBIENTE
+    • [] ENERGIA E SUSTENTABILIDADE
+    • [] METODOLOGIA DA PESQUISA CIENTÍFICA
+    • [] ESTATÍSTICA APLICADA
+    • [] ECONOMIA DOS RECURSOS NATURAIS E AMBIENTE
+    • [] QUÍMICA INORGÂNICA
+    • [] BIOLOGIA E BIOTECNOLOGIA APLICADA
+    • [] BOTÂNICA GERAL
+    • [] GEOCIÊNCIA AMBIENTAL
+    • [] ZOOLOGIA GERAL
+    • [] ECOLOGIA
+    • [] POLÍTICA E LEGISLAÇÃO AMBIENTAL
+    • [] ADMINISTRAÇÃO E GERENCIAMENTO DE PROJETOS
+    • [] GERENCIAMENTO DE RESÍDUOS
+    • [] GESTÃO PELA QUALIDADE DE EQUIPES
+    • [] GEORREFERENCIAMENTO
+    • [] QUÍMICA ANALÍTICA
+    • [] MICROBIOLOGIA AMBIENTAL
+    • [] GESAM GESTÃO AMBIENTAL E RESPONSABILIDADE SOCIAL
+    • [] INGL INGLÊS INSTRUMENTAL
+    • [] ALGORITMOS E LINGUAGEM DE PROGRAMAÇÃO I
+    • [] INTRODUÇÃO À LÓGICA
+    • [] ORGANIZAÇÃO DE COMPUTADORES
+    • [] MATEMÁTICA APLICADA
+    • [] FUNDAMENTOS DE SISTEMAS OPERACIONAIS
+    • [] ALGORITMOS E LINGUAGEM DE PROGRAMAÇÃO II
+    • [] ENGENHARIA DE SOFTWARE E DA USABILIDADE
+    • [] PROGRAMAÇÃO E DESIGN PARA WEB I
+    • [] METODOLOGIA DA PESQUISA CIENTÍFICO-TECNOLÓGICA
+    • [] FUNDAMENTOS DE REDES DE COMPUTADORES
+    • [] FUNDAMENTOS DE ESTRUTURAS DE DADOS
+    • [] PROGRAMAÇÃO E DESIGN PARA WEB II
+    • [] MÍDIAS E MARKETING DIGITAL
+    • [] GESTÃO DE PROJETOS INOVADORES
+    • [] GESTÃO DE PROJETO DE BANCO DE DADOS
+    • [] ANÁLISE E PROJETO DE SISTEMAS
+    • [] GESTÃO DE PROCESSOS
+    • [] ÉTICA E CIDADANIA
+    • [] EMPREENDEDORISMO DIGITAL
+    • [] PROGRAMAÇÃO CLIENTE/SERVIDOR
+    • [] MATEMÁTICA PARA COMPUTAÇÃO
+    • [] FUNDAMENTOS DE ALGORITMOS DE COMPUTAÇÃO
+    • [] MATEMÁTICA BÁSICA
+    • [] INTRODUÇÃO À ANÁLISE DE SISTEMAS
+    • [] INTERFACE HOMEM-MÁQUINA
+    • [] TÉCNICAS E PARADIGMAS HUMANOS
+    • [] ENGENHARIA DE REQUISITOS
+    • [] FUNDAMENTOS DE PROGRAMAÇÃO
+    • [] CONSTRUÇÃO DE APLICAÇÕES WEB
+    • [] LÍNGUA ESTRANGEIRA
+    • [] MÉTODOS E PROCESSOS ADMINISTRATIVOS
+    • [] CÁLCULO
+    • [] PROGRAMAÇÃO ORIENTADA A OBJETOS BÁSICA
+    • [] PROJETO DE BANCO DE DADOS
+    • [] DESENVOLVIMENTO DE TECNOLOGIAS WEB
+    • [] PROJETO DE EXTENSÃO II
+    • [] ÁLGEBRA
+    • [] ESTRUTURA DE DADOS
+    • [] FUNDAMENTOS DE REDES E SISTEMAS DISTRIBUÍDOS
+    • [] PROGRAMAÇÃO ORIENTADA A OBJETOS AVANÇADA
+    • [] HISTÓRIA DA EDUCAÇÃO BRASILEIRA
+    • [] EDUCAÇÃO PARA AS RELAÇÕES ÉTNICO-RACIAIS E DIVERSIDADES
+    • [] FUNDAMENTOS E METODOLOGIAS DA EDUCAÇÃO INCLUSIVA
+    • [] CULTURAS TECNOLÓGICAS EDUCATIVAS
+    • [] DIDÁTICA EDUCACIONAL
+    • [] LEITURA E PRODUÇÃO DE TEXTOS ACADÊMICOS
+    • [] FILOSOFIA DA EDUCAÇÃO
+    • [] PSICOLOGIA DA EDUCAÇÃO E DO DESENVOLVIMENTO HUMANO
+    • [] PLANEJAMENTO EDUCACIONAL
+    • [] CURRÍCULO E ORGANIZAÇÃO PEDAGÓGICA
+    • [] ESTUDO DA LÍNGUA BRASILEIRA DE SINAIS
+    • [] SOCIOLOGIA E ANTROPOLOGIA NA EDUCAÇÃO
+    • [] FUNDAMENTOS DA EDUCAÇÃO INFANTIL
+    • [] ARTE E EDUCAÇÃO
+    • [] ALFABETIZAÇÃO E LETRAMENTO
+    • [] AVALIAÇÃO DA APRENDIZAGEM E DOS PROCESSOS DE ENSINO
+    • [] PRÁTICAS PEDAGÓGICAS NA EDUCAÇÃO INCLUSIVA
+    • [] EXTENSÃO INTEGRADA I
+    • [] LEGISLAÇÃO E POLÍTICAS PÚBLICAS DA EDUCAÇÃO BÁSICA
+    • [] CORPO E MOVIMENTO
+    • [] METODOLOGIA DO ENSINO DA LÍNGUA PORTUGUESA
+    • [] PRÁTICAS PEDAGÓGICAS NA EDUCAÇÃO INFANTIL
+    • [] METODOLOGIA DO ENSINO DE HISTÓRIA E GEOGRAFIA
+    • [] EXTENSÃO INTEGRADA II
+    • [] ESTÁGIO SUPERVISIONADO- DOCÊNCIA NA EDUCAÇÃO INFANTIL
+    • [] FILOSOFIA E EDUCAÇÃO
+    • [] FUNDAMENTOS PARA O ENSINO DE LÍNGUA PORTUGUESA
+    • [] INTRODUÇÃO À METODOLOGIA DA PESQUISA
+    • [] DIDÁTICA E PRÁTICAS PEDAGÓGICAS
+    • [] MOVIMENTO E EXPRESSÃO CORPORAL
+    • [] HISTÓRIA DA EDUCAÇÃO
+    • [] ANTROPOLOGIA E EDUCAÇÃO
+    • [] METODOLOGIAS PARA O ENSINO DE LÍNGUA PORTUGUESA
+    • [] FILOSOFIA E QUESTÕES CONTEMPORÂNEAS
+    • [] PLANEJAMENTO E PRÁTICA PEDAGÓGICA
+    • [] EDUCAÇÃO E MOVIMENTOS SOCIAIS
+    • [] TECNOLOGIAS DIGITAIS NA EDUCAÇÃO
+    • [] PSICOLOGIA NA EDUCAÇÃO
+    • [] HISTÓRIA DA EDUCAÇÃO II
+    • [] INTERTEXTUALIDADES: LINGUAGEM VERBAL E NÃO VERBAL
+    • [] CURRÍCULO E EDUCAÇÃO
+    • [] TÓPICOS ESPECIAIS EM EDUCAÇÃO NÃO FORMAL
+    • [] FUNDAMENTOS E METODOLOGIAS PARA O ENSINO DE MATEMÁTICA I
+    • [] FUNDAMENTOS E METODOLOGIAS PARA O ENSINO DE CIÊNCIAS NATURAIS I
+    • [] FUNDAMENTOS E METODOLOGIAS PARA O ENSINO DE GEOGRAFIA I
+    • [] PSICOLOGIA DO DESENVOLVIMENTO E DA APRENDIZAGEM
+    • [] SOCIOLOGIA DA EDUCAÇÃO
+    • [] FUNDAMENTOS E METODOLOGIAS PARA A EDUCAÇÃO INFANTIL
+    • [] INTRODUÇÃO À LITERATURA INFANTO-JUVENIL
+    • [] FUNDAMENTOS DE LOGÍSTICA
+    • [] DIREITO EMPRESARIAL E LOGÍSTICO
+    • [] ECONOMIA
+    • [] MODELOS DE GESTÃO
+    • [] COMPORTAMENTO ORGANIZACIONAL
+    • [] INGLÊS INSTRUMENTAL I
+    • [] CONTABILIDADE
+    • [] PLANEJAMENTO DE MARKETING
+    • [] SISTEMAS DE ARMAZENAGEM E DISTRIBUIÇÃO DE CARGAS
+    • [] GESTÃO DA QUALIDADE
+    • [] TRANSPORTES NA LOGÍSTICA
+    • [] INGLÊS INSTRUMENTAL II
+    • [] INTEGRADO À LOGÍSTICA
+    • [] EMPREENDEDORISMO E INOVAÇÃO
+    • [] LOGÍSTICA REVERSA
+    • [] ADMINISTRAÇÃO DE MATERIAIS
+    • [] ÉTICA E RESPONSABILIDADE SOCIAL
+    • [] GESTÃO DA CADEIA DE SUPRIMENTOS
+    • [] COMÉRCIO EXTERIOR I
+    • [] MATEMÁTICA FINANCEIRA
+    • [] ELETIVA
+    • [] INTRODUÇÃO À ADMINISTRAÇÃO 3 60 50
+    • [] INTRODUÇÃO À ECONOMIA
+    • [] CONTABILIDADE GERENCIAL
+    • [] GESTÃO DE PROCESSOS ORGANIZACIONAIS
+    • [] GESTÃO DE MARKETING
+    • [] MATEMÁTICA APLICADA À ADMINISTRAÇÃO
+    • [] PLANEJAMENTO E GESTÃO ESTRATÉGICA
+    • [] SISTEMA DE INFORMAÇÕES GERENCIAIS
+    • [] GESTÃO ESTRATÉGICA DE PESSOAS
+    • [] PROJETO DE EXTENSÃO
+    • [] RESPONSABILIDADE AMBIENTAL, SOCIAL E GOVERNANÇA CORPORATIVA
+    • [] GESTÃO DA PRODUÇÃO E QUALIDADE
+    • [] GESTÃO DE COMPRAS E SUPRIMENTOS
+    • [] PESQUISA DE MARKETING
+    • [] GESTÃO FINANCEIRA E TRIBUTÁRIA
+    • [] GESTÃO DE PROJETOS
+    • [] DIREITO EMPRESARIAL
+    • [] ORÇAMENTO EMPRESARIAL E ANÁLISE DE INVESTIMENTOS
+    • [] FUNDAMENTOS DA PESQUISA PEDAGÓGICA I
+    • [] FUNDAMENTOS PSICOLÓGICOS DA EDUCAÇÃO
+    • [] DIDÁTICA GERAL E PRÁTICA EDUCATIVA
+    • [] ATIVIDADES ACADÊMICO-CIENTÍFICO-CULTURAIS
+    • [] FUNDAMENTOS DA PESQUISA PEDAGÓGICA II
+    • [] PEDAGOGIA INSTITUCIONAL
+    • [] LEGISLAÇÃO DO ENSINO NO BRASIL
+    • [] FUNDAMENTOS SOCIOLÓGICOS DA EDUCAÇÃO
+    • [] DIDÁTICA E TEORIAS DA APRENDIZAGEM
+    • [] FUNDAMENTOS DA PESQUISA PEDAGÓGICA III
+    • [] FUNDAMENTOS ANTROPOLÓGICOS DA EDUCAÇÃO
+    • [] POLÍTICAS PÚBLICAS E GESTÃO DA EDUCAÇÃO BÁSICA
+    • [] TEORIAS DO CURRÍCULO
+    • [] RELAÇÕES ÉTNICO-RACIAIS
+    • [] LIBRAS
+    • [] PESQUISA E PRÁTICA APLICADA À EDUCAÇÃO INFANTIL
+    • [] CORPO E MOVIMENTO NA EDUCAÇÃO INFANTIL
+    • [] PROCESSOS DE APRENDIZAGEM DA LEITURA E DA ESCRITA
+
+FILE: 03_01_2024___Projeto_Pedagogico_de_Curso___ADS_Paracambi__1_.pdf
+  Course: ADS - Análise e Desenvolvimento de Sistemas
+  Disciplines found: 50
+    • [] AtividadesAcadêmico-Científico-Culturais(ACC)(HR)
+    • [] TrabalhodeConclusãodeCurso(TCC)(HR)
+    • [] Estágio(Opcional)(HR)
+    • [] CHTotaldoCurso(HR)
+    • [] Estas disciplinas apresentarão aos alunos conhecimentos básicos de hardwaree software.
+    • [] Nestas disciplinas o aluno aprenderá, além de outras coisas, a coordenar equipes de produçãodesoftwares.
+    • [] Nestas disciplinas o aluno adquirirá a capacidade de avaliar, selecionar e utilizar, tecnologias eferramentasde bancos dedados.
+    • [] Nestas disciplinas o aluno adquirirá a capacidade de avaliar, selecionar e utilizar as tecnologias e linguagens de programaçãoparamelhor atingir seus objetivos.
+    • [] adquire conhecimentos
+    • [] gerais que serão úteisparao
+    • [] seu desenvolvimento
+    • [] interpessoal e que poderão
+    • [] subsidiar os conhecimentos
+    • [] vindouros.
+    • [] apresentarão aos alunos
+    • [] conhecimentos básicos de
+    • [] hardwaree software.
+    • [] aprenderá, além de outras
+    • [] coisas, a coordenar equipes
+    • [] de produçãodesoftwares.
+    • [] adquirirá a capacidade de
+    • [] avaliar, selecionar e utilizar,
+    • [] tecnologias eferramentasde
+    • [] bancos dedados.
+    • [] avaliar, selecionar e utilizar
+    • [] as tecnologias e linguagens
+    • [] de programaçãoparamelhor
+    • [] atingir seus objetivos.
+    • [] as melhores tecnologias e
+    • [] ferramentas da Engenharia
+    • [] de Software.
+    • [] AdilsonRicardo
+    • [] AlessandrodeAlmeida
+    • [] ArturSérgioLopes
+    • [] CarlosEduardoCosta
+    • [] DiegoMotaLima
+    • [] ElizangelaSimões
+    • [] FabioHenrique
+    • [] HenriquedeMedeiros
+    • [] HudsonDosSantos
+    • [] LeonardoPinheiro
+    • [] MarcioSerafim
+    • [] PauloCalixto
+    • [] RubensSaviano
+    • [] SelmaGomes
+    • [] TúlioDeSouza
+    • [] NOMEPESQUISADOR:
+    • [] ENDEREÇODOESPELHO:
+    • [] REPERCUSSÕESDOSTRABALHOSDOGRUPO:
+    • [] LINHASDEPESQUISADEATUAÇÃO:
+
+FILE: Modelo___Projeto_Pedagogico_de_Curso___TGA.pdf
+  Course: Pedagogia
+  Disciplines found: 37
+    • [EXT2] ProjetodeExtensão2  CH=80h
+    • [EXT3] ProjetodeExtensão3  CH=80h
+    • [] CHEstágioSupervisionado (HR)  CH=150h
+    • [] AtividadesAcadêmico-Científico-Culturais(ACC) (HR)  CH=50h
+    • [] CHTotaldoCurso(HR)  CH=1833h
+    • [] ● Químicageral e Inorgânica ● Geometria aplicada ao Meio Ambiente ● Estatística Aplicada ● QuímicaAnalítica ● Botânica Geral ● QuímicaAmbientalOrgânica ● Zoologia Geral ● Ecologia ● Noçõesde Direito ● Microbiologia Ambiental ● Língua Portuguesa ● Metodologia da Pesquisa Científica ● Ética
+    • [] ● Biologia e Biotecnologia Aplicada ● Georreferenciamento ● Limnologia ● Saúde Pública e a questão Ambiental ● EnergiaeSustentabilidade ● Geociências Ambientais ● Economia dos Recursos Naturais e Ambiente ● Educação Ambiental e Sustentabilidade ● Política eLegislaçãoAmbiental
+    • [] específicamente sobre as
+    • [] ações de controle da
+    • [] poluição a serem
+    • [] implantadas em projetos
+    • [] ambientais e a recuperação
+    • [] de áreasdegradadas
+    • [] ArturSergioLopes  CH=5h
+    • [] CinthiadaSilvaLisboa  CH=4h
+    • [] DanielVazquezFigueiredo  CH=5h
+    • [] DiegoMotaLima  CH=5h
+    • [] FabioHenriqueS.dosSantos  CH=4h
+    • [] FaustoAmarodaSilvaAraujo  CH=5h
+    • [] FranziskaHuber  CH=7h
+    • [] HudsondosSantosBarros  CH=4h
+    • [] IamaradaSilvaAndrade  CH=5h
+    • [] JanainadaSilvaVettorazzi  CH=6h
+    • [] KátiaReginaAraújodaSilva  CH=4h
+    • [] LeonardoPinheiroGomes  CH=4h
+    • [] MárciodeBritoSerafim  CH=4h
+    • [] MarciaLieAyukawa  CH=8h
+    • [] RomildaMariaAlvesLemos  CH=4h
+    • [] SilvestredeMellodeSouza  CH=6h
+    • [] TerezaAparecidaFerreiraDornelas  CH=5h
+    • [] Túlio Queto de Souza Pinto  CH=4h
+    • [] NOMEPESQUISADOR: FranziskaHuber eRomildaMaria Alvesde Lemos
+    • [] ENDEREÇO DOESPELHO: -
+    • [] REPERCUSSÕES DOSTRABALHOS DOGRUPO: Mendes, Marcos Pires; Huber, Franziska ANÁLISE FISICO-QUÍMICA E MICROBIOLÓGICA DAS ÁGUAS DE NASCENTES NA ÁREA URBANA DO MUNICÍPIO DE QUEIMADOS – RJ In: 6º Simpósio de Gestão Ambiental e Biodiversidade, 2017, Três Rios. 6º Simpósio de Gestão Ambiental e Biodiversidade., 2017. SILVA, S. O; Huber, Franziska; Brotto, Daniel Shimada CONCURSO “O FANTÁSTICO MUNDO DA ÁGUA – MODALIDADE: DESENHO E PINTURA” REALIZADO NA REGIÃO HIDROGRÁFICA II – GUANDU In: 6º Simpósio de Gestão Ambiental e Biodiversidade,2017,Três Rios.6º Simpósiode GestãoAmbiental eBiodiversidade.,2017. Rios, Manuellem Freitas; Huber, Franziska LEVANTAMENTO DA BIODIVERSIDADE EM QUINTAIS DOMÉSTICOS E SUA POSSÍVEL IMPORTÂNCIA NA SEGURANÇA ALIMENTAR E PRESERVAÇÃO DA FLORA DA MATAATLÂNTICA In: 6ºSimpósio deGestão Ambientale Biodiversidade,2017, Três Rios.6ºSimpósio de GestãoAmbiental eBiodiversidade. ,2017. F. Huber; Sampaio, C. T.; FIQUEIREDO, D. V. LEVANTAMENTO E IDENTIFICAÇÃO DE CUPINS NO PARQUE NATURAL MUNICIPAL DOCURIÓ, PARACAMBI, RJ In: 6º Simpósio de Gestão Ambiental e Biodiversidade, 2017, Três Rios.6º Simpósiode Gestão AmbientaleBiodiversidade. , VICENTE, M. C. ; FIGUEIREDO, D. V. ; TAVARES, N. N. ;SOUZA, M.M.S. .Uso de Tillandsia usneoides como biomonitor na avaliação da qualidade do ar em três bairros do município de Paracambi/RJ. In: Léia Maria Erlich Ruwer. (Org.). Meio ambiente e seusdesafios:EstudosContemporâneos. 1ed.BeloHorizonte- MG:Poisson, 2020,v. 1,p.141-152. DORNELAS, T. A. F. ; FIGUEIREDO, D. V. ; AMORIM, T. A.; NUNES-FREITAS, A. F. . EPÍFITAS VASCULARES DO PARQUE NATURAL MUNICIPAL DO CURIÓ: COMPOSIÇÃO FLORÍSTICA E RIQUEZA DE ESPÉCIES. In: Marcelo Elias Fraga. (Org.). ParquedoCurió. 1ed.Seropṕédica:TaniaMikaela Roberto,2020,v. 1,p.77-90.
+    • [] NOMEPESQUISADOR: HudsonSantosBarroseArtur Sergio Lopes
+    • [] REPERCUSSÕES DOSTRABALHOS DOGRUPO: ARAUJO, Fausto Amaro da Silva. Ensino da Função Exponencial utilizando dados da pandemia de Covid-19. In: II Congresso Brasileiro Interdisciplinar em Ciência e tecnologia, 2022, Diamantina - Online. Anais doCongressoBrasileiroInterdisciplinar em Ciência eTecnologia, 2022.v. 3. Tópicos nas ciências da saúde Vol IX. In: Drogas eSociedade.Gomes,L.P; Silva eSilva, P.H. Nova Xavantina, MT: Pantanal, 2022. Disponível: https://editorapantanal.com.br/ebooks/2022/topicos-nas-ciencias-da-saude-volume-ix/Cap 13.pdf
+    • [] LINHAS DE PESQUISA DEATUAÇÃO: Ecoturismo; Paisagismo,AgroecologiaeEducação Ambiental; Desenvolvimento urbanoe rurale impactosnoambiente esociedade; Desenvolvimento territorial,sócio-ambientalepolíticas públicas;
+
+FILE: PPC do Curso de Pedagogia (Licenciatura) - abril de 2023.pdf
+  Course: Pedagogia
+  Disciplines found: 9
+    • [] PFG16 Antropologia e Educação  CH=60h
+    • [] PDE02 Metodologias para o ensino de Língua Portuguesa  CH=40h
+    • [] PFG02 Filosofia e Questões Contemporâneas  CH=40h
+    • [] PAP15 Planejamento e Prática Pedagógica  CH=40h
+    • [] PFG08 Educação e Movimentos Sociais  CH=40h
+    • [] PDE16 Tecnologias digitais na educação  CH=60h
+    • [] PFG06 Psicologia na Educação  CH=60h
+    • [] PFG14 História da Educação II  CH=60h
+    • [] Tecnologias da Informação e Comunicação.
+
+FILE: PPC_ADS_FAETERJ_Rio_v2_25Jan2024.pdf
+  Course: ADS - Análise e Desenvolvimento de Sistemas
+  Disciplines found: 20
+    • [] CH Disciplinas Optativas
+    • [] CH Atividades Extensionistas
+    • [] CH Total do Curso
+    • [] Engenharia de Requisitos, Construção de Aplicações Web, Desenvolvimento de Tecnologias Web, Interface Homem-Máquina, Introdução à Análise de Sistemas, Modelagem de Sistemas, Programação Orientada a Objetos Básica e Avançada, Projeto de Banco de Dados, Tópicos Avançados, Tópicos em Análise e Desenvolvimento de Sistemas
+    • [] Alfredo Nazareno Pereira Boente  CH=40h
+    • [] André Henrique Pedrosa Neves  CH=40h
+    • [] Claudia Ferlin  CH=40h
+    • [] José Wilson Coura Pinto  CH=40h
+    • [] Leonardo Soares Vianna  CH=40h
+    • [] Marcio Belo Rodrigues da Silva  CH=40h
+    • [] Maria Cláudia Roenick Guimarães  CH=40h
+    • [] Miguel Gabriel Prazeres de Carvalho  CH=40h
+    • [] Nelson Luis Soares Bezerra  CH=40h
+    • [] Paulo Ricardo Galhanone  CH=40h
+    • [] Rosângela de Sena Almeida  CH=40h
+    • [] Rute Candida de Freitas  CH=40h
+    • [] NOME PESQUISADOR:
+    • [] ENDEREÇO DO ESPELHO:
+    • [] REPERCUSSÕES DOS TRABALHOS DO GRUPO:
+    • [] LINHAS DE PESQUISA DE ATUAÇÃO:
+
+FILE: Projeto_Pedagogico_de_Curso___Gestao_Portuaria.pdf
+  Course: Pedagogia
+  Disciplines found: 30
+    • [] AtividadesAcadêmico-Científico-Culturais(ACC)
+    • [] CHDisciplinasEletivas
+    • [] CHTotaldoCurso
+    • [] ● Gestão dePessoas ● Gestão daCadeiade Suprimentos ● Gestão daQualidade ● Saúde eSegurança noTrabalho ● Planejamento eAdministraçãode Cargas ● Operação deTerminais eArmazéns ● Gestão daLogística de Transportes Multimodais
+    • [] ● LegislaçãoPortuária e Aduaneira ● Organizaçãoe Estrutura Portuária ● Simulação emOperaçõesPortuárias ● Gestão deCustos eTributos Portuários ● Gestão Ambientale Responsabilidade Social ● Logística internacional
+    • [] ● FundamentosdeMatemática ● OperaçõesBásicasdeLogística ● PortuguêsInstrumental ● InformáticaAplicada ● MétodosparaProduçãodo Conhecimento ● InglêsInstrumental ● SaúdeeSegurançanoTrabalho ● Estatística ● MatemáticaFinanceira ● GestãodePessoas
+    • [] AlzimarFernandes Gomes  CH=40h
+    • [] Kleusda CruzCorrêa  CH=40h
+    • [] Etevaldo MarquesPessanha  CH=20h
+    • [] AngelaMariaSanges deAlvarengaRosaGhetti  CH=40h
+    • [] FabianoPortal Chagas  CH=40h
+    • [] Darcilane deAzevedo Rocha  CH=40h
+    • [] AlzimarFernandesGomes  CH=40h
+    • [] AnthoneMateusMagalhãesAfonso  CH=40h
+    • [] DarcilanedeAzevedoRocha  CH=40h
+    • [] EponineWagnerBarrosBorgesSouza  CH=40h
+    • [] EtevaldoMarquesPessanha  CH=20h
+    • [] FabianaGomesRodrigues  CH=40h
+    • [] FabianoPortalChagas  CH=40h
+    • [] FábioReisdaCosta  CH=40h
+    • [] GustavoWagnerdeMenezes  CH=40h
+    • [] KleusdaCruzCorrea  CH=40h
+    • [] LeandraLúciaEspinosaGomes  CH=40h
+    • [] LuizMauríciodeOliveiraMonteiro  CH=40h
+    • [] LuizRenatodeSouzaJustiniano  CH=40h
+    • [] MarcusViniciusMachadoMelo  CH=40h
+    • [] MarilenaCoelhodeAzevedo  CH=40h
+    • [] MilenaFerreiraHyginoNunes  CH=40h
+    • [] RafaelPeixotoPereira  CH=40h
+    • [] WashingtonLuizGomesTavares  CH=40h
+
+FILE: Projeto_Pedagogico_de_Curso___TPG___versao_final_15_12_23.pdf
+  Course: Pedagogia
+  Disciplines found: 45
+    • [] CHDisciplinasOptativaseEletivas
+    • [] AtividadesAcadêmico-Científico-Culturais(ACC)
+    • [] CHTotaldoCurso
+    • [] Libras
+    • [] InglêsInstrumental II
+    • [] GestãoEstratégica daTecnologiada Informação
+    • [] Informática Instrumental
+    • [] MétodosMatemáticos AplicadosaProcessos Gerenciais
+    • [] NegóciosInternacionais
+    • [] Gestão deTalentos
+    • [] 1º Período+ Gestão Estratégicade Pessoas+ Comportamento Organizacional
+    • [] ● Contabilidade Gerencial ● Introdução àEconomia ● Gestão de Processos Organizacionais ● Planejamento e Gestão Estratégica ● Orçamento EmpresarialeAnálise de Investimentos ● Responsabilidade Ambiental, Social eGovernançaCorporativa ● Gestão daProdução eQualidade ● Gestão de Compras e Suprimentos
+    • [] Ismael GarciaEstrada  CH=40h
+    • [] Wagner Salles  CH=40h
+    • [] Cynthia AdrielledaSilva Santos  CH=40h
+    • [] Camila SantosdeLima  CH=40h
+    • [] Lúcio Joséde Oliveira  CH=40h
+    • [] Carlos HenriquedaSilva Soares  CH=40h
+    • [] *E - Especialização,M- Mestrado,D - Doutorado
+    • [] ALEXANDREDEALMEIDALIMA  CH=40h
+    • [] ALEXANDREGODEGOL  CH=40h
+    • [] CARLOSHENRIQUEDASILVASOARES  CH=40h
+    • [] DAVIDSONDEALMEIDASANTOS  CH=40h
+    • [] ISMAELGARCIAESTRADA  CH=40h
+    • [] PAULOBRETASVILARINHOJUNIOR  CH=40h
+    • [] RAJAOLIVEIRAKHALIL  CH=40h
+    • [] FILIPECARVALHODEALARCAOPAES  CH=40h
+    • [] WAGNERSALLES  CH=40h
+    • [] MARCOSDELIMACARNEIRO  CH=20h
+    • [] CRISTIANONEVESDASILVA  CH=40h
+    • [] JOSEMAUROBAPTISTABIANCHI  CH=40h
+    • [] CAMILASANTOSDELIMA  CH=40h
+    • [] WESLEYSILVADESOUZA  CH=40h
+    • [] MARCELOSALVADOR  CH=20h
+    • [] LUCIOJOSEDEOLIVEIRA  CH=40h
+    • [] CYNTHIAADRIELLEDASILVASANTOS  CH=40h
+    • [] JOICEDAROCHAMARSEN  CH=40h
+    • [] CARLOSALBERTOCEREJADEBARROS  CH=40h
+    • [] PATRICIASOUZAN.COELHO  CH=40h
+    • [] NORMANDODOSSANTOSMOREIRA  CH=40h
+    • [Período] NºCréditos
+    • [] NOMEPESQUISADOR:
+    • [] ENDEREÇODOESPELHO:
+    • [] REPERCUSSÕESDOSTRABALHOSDOGRUPO:
+    • [] LINHASDEPESQUISADEATUAÇÃO:
+
+FILE: Projeto_Pedagogico_de_Curso_ADS_Barra_Mansa_2024_rev_v4_ERRATA.pdf
+  Course: ADS - Análise e Desenvolvimento de Sistemas
+  Disciplines found: 25
+    • [] CH Atividades complementares
+    • [] CH Atividades Extensionistas
+    • [] CH Total do Curso
+    • [GESER] Gestão de Serviços
+    • [ARQIN] Arquitetura da Informação (Wireframe)
+    • [DESTHIN] Design Thinking
+    • [LIBRAS] Lingua Brasileira de Sinais (LIBRAS)
+    • [CGRAF] Computação Gráfica
+    • [EMPJOG] Empreendedorismo com Gamificação e Jogos
+    • [PHPBAS] Programação em PHP Básico
+    • [PYTBAS] Programação em PYTHON Básico
+    • [] ● Empreendedorismo Digital ● Mídias e Marketing Digital ● Legislação em Negócios Digitais ● Logística e Comércio Eletrônico ● Metodologia da Pesquisa Científico- Tecnológica ● Optativa I ● Optativa II
+    • [] ● Gestão Ambiental e Responsabilidade Social ● Gestão de Sistemas Digitais na WEB ● Gestão de Processos ● Gestão de Projeto de Banco de Dados ● Gestão de Projetos Inovadores ● Governança de TI ● Projeto Integrador I ● Projeto Integrador II ● Laboratório de Projeto Integrador II
+    • [] ● Inglês Instrumental ● Matemática Aplicada ● Estatística Aplicada ● Algoritmos e Linguagem de Programação I ● Algoritmos e Linguagem de Programação II ● Introdução à Lógica ● Organização de Computadores ● Fundamentos de Sistemas Operacionais ● Fundamentos de Redes de computadores ● Fundamentos de Estruturas de Dados ● Engenharia de Software e da Usabilidade ● Modelagem Conceitual de Dados ● Programação e Design para Web I ● Programação e Design para Web II ● Programação e Design para WEB III ● Programação para Dispositivos Móveis ● Programação Cliente/Servidor ● Segurança em Sistemas Computacionais ● Análise e Projeto de Sistemas ● Qualidade e Testes de Software
+    • [] ● Ética e Cidadania ● Projeto de Extensão I ● Projeto de Extensão II
+    • [] Agnes Natasha Maciel de Sampaio  CH=18h
+    • [] Alini Reis Barbosa  CH=40h
+    • [] Anderson Evandro Simeão da Silva  CH=40h
+    • [] Alexandre Fernando Coutinho da Silva  CH=40h
+    • [] Arnaldo Fonseca Borges  CH=40h
+    • [] Edgar Eller Junior  CH=40h
+    • [] Fernanda de Souza Silva  CH=20h
+    • [] Henrique Barbosa de Souza Junior  CH=40h
+    • [] José Mauricio Franklin de Miranda  CH=40h
+    • [] José Maurício dos Santos Pinheiro  CH=40h
+
+
+======================================================================
+TOTAL: 918 disciplines across 16 files
+Code patterns detected: none
+Files with no extractable data (0):

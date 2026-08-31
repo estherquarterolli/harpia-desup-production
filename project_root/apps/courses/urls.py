@@ -10,6 +10,10 @@ urlpatterns = [
     path('matrices/<int:pk>/', views.CurriculumMatrixDetailView.as_view(), name='matrix_detail'),
     path('matrices/<int:pk>/edit/', views.CurriculumMatrixUpdateView.as_view(), name='matrix_update'),
 
+    # CORR-012 — arquivar/reativar matriz (DESUP-only, POST)
+    path('matrices/<int:pk>/arquivar/', views.ArquivarMatrizView.as_view(), name='matrix_archive'),
+    path('matrices/<int:pk>/reativar/', views.ReativarMatrizView.as_view(), name='matrix_reactivate'),
+
     # Partial HTMX — retorna apenas o fragmento da tabela (filtros)
     path('matrices/partial/', views.CurriculumMatrixListPartialView.as_view(), name='matrix_list_partial'),
 

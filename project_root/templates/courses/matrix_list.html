@@ -78,18 +78,18 @@
   </div>
 
   <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-    <div class="flex justify-between items-center px-6 py-4 border-b border-slate-100">
+    <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center px-6 py-4 border-b border-slate-100">
       <p class="text-sm font-semibold text-slate-500">{{ matrices|length }} matriz(es) encontrada(s)</p>
       {% if is_desup %}
       <a href="{% url 'courses:matrix_create' %}{% if request.GET.unidade_id %}?unidade_id={{ request.GET.unidade_id }}{% endif %}"
-        class="flex items-center gap-2 bg-[#ffb800] hover:bg-yellow-400 text-[#025c9f] px-4 py-2.5 rounded-xl text-sm font-black transition-colors shadow-md">
+        class="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#ffb800] hover:bg-yellow-400 text-[#025c9f] px-4 py-2.5 rounded-xl text-sm font-black transition-colors shadow-md">
         <i class="ph ph-plus"></i> Nova Matriz
       </a>
       {% endif %}
     </div>
 
     <div class="overflow-x-auto">
-      <table class="w-full text-left border-collapse min-w-[700px]">
+      <table class="w-full text-left border-collapse min-w-[700px] stack-table">
         <thead class="bg-[#025c9f] text-white text-[10px] font-black uppercase tracking-widest">
           <tr>
             {% if is_desup %}
@@ -107,15 +107,15 @@
           {% for matrix in matrices %}
           <tr class="hover:bg-slate-50 transition-colors">
             {% if is_desup %}
-            <td class="px-5 py-3 text-slate-600 font-semibold text-xs max-w-[180px]">
+            <td class="px-5 py-3 text-slate-600 font-semibold text-xs max-w-[180px]" data-label="Unidade">
               {% for u in matrix.unidades.all %}{{ u.nome }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}
             </td>
             {% endif %}
-            <td class="px-5 py-3 font-bold text-slate-800 cursor-pointer" onclick="window.location='{% url 'courses:matrix_detail' matrix.pk %}'">{{ matrix.curso.sigla }}</td>
+            <td class="px-5 py-3 font-bold text-slate-800 cursor-pointer" data-label="Curso" onclick="window.location='{% url 'courses:matrix_detail' matrix.pk %}'">{{ matrix.curso.sigla }}</td>
             <td class="px-5 py-3 text-slate-600 font-semibold cursor-pointer" onclick="window.location='{% url 'courses:matrix_detail' matrix.pk %}'">{{ matrix.nome|default:"—" }}</td>
-            <td class="px-5 py-3 text-center font-semibold text-slate-600">{{ matrix.qtd_componentes|default:0 }}</td>
-            <td class="px-5 py-3 text-center font-semibold text-slate-600">{{ matrix.ch_total|default:0 }}h</td>
-            <td class="px-5 py-3 text-center">
+            <td class="px-5 py-3 text-center font-semibold text-slate-600" data-label="Componentes">{{ matrix.qtd_componentes|default:0 }}</td>
+            <td class="px-5 py-3 text-center font-semibold text-slate-600" data-label="CH Total">{{ matrix.ch_total|default:0 }}h</td>
+            <td class="px-5 py-3 text-center" data-label="Status">
               {% if matrix.is_rascunho %}
               <span class="px-2.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-bold">Rascunho</span>
               {% elif matrix.is_vigente %}
@@ -125,6 +125,7 @@
               {% endif %}
             </td>
             <td class="px-5 py-3 text-center">
+              <div class="inline-flex items-center justify-center gap-2 flex-wrap">
               {% if matrix.is_rascunho %}
               <a href="{% url 'courses:matrix_update' matrix.pk %}"
                 class="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-xs font-bold transition-colors border border-amber-200">
@@ -134,7 +135,29 @@
               <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-50 text-slate-300 rounded-lg text-[10px] font-bold border border-slate-100" title="Apenas rascunhos podem ser editados">
                 <i class="ph ph-lock-simple"></i> Bloqueado
               </span>
+              {% if is_desup %}
+                {% if matrix.is_vigente %}
+                <form method="post" action="{% url 'courses:matrix_archive' matrix.pk %}"
+                  onsubmit="return confirm('Arquivar esta matriz? Ela sairá de Vigentes e irá para o Histórico.');" class="inline">
+                  {% csrf_token %}
+                  <button type="submit"
+                    class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg text-xs font-bold transition-colors border border-slate-200">
+                    <i class="ph ph-archive"></i> Arquivar
+                  </button>
+                </form>
+                {% else %}
+                <form method="post" action="{% url 'courses:matrix_reactivate' matrix.pk %}"
+                  onsubmit="return confirm('Reativar esta matriz? Ela voltará para Vigentes.');" class="inline">
+                  {% csrf_token %}
+                  <button type="submit"
+                    class="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-xs font-bold transition-colors border border-emerald-200">
+                    <i class="ph ph-arrow-counter-clockwise"></i> Reativar
+                  </button>
+                </form>
+                {% endif %}
               {% endif %}
+              {% endif %}
+              </div>
             </td>
           </tr>
           {% empty %}

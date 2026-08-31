@@ -27,6 +27,7 @@ urlpatterns = [
     path("pendencias/lote/enviar/", views.EnviarParaDesupLoteView.as_view(), name="enviar_desup_lote"),
     path("pendencias/<int:pk>/avisar/", views.AvisarUnidadeView.as_view(), name="avisar_unidade"),
     path("pendencias/<int:pk>/status/", views.PendenciaStatusUpdateView.as_view(), name="atualizar_status"),
+    path("pendencias/<int:pk>/reabrir/", views.PendenciaReabrirView.as_view(), name="reabrir_pendencia"),
     path("pendencias/lote/sei/editar/", views.PendenciaSEIUpdateLoteView.as_view(), name="editar_sei_lote"),
     path("pendencias/<int:pk>/enviar/", views.EnviarParaDesupView.as_view(), name="enviar_desup"),
     path("pendencias/<int:pk>/sei/editar/", views.PendenciaSEIUpdateView.as_view(), name="editar_sei"),

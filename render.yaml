@@ -2,7 +2,7 @@ services:
   - type: web
     name: allocgest-api
     runtime: python
-    runtimeVersion: "3.11"
+    runtimeVersion: "3.12"
     plan: free
 
     buildCommand: |
@@ -17,19 +17,17 @@ services:
       - key: DJANGO_SETTINGS_MODULE
         value: config.settings.production
       - key: PYTHON_VERSION
-        value: "3.11"
+        value: "3.12"
       - key: DATABASE_URL
-        sync: false   # preencher no dashboard com a URL do POOLER do Supabase
+        sync: false
       - key: SECRET_KEY
         sync: false
       - key: ALLOWED_HOSTS
         sync: false
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_KEY
-        sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
+      - key: DB_ENGINE
+        value: django.db.backends.mysql
+      - key: DB_PORT
+        value: "3306"
       - key: DEBUG
         value: "False"
       - key: DISABLE_COLLECTSTATIC

@@ -46,6 +46,13 @@ h1, h2, h3, h4, h5, h6, .font-black {
     .sidebar-desktop .sidebar-label {
         display: block !important;
     }
+    /* CORR-010: no rail recolhido (desktop) o ícone é centralizado via
+       `justify-center group-hover:justify-start`. Na gaveta mobile não há hover,
+       então o alinhamento volta a ser à esquerda — mesmo padrão do .sidebar-label
+       acima, que também é forçado aqui. */
+    .sidebar-desktop .sidebar-link {
+        justify-content: flex-start !important;
+    }
     .sidebar-desktop .sidebar-close-btn {
         display: block !important;
     }
@@ -63,6 +70,83 @@ h1, h2, h3, h4, h5, h6, .font-black {
 }
 .sidebar-backdrop.active {
     display: block;
+}
+
+/* ─── Responsividade global do conteudo ────────────────────────────────
+   O <main> e um flex-child; sem min-width:0 ele nao encolhe abaixo da
+   largura do conteudo, e uma tabela/elemento largo empurra a pagina toda
+   para o lado (scroll horizontal do body). Com min-width:0 ele encolhe e
+   os wrappers .overflow-x-auto internos passam a rolar sozinhos.        */
+.main-content {
+    min-width: 0;
+    max-width: 100%;
+}
+.main-content img {
+    max-width: 100%;
+    height: auto;
+}
+
+/* ─── Tabela → Cards no mobile (classe .stack-table) ───────────────────
+   Aplique class="... stack-table" no <table> e data-label="Titulo" em
+   cada <td> que deva exibir rotulo no celular. Em telas < 768px cada
+   linha vira um cartao (label: valor). Celulas SEM data-label (nome/
+   identidade, acoes, linha de "vazio") ocupam a largura inteira.        */
+@media (max-width: 767px) {
+    table.stack-table {
+        display: block;
+        width: 100%;
+        min-width: 0 !important;
+    }
+    table.stack-table thead {
+        display: none;
+    }
+    table.stack-table tbody {
+        display: block;
+        width: 100%;
+    }
+    table.stack-table tr {
+        display: block;
+        margin: 0 0 0.75rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        padding: 0.5rem 0.85rem;
+        background: #fff;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, .06);
+    }
+    table.stack-table tr:last-child {
+        margin-bottom: 0;
+    }
+    table.stack-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        text-align: right;
+        padding: 0.4rem 0;
+        border: none !important;
+        width: auto !important;
+        min-width: 0 !important;
+        white-space: normal;
+    }
+    table.stack-table td::before {
+        content: attr(data-label);
+        font-weight: 700;
+        color: var(--azul-escuro);
+        text-transform: uppercase;
+        font-size: 0.62rem;
+        letter-spacing: .03em;
+        text-align: left;
+        flex: 0 0 auto;
+        padding-right: .5rem;
+    }
+    /* Celulas sem rotulo (identidade/acoes/colspan) ocupam a largura toda */
+    table.stack-table td:not([data-label]) {
+        display: block;
+        text-align: left;
+    }
+    table.stack-table td:not([data-label])::before {
+        content: none;
+    }
 }
 
 /* Efeito de Tooltip (Unidades não conformes) */

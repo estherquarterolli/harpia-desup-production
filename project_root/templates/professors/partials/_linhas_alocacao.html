@@ -1,29 +1,31 @@
 {% for prof in professores %}
 <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-    <td class="p-3 border-r border-slate-200 text-slate-600">{{ prof.id_funcional }}</td>
+    <td class="p-3 border-r border-slate-200 text-slate-600" data-label="ID">{{ prof.id_funcional }}</td>
     <td class="p-3 border-r border-slate-200 font-medium text-[#025c9f]">{{ prof.nome }}</td>
-    <td class="p-3 border-r border-slate-200 text-center text-slate-600">{{ prof.tipo_contrato.regime_trabalho }}</td>
-    <td class="p-3 border-r border-slate-200 text-center text-slate-600">{{ prof.tipo_contrato.nome }}</td>
+    <td class="p-3 border-r border-slate-200 text-center text-slate-600" data-label="RT">{{ prof.tipo_contrato.regime_trabalho }}</td>
+    <td class="p-3 border-r border-slate-200 text-center text-slate-600" data-label="Tipo">{{ prof.tipo_contrato.nome }}</td>
 
     <!-- Esses dois campos virão da modelagem de matriz curricular depois -->
-    <td class="p-3 border-r border-slate-200 text-center text-slate-400">-</td>
-    <td class="p-3 border-r border-slate-200 text-center text-slate-400">-</td>
+    <td class="p-3 border-r border-slate-200 text-center text-slate-400" data-label="Curso_turno1">-</td>
+    <td class="p-3 border-r border-slate-200 text-center text-slate-400" data-label="Curso_turno2">-</td>
 
     <!-- Uso das propriedades matemáticas dinâmicas do models.py -->
-    <td class="p-3 border-r border-slate-200 text-center">{{ prof.ch_justificada }}h</td>
-    <td class="p-3 border-r border-slate-200 text-center font-bold text-[#025c9f]">{{ prof.ch_total }}h</td>
+    <td class="p-3 border-r border-slate-200 text-center" data-label="CH Justificada">{{ prof.ch_justificada }}h</td>
+    <td class="p-3 border-r border-slate-200 text-center font-bold text-[#025c9f]" data-label="Total">{{ prof.ch_total }}h</td>
 
     <!-- Lógica visual: Se sobrou hora, fica vermelhinho pra chamar atenção -->
     <td
-        class="p-3 border-r border-slate-200 text-center {% if prof.ch_nao_alocada > 0 %}text-red-500 font-medium{% endif %}">
+        class="p-3 border-r border-slate-200 text-center {% if prof.ch_nao_alocada > 0 %}text-red-500 font-medium{% endif %}"
+        data-label="Não alocado">
         {{ prof.ch_nao_alocada }}h
     </td>
 
     <!-- Lógica visual da Porcentagem -->
-    <td class="p-3 text-center font-bold 
+    <td class="p-3 text-center font-bold
             {% if prof.percentual_alocado == 100.0 %}text-green-600
             {% elif prof.percentual_alocado >= 70.0 %}text-blue-600
-            {% else %}text-orange-500{% endif %}">
+            {% else %}text-orange-500{% endif %}"
+        data-label="% Alocado">
         {{ prof.percentual_alocado }}%
     </td>
 </tr>

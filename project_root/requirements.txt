@@ -1,7 +1,6 @@
 asgiref==3.11.1
 Django==6.0.3
 celery>=5.4,<6
-psycopg2-binary
 python-decouple==3.8
 redis>=5,<6
 sqlparse==0.5.5
@@ -12,3 +11,4 @@ gunicorn==21.2.0
 dj-database-url==2.1.0
 supabase==2.1.0
 django-cors-headers>=4.0.0
+PyMySQL==1.1.1

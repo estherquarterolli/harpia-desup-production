@@ -7,11 +7,10 @@ Perfis e permissões:
   DESUP               → vê todas as unidades; edita apenas parecer e motivo via
                         ParecerUpdateView (HTMX inline).
 """
-from decimal import Decimal, InvalidOperation
-
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy, reverse
@@ -23,18 +22,22 @@ from apps.accounts.mixins import PerfilRequiredMixin
 from apps.core.models import Unidade
 from apps.core.services import build_window_lock_context, create_window_ticket, enforce_window_or_redirect, record_window_attempt
 from apps.extra_curricular.forms import (
+    AtividadeExtensionistaForm,
     AtividadeExtensionistaFormSet,
+    OrientacaoTCCForm,
     OrientacaoTCCFormSet,
     ParecerExtensaoForm,
     ParecerReducaoForm,
     ParecerTCCForm,
     PendenciaExtraForm,
+    ReducaoCargaHorariaForm,
     ReducaoCargaHorariaFormSet,
 )
 from apps.extra_curricular.services import sincronizar_status_pendencia
 from apps.extra_curricular.models import (
     AtividadeExtensionista,
     OrientacaoTCC,
+    ParecerChoices,
     PendenciaExtra,
     ReducaoCargaHoraria,
 )
@@ -45,10 +48,10 @@ from apps.extra_curricular.services import get_pendencias_data
 # Helper: obtém semestre da request ou padrão
 # ══════════════════════════════════════════════════════════════════════════════
 def _semestre_atual():
-    from django.utils import timezone
-    hoje = timezone.now()
-    s = "1" if hoje.month <= 6 else "2"
-    return f"{hoje.year}.{s}"
+    # Fonte única de verdade em apps.extra_curricular.utils.semestre_atual
+    # (reusada também pelo cálculo de CH justificada do professor).
+    from apps.extra_curricular.utils import semestre_atual
+    return semestre_atual()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -83,7 +86,9 @@ class PendenciaListView(LoginRequiredMixin, PerfilRequiredMixin, View):
             unidade = Unidade.objects.filter(pk=unidade_id).first() if unidade_id else None
 
         q = request.GET.get("q", "").strip()
-        status_filtro = request.GET.get("status", "").strip().lower()
+        # CORR-015: normaliza para o token canônico. O `replace(" ", "_")` mantém
+        # compatível qualquer URL antiga com `?status=Sem registro`.
+        status_filtro = request.GET.get("status", "").strip().lower().replace(" ", "_")
 
         # Dados de pendência
         unidade_id_to_filter = unidade.id if unidade else None
@@ -92,22 +97,14 @@ class PendenciaListView(LoginRequiredMixin, PerfilRequiredMixin, View):
 
         raw_data = get_pendencias_data(unidade_id_to_filter, semestre, q)
 
-        # Filtro de Status
+        # Filtro de Status — CORR-015: compara com o token canônico calculado em
+        # services.status_token(), o MESMO consumido pelos <option value> e pelo
+        # data-status das linhas (filtro instantâneo em JS). Antes cada camada usava
+        # um vocabulário próprio e "Sem registro" nunca casava com 'sem_registro'.
         if status_filtro:
-            filtered_data = []
-            for item in raw_data:
-                status_item = item.get("status_item")
-                pendencia = item.get("pendencia")
-                
-                if status_filtro == 'rascunho' and pendencia and status_item == 'RASCUNHO':
-                    filtered_data.append(item)
-                elif status_filtro == 'sem_registro' and not pendencia:
-                    filtered_data.append(item)
-                elif status_filtro == 'pendente' and pendencia and (status_item == 'ENVIADO' or status_item == 'PENDENTE'):
-                    filtered_data.append(item)
-                elif status_filtro == 'finalizado' and pendencia and status_item == 'APROVADO':
-                    filtered_data.append(item)
-            pendencias_data = filtered_data
+            pendencias_data = [
+                item for item in raw_data if item.get("status_token") == status_filtro
+            ]
         else:
             pendencias_data = raw_data
 
@@ -317,9 +314,18 @@ class PendenciaDetailView(LoginRequiredMixin, PerfilRequiredMixin, DetailView):
             "tcc_items": tcc_items,
             "ext_items": ext_items,
             "red_items": red_items,
-            "tcc_form": OrientacaoTCCFormSet(instance=object_, prefix="tcc"),
-            "ext_form": AtividadeExtensionistaFormSet(instance=object_, prefix="ext"),
-            "red_form": ReducaoCargaHorariaFormSet(instance=object_, prefix="red"),
+            "tcc_form": OrientacaoTCCFormSet(
+                instance=object_, prefix="tcc",
+                queryset=OrientacaoTCC.objects.filter(pendencia=object_, bloqueado=False),
+            ),
+            "ext_form": AtividadeExtensionistaFormSet(
+                instance=object_, prefix="ext",
+                queryset=AtividadeExtensionista.objects.filter(pendencia=object_, bloqueado=False),
+            ),
+            "red_form": ReducaoCargaHorariaFormSet(
+                instance=object_, prefix="red",
+                queryset=ReducaoCargaHoraria.objects.filter(pendencia=object_, bloqueado=False),
+            ),
             "parecer_tcc_forms": [
                 (item, ParecerTCCForm(instance=item, prefix=f"ptcc-{item.pk}"))
                 for item in tcc_items
@@ -385,8 +391,11 @@ class _BaseItemSaveView(LoginRequiredMixin, PerfilRequiredMixin, View):
                 messages.error(request, "Prazo de 5 dias excedido. O preenchimento do número SEI no cabeçalho é OBRIGATÓRIO para prosseguir com novas justificativas.")
                 return redirect(reverse_lazy("extra_curricular:pendencia_detail", kwargs={"pk": pk}))
 
+        # Itens já enviados em definitivo (bloqueado=True) ficam fora do formset:
+        # não podem ser editados nem marcados para exclusão pela unidade.
         formset = self.formset_class(
-            request.POST, instance=pendencia, prefix=self.prefix
+            request.POST, instance=pendencia, prefix=self.prefix,
+            queryset=self.formset_class.model.objects.filter(pendencia=pendencia, bloqueado=False),
         )
         if formset.is_valid():
             formset.save()
@@ -455,84 +464,92 @@ class _BaseLoteItemSaveView(LoginRequiredMixin, PerfilRequiredMixin, View):
         return redirect(f"{reverse_lazy('extra_curricular:pendencia_lote')}?ids={ids_str}")
 
 
-class SalvarTCCLoteView(LoginRequiredMixin, PerfilRequiredMixin, View):
+def _erros_legiveis(form):
+    """Achata os erros de um form numa única mensagem para exibir como toast."""
+    mensagens = [erro for erros in form.errors.values() for erro in erros]
+    return " ".join(mensagens) if mensagens else "Dados inválidos."
+
+
+class _BaseItemLoteCreateView(LoginRequiredMixin, PerfilRequiredMixin, View):
+    """
+    Base das rotas de inclusão da mesa de trabalho (um item por POST).
+
+    Estas views gravavam o POST cru (`int(...)` / `Decimal(...)` direto no valor
+    do request), sem form: entrada não numérica virava HTTP 500 e valores fora da
+    regra (9 orientandos, horas negativas, nº de estudantes que estoura o
+    `max_digits` do campo) eram persistidos, porque nem o `MaxValueValidator` do
+    model nem o `clean` do form rodam em `objects.create()`. Agora o caminho do
+    lote usa exatamente o mesmo `ModelForm` do caminho do detalhe.
+    """
     allowed_profiles = ["COORDENADOR_UNIDADE"]
+    form_class   = None
+    acordeao     = ""   # âncora do accordion a reabrir no redirect
+    msg_sucesso  = "Justificativa adicionada com sucesso."
+
+    def _dados_do_form(self, request):
+        """Ponto de extensão para normalizar o POST antes de validar."""
+        return request.POST
 
     def post(self, request):
         ids_str = request.POST.get("ids", "")
+        destino = (
+            f"{reverse_lazy('extra_curricular:pendencia_lote')}?ids={ids_str}&open={self.acordeao}"
+        )
         pendencia_id = request.POST.get("pendencia_id")
-        num_orientandos = request.POST.get("num_orientandos")
-        
-        if pendencia_id and num_orientandos:
-            pendencia = get_object_or_404(PendenciaExtra, pk=pendencia_id, unidade=request.user.unidade)
-            blocked = enforce_window_or_redirect(
-                request,
-                area_label='Justificativas',
-                action_label='alterar justificativas extracurriculares',
-                target_label=str(pendencia.professor.nome),
-                unidade=pendencia.unidade,
-                fallback_url=reverse_lazy('extra_curricular:pendencia_lote'),
-            )
-            if blocked:
-                return blocked
-            OrientacaoTCC.objects.create(pendencia=pendencia, num_orientandos=int(num_orientandos))
-            messages.success(request, "Orientação de TCC adicionada com sucesso.")
-        return redirect(f"{reverse_lazy('extra_curricular:pendencia_lote')}?ids={ids_str}&open=tcc")
+        if not pendencia_id:
+            return redirect(destino)
+
+        pendencia = get_object_or_404(
+            PendenciaExtra, pk=pendencia_id, unidade=request.user.unidade
+        )
+        blocked = enforce_window_or_redirect(
+            request,
+            area_label='Justificativas',
+            action_label='alterar justificativas extracurriculares',
+            target_label=str(pendencia.professor.nome),
+            unidade=pendencia.unidade,
+            fallback_url=reverse_lazy('extra_curricular:pendencia_lote'),
+        )
+        if blocked:
+            return blocked
+
+        form = self.form_class(self._dados_do_form(request))
+        if not form.is_valid():
+            messages.error(request, _erros_legiveis(form))
+            return redirect(destino)
+
+        item = form.save(commit=False)
+        item.pendencia = pendencia
+        item.save()
+        messages.success(request, self.msg_sucesso)
+        return redirect(destino)
 
 
-class SalvarExtensaoLoteView(LoginRequiredMixin, PerfilRequiredMixin, View):
-    allowed_profiles = ["COORDENADOR_UNIDADE"]
-
-    def post(self, request):
-        ids_str = request.POST.get("ids", "")
-        pendencia_id = request.POST.get("pendencia_id")
-        num_estudantes = request.POST.get("num_estudantes")
-        
-        if pendencia_id and num_estudantes:
-            pendencia = get_object_or_404(PendenciaExtra, pk=pendencia_id, unidade=request.user.unidade)
-            blocked = enforce_window_or_redirect(
-                request,
-                area_label='Justificativas',
-                action_label='alterar justificativas extracurriculares',
-                target_label=str(pendencia.professor.nome),
-                unidade=pendencia.unidade,
-                fallback_url=reverse_lazy('extra_curricular:pendencia_lote'),
-            )
-            if blocked:
-                return blocked
-            AtividadeExtensionista.objects.create(pendencia=pendencia, num_estudantes=int(num_estudantes))
-            messages.success(request, "Atividade extensionista adicionada com sucesso.")
-        return redirect(f"{reverse_lazy('extra_curricular:pendencia_lote')}?ids={ids_str}&open=ext")
+class SalvarTCCLoteView(_BaseItemLoteCreateView):
+    form_class  = OrientacaoTCCForm
+    acordeao    = "tcc"
+    msg_sucesso = "Orientação de TCC adicionada com sucesso."
 
 
-class SalvarReducaoLoteView(LoginRequiredMixin, PerfilRequiredMixin, View):
-    allowed_profiles = ["COORDENADOR_UNIDADE"]
+class SalvarExtensaoLoteView(_BaseItemLoteCreateView):
+    form_class  = AtividadeExtensionistaForm
+    acordeao    = "ext"
+    msg_sucesso = "Atividade extensionista adicionada com sucesso."
 
-    def post(self, request):
-        ids_str = request.POST.get("ids", "")
-        pendencia_id = request.POST.get("pendencia_id")
-        motivo_reducao = request.POST.get("motivo_reducao")
-        horas_reduzidas = request.POST.get("horas_reduzidas")
-        
-        if pendencia_id and motivo_reducao and horas_reduzidas:
-            pendencia = get_object_or_404(PendenciaExtra, pk=pendencia_id, unidade=request.user.unidade)
-            blocked = enforce_window_or_redirect(
-                request,
-                area_label='Justificativas',
-                action_label='alterar justificativas extracurriculares',
-                target_label=str(pendencia.professor.nome),
-                unidade=pendencia.unidade,
-                fallback_url=reverse_lazy('extra_curricular:pendencia_lote'),
-            )
-            if blocked:
-                return blocked
-            ReducaoCargaHoraria.objects.create(
-                pendencia=pendencia, 
-                motivo_reducao=motivo_reducao,
-                horas_reduzidas=Decimal(horas_reduzidas.replace(',', '.'))
-            )
-            messages.success(request, "Redução de carga horária adicionada com sucesso.")
-        return redirect(f"{reverse_lazy('extra_curricular:pendencia_lote')}?ids={ids_str}&open=red")
+
+class SalvarReducaoLoteView(_BaseItemLoteCreateView):
+    form_class  = ReducaoCargaHorariaForm
+    acordeao    = "red"
+    msg_sucesso = "Redução de carga horária adicionada com sucesso."
+
+    def _dados_do_form(self, request):
+        # A tela envia a vírgula decimal do pt-BR ("2,5"); o DecimalField do form
+        # só entende ponto. Normaliza antes de validar para não recusar um valor
+        # que o usuário digitou certo.
+        dados = request.POST.copy()
+        horas = dados.get("horas_reduzidas") or ""
+        dados["horas_reduzidas"] = horas.replace(",", ".")
+        return dados
 
 
 class DeletarItemLoteView(LoginRequiredMixin, PerfilRequiredMixin, View):
@@ -565,6 +582,10 @@ class DeletarItemLoteView(LoginRequiredMixin, PerfilRequiredMixin, View):
         )
         if blocked:
             return blocked
+        if item.bloqueado:
+            messages.error(request, "Esta justificativa já foi enviada em definitivo à DESUP e não pode ser excluída.")
+            ids_str = request.POST.get("ids", "")
+            return redirect(f"{reverse_lazy('extra_curricular:pendencia_lote')}?ids={ids_str}")
         item.delete()
         sincronizar_status_pendencia(pendencia)
         messages.success(request, "Item removido.")
@@ -601,6 +622,8 @@ class EnviarParaDesupLoteView(LoginRequiredMixin, PerfilRequiredMixin, View):
             if pendencia.sei_numero:
                 pendencia.status = PendenciaExtra.StatusChoices.ENVIADO
                 pendencia.save()
+                # Envio definitivo: trava os itens já enviados.
+                pendencia.bloquear_itens_enviados()
                 enviadas += 1
                 nomes_professores.append(pendencia.professor.nome)
         if enviadas:
@@ -650,6 +673,22 @@ class PendenciaSEIUpdateLoteView(LoginRequiredMixin, PerfilRequiredMixin, View):
         )
         if blocked:
             return blocked
+
+        # `QuerySet.update()` vai direto ao banco e NÃO roda os validators do
+        # model: o RegexValidator de `PendenciaExtra.sei_numero` era ignorado
+        # aqui, enquanto o caminho individual (`editar_sei`) recusava o mesmo
+        # valor. E um SEI inválido é justamente o que destrava o
+        # `enviar_desup_lote`, que só checa se o campo está preenchido.
+        # `run_validators` ignora valor vazio — limpar o SEI continua permitido.
+        campo_sei = PendenciaExtra._meta.get_field("sei_numero")
+        try:
+            campo_sei.run_validators(sei_numero)
+        except ValidationError as exc:
+            messages.error(request, " ".join(exc.messages))
+            return redirect(
+                f"{reverse_lazy('extra_curricular:pendencia_lote')}?ids={ids_str}&sei_error=1"
+            )
+
         updated = qs.update(sei_numero=sei_numero)
         messages.success(request, f"SEI atualizado em {updated} pendência(s).")
         return redirect(f"{reverse_lazy('extra_curricular:pendencia_lote')}?ids={ids_str}")
@@ -659,7 +698,15 @@ class PendenciaSEIUpdateLoteView(LoginRequiredMixin, PerfilRequiredMixin, View):
 # ParecerUpdateViews — exclusivo DESUP (atualiza parecer inline via POST)
 # ══════════════════════════════════════════════════════════════════════════════
 def _ch_aprovada_outros(pendencia, model_atual, item_pk):
-    """Soma a CH já aprovada nos demais itens da pendência (exclui o item sendo salvo)."""
+    """Soma a CH já APROVADA nos demais itens da pendência (exclui o item sendo salvo).
+
+    Só entram itens com `parecer_desup=APROVADO`, os mesmos que
+    `PendenciaExtra.ch_total_justificada` contabiliza. Um item INDEFERIDO (ou
+    ainda PENDENTE) não concede hora nenhuma, mas continua com `horas_aprovadas`
+    preenchido — o `save()` dos models copia o valor solicitado. Somando todo
+    mundo, um item indeferido seguia ocupando o limite do docente e impedia a
+    DESUP de deferir os itens seguintes.
+    """
     total = 0.0
     grupos = (
         (OrientacaoTCC, pendencia.orientacoes_tcc),
@@ -667,7 +714,7 @@ def _ch_aprovada_outros(pendencia, model_atual, item_pk):
         (ReducaoCargaHoraria, pendencia.reducoes_ch),
     )
     for model, related in grupos:
-        qs = related.all()
+        qs = related.filter(parecer_desup=ParecerChoices.APROVADO)
         if model == model_atual:
             qs = qs.exclude(pk=item_pk)
         total += sum(float(item.ch_aprovada) for item in qs)
@@ -690,15 +737,21 @@ class _BaseParecerView(LoginRequiredMixin, PerfilRequiredMixin, View):
         )
         if form.is_valid():
             instance = form.save(commit=False)
-            limite = pendencia.professor.limite_horas_extra_efetivo
-            outros = _ch_aprovada_outros(pendencia, self.model_class, item.pk)
-            if (outros + float(instance.ch_aprovada)) > limite:
-                messages.error(
-                    request,
-                    f"Limite de horas extras excedido. O docente {pendencia.professor.nome} possui "
-                    f"{limite}h disponíveis e as demais justificativas já somam {outros}h."
-                )
-                return redirect(reverse_lazy("extra_curricular:pendencia_detail", kwargs={"pk": pk}))
+            # A trava de limite só vale quando a DESUP está CONCEDENDO horas.
+            # Rodando antes de olhar o parecer, ela barrava até o INDEFERIMENTO
+            # (que não concede nada) e deixava a pendência em deadlock: acima do
+            # limite não dava para aprovar nem para indeferir o item excessivo —
+            # justamente a ação correta nesse caso.
+            if instance.parecer_desup == ParecerChoices.APROVADO:
+                limite = pendencia.professor.limite_horas_extra_efetivo
+                outros = _ch_aprovada_outros(pendencia, self.model_class, item.pk)
+                if (outros + float(instance.ch_aprovada)) > limite:
+                    messages.error(
+                        request,
+                        f"Limite de horas extras excedido. O docente {pendencia.professor.nome} possui "
+                        f"{limite}h disponíveis e as demais justificativas já somam {outros}h."
+                    )
+                    return redirect(reverse_lazy("extra_curricular:pendencia_detail", kwargs={"pk": pk}))
             instance.save()
             sincronizar_status_pendencia(pendencia)
             messages.success(request, "Parecer atualizado.")
@@ -726,74 +779,60 @@ class ParecerReducaoUpdateView(_BaseParecerView):
 
 
 class PendenciaStatusUpdateView(LoginRequiredMixin, PerfilRequiredMixin, View):
+    """
+    Ação de "Finalizar" (consolidação) da DESUP, exclusiva do perfil DESUP.
+
+    A decisão por item é feita nos endpoints ``parecer_*`` (Autorizar/Indeferir).
+    Esta view apenas registra o motivo geral (se enviado) e deriva o status
+    agregado da pendência a partir dos pareceres já gravados nos itens
+    (via ``sincronizar_status_pendencia``). NÃO sobrescreve pareceres nem
+    recalcula horas.
+    """
     allowed_profiles = ["DESUP"]
-
-    status_permitidos = {
-        PendenciaExtra.StatusChoices.ENVIADO,
-        PendenciaExtra.StatusChoices.APROVADO,
-    }
-
-    _item_models = {
-        "tcc": OrientacaoTCC,
-        "ext": AtividadeExtensionista,
-        "red": ReducaoCargaHoraria,
-    }
 
     def post(self, request, pk):
         pendencia = get_object_or_404(PendenciaExtra, pk=pk)
-        status = request.POST.get("status")
+
         motivo = request.POST.get("motivo_status_desup", "").strip()
-        item_tipo = request.POST.get("item_tipo", "").strip()
-        item_pk = request.POST.get("item_pk", "").strip()
-        horas_raw = request.POST.get("item_horas_aprovadas", "").strip()
+        if motivo != pendencia.motivo_status_desup:
+            pendencia.motivo_status_desup = motivo
+            pendencia.save(update_fields=["motivo_status_desup", "data_atualizacao"])
 
-        if status not in self.status_permitidos:
-            messages.error(request, "Status invalido para decisao da DESUP.")
-            return redirect(request.META.get("HTTP_REFERER", reverse_lazy("extra_curricular:pendencia_list")))
+        sincronizar_status_pendencia(pendencia)
 
-        # Horas aprovadas para o item específico desta linha (não o total do professor)
-        item = None
-        if item_tipo and item_pk:
-            model = self._item_models.get(item_tipo)
-            if model:
-                item = get_object_or_404(model, pk=item_pk, pendencia=pendencia)
+        messages.success(request, "Decisão consolidada com sucesso.")
+        return redirect(reverse_lazy("extra_curricular:pendencia_detail", kwargs={"pk": pendencia.pk}))
 
-        horas_aprovadas_item = None
-        if horas_raw:
-            try:
-                horas_aprovadas_item = Decimal(horas_raw.replace(",", "."))
-                if horas_aprovadas_item < 0:
-                    raise InvalidOperation
-            except InvalidOperation:
-                messages.error(request, "Valor inválido para horas aprovadas.")
-                return redirect(request.META.get("HTTP_REFERER", reverse_lazy("extra_curricular:pendencia_list")))
 
-        if item is not None and horas_aprovadas_item is not None:
-            outros = _ch_aprovada_outros(pendencia, type(item), item.pk)
-            limite = pendencia.professor.limite_horas_extra_efetivo
-            if (outros + float(horas_aprovadas_item)) > limite:
-                messages.error(
-                    request,
-                    f"Limite de horas extras excedido. O docente {pendencia.professor.nome} possui "
-                    f"{limite}h disponíveis e as demais justificativas já somam {outros}h."
-                )
-                return redirect(request.META.get("HTTP_REFERER", reverse_lazy("extra_curricular:pendencia_list")))
-            item.horas_aprovadas = horas_aprovadas_item
-            item.save(update_fields=["horas_aprovadas"])
+class PendenciaReabrirView(LoginRequiredMixin, PerfilRequiredMixin, View):
+    """
+    Reabre uma pendência já finalizada (APROVADO), exclusiva do perfil DESUP.
 
-        pendencia.status = status
-        pendencia.motivo_status_desup = motivo
-        pendencia.save(update_fields=["status", "motivo_status_desup", "data_atualizacao"])
+    Reverte o parecer de todos os itens para PENDENTE (mantendo as horas já
+    aprovadas como ponto de partida) e deriva o status agregado novamente via
+    ``sincronizar_status_pendencia``, permitindo à DESUP ajustar os pareceres
+    e as horas aprovadas antes de finalizar de novo.
+    """
+    allowed_profiles = ["DESUP"]
 
-        parecer = {
-            PendenciaExtra.StatusChoices.ENVIADO: "PENDENTE",
-            PendenciaExtra.StatusChoices.APROVADO: "APROVADO",
-        }[status]
-        for related in (pendencia.orientacoes_tcc, pendencia.atividades_extensao, pendencia.reducoes_ch):
-            related.update(parecer_desup=parecer, motivo_parecer=motivo)
+    def post(self, request, pk):
+        pendencia = get_object_or_404(PendenciaExtra, pk=pk)
 
-        messages.success(request, "Status extracurricular atualizado.")
-        return redirect(request.META.get("HTTP_REFERER", reverse_lazy("extra_curricular:pendencia_list")))
+        # CORR-023: PARCIAL também é análise concluída e, portanto, reabrível.
+        if pendencia.status not in PendenciaExtra.STATUS_FINALIZADOS:
+            messages.error(request, "Só é possível reabrir uma pendência já finalizada.")
+            return redirect(reverse_lazy("extra_curricular:pendencia_detail", kwargs={"pk": pendencia.pk}))
+
+        # Reverte o parecer de todos os itens para PENDENTE (mantendo as horas já
+        # aprovadas como ponto de partida) e re-deriva o status agregado. Enquanto o
+        # status não voltar a APROVADO, a CH aprovada anteriormente deixa de contar.
+        with transaction.atomic():
+            for related in (pendencia.orientacoes_tcc, pendencia.atividades_extensao, pendencia.reducoes_ch):
+                related.update(parecer_desup=ParecerChoices.PENDENTE)
+            sincronizar_status_pendencia(pendencia)
+
+        messages.success(request, "Pendência reaberta. Ajuste os pareceres e as horas aprovadas e finalize novamente.")
+        return redirect(reverse_lazy("extra_curricular:pendencia_detail", kwargs={"pk": pendencia.pk}))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -837,12 +876,31 @@ class DeletarItemView(LoginRequiredMixin, PerfilRequiredMixin, View):
         if user.perfil == "COORDENADOR_UNIDADE" and pendencia.unidade != user.unidade:
             raise PermissionDenied
 
+        # Esta era a única rota de escrita do app sem a trava de janela — a gêmea
+        # de lote (`DeletarItemLoteView`) já a aplicava. Sem ela, a unidade
+        # apagava justificativa fora do prazo sem que a DESUP fosse notificada da
+        # tentativa (o modal do front também não aparecia: os botões da lixeira
+        # chamavam `form.submit()`, que não dispara o evento `submit`).
+        blocked = enforce_window_or_redirect(
+            request,
+            area_label='Justificativas',
+            action_label='excluir justificativa extracurricular',
+            target_label=str(pendencia.professor.nome),
+            unidade=pendencia.unidade,
+            fallback_url=reverse_lazy("extra_curricular:pendencia_detail", kwargs={"pk": pk}),
+        )
+        if blocked:
+            return blocked
+
         model = self._map.get(tipo)
         if not model:
             messages.error(request, "Tipo inválido.")
             return redirect(reverse_lazy("extra_curricular:pendencia_detail", kwargs={"pk": pk}))
 
         item = get_object_or_404(model, pk=item_pk, pendencia=pendencia)
+        if item.bloqueado:
+            messages.error(request, "Esta justificativa já foi enviada em definitivo à DESUP e não pode ser excluída.")
+            return redirect(reverse_lazy("extra_curricular:pendencia_detail", kwargs={"pk": pk}))
         item.delete()
         sincronizar_status_pendencia(pendencia)
         messages.success(request, "Item removido.")
@@ -879,6 +937,8 @@ class EnviarParaDesupView(LoginRequiredMixin, PerfilRequiredMixin, View):
 
         pendencia.status = PendenciaExtra.StatusChoices.ENVIADO
         pendencia.save()
+        # Envio definitivo: trava os itens já enviados (unidade não edita/exclui mais).
+        pendencia.bloquear_itens_enviados()
         messages.success(request, "Justificativa enviada para análise da DESUP.")
         return redirect(reverse_lazy("extra_curricular:pendencia_detail", kwargs={"pk": pk}))
 

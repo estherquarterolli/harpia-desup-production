@@ -5,39 +5,56 @@
   <td class="hidden">{{ form_row.id }}</td>
 
   {# Período #}
-  <td class="p-2 align-top">
+  <td class="p-2 align-top" data-label="Período">
     {{ form_row.periodo }}
     {% if form_row.periodo.errors %}<div class="field-error">{{ form_row.periodo.errors.0 }}</div>{% endif %}
   </td>
 
   {# Código #}
-  <td class="p-2 align-top w-28">
+  <td class="p-2 align-top w-28" data-label="Cód">
     {{ form_row.codigo }}
     {% if form_row.codigo.errors %}<div class="field-error">{{ form_row.codigo.errors.0 }}</div>{% endif %}
   </td>
 
-  {# Disciplina (Nome) #}
-  <td class="p-2 align-top">
-    {{ form_row.disciplina_nome }}
-    {% if form_row.disciplina_nome.errors %}<div class="field-error">{{ form_row.disciplina_nome.errors.0 }}</div>{% endif %}
+  {# Disciplina — o campo do form é `componente_curricular` (FK). O nome solto
+     `disciplina_nome` não existe mais e o Django o renderizava como vazio em
+     silêncio: a linha nova voltava sem seletor e o POST caía em "campo obrigatório".
+     Mesmo par do matrix_form.html: hidden com o ID real + input de busca. #}
+  <td class="p-2 align-top relative" data-label="Disciplina">
+    <div class="hidden">{{ form_row.componente_curricular }}</div>
+    <input
+      type="text"
+      class="form-field cc-search-input"
+      placeholder="Pesquisar disciplina..."
+      autocomplete="off"
+      data-hidden-id="{{ form_row.componente_curricular.html_name }}"
+      value="{% if form_row.instance.pk and form_row.instance.componente_curricular %}{{ form_row.instance.componente_curricular.nome }}{% endif %}"
+    >
+    <div class="cc-dropdown hidden absolute z-20 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg mt-1 max-h-56 overflow-y-auto text-sm"></div>
+    {% if form_row.componente_curricular.errors %}<div class="field-error">{{ form_row.componente_curricular.errors.0 }}</div>{% endif %}
   </td>
 
   {# Crédito #}
-  <td class="p-2 align-top w-28">
+  <td class="p-2 align-top w-28" data-label="Crédito">
     {{ form_row.creditos }}
     {% if form_row.creditos.errors %}<div class="field-error">{{ form_row.creditos.errors.0 }}</div>{% endif %}
   </td>
 
   {# CH #}
-  <td class="p-2 align-top w-28">
+  <td class="p-2 align-top w-28" data-label="HA">
     {{ form_row.carga_horaria }}
     {% if form_row.carga_horaria.errors %}<div class="field-error">{{ form_row.carga_horaria.errors.0 }}</div>{% endif %}
   </td>
 
   {# HA (CH Semanal) #}
-  <td class="p-2 align-top w-32">
+  <td class="p-2 align-top w-32" data-label="HA/sem">
     {{ form_row.carga_horaria_semanal }}
     {% if form_row.carga_horaria_semanal.errors %}<div class="field-error">{{ form_row.carga_horaria_semanal.errors.0 }}</div>{% endif %}
+  </td>
+
+  {# HR (hora-relógio total) — AUTO, read-only, NÃO é input. Recalcula via JS ao digitar HA. #}
+  <td class="p-2 align-top w-28" data-label="HR">
+    <span class="js-hr-total inline-block px-2 py-1 font-semibold text-slate-600">{% if form_row.instance.pk %}{{ form_row.instance.hr_total|floatformat:2 }}{% else %}0.00{% endif %}</span>
   </td>
 
   {# Ações / Campos Ocultos #}

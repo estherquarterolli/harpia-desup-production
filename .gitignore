@@ -209,3 +209,7 @@ __marimo__/
 
 # dados de banco
 docs/sensivel/
+
+# Vercel
+.vercel
+.env*

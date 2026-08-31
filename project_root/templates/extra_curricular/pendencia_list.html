@@ -10,22 +10,21 @@
   .badge-enviado    { background:#dbeafe; color:#1e40af; }
   .badge-aprovado   { background:#dcfce7; color:#166534; }
   .badge-rascunho   { background:#f1f5f9; color:#475569; }
+  .badge-indeferido { background:#fee2e2; color:#991b1b; }
+  .badge-parcial    { background:#ffedd5; color:#9a3412; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="p-2 md:p-0">
 
-{% if window_fechada %}
-<div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 flex items-start gap-3">
-  <i class="ph ph-lock-key text-2xl text-amber-600 flex-shrink-0"></i>
-  <div>
-    <p class="font-black">Janela de entrega fechada</p>
-    <p class="text-xs mt-0.5">O período de registro de justificativas extracurriculares está encerrado para sua unidade.</p>
-  </div>
-</div>
-{% endif %}
-
+{% comment %}
+CORR-014: o aviso "Janela de entrega fechada" fica SÓ no base.html (o ramo de
+janela_fechada), que é o único com o botão "Solicitar abertura". O banner inline
+que existia aqui era o segundo pop-up duplicado para o perfil unidade —
+janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo público
+(COORDENADOR_UNIDADE; DESUP/superuser fazem bypass da janela).
+{% endcomment %}
 
   {# ── Barra de filtros ── #}
   <div class="flex flex-wrap items-end gap-3 mb-6">
@@ -85,7 +84,7 @@
 
     {% if not is_desup %}
     <a href="{% url 'extra_curricular:pendencia_create' %}"
-       class="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-black text-sm px-5 py-2.5 rounded-xl shadow-md transition-all hover:scale-105 active:scale-100">
+       class="flex items-center justify-center gap-2 w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white font-black text-sm px-5 py-2.5 rounded-xl shadow-md transition-all hover:scale-105 active:scale-100">
       <i class="ph ph-plus text-lg"></i>
       Nova Justificativa
     </a>
@@ -116,7 +115,7 @@
   {# Barra de filtros instantâneos #}
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6">
     <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center gap-4">
-      <div class="flex-1 min-w-[260px]">
+      <div class="w-full sm:flex-1 sm:min-w-[260px]">
         <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Pesquisar Docente</label>
         <div class="relative">
           <input type="text" id="search-docente" placeholder="Buscar por nome do docente..."
@@ -129,11 +128,16 @@
         <div class="relative">
           <select id="filter-status"
             class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-semibold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer pr-10 appearance-none">
+            {% comment %}
+            CORR-015: os values são os MESMOS tokens usados pelo filtro server-side
+            (views.PendenciaListView, ?status=...) e pelo data-status das linhas.
+            {% endcomment %}
             <option value="">Todos os Status</option>
-            <option value="Rascunho" {% if status_filtro == 'rascunho' %}selected{% endif %}>Rascunho</option>
-            <option value="Pendente" {% if status_filtro == 'pendente' %}selected{% endif %}>Pendente</option>
-            <option value="Finalizado" {% if status_filtro == 'finalizado' %}selected{% endif %}>Finalizado</option>
-            <option value="Sem registro" {% if status_filtro == 'sem_registro' %}selected{% endif %}>Sem registro</option>
+            <option value="rascunho" {% if status_filtro == 'rascunho' %}selected{% endif %}>Rascunho</option>
+            <option value="pendente" {% if status_filtro == 'pendente' %}selected{% endif %}>Pendente</option>
+            <option value="finalizado" {% if status_filtro == 'finalizado' %}selected{% endif %}>Finalizado</option>
+            <option value="indeferido" {% if status_filtro == 'indeferido' %}selected{% endif %}>Indeferido</option>
+            <option value="sem_registro" {% if status_filtro == 'sem_registro' %}selected{% endif %}>Sem registro</option>
           </select>
           <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
         </div>
@@ -143,11 +147,15 @@
         <div class="relative">
           <select id="filter-justificativa"
             class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-semibold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer pr-10 appearance-none">
+            {% comment %}
+            CORR-015: tokens sem acento, alinhados com o data-justificativa das linhas.
+            O antigo value="Sem registro" nunca casava (linha sem item tinha tipo vazio).
+            {% endcomment %}
             <option value="">Todos os Tipos</option>
-            <option value="TCC">Orientação de TCC</option>
-            <option value="Extensão">Atividade Extensionista</option>
-            <option value="Redução">Redução de CH</option>
-            <option value="Sem registro">Sem registro</option>
+            <option value="tcc">Orientação de TCC</option>
+            <option value="extensao">Atividade Extensionista</option>
+            <option value="reducao">Redução de CH</option>
+            <option value="sem_registro">Sem registro</option>
           </select>
           <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
         </div>
@@ -157,7 +165,7 @@
 
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
     <div class="overflow-x-auto">
-      <table class="w-full text-left min-w-[1000px]" id="pendencias-table">
+      <table class="w-full text-left min-w-[1000px] stack-table" id="pendencias-table">
         <thead>
           <tr class="bg-[#025c9f] text-white text-[10px] font-black uppercase tracking-widest border-b border-slate-200">
             <th class="px-5 py-4 rounded-tl-2xl">Docente</th>
@@ -175,8 +183,9 @@
           {% for item in pendencias_data %}
           <tr class="hover:bg-slate-50/70 transition-colors group {% if item.ch_faltante > 0 and not item.pendencia %}bg-red-50/30{% endif %} pendencia-row"
               data-docente="{{ item.professor.nome|lower }}"
-              data-status="{% if item.status_item == 'RASCUNHO' %}Rascunho{% elif item.status_item == 'ENVIADO' or item.status_item == 'PENDENTE' %}Pendente{% elif item.status_item == 'APROVADO' %}Finalizado{% else %}Sem registro{% endif %}"
-              data-justificativa="{{ item.justificativa_tipo }}">
+              {# CORR-015: tokens de services.status_token/justificativa_token. #}
+              data-status="{{ item.status_token }}"
+              data-justificativa="{{ item.justificativa_token }}">
 
             {# Docente #}
             <td class="px-5 py-4">
@@ -188,6 +197,10 @@
                     <i class="ph ph-paper-plane-right text-[#025c9f] text-base flex-shrink-0" title="Pendente"></i>
                   {% elif item.status_item == 'APROVADO' %}
                     <i class="ph ph-check-circle text-emerald-500 text-base flex-shrink-0" title="Finalizado"></i>
+                  {% elif item.status_item == 'PARCIAL' %}
+                    <i class="ph ph-check-square-offset text-orange-500 text-base flex-shrink-0" title="Finalizado parcialmente"></i>
+                  {% elif item.status_item == 'INDEFERIDO' %}
+                    <i class="ph ph-x-circle text-red-500 text-base flex-shrink-0" title="Indeferido"></i>
                   {% else %}
                     <i class="ph ph-circle-dashed text-slate-400 text-base flex-shrink-0" title="{{ item.status_item }}"></i>
                   {% endif %}
@@ -213,7 +226,7 @@
             </td>
 
             {# Processo SEI #}
-            <td class="px-5 py-4">
+            <td class="px-5 py-4" data-label="Processo SEI">
               {% if item.sei_numero %}
               <span class="text-xs font-bold text-[#025c9f] bg-slate-100 px-2 py-1 rounded">
                 {{ item.sei_numero }}
@@ -224,9 +237,9 @@
             </td>
 
             {# Justificativa #}
-            <td class="px-5 py-4">
-              <div class="text-xs font-semibold text-[#025c9f]">
-                {{ item.justificativa_detalhe }}
+            <td class="px-5 py-4" data-label="Justificativa">
+              <div class="text-xs font-semibold {% if item.justificativa_detalhe %}text-[#025c9f]{% else %}text-slate-400{% endif %}">
+                {{ item.justificativa_detalhe|default_if_none:"Nenhuma" }}
               </div>
               {% if item.justificativa_ch > 0 %}
               <div class="text-[9px] text-indigo-600 font-black uppercase mt-0.5">
@@ -236,19 +249,19 @@
             </td>
 
             {# Meta CH #}
-            <td class="px-5 py-4 text-center">
+            <td class="px-5 py-4 text-center" data-label="Meta CH">
               <span class="text-sm font-bold text-slate-700">{{ item.meta_horas }}h</span>
             </td>
 
             {# CH Alocada #}
-            <td class="px-5 py-4 text-center">
+            <td class="px-5 py-4 text-center" data-label="CH Alocada">
               <span class="text-sm font-bold {% if item.ch_alocada < item.meta_horas %}text-amber-600{% else %}text-emerald-600{% endif %}">
                 {{ item.ch_alocada }}h
               </span>
             </td>
 
             {# CH Pendente #}
-            <td class="px-5 py-4 text-center">
+            <td class="px-5 py-4 text-center" data-label="CH Pendente">
               <span class="inline-block px-2 py-0.5 rounded-full text-xs font-black
                 {% if item.ch_pendente > 0 %}bg-red-50 text-red-700{% else %}bg-emerald-50 text-emerald-700{% endif %}">
                 {{ item.ch_pendente }}h
@@ -256,12 +269,12 @@
             </td>
 
             {# CH Justificada #}
-            <td class="px-5 py-4 text-center">
+            <td class="px-5 py-4 text-center" data-label="CH Justificada">
               <span class="text-sm font-bold text-indigo-600">{{ item.ch_justificada }}h</span>
             </td>
 
             {# Não alocado (ch_faltante) #}
-            <td class="px-5 py-4 text-center">
+            <td class="px-5 py-4 text-center" data-label="Não alocado">
               <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-black
                 {% if item.ch_faltante > 0 %}bg-orange-50 text-orange-700{% else %}bg-emerald-50 text-emerald-700{% endif %}">
                 {% if item.ch_faltante > 0 %}<i class="ph ph-warning text-sm"></i>{% endif %}
@@ -269,51 +282,21 @@
               </span>
             </td>
 
-            {# Status da pendência #}
-            <td class="px-5 py-4 text-center">
+            {# Status da pendência (somente leitura) #}
+            <td class="px-5 py-4 text-center" data-label="Status">
               {% if item.pendencia %}
-              {% if is_desup and item.pendencia.status != 'RASCUNHO' %}
-              <form method="POST" action="{% url 'extra_curricular:atualizar_status' pk=item.pendencia.pk %}" class="m-0 min-w-[280px] space-y-2 text-left" onsubmit="this.querySelector('button[type=submit], input[type=submit]').disabled=true; return true;">
-                {% csrf_token %}
-                <input type="hidden" name="status" value="APROVADO">
-                <input type="hidden" name="item_tipo" value="{{ item.item_tipo }}">
-                <input type="hidden" name="item_pk" value="{{ item.item_pk }}">
-
-                <div class="text-center">
-                  {% if item.pendencia.status == 'APROVADO' %}
-                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase badge-aprovado">
-                      <i class="ph ph-check-circle"></i> Finalizado
-                    </span>
-                  {% else %}
-                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-slate-100 text-slate-500">
-                      <i class="ph ph-hourglass-medium"></i> Pendente
-                    </span>
-                  {% endif %}
-                </div>
-
-                <div class="flex gap-2">
-                  <textarea name="motivo_status_desup" rows="2"
-                    class="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-[#025c9f] focus:ring-2 focus:ring-[#025c9f]/20"
-                    placeholder="Motivo da decisão">{{ item.pendencia.motivo_status_desup }}</textarea>
-                  <div class="w-20 flex-shrink-0">
-                    <input type="text" name="item_horas_aprovadas"
-                      value="{{ item.item_horas_aprovadas|default_if_none:'' }}"
-                      class="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-center text-[#025c9f] outline-none focus:border-[#025c9f] focus:ring-2 focus:ring-[#025c9f]/20"
-                      placeholder="{{ item.justificativa_ch }}h"
-                      title="Horas aprovadas desta justificativa. Se deixado em branco, será somado o total calculado automaticamente ({{ item.justificativa_ch }}h).">
-                    <p class="mt-1 text-[9px] leading-tight text-slate-400 text-center">Horas<br>aprovadas</p>
-                  </div>
-                </div>
-                <button type="submit"
-                  class="inline-flex items-center gap-1.5 rounded-lg bg-[#025c9f] px-3 py-1.5 text-[10px] font-black uppercase text-white transition-colors hover:bg-[#153e70]">
-                  <i class="ph ph-check-circle"></i>
-                  Finalizar
-                </button>
-              </form>
-              {% else %}
                 {% if item.status_item == 'RASCUNHO' %}
                   <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase badge-rascunho">
                     <i class="ph ph-pencil-simple"></i> Rascunho
+                  </span>
+                {% elif item.status_item == 'PARCIAL' %}
+                  {# CORR-023: análise concluída com resultado misto — parte deferida, parte não. #}
+                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase badge-parcial">
+                    <i class="ph ph-check-square-offset"></i> Parcial
+                  </span>
+                {% elif item.status_item == 'INDEFERIDO' %}
+                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase badge-indeferido">
+                    <i class="ph ph-x-circle"></i> Indeferido
                   </span>
                 {% else %}
                   <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase
@@ -328,11 +311,6 @@
                     {% else %}{{ item.status_item }}{% endif %}
                   </span>
                 {% endif %}
-
-                {% if item.pendencia.motivo_status_desup %}
-                  <p class="mt-1 text-[10px] font-semibold text-slate-500">{{ item.pendencia.motivo_status_desup }}</p>
-                {% endif %}
-              {% endif %}
               {% else %}
               <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-slate-100 text-slate-500">
                 <i class="ph ph-minus-circle"></i>
@@ -355,7 +333,7 @@
     </div>
 
     {# Rodapé #}
-    <div class="px-5 py-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
+    <div class="px-5 py-3 border-t border-slate-100 bg-slate-50/50 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
       <p class="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">
         {{ pendencias_data|length }} linha{{ pendencias_data|length|pluralize }} de justificativa em {{ semestre }}
       </p>

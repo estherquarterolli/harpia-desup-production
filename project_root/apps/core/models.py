@@ -65,7 +65,10 @@ class JanelaEntrega(models.Model):
     @property
     def is_ativa(self):
         from django.utils import timezone
-        hoje = timezone.now().date()
+        # localdate() e não now().date(): com USE_TZ=True o now() é UTC, e em
+        # America/Sao_Paulo (UTC-3) o dia virava às 21h — a janela "fechava" três
+        # horas antes da meia-noite do último dia do prazo.
+        hoje = timezone.localdate()
         return self.status != self.StatusChoices.FECHADO and self.data_inicio <= hoje <= self.data_fim
 
 class UnitBoundQuerySet(models.QuerySet):
@@ -157,4 +160,28 @@ class AuditoriaGlobal(models.Model):
 
     def __str__(self):
         return f"{self.criado_em:%Y-%m-%d %H:%M:%S} - {self.acao} - {self.email}"
+
+
+class AtalhoDashboard(models.Model):
+    """Atalho configurável do dashboard (por usuário). Guarda a *chave* do
+    catálogo (apps/core/atalhos.py) — whitelist, não URL crua."""
+
+    user = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.CASCADE,
+        related_name='atalhos',
+        verbose_name='Usuário',
+    )
+    chave = models.CharField(max_length=80, verbose_name='Chave do atalho')
+    ordem = models.PositiveIntegerField(default=0, verbose_name='Ordem')
+    criado_em = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+
+    class Meta:
+        verbose_name = 'Atalho do Dashboard'
+        verbose_name_plural = 'Atalhos do Dashboard'
+        ordering = ['ordem', 'id']
+        unique_together = ('user', 'chave')
+
+    def __str__(self):
+        return f"{self.user_id}:{self.chave}"
 

@@ -11,6 +11,12 @@ import os
 
 from django.core.asgi import get_asgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.development')
+# SEC-003: o default é o settings de PRODUÇÃO. Este módulo só é importado por
+# servidor de aplicação (gunicorn/uvicorn), nunca no desenvolvimento local —
+# quem roda local usa o manage.py, que continua com o default de development.
+# Com o default anterior, um deploy que não exportasse DJANGO_SETTINGS_MODULE
+# (o Procfile não exportava; só o render.yaml define) subia com DEBUG=True e
+# ALLOWED_HOSTS=['*'], expondo a página de debug do Django.
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.production')
 
 application = get_asgi_application()

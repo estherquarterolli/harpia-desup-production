@@ -8,6 +8,13 @@ from django.http import JsonResponse
 from apps.allocations.models import AlocacaoCurricular
 from apps.core.services import build_window_lock_context, enforce_window_or_redirect
 
+# `AlocacaoCurricular.turno` é NOT NULL (models.py), mas `CurriculumMatrix.turno` é
+# opcional e o formulário de matriz nem expõe o campo — ou seja, toda matriz criada pela
+# tela nasce sem turno e a aprovação quebrava com IntegrityError/500. Enquanto a matriz
+# não passar a exigir turno, o consolidado assume o primeiro turno do domínio (Manhã) e
+# a DESUP é avisada por mensagem para corrigir a matriz.
+TURNO_PADRAO_ALOCACAO = 'M'
+
 class AllocCurricularView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
     template_name = "allocations/alloc_curricular.html"
     allowed_profiles = ['DESUP', 'COORDENADOR_UNIDADE']
@@ -199,20 +206,33 @@ class AprovarAlocacaoUnidadeView(LoginRequiredMixin, PerfilRequiredMixin, View):
             return redirect(f'/alocacao-curricular/?unidade_id={unidade_id}')
 
         aprovadas = 0
+        matrizes_sem_turno = []
         for matriz in matrizes:
             course_unit = CourseUnit.objects.filter(curso=matriz.curso, unidade_id=unidade_id).first()
             if not course_unit:
                 continue
+            # Matriz sem turno não pode virar consolidado NOT NULL: cai no turno padrão
+            # (ver TURNO_PADRAO_ALOCACAO) para a aprovação não morrer em 500.
+            turno = matriz.turno or TURNO_PADRAO_ALOCACAO
+            if not matriz.turno:
+                matrizes_sem_turno.append(str(matriz))
             alocacao, _ = AlocacaoCurricular.objects.get_or_create(
                 unidade_id=unidade_id,
                 curso=course_unit,
                 semestre=semestre,
-                turno=matriz.turno,
+                turno=turno,
             )
             alocacao.status = AlocacaoCurricular.StatusChoices.APROVADO
             alocacao.save(update_fields=['status', 'data_ultimo_ajuste'])
             aprovadas += 1
         messages.success(request, f'Alocacao curricular aprovada para {aprovadas} matriz(es) da unidade.')
+        if matrizes_sem_turno:
+            messages.warning(
+                request,
+                'Matriz(es) sem turno definido consolidada(s) como Manhã: '
+                f'{", ".join(matrizes_sem_turno)}. Ajuste o turno da matriz para o '
+                'consolidado ficar correto.',
+            )
         return redirect(f'/alocacao-curricular/?unidade_id={unidade_id}')
 
 
@@ -228,6 +248,9 @@ class BuscarProfessoresView(LoginRequiredMixin, PerfilRequiredMixin, View):
     allowed_profiles = ['DESUP', 'COORDENADOR_UNIDADE']
 
     def get(self, request):
+        from django.db.models import Q, Value
+        from django.db.models.functions import Coalesce, NullIf
+
         from apps.professors.models import Professor
 
         q = request.GET.get('q', '').strip()
@@ -246,15 +269,24 @@ class BuscarProfessoresView(LoginRequiredMixin, PerfilRequiredMixin, View):
             if unidade_id:
                 qs = qs.filter(unidade_principal_id=unidade_id)
 
-        if q:
-            qs = qs.filter(rh_nome__icontains=q)
+        # Regra #3: o ajuste da DESUP (`desup_nome`) prevalece sobre o dado do RH — é o
+        # que `Professor.nome` devolve e o que a tela mostra. Antes o endpoint filtrava e
+        # devolvia `rh_nome` cru, então o autocomplete não achava (nem exibia) o nome
+        # ajustado. `nome_exibicao` reproduz a property no banco para dar pra ordenar.
+        qs = qs.annotate(
+            nome_exibicao=Coalesce(NullIf('desup_nome', Value('')), 'rh_nome')
+        )
 
-        qs = qs.select_related('unidade_principal').order_by('rh_nome')[:20]
+        if q:
+            # Busca pelos dois nomes: quem só conhece o nome antigo do RH continua achando.
+            qs = qs.filter(Q(desup_nome__icontains=q) | Q(rh_nome__icontains=q))
+
+        qs = qs.select_related('unidade_principal').order_by('nome_exibicao')[:20]
 
         results = [
             {
                 'id': p.id,
-                'nome': p.rh_nome,
+                'nome': p.nome,
                 'unidade': p.unidade_principal.sigla if p.unidade_principal else '',
             }
             for p in qs

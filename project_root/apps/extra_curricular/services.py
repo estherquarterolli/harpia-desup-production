@@ -9,32 +9,86 @@ from apps.extra_curricular.models import PendenciaExtra
 
 
 # ──────────────────────────────────────────────────────────────
+# CORR-015 — tokens canônicos de filtro da listagem de pendências
+# ──────────────────────────────────────────────────────────────
+# Fonte da verdade única, consumida pelas três camadas que antes divergiam:
+#   1. filtro server-side em PendenciaListView (?status=...);
+#   2. os <option value> dos selects em extra_curricular/pendencia_list.html;
+#   3. os atributos data-status / data-justificativa das linhas (filtro em JS).
+# Antes, o select mandava "Sem registro" e a view comparava com "sem_registro",
+# e o data-justificativa vinha vazio — por isso "Sem registro" não retornava nada.
+
+TOKEN_SEM_REGISTRO = "sem_registro"
+
+_STATUS_TOKENS = {
+    "RASCUNHO": "rascunho",
+    "ENVIADO": "pendente",
+    "PENDENTE": "pendente",
+    "APROVADO": "finalizado",
+    # CORR-023: parcial é um estado final próprio — misturá-lo com "finalizado"
+    # esconderia da DESUP justamente as pendências que tiveram item indeferido.
+    "PARCIAL": "parcial",
+    "INDEFERIDO": "indeferido",
+}
+
+_JUSTIFICATIVA_TOKENS = {
+    "tcc": "tcc",
+    "ext": "extensao",
+    "red": "reducao",
+}
+
+
+def status_token(row: dict) -> str:
+    """Token canônico do status de uma linha de `get_pendencias_data`."""
+    if not row.get("pendencia"):
+        return TOKEN_SEM_REGISTRO
+    return _STATUS_TOKENS.get(row.get("status_item") or "", TOKEN_SEM_REGISTRO)
+
+
+def justificativa_token(row: dict) -> str:
+    """Token canônico do tipo de justificativa de uma linha de `get_pendencias_data`."""
+    return _JUSTIFICATIVA_TOKENS.get(row.get("item_tipo") or "", TOKEN_SEM_REGISTRO)
+
+
+# ──────────────────────────────────────────────────────────────
 # Cálculos de carga horária
 # ──────────────────────────────────────────────────────────────
 
 def calcular_ch_tcc(num_orientandos: int) -> Decimal:
     """
     0,5h por orientando, limitado a 4h (8 orientandos máx.).
+
+    Piso em 0: quantidade negativa não existe como pedido real (vem de um `n`
+    manipulado na querystring da API de prévia) e não pode virar CH negativa —
+    isso apareceria na tela como prévia e, pior, abateria o total do docente.
     """
-    return Decimal(min(num_orientandos * 0.5, 4.0)).quantize(Decimal("0.1"))
+    return Decimal(min(max(num_orientandos, 0) * 0.5, 4.0)).quantize(Decimal("0.1"))
 
 
 def calcular_ch_extensao(num_estudantes: int) -> Decimal:
     """
-    0,5h por estudante, sem limite.
+    0,5h por estudante, sem limite (mas com piso em 0 — ver `calcular_ch_tcc`).
     """
-    return Decimal(num_estudantes * 0.5).quantize(Decimal("0.1"))
+    return Decimal(max(num_estudantes, 0) * 0.5).quantize(Decimal("0.1"))
 
 
 def sincronizar_status_pendencia(pendencia: PendenciaExtra) -> str:
     """
     Atualiza o status agregado da pendência com base nos pareceres dos itens.
 
-    Regras:
-      - qualquer item rejeitado => REJEITADO
-      - todos os itens aprovados e ao menos um item existente => APROVADO
-      - caso contrário, quando a pendência já tiver sido enviada => ENVIADO
-      - rascunhos permanecem como RASCUNHO
+    Regras (CORR-023 — aprovação parcial):
+      - rascunho nunca é promovido (nem a APROVADO, nem a INDEFERIDO)
+      - sem itens => mantém o status atual
+      - ainda há item PENDENTE => ENVIADO (análise em curso)
+      - todos os itens aprovados        => APROVADO
+      - todos os itens indeferidos      => INDEFERIDO
+      - misto (aprovado + indeferido)   => PARCIAL
+
+    Antes, `any(INDEFERIDO)` derrubava a pendência inteira para INDEFERIDO. Como
+    `ch_total_justificada` zera fora dos status finalizados, um único item
+    indeferido apagava TODA a CH que a DESUP já tinha aprovado nos outros itens.
+    O `PARCIAL` separa "a análise terminou com resultado misto" de "nada foi
+    deferido": o que foi aprovado conta, o indeferido apenas não entra na soma.
     """
     from apps.extra_curricular.models import (
         AtividadeExtensionista,
@@ -43,18 +97,38 @@ def sincronizar_status_pendencia(pendencia: PendenciaExtra) -> str:
         ReducaoCargaHoraria,
     )
 
+    # Rascunho é estado anterior ao trâmite: a unidade ainda não informou o SEI
+    # nem enviou nada à DESUP. Promover daqui (o ramo `all(APROVADO)` vinha antes
+    # da proteção de rascunho) furava a regra "SEI obrigatório para enviar" —
+    # bastava a DESUP emitir parecer nos itens para a pendência virar APROVADO
+    # sem nunca ter sido enviada.
+    if pendencia.status == PendenciaExtra.StatusChoices.RASCUNHO:
+        return pendencia.status
+
     itens = []
     itens.extend(list(OrientacaoTCC.objects.filter(pendencia=pendencia).values_list("parecer_desup", flat=True)))
     itens.extend(list(AtividadeExtensionista.objects.filter(pendencia=pendencia).values_list("parecer_desup", flat=True)))
     itens.extend(list(ReducaoCargaHoraria.objects.filter(pendencia=pendencia).values_list("parecer_desup", flat=True)))
 
-    novo_status = pendencia.status
+    tem_aprovado = any(status == ParecerChoices.APROVADO for status in itens)
+    tem_indeferido = any(status == ParecerChoices.INDEFERIDO for status in itens)
+    # Qualquer item ainda sem decisão mantém a pendência em análise — nem PARCIAL
+    # nem INDEFERIDO, senão a unidade veria "finalizado" antes da hora.
+    falta_decidir = any(
+        status not in (ParecerChoices.APROVADO, ParecerChoices.INDEFERIDO)
+        for status in itens
+    )
+
     if not itens:
         novo_status = pendencia.status
-    elif all(status == ParecerChoices.APROVADO for status in itens):
-        novo_status = PendenciaExtra.StatusChoices.APROVADO
-    elif pendencia.status != PendenciaExtra.StatusChoices.RASCUNHO:
+    elif falta_decidir:
         novo_status = PendenciaExtra.StatusChoices.ENVIADO
+    elif tem_aprovado and tem_indeferido:
+        novo_status = PendenciaExtra.StatusChoices.PARCIAL
+    elif tem_aprovado:
+        novo_status = PendenciaExtra.StatusChoices.APROVADO
+    else:
+        novo_status = PendenciaExtra.StatusChoices.INDEFERIDO
 
     if pendencia.status != novo_status:
         pendencia.status = novo_status
@@ -131,6 +205,11 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
         if pendencia:
             ch_justificada = pendencia.ch_total_justificada
             ch_faltante = max(ch_pendente - ch_justificada, 0)
+            # Só conta como CH Justificada (coluna da lista) quando a pendência está
+            # de fato APROVADA. Após uma reabertura (status volta a ENVIADO) a CH
+            # aprovada anteriormente deixa de contar até ser aprovada novamente.
+            # CORR-023: PARCIAL também é estado finalizado — o item aprovado conta.
+            conta_justificada = pendencia.status in PendenciaExtra.STATUS_FINALIZADOS
 
             # Obter itens de justificativa
             tcc_items = list(pendencia.orientacoes_tcc.all())
@@ -145,7 +224,7 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                         "meta_horas": meta,
                         "ch_alocada": ch_alocada,
                         "ch_pendente": ch_pendente,
-                        "ch_justificada": item.ch_aprovada,
+                        "ch_justificada": item.ch_aprovada if conta_justificada else 0,
                         "ch_faltante": ch_faltante,
                         "pendencia": pendencia,
                         "justificativa_detalhe": f"Orientação de TCC ({item.num_orientandos} orientando{'s' if item.num_orientandos > 1 else ''})",
@@ -163,7 +242,7 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                         "meta_horas": meta,
                         "ch_alocada": ch_alocada,
                         "ch_pendente": ch_pendente,
-                        "ch_justificada": item.ch_aprovada,
+                        "ch_justificada": item.ch_aprovada if conta_justificada else 0,
                         "ch_faltante": ch_faltante,
                         "pendencia": pendencia,
                         "justificativa_detalhe": f"Atividade Extensionista ({item.num_estudantes} estudante{'s' if item.num_estudantes > 1 else ''})",
@@ -181,7 +260,7 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                         "meta_horas": meta,
                         "ch_alocada": ch_alocada,
                         "ch_pendente": ch_pendente,
-                        "ch_justificada": item.ch_aprovada,
+                        "ch_justificada": item.ch_aprovada if conta_justificada else 0,
                         "ch_faltante": ch_faltante,
                         "pendencia": pendencia,
                         "justificativa_detalhe": f"Redução de CH ({item.horas_reduzidas}h) - Motivo: {item.motivo_reducao}",
@@ -225,4 +304,10 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                 "justificativa_tipo": "",
                 "sei_numero": "",
             })
+
+    # CORR-015 — anexa os tokens canônicos de filtro em cada linha.
+    for row in result:
+        row["status_token"] = status_token(row)
+        row["justificativa_token"] = justificativa_token(row)
+
     return result

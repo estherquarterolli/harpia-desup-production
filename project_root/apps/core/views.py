@@ -1,6 +1,10 @@
 import logging
-from django.shortcuts import redirect, render
+from django import forms
+from django.db.models import Q
+from django.http import Http404
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.views import View
 from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
@@ -84,7 +88,53 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
             }
             for prof in professores_qs[:50]
         ]
+
+        # Atalhos do dashboard (do usuário) e opções disponíveis para adicionar
+        from apps.core.atalhos import ATALHOS_CATALOGO, resolver_atalho
+        user_atalhos = list(self.request.user.atalhos.all())
+        atalhos_user = []
+        for a in user_atalhos:
+            resolvido = resolver_atalho(a.chave)
+            if resolvido:
+                atalhos_user.append({'id': a.id, **resolvido})
+        ctx['atalhos_user'] = atalhos_user
+        usadas = {a.chave for a in user_atalhos}
+        ctx['atalhos_disponiveis'] = [
+            {'chave': chave, 'label': dados['label']}
+            for chave, dados in ATALHOS_CATALOGO.items()
+            if chave not in usadas
+        ]
         return ctx
+
+
+class AtalhoAddView(LoginRequiredMixin, PerfilRequiredMixin, View):
+    """Adiciona um atalho ao dashboard do usuário (DESUP). Só chaves do catálogo (whitelist)."""
+    allowed_profiles = ['DESUP']
+
+    def post(self, request):
+        from apps.core.models import AtalhoDashboard
+        from apps.core.atalhos import ATALHOS_CATALOGO
+        chaves = [c.strip() for c in request.POST.getlist('chave') if c.strip()]
+        validas = [c for c in chaves if c in ATALHOS_CATALOGO]
+        if not validas:
+            messages.error(request, 'Selecione ao menos um atalho válido.')
+            return redirect('dashboard_desup')
+        for chave in validas:
+            AtalhoDashboard.objects.get_or_create(user=request.user, chave=chave)
+        messages.success(request, 'Atalho(s) salvo(s).')
+        return redirect('dashboard_desup')
+
+
+class AtalhoRemoveView(LoginRequiredMixin, PerfilRequiredMixin, View):
+    """Remove um atalho do próprio usuário (DESUP)."""
+    allowed_profiles = ['DESUP']
+
+    def post(self, request, pk):
+        from apps.core.models import AtalhoDashboard
+        atalho = get_object_or_404(AtalhoDashboard, pk=pk, user=request.user)
+        atalho.delete()
+        messages.success(request, 'Atalho(s) removido(s).')
+        return redirect('dashboard_desup')
 
 
 class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
@@ -183,9 +233,30 @@ class CursoListView(CursoBaseView, ListView):
         ctx['unidade'] = self.get_unidade()
         return ctx
 
+class CursoOfertaForm(forms.ModelForm):
+    """
+    CORR-029: cadastrar um curso aqui significa **ofertá-lo nesta unidade**, não
+    necessariamente criar um `Course` novo.
+
+    `Course.nome` e `Course.sigla` são `unique` (o curso é global; quem é por
+    unidade é o `CourseUnit`). Com a validação de unicidade padrão do ModelForm, o
+    formulário rejeitava o mesmo curso numa segunda unidade — e o caminho de
+    reaproveitamento que já existia no `form_valid` era inalcançável. Desligamos a
+    checagem de unicidade aqui justamente porque repetir nome/sigla é o sinal de
+    "é este curso mesmo"; a decisão de reusar ou criar fica no `form_valid`.
+    """
+
+    class Meta:
+        model = Course
+        fields = ['nome', 'sigla']
+
+    def validate_unique(self):
+        return
+
+
 class CursoCreateView(CursoBaseView, CreateView):
     model = Course
-    fields = ['nome', 'sigla']
+    form_class = CursoOfertaForm
     template_name = 'core/curso_form.html'
 
     def get_success_url(self):
@@ -193,7 +264,11 @@ class CursoCreateView(CursoBaseView, CreateView):
 
     def form_valid(self, form):
         curso = form.save(commit=False)
-        curso_existente = Course.objects.filter(sigla=curso.sigla).first()
+        # Reaproveita o curso já cadastrado (por sigla OU por nome — os dois são
+        # `unique`, então bater em qualquer um dos dois significa ser o mesmo curso).
+        curso_existente = Course.objects.filter(
+            Q(sigla=curso.sigla) | Q(nome=curso.nome)
+        ).first()
         if curso_existente:
             curso = curso_existente
         else:
@@ -213,7 +288,15 @@ class CursoUpdateView(CursoBaseView, UpdateView):
     template_name = 'core/curso_form.html'
 
     def get_object(self, queryset=None):
-        return get_object_or_404(CourseUnit, pk=self.kwargs['pk']).curso
+        # CORR-029: o vínculo tem de pertencer à unidade da URL. Sem o filtro, a
+        # edição aberta a partir de uma unidade alterava o curso de OUTRA e
+        # redirecionava para uma lista onde a alteração nem aparecia. O
+        # `CursoDeleteView` já filtrava; aqui tinha ficado de fora.
+        return get_object_or_404(
+            CourseUnit,
+            pk=self.kwargs['pk'],
+            unidade_id=self.kwargs['unidade_pk'],
+        ).curso
 
     def get_success_url(self):
         return reverse_lazy('core:curso_list', kwargs={'unidade_pk': self.kwargs['unidade_pk']})
@@ -240,20 +323,24 @@ class CursoDeleteView(CursoBaseView, DeleteView):
 
 # --- CRUD de Janela de Entrega ---
 from .models import JanelaEntrega
+from .forms import JanelaEntregaValidacaoMixin
 from django import forms
 
 _JANELA_FIELD_CSS = 'w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:border-[#1e4e8c] outline-none transition bg-white'
 _JANELA_SELECT_CSS = 'w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#1e4e8c] outline-none transition'
 
 
-class JanelaEntregaCreateForm(forms.ModelForm):
+class JanelaEntregaCreateForm(JanelaEntregaValidacaoMixin, forms.ModelForm):
     """Form para criar nova janela — data_inicio e data_fim configuráveis."""
     class Meta:
         model = JanelaEntrega
         fields = ['semestre', 'data_inicio', 'data_fim', 'status', 'unidade']
         widgets = {
-            'data_inicio': forms.DateInput(attrs={'type': 'date', 'class': _JANELA_FIELD_CSS}),
-            'data_fim': forms.DateInput(attrs={'type': 'date', 'class': _JANELA_FIELD_CSS}),
+            # flatpickr (classe js-date-ptbr) exibe dd/mm/aaaa fixo, independente do
+            # idioma do navegador, e envia o valor em ISO (Y-m-d). format='%Y-%m-%d'
+            # garante que o valor inicial ja saia em ISO para o flatpickr interpretar.
+            'data_inicio': forms.DateInput(format='%Y-%m-%d', attrs={'class': _JANELA_FIELD_CSS + ' js-date-ptbr', 'placeholder': 'dd/mm/aaaa', 'data-min-today': '1'}),
+            'data_fim': forms.DateInput(format='%Y-%m-%d', attrs={'class': _JANELA_FIELD_CSS + ' js-date-ptbr', 'placeholder': 'dd/mm/aaaa', 'data-min-today': '1'}),
             'semestre': forms.TextInput(attrs={'class': _JANELA_FIELD_CSS, 'placeholder': 'Ex: 2026.1'}),
             'status': forms.Select(attrs={'class': _JANELA_SELECT_CSS}),
             'unidade': forms.Select(attrs={'class': _JANELA_SELECT_CSS}),
@@ -262,32 +349,47 @@ class JanelaEntregaCreateForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         from django.utils import timezone
-        self.fields['data_inicio'].initial = timezone.now().date()
+        # localdate(): com now().date() o campo já vinha pré-preenchido com amanhã
+        # das 21h à meia-noite (UTC-3), divergindo do "hoje" validado no clean().
+        self.fields['data_inicio'].initial = timezone.localdate()
+        # Nova janela nasce sempre "Aberta" — nao faz sentido criar ja fechada. Campo
+        # travado: disabled ignora o POST e usa este initial, entao nao ha como burlar.
         self.fields['status'].choices = [
             (JanelaEntrega.StatusChoices.ABERTO, 'Aberto'),
-            (JanelaEntrega.StatusChoices.FECHADO, 'Fechado'),
         ]
         self.fields['status'].initial = JanelaEntrega.StatusChoices.ABERTO
+        self.fields['status'].disabled = True
         self.fields['unidade'].empty_label = 'Todas as unidades'
         self.fields['unidade'].help_text = ''
 
     def clean(self):
         cleaned_data = super().clean()
+        from django.utils import timezone
+        # localdate(): now().date() é UTC e, das 21h à meia-noite de Brasília, já
+        # apontava para amanhã — a DESUP não conseguia criar janela começando hoje.
+        hoje = timezone.localdate()
         inicio = cleaned_data.get('data_inicio')
         fim = cleaned_data.get('data_fim')
-        if inicio and fim and fim < inicio:
-            raise forms.ValidationError({'data_fim': 'A data de fim não pode ser anterior à data de início.'})
-        return cleaned_data
+        if inicio and inicio < hoje:
+            self.add_error('data_inicio', 'A data de início não pode ser anterior ao dia atual.')
+        if fim and fim < hoje:
+            self.add_error('data_fim', 'A data de fim não pode ser anterior ao dia atual.')
+        # Ordem das datas, formato do semestre e sobreposição: regras compartilhadas
+        # com o form do admin (apps/core/forms.py) para não divergirem.
+        return self._validar_regras_da_janela(cleaned_data)
 
 
-class JanelaEntregaUpdateForm(forms.ModelForm):
+class JanelaEntregaUpdateForm(JanelaEntregaValidacaoMixin, forms.ModelForm):
     """Form para editar janela — permite editar data_inicio e status."""
     class Meta:
         model = JanelaEntrega
         fields = ['semestre', 'data_inicio', 'data_fim', 'status', 'unidade']
         widgets = {
-            'data_inicio': forms.DateInput(attrs={'type': 'date', 'class': _JANELA_FIELD_CSS}),
-            'data_fim': forms.DateInput(attrs={'type': 'date', 'class': _JANELA_FIELD_CSS}),
+            # flatpickr (classe js-date-ptbr) exibe dd/mm/aaaa fixo, independente do
+            # idioma do navegador, e envia o valor em ISO (Y-m-d). format='%Y-%m-%d'
+            # garante que o valor inicial ja saia em ISO para o flatpickr interpretar.
+            'data_inicio': forms.DateInput(format='%Y-%m-%d', attrs={'class': _JANELA_FIELD_CSS + ' js-date-ptbr', 'placeholder': 'dd/mm/aaaa', 'data-min-today': '1'}),
+            'data_fim': forms.DateInput(format='%Y-%m-%d', attrs={'class': _JANELA_FIELD_CSS + ' js-date-ptbr', 'placeholder': 'dd/mm/aaaa', 'data-min-today': '1'}),
             'semestre': forms.TextInput(attrs={'class': _JANELA_FIELD_CSS, 'placeholder': 'Ex: 2026.1'}),
             'status': forms.Select(attrs={'class': _JANELA_SELECT_CSS}),
             'unidade': forms.Select(attrs={'class': _JANELA_SELECT_CSS}),
@@ -308,19 +410,32 @@ class JanelaEntregaUpdateForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        from django.utils import timezone
+        # localdate(): ver comentário no form de criação — now().date() é UTC.
+        hoje = timezone.localdate()
         inicio = cleaned_data.get('data_inicio')
         fim = cleaned_data.get('data_fim')
-        if inicio and fim and fim < inicio:
-            raise forms.ValidationError({'data_fim': 'A data de fim não pode ser anterior à data de início.'})
+        # Só barra data passada nos campos que o usuário efetivamente alterou; assim,
+        # editar (p.ex. o status) de uma janela já em andamento — cujo início/fim já
+        # ficou no passado — não é bloqueado. Ao escolher uma data nova, ela deve ser
+        # de hoje em diante. (self.instance ainda tem os valores originais do banco.)
+        if inicio and inicio < hoje and inicio != self.instance.data_inicio:
+            self.add_error('data_inicio', 'A data de início não pode ser anterior ao dia atual.')
+        if fim and fim < hoje and fim != self.instance.data_fim:
+            self.add_error('data_fim', 'A data de fim não pode ser anterior ao dia atual.')
         # Impede que uma janela global seja convertida em janela de unidade específica
         if self.instance.pk and self.instance.unidade is None:
             nova_unidade = cleaned_data.get('unidade')
             if nova_unidade is not None:
                 raise forms.ValidationError(
                     'Não é possível vincular uma janela global a uma unidade específica. '
-                    'Para fechar apenas para uma unidade, crie uma nova janela com status "Fechado" para aquela unidade.'
+                    'Para fechar apenas para uma unidade, crie uma nova janela com status "Fechado" '
+                    'cobrindo o período em que a unidade deve ficar bloqueada — o fechamento por '
+                    'unidade só vale enquanto a janela Fechado estiver vigente.'
                 )
-        return cleaned_data
+        # Ordem das datas, formato do semestre e sobreposição: regras compartilhadas
+        # com o form do admin (apps/core/forms.py) para não divergirem.
+        return self._validar_regras_da_janela(cleaned_data)
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -407,24 +522,53 @@ def _usuario_pode_marcar_notificacao(user, notificacao):
     return False
 
 
+def _get_notificacao_do_usuario(request, pk):
+    """
+    SEC-001: devolve a notificação SOMENTE se o usuário puder vê-la; caso
+    contrário, 404 (e não 403 — 403 confirmaria que a notificação existe).
+
+    Antes, a view carregava a notificação sem escopo nenhum e redirecionava para
+    `notificacao.url_acao` FORA do `if` de permissão. Como o `url_acao` da
+    notificação de reset de senha carrega o token de aprovação, qualquer usuário
+    logado lia o token de qualquer outra pessoa só iterando o `pk` e olhando o
+    header `Location` do 302.
+    """
+    from apps.core.models import Notificacao
+    from django.shortcuts import get_object_or_404
+
+    notificacao = get_object_or_404(Notificacao, pk=pk)
+    if not _usuario_pode_marcar_notificacao(request.user, notificacao):
+        logger.warning(
+            "Acesso negado a notificação alheia (usuário %s, notificação %s).",
+            request.user.pk, pk,
+        )
+        raise Http404("Notificação não encontrada.")
+    return notificacao
+
+
+def _url_acao_segura(notificacao, request):
+    """Só redireciona para caminho interno — `url_acao` nunca deve levar para fora."""
+    destino = notificacao.url_acao or '/'
+    if not url_has_allowed_host_and_scheme(
+        destino,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return '/'
+    return destino
+
+
 class MarcarNotificacaoLidaView(LoginRequiredMixin, View):
     def get(self, request, pk):
-        from apps.core.models import Notificacao
-        from django.shortcuts import get_object_or_404
-        notificacao = get_object_or_404(Notificacao, pk=pk)
-        if _usuario_pode_marcar_notificacao(request.user, notificacao):
-            notificacao.lida = True
-            notificacao.save()
-        redirect_url = notificacao.url_acao or '/'
-        return redirect(redirect_url)
+        notificacao = _get_notificacao_do_usuario(request, pk)
+        notificacao.lida = True
+        notificacao.save()
+        return redirect(_url_acao_segura(notificacao, request))
 
     def post(self, request, pk):
-        from apps.core.models import Notificacao
-        from django.shortcuts import get_object_or_404
-        notificacao = get_object_or_404(Notificacao, pk=pk)
-        if _usuario_pode_marcar_notificacao(request.user, notificacao):
-            notificacao.lida = True
-            notificacao.save()
+        notificacao = _get_notificacao_do_usuario(request, pk)
+        notificacao.lida = True
+        notificacao.save()
 
         # Requisição HTMX → retorna resposta vazia para o elemento ser removido via hx-swap="delete"
         if request.headers.get('HX-Request'):

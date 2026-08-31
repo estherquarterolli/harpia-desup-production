@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import models
 
 class Course(models.Model):
@@ -53,7 +55,6 @@ class CurricularComponent(models.Model):
     Modelo que representa um Componente Curricular base.
     """
     nome = models.CharField(max_length=255, verbose_name="Nome do Componente Curricular")
-    sigla = models.CharField(max_length=20, verbose_name="Sigla")
     codigo = models.CharField(max_length=50, blank=True, db_index=True, verbose_name="Codigo")
     carga_horaria_padrao = models.PositiveIntegerField(verbose_name="Carga Horária Padrão")
     creditos = models.PositiveSmallIntegerField(default=0, verbose_name="Creditos")
@@ -74,7 +75,7 @@ class CurricularComponent(models.Model):
 
     def __str__(self):
         codigo = f"{self.codigo} - " if self.codigo else ""
-        return f"{codigo}{self.sigla} - {self.nome} ({self.carga_horaria_padrao}h)"
+        return f"{codigo}{self.nome} ({self.carga_horaria_padrao}h)"
 
 class CurriculumMatrix(models.Model):
     """
@@ -235,6 +236,11 @@ class MatrixComponent(models.Model):
         """Hora-Relógio semanal: HA semanal * 50min / 60min."""
         return self.ha_semanal * (50.0 / 60.0)
 
+    @property
+    def hr_total(self):
+        """Hora-Relógio total do componente: carga horária (hora-aula) × 50/60."""
+        return (self.carga_horaria or 0) * Decimal("50") / Decimal("60")
+
     class Meta:
         verbose_name = "Componente da Matriz"
         verbose_name_plural = "Componentes da Matriz"
@@ -255,20 +261,24 @@ class MatrixComponent(models.Model):
             })
 
     def save(self, *args, **kwargs):
-        if not self.codigo:
-            cc = self.componente_curricular
-            self.codigo = cc.codigo or cc.sigla or ''
+        cc = self.componente_curricular
+        if not self.codigo and cc.codigo:
+            self.codigo = cc.codigo
+        elif self.codigo and not cc.codigo:
+            cc.codigo = self.codigo
+            cc.save(update_fields=['codigo'])
         if self.carga_horaria is None:
-            self.carga_horaria = self.componente_curricular.carga_horaria_padrao
-        
-        # Calcular creditos e carga horaria semanal
+            self.carga_horaria = cc.carga_horaria_padrao
+        # Só preenche os calculados quando NÃO informados (respeita o que a DESUP digitou).
         if self.carga_horaria is not None:
-            self.creditos = self.carga_horaria // 20
-            self.carga_horaria_semanal = self.creditos
+            if self.creditos is None:
+                self.creditos = self.carga_horaria // 20
+            if self.carga_horaria_semanal is None:
+                self.carga_horaria_semanal = round(self.carga_horaria / 20, 2)
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.matriz} - {self.componente_curricular.sigla}"
+        return f"{self.matriz} - {self.componente_curricular.nome}"
 
 class ClassGroup(models.Model):
     """
@@ -305,5 +315,5 @@ class ClassGroup(models.Model):
         unique_together = ('matriz_curricular', 'ano_semestre', 'identificador')
 
     def __str__(self):
-        componente = self.matriz_componente.componente_curricular.sigla if self.matriz_componente_id else self.matriz_curricular.curso.sigla
+        componente = self.matriz_componente.componente_curricular.nome if self.matriz_componente_id else self.matriz_curricular.curso.sigla
         return f"{componente} - Turma {self.identificador} ({self.ano_semestre})"

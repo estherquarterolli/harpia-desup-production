@@ -18,7 +18,7 @@
             type="text"
             name="q"
             value="{{ request.GET.q }}"
-            placeholder="Nome, sigla ou código..."
+            placeholder="Nome ou código..."
             class="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition font-semibold text-[#025c9f]"
           >
         </div>
@@ -41,20 +41,19 @@
 
   <!-- Tabela -->
   <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-    <div class="flex justify-between items-center px-6 py-4 border-b border-slate-100">
+    <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center px-6 py-4 border-b border-slate-100">
       <p class="text-sm font-semibold text-slate-500">{{ componentes|length }} componente(s) encontrado(s)</p>
       <a href="{% url 'courses:component_create' %}"
-        class="flex items-center gap-2 bg-[#ffb800] hover:bg-yellow-400 text-[#025c9f] px-4 py-2.5 rounded-xl text-sm font-black transition-colors shadow-md">
+        class="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#ffb800] hover:bg-yellow-400 text-[#025c9f] px-4 py-2.5 rounded-xl text-sm font-black transition-colors shadow-md">
         <i class="ph ph-plus"></i> Novo Componente
       </a>
     </div>
 
     <div class="overflow-x-auto">
-      <table class="w-full text-left border-collapse min-w-[600px]">
+      <table class="w-full text-left border-collapse min-w-[600px] stack-table">
         <thead class="bg-[#025c9f] text-white text-[10px] font-black uppercase tracking-widest">
           <tr>
             <th class="px-5 py-3">Código</th>
-            <th class="px-5 py-3">Sigla</th>
             <th class="px-5 py-3 w-full">Nome</th>
             <th class="px-5 py-3 text-center">CH Padrão</th>
             <th class="px-5 py-3 text-center">Créditos</th>
@@ -64,11 +63,10 @@
         <tbody class="divide-y divide-slate-100 text-sm">
           {% for comp in componentes %}
           <tr class="hover:bg-slate-50 transition-colors">
-            <td class="px-5 py-3 font-mono text-xs text-slate-500 font-semibold">{{ comp.codigo|default:"—" }}</td>
-            <td class="px-5 py-3 font-bold text-[#025c9f]">{{ comp.sigla }}</td>
+            <td class="px-5 py-3 font-mono text-xs text-slate-500 font-semibold" data-label="Código">{{ comp.codigo|default:"—" }}</td>
             <td class="px-5 py-3 text-slate-700 font-semibold">{{ comp.nome }}</td>
-            <td class="px-5 py-3 text-center font-semibold text-slate-600">{{ comp.carga_horaria_padrao }}h</td>
-            <td class="px-5 py-3 text-center font-semibold text-slate-600">{{ comp.creditos }}</td>
+            <td class="px-5 py-3 text-center font-semibold text-slate-600" data-label="CH Padrão">{{ comp.carga_horaria_padrao }}h</td>
+            <td class="px-5 py-3 text-center font-semibold text-slate-600" data-label="Créditos">{{ comp.creditos }}</td>
             <td class="px-5 py-3 text-center">
               <a href="{% url 'courses:component_edit' comp.pk %}"
                 class="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-[#025c9f] hover:bg-blue-100 rounded-lg text-xs font-bold transition-colors">
@@ -78,7 +76,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="6" class="px-6 py-16 text-center text-slate-400 font-semibold">
+            <td colspan="5" class="px-6 py-16 text-center text-slate-400 font-semibold">
               <i class="ph ph-books text-5xl opacity-20 mb-3 block"></i>
               Nenhum componente curricular encontrado.
             </td>

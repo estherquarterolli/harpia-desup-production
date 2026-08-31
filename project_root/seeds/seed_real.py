@@ -7,7 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.base')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.production')
 django.setup()
 
 from django.contrib.auth.hashers import make_password
@@ -25,8 +25,8 @@ def seed_code(value):
 def run():
     print("Criando Unidade Paracambi...")
     unidade, created = Unidade.objects.get_or_create(
-        sigla="FAETERJ-PARACAMBI",
-        defaults={"nome": "FAETERJ Paracambi", "status": True}
+        nome="FAETERJ Paracambi",
+        defaults={"sigla": "FAETERJ-PARACAMBI", "status": True}
     )
     if not created:
         unidade.status = True
@@ -155,11 +155,12 @@ def run():
 
     print("Criando Matriz TGA...")
     matriz_tga, _ = CurriculumMatrix.objects.get_or_create(
-        curso=curso_tga,
+        curso=curso_tga_global,
         periodo_letivo="2026.1",
         turno="N",
         defaults={"nome": "Matriz TGA 2026", "is_vigente": True}
     )
+    matriz_tga.unidades.add(unidade)
 
     tga_disciplinas = [
         (1, "QUG", "Química geral", 2, 40),
@@ -202,7 +203,10 @@ def run():
     ]
 
     for periodo, cod, nome, cred, ch in tga_disciplinas:
-        cc, _ = CurricularComponent.objects.get_or_create(nome=nome, defaults={"carga_horaria_padrao": ch})
+        cc, _ = CurricularComponent.objects.get_or_create(
+            nome=nome,
+            defaults={"carga_horaria_padrao": ch, "codigo": cod}
+        )
         MatrixComponent.objects.get_or_create(
             matriz=matriz_tga,
             codigo=cod,
@@ -217,11 +221,12 @@ def run():
 
     print("Criando Matriz ADS...")
     matriz_ads, _ = CurriculumMatrix.objects.get_or_create(
-        curso=curso_ads,
+        curso=curso_ads_global,
         periodo_letivo="2026.1",
         turno="N",
         defaults={"nome": "Matriz ADS 2026", "is_vigente": True}
     )
+    matriz_ads.unidades.add(unidade)
 
     ads_disciplinas = [
         (1, "PRG-1", "Programação Estruturada", 4, 80),
@@ -232,7 +237,10 @@ def run():
     ]
 
     for periodo, cod, nome, cred, ch in ads_disciplinas:
-        cc, _ = CurricularComponent.objects.get_or_create(nome=nome, defaults={"carga_horaria_padrao": ch})
+        cc, _ = CurricularComponent.objects.get_or_create(
+            nome=nome,
+            defaults={"carga_horaria_padrao": ch, "codigo": cod}
+        )
         MatrixComponent.objects.get_or_create(
             matriz=matriz_ads,
             codigo=cod,

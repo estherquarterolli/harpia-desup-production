@@ -31,7 +31,7 @@
         {% if window_fechada and not is_desup %}data-window-lock="true" data-window-area="{{ window_area_label }}" data-window-action="{{ window_action_label }}" data-window-target="{{ window_target_label }}" data-window-message="{{ window_message }}"{% endif %}>
     {% csrf_token %}
     
-    <div class="flex items-center justify-between mb-3">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
       <h3 class="text-sm font-black text-[#025c9f] uppercase tracking-wide">
         <i class="ph ph-users-three mr-1"></i> Docentes com Pendência (Semestre: {{ semestre_atual }})
       </h3>
@@ -39,7 +39,7 @@
     </div>
 
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto mb-6">
-      <table class="w-full text-left min-w-[500px]">
+      <table class="w-full text-left min-w-[500px] stack-table">
         <thead>
           <tr class="bg-slate-50 text-[10px] font-black text-[#025c9f] uppercase tracking-widest border-b border-slate-100">
             <th class="px-5 py-3 w-12 text-center">
@@ -59,10 +59,10 @@
             <td class="px-5 py-3">
               <span class="text-sm font-bold text-[#025c9f]">{{ prof.rh_nome }}</span>
             </td>
-            <td class="px-5 py-3 text-center">
+            <td class="px-5 py-3 text-center" data-label="ID">
               <span class="text-xs text-slate-500">ID: {{ prof.id_funcional }}</span>
             </td>
-            <td class="px-5 py-3 text-center">
+            <td class="px-5 py-3 text-center" data-label="CH Alocada / Meta">
               <span class="text-xs font-bold text-amber-600">{{ prof.ch_alocada }}h</span>
               <span class="text-xs text-slate-400 mx-1">/</span>
               <span class="text-xs font-bold text-slate-700">{{ prof.tipo_contrato.max_class_hours|default:20 }}h</span>

@@ -61,7 +61,7 @@
 
     <!-- Seção 2: Componentes Curriculares -->
     <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-      <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/70 flex justify-between items-center">
+      <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/70 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
         <div>
           <h2 class="text-sm font-black text-[#025c9f] uppercase tracking-widest">Componentes Curriculares</h2>
           <p class="text-[11px] text-slate-400 mt-0.5">Cada linha é um componente desta matriz. Selecione a disciplina para preencher o código correspondente.</p>
@@ -78,10 +78,15 @@
 
       <!-- Cabeçalho da tabela de componentes -->
       <div class="hidden md:grid grid-cols-12 gap-3 px-6 pt-4 pb-2">
+        {% comment %}
+        CORR-009: Código passou de col-span-1 para col-span-2 (o código completo não
+        cabia em 1/12). A coluna doadora é CH Total, que agora é read-only e mostra
+        só um número. O total continua somando 12.
+        {% endcomment %}
         <div class="col-span-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Disciplina</div>
-        <div class="col-span-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Código</div>
+        <div class="col-span-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Código</div>
         <div class="col-span-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Período</div>
-        <div class="col-span-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">CH Total</div>
+        <div class="col-span-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">CH Total</div>
         <div class="col-span-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Créditos</div>
         <div class="col-span-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">CH Sem.</div>
         <div class="col-span-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Remover</div>
@@ -115,8 +120,8 @@
               <div class="cc-dropdown hidden absolute z-20 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg mt-1 max-h-56 overflow-y-auto text-sm"></div>
             </div>
 
-            <!-- Código -->
-            <div class="col-span-6 md:col-span-1">
+            <!-- Código — CORR-009: col-span-2 (acompanha o cabeçalho) -->
+            <div class="col-span-6 md:col-span-2">
               <label class="md:hidden text-[10px] font-bold text-slate-400 uppercase mb-1 block">Código</label>
               {{ component_form.codigo }}
             </div>
@@ -127,8 +132,8 @@
               {{ component_form.periodo }}
             </div>
 
-            <!-- CH Total -->
-            <div class="col-span-4 md:col-span-2">
+            <!-- CH Total — CORR-009: doou uma coluna para o Código -->
+            <div class="col-span-4 md:col-span-1">
               <label class="md:hidden text-[10px] font-bold text-slate-400 uppercase mb-1 block">CH Total</label>
               {{ component_form.carga_horaria }}
             </div>
@@ -200,7 +205,7 @@
 </div>
 
 <!-- Modal: Copiar Matriz Anterior -->
-<div id="modal-copiar" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-sm">
+<div id="modal-copiar" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-sm px-4">
   <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-8 text-center">
     <div class="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
       <i class="ph ph-copy text-2xl text-[#025c9f]"></i>
@@ -249,11 +254,11 @@ if (container) {
         if (chInput) {
           chInput.value = info.carga_horaria || '';
           
-          // Calcular creditos e ch semanal
+          // Calcular creditos e ch semanal (mesmas regras do servidor —
+          // MatrixComponentForm.clean: creditos = ch // 20, ch semanal = ch / 20).
           const ch = parseInt(info.carga_horaria || 0);
-          const creds = Math.floor(ch / 20);
-          if (creditosInput) creditosInput.value = creds;
-          if (chSemanalInput) chSemanalInput.value = creds;
+          if (creditosInput) creditosInput.value = Math.floor(ch / 20);
+          if (chSemanalInput) chSemanalInput.value = (ch / 20).toFixed(2);
         }
       } else {
         if (codeInput) codeInput.value = '';
@@ -271,9 +276,8 @@ if (container) {
       const chSemanalInput = row.querySelector('input[name$="-carga_horaria_semanal"]');
       
       const ch = parseInt(chInput.value || 0);
-      const creds = Math.floor(ch / 20);
-      if (creditosInput) creditosInput.value = creds;
-      if (chSemanalInput) chSemanalInput.value = creds;
+      if (creditosInput) creditosInput.value = Math.floor(ch / 20);
+      if (chSemanalInput) chSemanalInput.value = (ch / 20).toFixed(2);
     }
   });
 }
@@ -526,12 +530,14 @@ function addComponent() {
     const credInput   = row.querySelector('input[name$="-creditos"]');
     const chSemInput  = row.querySelector('input[name$="-carga_horaria_semanal"]');
 
-    if (codeInput) codeInput.value = item.codigo || item.sigla || '';
+    if (codeInput) codeInput.value = item.codigo || '';
     if (chInput && item.carga_horaria) {
+      // Espelha as regras do servidor (MatrixComponentForm.clean):
+      // creditos = ch // 20, ch semanal = ch / 20. Os campos são apenas
+      // informativos — vêm `disabled` e o servidor recalcula tudo (CORR-007).
       chInput.value = item.carga_horaria;
-      const creds = Math.floor(item.carga_horaria / 20);
-      if (credInput) credInput.value = creds;
-      if (chSemInput) chSemInput.value = creds;
+      if (credInput) credInput.value = Math.floor(item.carga_horaria / 20);
+      if (chSemInput) chSemInput.value = (item.carga_horaria / 20).toFixed(2);
     }
   }
 

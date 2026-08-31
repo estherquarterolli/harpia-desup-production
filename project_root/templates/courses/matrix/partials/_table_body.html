@@ -12,7 +12,7 @@
 {% else %}
 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
   <div class="overflow-x-auto">
-    <table class="w-full text-left min-w-[640px]">
+    <table class="w-full text-left min-w-[640px] stack-table">
 
       {# Cabeçalho #}
       <thead>
@@ -41,7 +41,7 @@
           </td>
 
           {# Unidade #}
-          <td class="px-5 py-4">
+          <td class="px-5 py-4" data-label="Unidade">
             {% for unidade in matriz.unidades.all %}
               <span class="text-sm font-bold text-slate-600">{{ unidade.sigla }}</span>{% if not forloop.last %}, {% endif %}
             {% empty %}
@@ -50,7 +50,7 @@
           </td>
 
           {# Curso #}
-          <td class="px-5 py-4">
+          <td class="px-5 py-4" data-label="Curso">
             {% if matriz.curso %}
             <span class="text-sm font-bold text-slate-700">{{ matriz.curso.nome }}</span>
             <p class="text-[10px] text-slate-400 leading-tight truncate">Sigla: {{ matriz.curso.sigla }}</p>
@@ -60,20 +60,46 @@
           </td>
 
           {# Qtd Componentes #}
-          <td class="px-5 py-4 text-center">
+          <td class="px-5 py-4 text-center" data-label="Qtd. Matérias">
             <span class="text-sm font-bold text-slate-600">{{ matriz.qtd_componentes }}</span>
           </td>
 
           {# CH Total #}
-          <td class="px-5 py-4 text-center">
+          <td class="px-5 py-4 text-center" data-label="CH Total">
             <span class="text-sm font-bold text-slate-600">{{ matriz.ch_total|default:"0" }}h</span>
           </td>
           
           {# Ações #}
           <td class="px-5 py-4 text-right">
-            <a href="{% url 'courses:matrix_update' matriz.pk %}" class="inline-flex items-center gap-1 px-3 py-1.5 bg-[#025c9f]/10 text-[#025c9f] hover:bg-[#025c9f]/20 rounded-lg text-xs font-bold transition-colors">
-              <i class="ph ph-pencil-simple"></i> Editar
+            <div class="inline-flex items-center justify-end gap-2 flex-wrap">
+            {% if matriz.is_rascunho %}
+            <a href="{% url 'courses:matrix_update' matriz.pk %}" class="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-xs font-bold transition-colors border border-amber-200">
+              <i class="ph ph-pencil-simple"></i> Editar Rascunho
             </a>
+            {% elif is_desup %}
+              {% if matriz.is_vigente %}
+              <form method="post" action="{% url 'courses:matrix_archive' matriz.pk %}"
+                onsubmit="return confirm('Arquivar esta matriz? Ela sairá de Vigentes e irá para o Histórico.');" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg text-xs font-bold transition-colors border border-slate-200">
+                  <i class="ph ph-archive"></i> Arquivar
+                </button>
+              </form>
+              {% else %}
+              <form method="post" action="{% url 'courses:matrix_reactivate' matriz.pk %}"
+                onsubmit="return confirm('Reativar esta matriz? Ela voltará para Vigentes.');" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-xs font-bold transition-colors border border-emerald-200">
+                  <i class="ph ph-arrow-counter-clockwise"></i> Reativar
+                </button>
+              </form>
+              {% endif %}
+            {% else %}
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-50 text-slate-300 rounded-lg text-[10px] font-bold border border-slate-100" title="Apenas rascunhos podem ser editados">
+              <i class="ph ph-lock-simple"></i> Bloqueado
+            </span>
+            {% endif %}
+            </div>
           </td>
 
         </tr>
