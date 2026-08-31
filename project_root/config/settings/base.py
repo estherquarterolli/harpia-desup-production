@@ -4,6 +4,9 @@ Django settings for config project.
 
 from pathlib import Path
 from decouple import config
+from django.templatetags.static import static
+from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -12,8 +15,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 SECRET_KEY = config("SECRET_KEY")
 DEBUG = config("DEBUG", default=False, cast=bool)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1").split(",")
+LANGUAGE_CODE = "pt-br"
 TIME_ZONE = config("TIME_ZONE", default="America/Sao_Paulo")
+USE_I18N = True
 USE_TZ = True
+
+# Catálogo próprio em pt-BR para os textos do django-unfold que o Django
+# não traduz sozinho (o pacote não vem com locale próprio).
+LOCALE_PATHS = [BASE_DIR / "locale"]
 
 # Application definition
 INSTALLED_APPS = [
@@ -266,22 +275,163 @@ CELERY_TIMEZONE = TIME_ZONE
 
 UNFOLD = {
     "SITE_TITLE": "Harpia",
-    "SITE_SYMBOL": "ads_click",
-    "THEMING": {
-        "colors": {
-            "primary": {
-                "50": "239 246 255",
-                "100": "219 234 254",
-                "200": "191 219 254",
-                "300": "147 197 253",
-                "400": "96 165 250",
-                "500": "59 130 246",
-                "600": "37 99 235",
-                "700": "29 78 216",
-                "800": "30 64 175",
-                "900": "30 58 138",
-            },
+    "SITE_HEADER": "Harpia",
+    "SITE_URL": "/dashboard/",
+    "SITE_ICON": {
+        "light": lambda request: static("img/logo-harpia-colorida-modificada.PNG"),
+        "dark": lambda request: static("img/logo-harpia-colorida-modificada.PNG"),
+    },
+    "SITE_LOGO": {
+        "light": lambda request: static("img/logo-harpia-colorida-modificada.PNG"),
+        "dark": lambda request: static("img/logo-harpia-colorida-modificada.PNG"),
+    },
+    "SITE_SYMBOL": "hub",
+    # Paleta ancorada no azul da marca Harpia (#025c9f), o mesmo usado no
+    # app principal em static/css/dashboard.css (--azul-escuro / --azul-medio).
+    "COLORS": {
+        "primary": {
+            "50": "240 248 255",
+            "100": "219 237 252",
+            "200": "179 216 247",
+            "300": "130 190 240",
+            "400": "79 155 217",
+            "500": "33 118 187",
+            "600": "2 92 159",
+            "700": "2 74 128",
+            "800": "8 58 100",
+            "900": "12 46 79",
         },
+    },
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_applications": False,
+        "navigation": [
+            {
+                "title": _("Pessoas"),
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("Professores"),
+                        "icon": "school",
+                        "link": reverse_lazy("alloc_admin:professors_professor_changelist"),
+                    },
+                    {
+                        "title": _("Tipos de Contrato"),
+                        "icon": "badge",
+                        "link": reverse_lazy("alloc_admin:professors_contracttype_changelist"),
+                    },
+                    {
+                        "title": _("Disponibilidades"),
+                        "icon": "event_available",
+                        "link": reverse_lazy("alloc_admin:professors_availability_changelist"),
+                    },
+                    {
+                        "title": _("Ausências"),
+                        "icon": "event_busy",
+                        "link": reverse_lazy("alloc_admin:professors_absencerecord_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": _("Gestão Acadêmica"),
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("Cursos"),
+                        "icon": "menu_book",
+                        "link": reverse_lazy("alloc_admin:courses_course_changelist"),
+                    },
+                    {
+                        "title": _("Cursos por Unidade"),
+                        "icon": "domain",
+                        "link": reverse_lazy("alloc_admin:courses_courseunit_changelist"),
+                    },
+                    {
+                        "title": _("Componentes Curriculares"),
+                        "icon": "book_4",
+                        "link": reverse_lazy("alloc_admin:courses_curricularcomponent_changelist"),
+                    },
+                    {
+                        "title": _("Matrizes Curriculares"),
+                        "icon": "account_tree",
+                        "link": reverse_lazy("alloc_admin:courses_curriculummatrix_changelist"),
+                    },
+                    {
+                        "title": _("Componentes da Matriz"),
+                        "icon": "view_list",
+                        "link": reverse_lazy("alloc_admin:courses_matrixcomponent_changelist"),
+                    },
+                    {
+                        "title": _("Turmas"),
+                        "icon": "groups",
+                        "link": reverse_lazy("alloc_admin:courses_classgroup_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": _("Alocação & Extracurricular"),
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("Alocações Curriculares"),
+                        "icon": "calendar_month",
+                        "link": reverse_lazy("alloc_admin:allocations_alocacaocurricular_changelist"),
+                    },
+                    {
+                        "title": _("Pendências Extracurriculares"),
+                        "icon": "assignment_late",
+                        "link": reverse_lazy("alloc_admin:extra_curricular_pendenciaextra_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": _("Configurações do Sistema"),
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("Unidades"),
+                        "icon": "account_balance",
+                        "link": reverse_lazy("alloc_admin:core_unidade_changelist"),
+                    },
+                    {
+                        "title": _("Janelas de Entrega"),
+                        "icon": "lock_clock",
+                        "link": reverse_lazy("alloc_admin:core_janelaentrega_changelist"),
+                    },
+                    {
+                        "title": _("Notificações"),
+                        "icon": "notifications",
+                        "link": reverse_lazy("alloc_admin:core_notificacao_changelist"),
+                    },
+                    {
+                        "title": _("Auditoria Global"),
+                        "icon": "history",
+                        "link": reverse_lazy("alloc_admin:core_auditoriaglobal_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": _("Usuários & Permissões"),
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("Usuários"),
+                        "icon": "person",
+                        "link": reverse_lazy("alloc_admin:accounts_user_changelist"),
+                    },
+                    {
+                        "title": _("Grupos"),
+                        "icon": "group",
+                        "link": reverse_lazy("alloc_admin:auth_group_changelist"),
+                    },
+                ],
+            },
+        ],
     },
 }
 

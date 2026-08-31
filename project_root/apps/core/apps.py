@@ -13,3 +13,4 @@ def set_database_session_settings(sender, connection, **kwargs):
 
 class CoreConfig(AppConfig):
     name = 'apps.core'
+    verbose_name = 'Configurações do Sistema'

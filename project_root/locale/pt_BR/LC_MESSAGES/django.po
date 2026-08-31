@@ -1,0 +1,183 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Harpia\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# Catálogo próprio do projeto: cobre apenas os textos da interface do
+# django-unfold (admin) que não existem no catálogo pt_BR nativo do Django
+# (o pacote django-unfold não traz traduções próprias). Não sobrescreve
+# nenhuma string que o Django já traduz sozinho.
+
+msgid "Add row"
+msgstr "Adicionar linha"
+
+msgid "All applications"
+msgstr "Todas as aplicações"
+
+msgid "Apply Filters"
+msgstr "Aplicar Filtros"
+
+msgid "Cancel"
+msgstr "Cancelar"
+
+msgid "Choose file to upload"
+msgstr "Escolher arquivo para enviar"
+
+msgid "Click to cancel"
+msgstr "Clique para cancelar"
+
+msgid "Click to download"
+msgstr "Clique para baixar"
+
+msgid "Dark"
+msgstr "Escuro"
+
+msgid "Expand row"
+msgstr "Expandir linha"
+
+msgid "False"
+msgstr "Não"
+
+msgid "Filters"
+msgstr "Filtros"
+
+msgid "Forgotten your password or username?"
+msgstr "Esqueceu sua senha ou usuário?"
+
+msgid "General"
+msgstr "Geral"
+
+msgid "Go back"
+msgstr "Voltar"
+
+msgid "Image preview"
+msgstr "Pré-visualização da imagem"
+
+msgid "Light"
+msgstr "Claro"
+
+msgid "More actions"
+msgstr "Mais ações"
+
+msgid "Navigate"
+msgstr "Navegar"
+
+msgid "Next"
+msgstr "Próxima"
+
+msgid "No data"
+msgstr "Sem dados"
+
+msgid "No results found"
+msgstr "Nenhum resultado encontrado"
+
+msgid "Nothing matched your search"
+msgstr "Nada correspondeu à sua busca"
+
+msgid "Previous"
+msgstr "Anterior"
+
+msgid "Recent searches"
+msgstr "Buscas recentes"
+
+msgid "Record picture"
+msgstr "Imagem do registro"
+
+msgid "Reset filters"
+msgstr "Limpar filtros"
+
+msgid "Return to site"
+msgstr "Voltar ao sistema"
+
+msgid "Search apps and models..."
+msgstr "Buscar aplicações e modelos..."
+
+msgid "Select"
+msgstr "Selecionar"
+
+msgid "Select all rows"
+msgstr "Selecionar todas as linhas"
+
+msgid "Submit"
+msgstr "Enviar"
+
+msgid "System"
+msgstr "Sistema"
+
+msgid "This item will be deleted."
+msgstr "Este item será excluído."
+
+msgid "This page yielded into no results. Create a new item or reset your filters."
+msgstr "Esta página não retornou resultados. Crie um novo item ou limpe os filtros."
+
+msgid "Toggle password visibility"
+msgstr "Mostrar/ocultar senha"
+
+msgid "True"
+msgstr "Sim"
+
+msgid "Type to search"
+msgstr "Digite para buscar"
+
+msgid "Yes, I'm sure"
+msgstr "Sim, tenho certeza"
+
+msgid "You don't have permission to view or edit anything."
+msgstr "Você não tem permissão para visualizar ou editar nada."
+
+msgid "You have been successfully logged out from the administration"
+msgstr "Você saiu da administração com sucesso"
+
+msgid "Welcome back to"
+msgstr "Bem-vindo(a) de volta a"
+
+msgid "Welcome"
+msgstr "Bem-vindo(a)"
+
+msgid "Date from"
+msgstr "Data de"
+
+msgid "Date to"
+msgstr "Data até"
+
+msgid "Date"
+msgstr "Data"
+
+msgid "From"
+msgstr "De"
+
+msgid "Select action to run"
+msgstr "Selecione a ação a executar"
+
+msgid "Select action"
+msgstr "Selecionar ação"
+
+msgid "Select currency"
+msgstr "Selecionar moeda"
+
+msgid "Select format"
+msgstr "Selecionar formato"
+
+msgid "Select record"
+msgstr "Selecionar registro"
+
+msgid "Select value"
+msgstr "Selecionar valor"
+
+msgid "To"
+msgstr "Até"
+
+msgid "Value"
+msgstr "Valor"
+
+msgid "Dataset not found. No action performed."
+msgstr "Conjunto de dados não encontrado. Nenhuma ação realizada."
+
+msgid "You can not create nested object without parent"
+msgstr "Não é possível criar um objeto aninhado sem um item pai"
+
+msgid "This object doesn't have a change history. It probably wasn't added via this admin site."
+msgstr "Este objeto não possui histórico de alterações. Provavelmente não foi adicionado por este site de administração."
