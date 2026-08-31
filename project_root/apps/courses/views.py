@@ -11,7 +11,7 @@ from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 from apps.accounts.mixins import PerfilRequiredMixin
 from apps.core.models import Unidade
 
-from .forms import ClassGroupForm, CurriculumMatrixForm, MatrixComponentForm, MatrixComponentFormSet, CurricularComponentForm
+from .forms import ClassGroupForm, CurriculumMatrixForm, MatrixComponentForm, MatrixComponentFormSet, CurricularComponentForm, CurricularComponentImportForm
 from .models import ClassGroup, Course, CourseUnit, CurriculumMatrix, MatrixComponent, CurricularComponent
 
 
@@ -724,6 +724,93 @@ class CurricularComponentListView(DesupOnlyMixin, ListView):
                 Q(codigo__icontains=q)
             )
         return qs
+
+
+class CurricularComponentImportView(DesupOnlyMixin, View):
+    """Importa Componentes Curriculares de uma planilha Excel ou do Google Sheets.
+
+    Regra do cliente: casa pelo código.
+      - Código novo -> cria direto.
+      - Código já existente -> não mexe sozinho; pede confirmação numa
+        segunda tela (mostrando valor atual x valor da planilha) antes de
+        sobrescrever.
+    """
+    template_name = 'courses/component_import.html'
+    SESSION_KEY = 'component_import_rows'
+
+    def get(self, request):
+        request.session.pop(self.SESSION_KEY, None)
+        return render(request, self.template_name, {'form': CurricularComponentImportForm()})
+
+    def post(self, request):
+        from .import_services import (
+            SpreadsheetImportError,
+            apply_import,
+            parse_google_sheets_url,
+            parse_uploaded_spreadsheet,
+            preview_import,
+        )
+
+        if request.POST.get('confirm_step') == '1':
+            rows = request.session.get(self.SESSION_KEY)
+            if rows is None:
+                messages.error(request, 'A confirmação expirou — envie a planilha de novo.')
+                return redirect('courses:component_import')
+
+            previews = preview_import(rows)
+            replace_codigos = set(request.POST.getlist('replace'))
+            summary = apply_import(previews, replace_codigos)
+            request.session.pop(self.SESSION_KEY, None)
+            self._flash_summary(request, summary)
+            return render(request, self.template_name, {'form': CurricularComponentImportForm(), 'summary': summary})
+
+        form = CurricularComponentImportForm(request.POST, request.FILES)
+        if not form.is_valid():
+            return render(request, self.template_name, {'form': form})
+
+        try:
+            if form.cleaned_data.get('arquivo'):
+                rows = parse_uploaded_spreadsheet(form.cleaned_data['arquivo'])
+            else:
+                rows = parse_google_sheets_url(form.cleaned_data['google_sheets_url'])
+        except SpreadsheetImportError as e:
+            form.add_error(None, str(e))
+            return render(request, self.template_name, {'form': form})
+
+        if not rows:
+            messages.warning(request, 'Nenhuma linha de dados encontrada na planilha.')
+            return render(request, self.template_name, {'form': CurricularComponentImportForm()})
+
+        previews = preview_import(rows)
+        duplicates = [p for p in previews if p.status == 'duplicate']
+
+        if not duplicates:
+            # nada pra confirmar — aplica direto (só 'new' e possíveis 'error')
+            summary = apply_import(previews, replace_codigos=set())
+            self._flash_summary(request, summary)
+            return render(request, self.template_name, {'form': CurricularComponentImportForm(), 'summary': summary})
+
+        # existe pelo menos um código repetido — pede confirmação antes de tocar no banco
+        request.session[self.SESSION_KEY] = rows
+        novos = [p for p in previews if p.status == 'new']
+        erros = [p for p in previews if p.status == 'error']
+        return render(request, self.template_name, {
+            'form': CurricularComponentImportForm(),
+            'preview_duplicates': duplicates,
+            'preview_novos_count': len(novos),
+            'preview_erros_count': len(erros),
+        })
+
+    @staticmethod
+    def _flash_summary(request, summary):
+        if summary.added:
+            messages.success(request, f'{len(summary.added)} componente(s) curricular(es) criado(s).')
+        if summary.replaced:
+            messages.success(request, f'{len(summary.replaced)} componente(s) substituído(s) pelos dados da planilha.')
+        if summary.skipped:
+            messages.info(request, f'{len(summary.skipped)} linha(s) mantida(s) como estavam (não marcadas para substituição).')
+        if summary.errors:
+            messages.warning(request, f'{len(summary.errors)} linha(s) com erro — veja o detalhamento abaixo.')
 
 
 class CurricularComponentCreateView(DesupOnlyMixin, CreateView):

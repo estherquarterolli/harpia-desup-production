@@ -169,6 +169,36 @@ class ClassGroupForm(forms.ModelForm):
         }
 
 
+class CurricularComponentImportForm(forms.Form):
+    """Upload de planilha (.xlsx) OU link público do Google Sheets — um dos dois."""
+
+    arquivo = forms.FileField(
+        required=False,
+        label="Planilha Excel (.xlsx)",
+        widget=forms.ClearableFileInput(attrs={'class': _FIELD_CSS, 'accept': '.xlsx'}),
+    )
+    google_sheets_url = forms.URLField(
+        required=False,
+        label="ou link do Google Sheets",
+        widget=forms.URLInput(attrs={
+            'class': _FIELD_CSS,
+            'placeholder': 'https://docs.google.com/spreadsheets/d/.../edit',
+        }),
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        arquivo = cleaned.get('arquivo')
+        url = cleaned.get('google_sheets_url')
+        if not arquivo and not url:
+            raise forms.ValidationError("Envie um arquivo .xlsx ou cole o link de uma planilha do Google Sheets.")
+        if arquivo and url:
+            raise forms.ValidationError("Escolha só uma opção: arquivo OU link do Google Sheets, não os dois.")
+        if arquivo and not arquivo.name.lower().endswith('.xlsx'):
+            raise forms.ValidationError("O arquivo precisa ser .xlsx (Excel).")
+        return cleaned
+
+
 class CurricularComponentForm(forms.ModelForm):
     """Form para criação/edição de Componente Curricular pela DESUP."""
 

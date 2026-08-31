@@ -40,6 +40,7 @@ urlpatterns = [
     # ── Componentes Curriculares (DESUP) ───────────────────────
     path('componentes/', views.CurricularComponentListView.as_view(), name='component_list'),
     path('componentes/novo/', views.CurricularComponentCreateView.as_view(), name='component_create'),
+    path('componentes/importar/', views.CurricularComponentImportView.as_view(), name='component_import'),
     path('componentes/<int:pk>/editar/', views.CurricularComponentUpdateView.as_view(), name='component_edit'),
     path('componentes/<int:pk>/excluir/', views.CurricularComponentDeleteView.as_view(), name='component_delete'),
 

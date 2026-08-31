@@ -43,10 +43,16 @@
   <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
     <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center px-6 py-4 border-b border-slate-100">
       <p class="text-sm font-semibold text-slate-500">{{ componentes|length }} componente(s) encontrado(s)</p>
-      <a href="{% url 'courses:component_create' %}"
-        class="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#ffb800] hover:bg-yellow-400 text-[#025c9f] px-4 py-2.5 rounded-xl text-sm font-black transition-colors shadow-md">
-        <i class="ph ph-plus"></i> Novo Componente
-      </a>
+      <div class="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
+        <a href="{% url 'courses:component_import' %}"
+          class="w-full sm:w-auto flex items-center justify-center gap-2 bg-white border border-[#025c9f] hover:bg-blue-50 text-[#025c9f] px-4 py-2.5 rounded-xl text-sm font-black transition-colors shadow-sm">
+          <i class="ph ph-file-arrow-up"></i> Importar Planilha
+        </a>
+        <a href="{% url 'courses:component_create' %}"
+          class="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#ffb800] hover:bg-yellow-400 text-[#025c9f] px-4 py-2.5 rounded-xl text-sm font-black transition-colors shadow-md">
+          <i class="ph ph-plus"></i> Novo Componente
+        </a>
+      </div>
     </div>
 
     <div class="overflow-x-auto">
