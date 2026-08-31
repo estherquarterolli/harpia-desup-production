@@ -187,6 +187,13 @@ DJANGO_LOG_LEVEL = config("DJANGO_LOG_LEVEL", default="INFO")
 LOG_DIR = BASE_DIR / "logs"
 try:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
+    # mkdir com exist_ok=True não falha se o diretório já existir (ex.: foi
+    # criado durante o build, que roda com filesystem gravável) mesmo que o
+    # filesystem em runtime seja somente-leitura (caso do Vercel) — por isso
+    # testamos a escrita de um arquivo de verdade, não só a criação do dir.
+    _log_dir_probe = LOG_DIR / ".write_test"
+    _log_dir_probe.touch()
+    _log_dir_probe.unlink()
 except OSError:
     # Filesystem somente-leitura (ambientes efêmeros): segue só com console.
     LOG_DIR = None
