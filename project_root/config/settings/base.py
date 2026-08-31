@@ -185,18 +185,24 @@ ADMIN_EMAIL_INCLUDE_HTML = config("ADMIN_EMAIL_INCLUDE_HTML", default=False, cas
 DJANGO_LOG_LEVEL = config("DJANGO_LOG_LEVEL", default="INFO")
 
 LOG_DIR = BASE_DIR / "logs"
-try:
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    # mkdir com exist_ok=True não falha se o diretório já existir (ex.: foi
-    # criado durante o build, que roda com filesystem gravável) mesmo que o
-    # filesystem em runtime seja somente-leitura (caso do Vercel) — por isso
-    # testamos a escrita de um arquivo de verdade, não só a criação do dir.
-    _log_dir_probe = LOG_DIR / ".write_test"
-    _log_dir_probe.touch()
-    _log_dir_probe.unlink()
-except OSError:
-    # Filesystem somente-leitura (ambientes efêmeros): segue só com console.
+if config("VERCEL", default=""):
+    # Vercel seta VERCEL=1 automaticamente em build e runtime. O runtime da
+    # function é sempre somente-leitura fora de /tmp — nem tenta: só console
+    # (que o próprio Vercel já captura como log da function).
     LOG_DIR = None
+else:
+    try:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        # mkdir com exist_ok=True não falha se o diretório já existir (ex.:
+        # foi criado antes num filesystem gravável) mesmo que agora esteja
+        # somente-leitura — por isso testamos a escrita de um arquivo de
+        # verdade, não só a criação do dir.
+        _log_dir_probe = LOG_DIR / ".write_test"
+        _log_dir_probe.touch()
+        _log_dir_probe.unlink()
+    except OSError:
+        # Filesystem somente-leitura (outros ambientes efêmeros): só console.
+        LOG_DIR = None
 
 _error_handlers = ["console"] + (["file"] if LOG_DIR else [])
 
