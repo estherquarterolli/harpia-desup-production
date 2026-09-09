@@ -47,7 +47,7 @@ contrato_40h, _ = ContractType.objects.get_or_create(
     }
 )
 contrato_20h, _ = ContractType.objects.get_or_create(
-    nome='Professor FAETEC I 20H',
+    nome='Professor FAETEC II 20H',
     defaults={
         'categoria': 'EFETIVO',
         'regime_trabalho': '20h',

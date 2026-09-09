@@ -129,7 +129,7 @@ def seed_paracambi():
 
     print("Criando Tipos de Contrato...")
     c_40h_i, _ = ContractType.objects.get_or_create(
-        nome="PROFESSOR FAETEC I 40H",
+        nome="PROFESSOR FAETEC II 40H",
         defaults={"max_class_hours": 20, "max_total_hours": 40, "max_classes": 10}
     )
     c_40h_sup, _ = ContractType.objects.get_or_create(
