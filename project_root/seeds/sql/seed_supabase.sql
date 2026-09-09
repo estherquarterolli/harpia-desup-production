@@ -42,7 +42,6 @@ VALUES
   (1, 'Professor FAETEC II - 40h', 'EFETIVO', '40h', 3, 32, 40, 6),
   (2, 'Professor FAETEC II - 20h', 'EFETIVO', '20h', 2, 16, 20, 4),
   (3, 'Professor FAETEC Ensino Superior 40h', 'EFETIVO', '40h DE', 3, 32, 40, 6),
-  (4, 'Instrutor', 'EFETIVO', '40h', 3, 20, 40, 4),
   (5, 'Professor Contratado 20h', 'TERCEIRIZADO', '20h', 2, 16, 20, 4),
   (6, 'Professor Contratado 40h', 'TERCEIRIZADO', '40h', 3, 32, 40, 6),
   (7, 'Professor Cedido', 'EFETIVO', '40h', 3, 20, 40, 4);

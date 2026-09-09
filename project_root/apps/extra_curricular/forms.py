@@ -87,20 +87,12 @@ class BasePendenciaFormSet(BaseInlineFormSet):
         ch_extra_total = float(ch_outros) + ch_deste_formset
         ch_global_total = float(ch_sala) + ch_extra_total
 
-        if professor.limite_horas_extra is not None:
-            limite = float(professor.limite_horas_extra)
-            if ch_extra_total > limite:
-                raise forms.ValidationError(
-                    f"Limite de horas extracurriculares excedido. O limite definido para este docente é {limite}h. "
-                    f"As justificativas extras totalizariam {ch_extra_total}h."
-                )
-        else:
-            limite_total = float(professor.ch_total) if professor.ch_total else 40.0
-            if ch_global_total > limite_total:
-                raise forms.ValidationError(
-                    f"Limite global de {limite_total}h semanais excedido. O docente já possui {ch_sala}h em sala. "
-                    f"As justificativas extras totalizariam {ch_extra_total}h (Total: {ch_global_total}h)."
-                )
+        limite_total = float(professor.ch_total) if professor.ch_total else 40.0
+        if ch_global_total > limite_total:
+            raise forms.ValidationError(
+                f"Limite global de {limite_total}h semanais excedido. O docente já possui {ch_sala}h em sala. "
+                f"As justificativas extras totalizariam {ch_extra_total}h (Total: {ch_global_total}h)."
+            )
 
         # Preparação Regra BTT: se for BTT, trava em 10h de sala (o front/alocação já deve travar)
         # if professor.tipo_contrato and "BTT" in professor.tipo_contrato.nome and ch_sala > 10:

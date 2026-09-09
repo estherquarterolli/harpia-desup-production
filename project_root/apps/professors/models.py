@@ -34,7 +34,7 @@ class ContractType(models.Model):
         ordering = ['nome']
 
     def __str__(self):
-        return f"{self.nome} (Max: {self.max_class_hours}h / {self.max_classes} turmas)"
+        return self.nome
 
 class Professor(models.Model):
     """
@@ -68,15 +68,7 @@ class Professor(models.Model):
     #  Campos DESUP (Sobrescritas e Ajustes - Regra #3)
     desup_nome = models.CharField(max_length=255, blank=True, null=True, verbose_name="Nome (Ajuste DESUP)")
     desup_email = models.EmailField(blank=True, null=True, verbose_name="E-mail (Ajuste DESUP)")
-    limite_horas_extra = models.DecimalField(
-        max_digits=5,
-        decimal_places=1,
-        null=True,
-        blank=True,
-        verbose_name="Limite de Horas Extracurriculares",
-        help_text="Máximo de horas extracurriculares permitidas. Se vazio, usa o limite total do contrato.",
-    )
-    
+
     tipo_contrato = models.ForeignKey(
         ContractType,
         on_delete=models.PROTECT,
@@ -213,11 +205,8 @@ class Professor(models.Model):
     def limite_horas_extra_efetivo(self) -> float:
         """
         Limite de horas extracurriculares aprováveis pela DESUP.
-        Usa o valor manual (limite_horas_extra) se definido; caso contrário,
-        usa o total já calculado pelo sistema (horas de sala ainda não preenchidas).
+        Usa o total já calculado pelo sistema (horas de sala ainda não preenchidas).
         """
-        if self.limite_horas_extra is not None:
-            return float(self.limite_horas_extra)
         meta = self.tipo_contrato.max_class_hours if self.tipo_contrato else 0
         return max(meta - self.ch_alocada, 0)
 

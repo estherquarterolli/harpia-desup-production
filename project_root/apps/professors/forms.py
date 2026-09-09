@@ -19,7 +19,6 @@ class ProfessorForm(forms.ModelForm):
             'materia',
             'cursos',
             'status',
-            'limite_horas_extra',
         ]
         widgets = {
             'id_funcional': forms.TextInput(attrs={'class': _INPUT_CSS, 'placeholder': 'Ex: 1234567'}),
@@ -35,12 +34,6 @@ class ProfessorForm(forms.ModelForm):
             'materia': forms.Select(attrs={'class': _SELECT_CSS}),
             'cursos': forms.CheckboxSelectMultiple(),
             'status': forms.Select(attrs={'class': _SELECT_CSS}),
-            'limite_horas_extra': forms.NumberInput(attrs={
-                'class': _INPUT_CSS,
-                'placeholder': 'Ex: 20 (vazio = usa limite do contrato)',
-                'min': '0',
-                'step': '0.5',
-            }),
         }
         labels = {
             'id_funcional': 'ID',
@@ -51,7 +44,6 @@ class ProfessorForm(forms.ModelForm):
             'materia': 'Eixo',
             'cursos': 'Cursos (Checklist)',
             'status': 'Status',
-            'limite_horas_extra': 'Limite de Horas Extracurriculares',
         }
 
     def __init__(self, *args, **kwargs):
@@ -66,18 +58,14 @@ class ProfessorForm(forms.ModelForm):
             )
             if is_gestor_unidade:
                 # CORR: esconder o widget NÃO protege o campo — o valor do POST continuava
-                # sendo aceito e o coordenador conseguia (a) empurrar o docente para outra
-                # unidade e (b) esticar o próprio teto de horas extras (que alimenta
-                # `limite_horas_extra_efetivo`, usado no parecer da DESUP). Com
-                # `disabled=True` o Django ignora o que vier no POST e usa sempre o valor
-                # inicial (o da instância na edição), fechando a escrita cruzada.
+                # sendo aceito e o coordenador conseguia empurrar o docente para outra
+                # unidade. Com `disabled=True` o Django ignora o que vier no POST e usa
+                # sempre o valor inicial (o da instância na edição), fechando a escrita
+                # cruzada.
                 self.fields['unidade_principal'].widget = forms.HiddenInput()
                 self.fields['unidade_principal'].disabled = True
                 if self.user.unidade:
                     self.fields['unidade_principal'].initial = self.user.unidade
-                self.fields['limite_horas_extra'].widget = forms.HiddenInput()
-                self.fields['limite_horas_extra'].disabled = True
-                self.fields['limite_horas_extra'].required = False
 
         # Configurar queryset de cursos baseado na unidade selecionada (para edição ou erro de form)
         unidade_id = None
