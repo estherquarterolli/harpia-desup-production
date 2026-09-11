@@ -21,6 +21,7 @@ class Unidade(models.Model):
     )
 
     class Meta:
+        db_table = 'harpiadb_nucleo_unidade'
         verbose_name = 'Unidade'
         verbose_name_plural = 'Unidades'
         ordering = ['nome']
@@ -54,6 +55,7 @@ class JanelaEntrega(models.Model):
     )
 
     class Meta:
+        db_table = "harpiadb_nucleo_janela_entrega"
         verbose_name = "Janela de Entrega"
         verbose_name_plural = "Janelas de Entrega"
         ordering = ['-semestre', '-data_fim']
@@ -125,6 +127,7 @@ class Notificacao(models.Model):
     data_criacao = models.DateTimeField(auto_now_add=True, verbose_name="Data de Criação")
 
     class Meta:
+        db_table = "harpiadb_nucleo_notificacao"
         verbose_name = "Notificação"
         verbose_name_plural = "Notificações"
         ordering = ['-data_criacao']
@@ -154,6 +157,7 @@ class AuditoriaGlobal(models.Model):
     criado_em = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name='Data de Criacao')
 
     class Meta:
+        db_table = 'harpiadb_nucleo_auditoria'
         verbose_name = 'Auditoria Global'
         verbose_name_plural = 'Auditoria Global'
         ordering = ['-criado_em']
@@ -177,6 +181,7 @@ class AtalhoDashboard(models.Model):
     criado_em = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
 
     class Meta:
+        db_table = 'harpiadb_nucleo_atalho_dashboard'
         verbose_name = 'Atalho do Dashboard'
         verbose_name_plural = 'Atalhos do Dashboard'
         ordering = ['ordem', 'id']

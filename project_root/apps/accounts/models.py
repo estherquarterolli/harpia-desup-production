@@ -103,12 +103,35 @@ class User(AbstractUser):
         verbose_name="Forcar troca de senha",
     )
 
+    groups = models.ManyToManyField(
+        Group,
+        verbose_name=_("groups"),
+        blank=True,
+        help_text=_(
+            "The groups this user belongs to. A user will get all permissions "
+            "granted to each of their groups."
+        ),
+        related_name="user_set",
+        related_query_name="user",
+        db_table="harpiadb_contas_usuario_grupos",
+    )
+    user_permissions = models.ManyToManyField(
+        Permission,
+        verbose_name=_("user permissions"),
+        blank=True,
+        help_text=_("Specific permissions for this user."),
+        related_name="user_set",
+        related_query_name="user",
+        db_table="harpiadb_contas_usuario_permissoes",
+    )
+
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
 
     objects = UserManager()
 
     class Meta:
+        db_table = "harpiadb_contas_usuario"
         verbose_name = "Usuario"
         verbose_name_plural = "Usuarios"
         ordering = ["email"]
@@ -158,6 +181,7 @@ class PasswordResetRequest(models.Model):
     COOLDOWN = timedelta(hours=24)
 
     class Meta:
+        db_table = "harpiadb_contas_redefinicao_senha"
         verbose_name = "Solicitacao de Reset"
         verbose_name_plural = "Solicitacoes de Reset"
         ordering = ["-criado_em"]
@@ -203,6 +227,7 @@ class SelfPasswordChangeRequest(models.Model):
     COOLDOWN = timedelta(days=1)
 
     class Meta:
+        db_table = "harpiadb_contas_alteracao_senha"
         verbose_name = "Solicitacao de Troca de Senha"
         verbose_name_plural = "Solicitacoes de Troca de Senha"
         ordering = ["-criado_em"]

@@ -29,6 +29,7 @@ class ContractType(models.Model):
     max_classes = models.PositiveIntegerField(verbose_name="Limite de turmas")
 
     class Meta:
+        db_table = "harpiadb_professores_tipo_contrato"
         verbose_name = "Tipo de Contrato"
         verbose_name_plural = "Tipos de Contrato"
         ordering = ['nome']
@@ -89,7 +90,8 @@ class Professor(models.Model):
         'courses.Course',
         blank=True,
         related_name='professores_cursos',
-        verbose_name="Cursos"
+        verbose_name="Cursos",
+        db_table="harpiadb_professores_professor_cursos",
     )
 
     class MateriaChoices(models.TextChoices):
@@ -123,6 +125,7 @@ class Professor(models.Model):
     )
 
     class Meta:
+        db_table = "harpiadb_professores_professor"
         verbose_name = "Professor"
         verbose_name_plural = "Professores"
         ordering = ['rh_nome']
@@ -292,6 +295,7 @@ class Availability(models.Model):
     )
 
     class Meta:
+        db_table = "harpiadb_professores_disponibilidade"
         verbose_name = "Disponibilidade"
         verbose_name_plural = "Disponibilidades"
         unique_together = ('professor', 'dia_semana', 'turno')
@@ -321,6 +325,7 @@ class AbsenceRecord(models.Model):
     )
 
     class Meta:
+        db_table = "harpiadb_professores_ausencia"
         verbose_name = "Registro de Ausência"
         verbose_name_plural = "Registros de Ausência"
         ordering = ['-data_inicio']

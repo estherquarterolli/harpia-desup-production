@@ -40,6 +40,7 @@ class AlocacaoCurricular(models.Model):
     data_ultimo_ajuste = models.DateTimeField(auto_now=True)
 
     class Meta:
+        db_table = "harpiadb_alocacoes_alocacao_curricular"
         verbose_name = "Alocação Curricular"
         verbose_name_plural = "Alocações Curriculares"
         unique_together = ('curso', 'semestre', 'turno')

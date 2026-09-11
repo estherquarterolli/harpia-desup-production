@@ -96,6 +96,7 @@ class PendenciaExtra(models.Model):
     data_atualizacao = models.DateTimeField(auto_now=True,    verbose_name="Atualizado em")
 
     class Meta:
+        db_table              = "harpiadb_extracurricular_pendencia"
         verbose_name          = "Pendência Extracurricular"
         verbose_name_plural   = "Pendências Extracurriculares"
         unique_together       = ("professor", "semestre")
@@ -221,6 +222,7 @@ class OrientacaoTCC(models.Model):
     data_atualizacao = models.DateTimeField(auto_now=True)
 
     class Meta:
+        db_table            = "harpiadb_extracurricular_orientacao_tcc"
         verbose_name        = "Orientação de TCC"
         verbose_name_plural = "Orientações de TCC"
 
@@ -320,6 +322,7 @@ class AtividadeExtensionista(models.Model):
     data_atualizacao = models.DateTimeField(auto_now=True)
 
     class Meta:
+        db_table            = "harpiadb_extracurricular_atividade_extensionista"
         verbose_name        = "Atividade Extensionista"
         verbose_name_plural = "Atividades Extensionistas"
 
@@ -402,6 +405,7 @@ class ReducaoCargaHoraria(models.Model):
     data_atualizacao = models.DateTimeField(auto_now=True)
 
     class Meta:
+        db_table            = "harpiadb_extracurricular_reducao_carga_horaria"
         verbose_name        = "Redução de Carga Horária"
         verbose_name_plural = "Reduções de Carga Horária"
 

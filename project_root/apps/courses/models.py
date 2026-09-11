@@ -10,6 +10,7 @@ class Course(models.Model):
     sigla = models.CharField(max_length=20, unique=True, verbose_name="Sigla")
 
     class Meta:
+        db_table = "harpiadb_cursos_curso"
         verbose_name = "Curso"
         verbose_name_plural = "Cursos"
         ordering = ['nome']
@@ -34,6 +35,7 @@ class CourseUnit(models.Model):
     ativo = models.BooleanField(default=True, verbose_name="Ativo")
 
     class Meta:
+        db_table = "harpiadb_cursos_curso_unidade"
         verbose_name = "Curso na Unidade"
         verbose_name_plural = "Cursos na Unidade"
         unique_together = ('curso', 'unidade')
@@ -64,11 +66,13 @@ class CurricularComponent(models.Model):
         symmetrical=False,
         blank=True,
         related_name='componentes_dependentes',
-        verbose_name="Pre-requisitos padrao"
+        verbose_name="Pre-requisitos padrao",
+        db_table="harpiadb_cursos_componente_pre_requisitos",
     )
     ementa = models.TextField(blank=True, verbose_name="Ementa")
 
     class Meta:
+        db_table = "harpiadb_cursos_componente_curricular"
         verbose_name = "Componente Curricular"
         verbose_name_plural = "Componentes Curriculares"
         ordering = ['nome']
@@ -96,6 +100,7 @@ class CurriculumMatrix(models.Model):
         blank=True,
         related_name='curriculum_matrices',
         verbose_name="Unidades",
+        db_table="harpiadb_cursos_matriz_unidades",
     )
     nome = models.CharField(
         max_length=100,
@@ -141,6 +146,7 @@ class CurriculumMatrix(models.Model):
         verbose_name="Componentes Curriculares"
     )
     class Meta:
+        db_table = "harpiadb_cursos_matriz_curricular"
         verbose_name = "Matriz Curricular"
         verbose_name_plural = "Matrizes Curriculares"
         ordering = ['curso__nome', 'nome']
@@ -192,7 +198,8 @@ class MatrixComponent(models.Model):
         CurricularComponent,
         blank=True,
         related_name='requisito_em_matrizes',
-        verbose_name="Pre-requisitos"
+        verbose_name="Pre-requisitos",
+        db_table="harpiadb_cursos_matriz_pre_requisitos",
     )
     docente = models.ForeignKey(
         'professors.Professor',
@@ -242,6 +249,7 @@ class MatrixComponent(models.Model):
         return (self.carga_horaria or 0) * Decimal("50") / Decimal("60")
 
     class Meta:
+        db_table = "harpiadb_cursos_componente_matriz"
         verbose_name = "Componente da Matriz"
         verbose_name_plural = "Componentes da Matriz"
         unique_together = ('matriz', 'componente_curricular')
@@ -310,6 +318,7 @@ class ClassGroup(models.Model):
     )
 
     class Meta:
+        db_table = "harpiadb_cursos_turma"
         verbose_name = "Turma"
         verbose_name_plural = "Turmas"
         unique_together = ('matriz_curricular', 'ano_semestre', 'identificador')
