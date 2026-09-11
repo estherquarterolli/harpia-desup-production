@@ -35,7 +35,7 @@ class CustomUserAdmin(DjangoUserAdmin, ModelAdmin):
 
     actions = ['resetar_senha_usuarios', 'ativar_senha_padrao']
 
-    @admin.action(description="Resetar senha dos usuários selecionados para Faetec@123")
+    @admin.action(description="Resetar senha dos usuários selecionados para a senha padrão e forçar troca")
     def resetar_senha_usuarios(self, request, queryset):
         self._aplicar_senha_padrao(request, queryset, "resetada")
 
