@@ -2,7 +2,7 @@
 
 > Sistema de Gestão e Alocação de Professores para Coordenação Acadêmica
 >
-> **Última atualização (09/09/2026):** este README foi revisado a partir do `requirements.txt` e dos arquivos de deploy do repositório. A principal correção é a seção **Arquitetura → Banco de Dados/Infraestrutura**, que estava desatualizada (ver changelog no final do arquivo).
+> **Última atualização (09/09/2026):** este README foi revisado a partir do `requirements.txt` e dos arquivos de deploy do repositório. 
 
 Sobre • Funcionalidades • Arquitetura • Como Executar • Regras de Negócio • Perfis • Roadmap
 
