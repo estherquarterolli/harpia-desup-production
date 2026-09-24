@@ -2,7 +2,10 @@ from .base import *
 import dj_database_url
 
 DEBUG = False
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost").split(",")
+ALLOWED_HOSTS = config(
+    "ALLOWED_HOSTS",
+    default="harpiadesup.vercel.app,.vercel.app,localhost,127.0.0.1",
+).split(",")
 
 # Domínios dinâmicos do Vercel: VERCEL_URL é o do deploy atual (muda a cada
 # build), VERCEL_PROJECT_PRODUCTION_URL é o domínio fixo de produção
@@ -11,8 +14,11 @@ for vercel_host in (config("VERCEL_URL", default=""), config("VERCEL_PROJECT_PRO
     if vercel_host and vercel_host not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(vercel_host)
 
+# ".vercel.app" em ALLOWED_HOSTS libera qualquer subdomínio (Django aceita
+# esse prefixo), mas CSRF_TRUSTED_ORIGINS exige o coringa explícito "*.".
 CSRF_TRUSTED_ORIGINS = [
-    f"https://{host}" for host in ALLOWED_HOSTS if host not in ("localhost", "127.0.0.1")
+    f"https://{'*' + host if host.startswith('.') else host}"
+    for host in ALLOWED_HOSTS if host not in ("localhost", "127.0.0.1")
 ]
 
 database_url = config("DATABASE_URL", default="").strip()
