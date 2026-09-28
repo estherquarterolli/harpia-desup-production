@@ -634,12 +634,20 @@ class HtmxProfessorE2ETests(ProfessorE2EBase):
 
         resposta = self.client.get(self.url_tabela)
 
-        # ch_total = 40 (contrato), ch_alocada = 4 -> não alocado = 36.
+        # CORRIGIDO: "Não alocado"/"% Alocado" são relativos à meta de horas EM
+        # SALA (max_class_hours = 20 no contrato do cenário), não ao total do
+        # contrato (ch_total/max_total_hours = 40). Antes a view usava ch_total
+        # como base e um professor com 4h em sala aparecia com 36h de "sobra"
+        # (10% alocado) em vez das 16h reais (20% alocado) — a mesma distorção
+        # relatada para o professor "Alexandre" (alocado 6h de 20h em sala
+        # deveria mostrar 14h não alocadas, não 34h).
+        # "Total" na tabela continua sendo o ch_total do contrato (40h); só o
+        # cálculo de sobra/percentual muda de base.
         # O parcial imprime o valor cru (sem `floatformat`), e `ch_nao_alocada`
-        # devolve float porque `ha_semanal` é float — daí o "36.0h".
+        # devolve float porque `ha_semanal` é float — daí o "16.0h".
         self.assertContains(resposta, '40h')
-        self.assertContains(resposta, '36.0h')
-        self.assertContains(resposta, '10.0%')
+        self.assertContains(resposta, '16.0h')
+        self.assertContains(resposta, '20.0%')
 
     def test_tabela_alocacao_da_desup_deveria_trazer_todas_as_unidades(self):
         """

@@ -156,10 +156,17 @@ class ProfessorListView(LoginRequiredMixin, ListView):
             prof.ch_alocada_total = ch_alocada_total
             prof.ch_justificada_total = ch_justificada_total
             prof.soma_horas = ch_alocada_total + ch_justificada_total
-            prof.ch_nao_alocada_total = max(prof.ch_total - prof.soma_horas, 0)
+            # "Não alocado" é a sobra de horas EM SALA (max_class_hours do
+            # contrato — ex.: 20h de um contrato de 40h), não do total do
+            # contrato (ch_total/max_total_hours). Usar ch_total aqui inflava
+            # o saldo (ex.: professor 40h com 6h em sala aparecia com 34h de
+            # sobra em vez de 14h) — mesma meta já usada em
+            # extra_curricular/services.py (get_pendencias_data).
+            meta_horas = prof.tipo_contrato.max_class_hours if prof.tipo_contrato else 0
+            prof.ch_nao_alocada_total = max(meta_horas - prof.soma_horas, 0)
             prof.percentual_alocado_total = (
-                round(min((prof.soma_horas / prof.ch_total) * 100, 100.0), 2)
-                if prof.ch_total else 0.0
+                round(min((prof.soma_horas / meta_horas) * 100, 100.0), 2)
+                if meta_horas else 0.0
             )
         ctx['professores'] = professores_list
 
@@ -375,10 +382,14 @@ def htmx_tabela_alocacao(request):
         ch_justificada_total = ch_justificada_map.get(prof.pk, 0.0)
         prof.ch_justificada_total = ch_justificada_total
         soma = ch_alocada_total + ch_justificada_total
-        prof.ch_nao_alocada_total = max(prof.ch_total - soma, 0)
+        # Mesma correção do ProfessorListView: "não alocado" e "% alocado"
+        # são relativos à meta de horas EM SALA (max_class_hours), não ao
+        # total do contrato (ch_total/max_total_hours).
+        meta_horas = prof.tipo_contrato.max_class_hours if prof.tipo_contrato else 0
+        prof.ch_nao_alocada_total = max(meta_horas - soma, 0)
         prof.percentual_alocado_total = (
-            round(min((soma / prof.ch_total) * 100, 100.0), 2)
-            if prof.ch_total else 0.0
+            round(min((soma / meta_horas) * 100, 100.0), 2)
+            if meta_horas else 0.0
         )
 
     return render(request, 'professors/partials/_linhas_alocacao.html', {'professores': professores})
