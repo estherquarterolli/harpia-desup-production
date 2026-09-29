@@ -57,6 +57,20 @@ def linha_componente(disciplina, periodo='1º Semestre', **extra):
     return dados
 
 
+def linha_componente_temporaria(nome, carga_horaria, periodo='1º Semestre', **extra):
+    """Uma linha do formset usando disciplina temporária (fora do catálogo) —
+    mesmo papel de `linha_componente`, mas pro modo 'disciplina não cadastrada'."""
+    dados = {
+        'usar_disciplina_temporaria': 'on',
+        'nome_temporario': nome,
+        'carga_horaria': str(carga_horaria),
+        'periodo': periodo,
+        'status': MatrixComponent.StatusChoices.SEM_PROFESSOR,
+    }
+    dados.update({k: str(v) for k, v in extra.items()})
+    return dados
+
+
 def payload_matriz(*, curso, unidades, nome, linhas, rascunho=False, initial_forms=0):
     """Monta o POST completo do formulário de matriz (form + management form + linhas)."""
     data = {
@@ -1337,6 +1351,61 @@ class FormsetMatrizE2ETests(BaseCoursesE2ETests):
         self.assertEqual(comp.carga_horaria, 40)                  # CH padrão de Banco
         self.assertEqual(comp.creditos, 2)                        # 40 // 20
         self.assertEqual(comp.carga_horaria_semanal, Decimal('2'))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Cenário 7B — Disciplina temporária (fora do catálogo) e importação de planilha
+# ══════════════════════════════════════════════════════════════════════════════
+
+class DisciplinaTemporariaEImportacaoE2ETests(BaseCoursesE2ETests):
+    """Disciplina "não cadastrada" pela tela de matriz (ver `DisciplinaTemporariaTests`
+    em tests.py pra cobertura de form/model) e o gate de unidade obrigatória antes
+    de importar planilha (`MatrixImportRowsView`)."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.desup)
+
+    def test_publicar_matriz_com_disciplina_temporaria(self):
+        resp = self.client.post(reverse('courses:matrix_create'), data=payload_matriz(
+            curso=self.curso, unidades=[self.unidade_a], nome='MC-TEMP',
+            linhas=[
+                linha_componente(self.algoritmos, '1º Semestre'),
+                linha_componente_temporaria('Tópicos Especiais', 40, '2º Semestre'),
+            ],
+        ))
+        self.assertEqual(resp.status_code, 302, resp.content[:400])
+
+        matriz = CurriculumMatrix.objects.get(nome='MC-TEMP')
+        self.assertEqual(matriz.componentes_da_matriz.count(), 2)
+        temp = matriz.componentes_da_matriz.get(componente_curricular__isnull=True)
+        self.assertEqual(temp.nome_temporario, 'Tópicos Especiais')
+        self.assertEqual(temp.carga_horaria, 40)
+        # O ponto do pedido: disciplina temporária não vira registro no catálogo geral.
+        self.assertFalse(CurricularComponent.objects.filter(nome='Tópicos Especiais').exists())
+
+    def test_import_rows_exige_login(self):
+        self.client.logout()
+        resp = self.client.post(
+            reverse('courses:matrix_import_rows'),
+            data={'unidades': [str(self.unidade_a.id)]},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn(reverse('login'), resp.url)
+
+    def test_import_rows_sem_unidade_selecionada_e_recusado(self):
+        """Regra pedida pelo cliente: precisa escolher a unidade ANTES de importar."""
+        resp = self.client.post(reverse('courses:matrix_import_rows'), data={})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('unidade', resp.json()['erro'].lower())
+
+    def test_import_rows_sem_arquivo_nem_link_e_recusado(self):
+        resp = self.client.post(
+            reverse('courses:matrix_import_rows'),
+            data={'unidades': [str(self.unidade_a.id)]},
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('erro', resp.json())
 
 
 # ══════════════════════════════════════════════════════════════════════════════

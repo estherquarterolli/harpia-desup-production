@@ -97,7 +97,10 @@
           <tr class="hover:bg-slate-50 transition-colors" id="row-comp-{{ comp.id }}">
             <td class="px-4 py-3 text-center font-bold text-slate-700" data-label="Período">{{ comp.periodo|default:"-" }}</td>
             <td class="px-4 py-3 font-mono text-xs text-slate-500" data-label="Código">{{ comp.codigo|default:"-" }}</td>
-            <td class="px-4 py-3 font-bold text-slate-800">{{ comp.componente_curricular.nome }}</td>
+            <td class="px-4 py-3 font-bold text-slate-800">
+              {{ comp.nome_disciplina }}
+              {% if comp.is_temporario %}<span class="ml-1 inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700" title="Disciplina temporária: só existe nesta matriz, não está no catálogo de Componentes Curriculares.">Temporária</span>{% endif %}
+            </td>
             <td class="px-4 py-2" data-label="Docente">
               <!-- Autocomplete Docente -->
               <div class="ac-docente relative"
@@ -105,7 +108,7 @@
                    data-alocar-url="{% url 'alocar_docente_componente' pk=comp.id %}"
                    data-current-id="{% if comp.docente %}{{ comp.docente.id }}{% elif comp.status == 'NAO_OFERECIDA' %}NAO_OFERECIDA{% else %}SEM_PROFESSOR{% endif %}"
                    data-current-nome="{% if comp.docente %}{{ comp.docente.rh_nome }}{% elif comp.status == 'NAO_OFERECIDA' %}Não oferecido{% else %}{% endif %}"
-                   {% if window_fechada and user.perfil != 'DESUP' %}data-window-lock="true" data-window-area="{{ window_area_label }}" data-window-action="{{ window_action_label }}" data-window-target="{{ comp.componente_curricular.nome }}" data-window-message="{{ window_message }}"{% endif %}
+                   {% if window_fechada and user.perfil != 'DESUP' %}data-window-lock="true" data-window-area="{{ window_area_label }}" data-window-action="{{ window_action_label }}" data-window-target="{{ comp.nome_disciplina }}" data-window-message="{{ window_message }}"{% endif %}
               >
                 <div class="ac-input-wrap flex items-center gap-1.5 w-full px-3 py-1.5 border rounded text-sm transition cursor-pointer
                   {% if comp.docente %}border-emerald-300 bg-emerald-50{% elif comp.status == 'NAO_OFERECIDA' %}border-slate-300 bg-slate-100{% elif comp.status == 'SEM_PROFESSOR' %}border-slate-300 bg-slate-50{% else %}border-slate-200 bg-slate-50{% endif %}"

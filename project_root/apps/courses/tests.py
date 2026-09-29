@@ -12,6 +12,7 @@ from apps.courses.forms import (
     MatrixComponentForm,
     MatrixComponentFormSet,
 )
+from apps.courses.import_services import parse_matrix_rows
 from apps.courses.models import Course, CourseUnit, CurricularComponent, CurriculumMatrix, MatrixComponent
 
 
@@ -153,6 +154,150 @@ class CurriculumMatrixComponentTests(TestCase):
         mc = MatrixComponent.objects.get(matriz=matrix)
         self.assertEqual(mc.codigo, 'SI001')                       # não 'HACKED'
         self.assertEqual(mc.carga_horaria_semanal, Decimal('4'))   # 80/20, não 999
+
+
+class DisciplinaTemporariaTests(TestCase):
+    """Disciplina "não cadastrada" numa linha de matriz: não existe no catálogo
+    (CurricularComponent), só vale para aquela matriz (MatrixComponent.nome_temporario)."""
+
+    def setUp(self):
+        self.unidade = Unidade.objects.create(nome='Unidade Temp', sigla='UTMP')
+        self.curso_global = Course.objects.create(nome='Curso Temp', sigla='CTMP')
+        CourseUnit.objects.create(curso=self.curso_global, unidade=self.unidade)
+
+    def _formset(self, linha, total_componentes_antes=0):
+        matrix = CurriculumMatrix(curso=self.curso_global)
+        data = {
+            'componentes-TOTAL_FORMS': '1',
+            'componentes-INITIAL_FORMS': '0',
+            'componentes-MIN_NUM_FORMS': '1',
+            'componentes-MAX_NUM_FORMS': '1000',
+            'componentes-0-status': MatrixComponent.StatusChoices.SEM_PROFESSOR,
+        }
+        data.update({f'componentes-0-{k}': v for k, v in linha.items()})
+        return matrix, MatrixComponentFormSet(data=data, instance=matrix, prefix='componentes')
+
+    def test_disciplina_temporaria_e_salva_sem_criar_registro_no_catalogo(self):
+        matrix, formset = self._formset({
+            'usar_disciplina_temporaria': 'on',
+            'nome_temporario': 'Tópicos Especiais em IA',
+            'carga_horaria': '40',
+            'periodo': '1º Semestre',
+        })
+
+        self.assertTrue(formset.is_valid(), formset.errors)
+        matrix.save()
+        formset.instance = matrix
+        formset.save()
+
+        mc = MatrixComponent.objects.get(matriz=matrix)
+        self.assertIsNone(mc.componente_curricular_id)
+        self.assertEqual(mc.nome_temporario, 'Tópicos Especiais em IA')
+        self.assertEqual(mc.nome_disciplina, 'Tópicos Especiais em IA')
+        self.assertTrue(mc.is_temporario)
+        # Créditos/CH semanal derivam da CH digitada, mesma regra do fluxo de catálogo.
+        self.assertEqual(mc.creditos, 2)
+        self.assertEqual(mc.carga_horaria_semanal, Decimal('2'))
+        # Ponto central do pedido: nada disso pode ir parar no catálogo geral.
+        self.assertFalse(CurricularComponent.objects.filter(nome='Tópicos Especiais em IA').exists())
+
+    def test_disciplina_temporaria_sem_carga_horaria_e_recusada(self):
+        _, formset = self._formset({
+            'usar_disciplina_temporaria': 'on',
+            'nome_temporario': 'Sem CH',
+            'periodo': '1º Semestre',
+        })
+        self.assertFalse(formset.is_valid())
+        self.assertIn('carga_horaria', formset.errors[0])
+
+    def test_disciplina_temporaria_sem_nome_e_recusada(self):
+        _, formset = self._formset({
+            'usar_disciplina_temporaria': 'on',
+            'carga_horaria': '40',
+            'periodo': '1º Semestre',
+        })
+        self.assertFalse(formset.is_valid())
+        self.assertIn('nome_temporario', formset.errors[0])
+
+    def test_linha_sem_catalogo_e_sem_temporaria_e_recusada(self):
+        """Sem marcar temporária e sem escolher disciplina do catálogo: erro
+        continua no mesmo campo de sempre (componente_curricular)."""
+        _, formset = self._formset({'periodo': '1º Semestre'})
+        self.assertFalse(formset.is_valid())
+        self.assertIn('componente_curricular', formset.errors[0])
+
+    def test_model_recusa_ter_catalogo_e_temporaria_ao_mesmo_tempo(self):
+        cc = CurricularComponent.objects.create(
+            nome='Cálculo I', codigo='CT001', carga_horaria_padrao=80, creditos=4,
+        )
+        matrix = CurriculumMatrix.objects.create(curso=self.curso_global)
+        mc = MatrixComponent(
+            matriz=matrix, componente_curricular=cc, nome_temporario='Duplicado',
+            carga_horaria=80, status=MatrixComponent.StatusChoices.SEM_PROFESSOR,
+        )
+        with self.assertRaises(forms.ValidationError):
+            mc.full_clean()
+
+    def test_model_recusa_nem_catalogo_nem_temporaria(self):
+        matrix = CurriculumMatrix.objects.create(curso=self.curso_global)
+        mc = MatrixComponent(
+            matriz=matrix, carga_horaria=40, status=MatrixComponent.StatusChoices.SEM_PROFESSOR,
+        )
+        with self.assertRaises(forms.ValidationError):
+            mc.full_clean()
+
+
+class ParseMatrixRowsTests(TestCase):
+    """`import_services.parse_matrix_rows` — resolve cada linha da planilha de
+    importação de matriz contra o catálogo (por código, senão por nome) ou
+    marca como disciplina temporária. Opera sobre `rows` já extraídas (mesmo
+    formato que `parse_uploaded_spreadsheet`/`parse_google_sheets_url` devolvem),
+    sem precisar fabricar um .xlsx de verdade no teste."""
+
+    def setUp(self):
+        self.algoritmos = CurricularComponent.objects.create(
+            nome='Algoritmos', codigo='SI001', carga_horaria_padrao=80, creditos=4,
+        )
+
+    def test_linha_casa_por_codigo_do_catalogo(self):
+        previews = parse_matrix_rows([
+            {'periodo': '1º Semestre', 'codigo': 'SI001', 'nome': 'Nome Divergente', 'carga_horaria': ''},
+        ])
+        self.assertEqual(len(previews), 1)
+        p = previews[0]
+        self.assertEqual(p.status, 'ok')
+        self.assertEqual(p.componente_curricular_id, self.algoritmos.id)
+        # Casou pelo código -> usa os dados oficiais do catálogo, não o texto da planilha.
+        self.assertEqual(p.nome, 'Algoritmos')
+        self.assertEqual(p.carga_horaria, 80)
+
+    def test_linha_casa_por_nome_quando_sem_codigo(self):
+        previews = parse_matrix_rows([
+            {'periodo': '1º Semestre', 'codigo': '', 'nome': 'algoritmos', 'carga_horaria': ''},
+        ])
+        self.assertEqual(previews[0].componente_curricular_id, self.algoritmos.id)
+
+    def test_disciplina_fora_do_catalogo_com_ch_vira_temporaria(self):
+        previews = parse_matrix_rows([
+            {'periodo': '2º Semestre', 'codigo': '', 'nome': 'Robótica Aplicada', 'carga_horaria': '40'},
+        ])
+        p = previews[0]
+        self.assertEqual(p.status, 'ok')
+        self.assertIsNone(p.componente_curricular_id)
+        self.assertEqual(p.nome, 'Robótica Aplicada')
+        self.assertEqual(p.carga_horaria, 40)
+
+    def test_disciplina_fora_do_catalogo_sem_ch_da_erro(self):
+        previews = parse_matrix_rows([
+            {'periodo': '2º Semestre', 'codigo': '', 'nome': 'Sem Carga Horária', 'carga_horaria': ''},
+        ])
+        self.assertEqual(previews[0].status, 'error')
+
+    def test_linha_sem_nome_da_erro(self):
+        previews = parse_matrix_rows([
+            {'periodo': '1º Semestre', 'codigo': '', 'nome': '', 'carga_horaria': '40'},
+        ])
+        self.assertEqual(previews[0].status, 'error')
 
 
 class HoraAulaHoraRelogioTests(TestCase):

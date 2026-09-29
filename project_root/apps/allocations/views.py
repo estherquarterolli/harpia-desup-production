@@ -111,7 +111,7 @@ class AlocarDocenteComponenteView(LoginRequiredMixin, PerfilRequiredMixin, View)
             request,
             area_label='Alocação',
             action_label='alocar docente',
-            target_label=str(comp.componente_curricular.nome),
+            target_label=str(comp.nome_disciplina),
             unidade=unidade_comp,
             fallback_url=request.META.get('HTTP_REFERER', '/alocacao-curricular/'),
         )
@@ -124,12 +124,12 @@ class AlocarDocenteComponenteView(LoginRequiredMixin, PerfilRequiredMixin, View)
             comp.docente = None
             comp.status = MatrixComponent.StatusChoices.NAO_OFERECIDA
             comp.save()
-            messages.success(request, f'Componente {comp.componente_curricular.nome} marcado como Não oferecido.')
+            messages.success(request, f'Componente {comp.nome_disciplina} marcado como Não oferecido.')
         elif docente_id == MatrixComponent.StatusChoices.SEM_PROFESSOR or not docente_id:
             comp.docente = None
             comp.status = MatrixComponent.StatusChoices.SEM_PROFESSOR
             comp.save()
-            messages.success(request, f'Componente {comp.componente_curricular.nome} marcado como Sem professor.')
+            messages.success(request, f'Componente {comp.nome_disciplina} marcado como Sem professor.')
         else:
             # Segurança: Coordenador só pode alocar professores da sua unidade
             if user.perfil == 'COORDENADOR_UNIDADE':
@@ -140,7 +140,7 @@ class AlocarDocenteComponenteView(LoginRequiredMixin, PerfilRequiredMixin, View)
             comp.docente_id = docente_id
             comp.status = MatrixComponent.StatusChoices.COMPLETO
             comp.save()
-            messages.success(request, f'Docente alocado para {comp.componente_curricular.nome} com sucesso!')
+            messages.success(request, f'Docente alocado para {comp.nome_disciplina} com sucesso!')
             
         response = HttpResponse()
         response['HX-Refresh'] = 'true'

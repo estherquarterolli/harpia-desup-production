@@ -247,18 +247,19 @@ class Professor(models.Model):
         return 0
 
     def get_disciplinas_alocadas(self):
-        """Disciplinas distintas em que o professor está alocado na matriz vigente."""
+        """Disciplinas distintas em que o professor está alocado na matriz vigente.
+
+        Inclui tanto disciplinas do catálogo quanto temporárias (`nome_temporario`,
+        sem registro em CurricularComponent) — por isso usa `nome_disciplina`
+        (property) em vez de filtrar direto no banco por `componente_curricular__nome`.
+        """
         from apps.courses.models import MatrixComponent
-        nomes = (
-            MatrixComponent.objects.filter(
-                docente=self,
-                matriz__is_vigente=True,
-            )
-            .select_related('componente_curricular')
-            .values_list('componente_curricular__nome', flat=True)
-            .distinct()
-        )
-        return [n for n in nomes if n]
+        componentes = MatrixComponent.objects.filter(
+            docente=self,
+            matriz__is_vigente=True,
+        ).select_related('componente_curricular')
+        nomes = {c.nome_disciplina for c in componentes if c.nome_disciplina}
+        return sorted(nomes)
 
 class Availability(models.Model):
     """

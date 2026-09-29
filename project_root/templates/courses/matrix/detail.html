@@ -94,7 +94,10 @@
             <tr class="hover:bg-slate-50">
               <td class="px-4 py-3 font-semibold" data-label="Período">{{ comp.periodo|default:"—" }}</td>
               <td class="px-4 py-3" data-label="Cód">{{ comp.codigo }}</td>
-              <td class="px-4 py-3 font-bold text-slate-800">{{ comp.componente_curricular.nome }}</td>
+              <td class="px-4 py-3 font-bold text-slate-800">
+                {{ comp.nome_disciplina }}
+                {% if comp.is_temporario %}<span class="ml-1 inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700" title="Disciplina temporária: só existe nesta matriz, não está no catálogo de Componentes Curriculares.">Temporária</span>{% endif %}
+              </td>
               <td class="px-4 py-3" data-label="Crédito">{{ comp.creditos }}</td>
               <td class="px-4 py-3" data-label="HA">{{ comp.carga_horaria }}h</td>
               <td class="px-4 py-3" data-label="HR">{{ comp.hr_total|floatformat:2 }}h</td>

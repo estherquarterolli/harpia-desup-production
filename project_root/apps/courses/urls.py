@@ -27,6 +27,9 @@ urlpatterns = [
     # HTMX — importar matriz anterior do curso
     path('matrices/import-previous/', views.ImportPreviousMatrixView.as_view(), name='matrix_import_previous'),
 
+    # Importar planilha com as linhas de disciplina de UMA matriz (exige unidade já selecionada)
+    path('matrices/importar-linhas/', views.MatrixImportRowsView.as_view(), name='matrix_import_rows'),
+
     # JSON — verificar se existe matriz para o curso+turno (popup de copiar)
     path('matrices/buscar-existente/', views.BuscarMatrizExistenteView.as_view(), name='matrix_buscar_existente'),
 

@@ -98,14 +98,19 @@ def _parse_bool(value, default=True):
     return default
 
 
-def _rows_from_matrix(header_row, data_rows):
-    """header_row: lista de células do cabeçalho. data_rows: iterável de listas de células."""
-    normalized = [_normalize_header(h) for h in header_row]
-    mapped = [_HEADER_ALIASES.get(h) for h in normalized]
+def _rows_from_matrix(header_row, data_rows, header_aliases=_HEADER_ALIASES, required_field="nome", required_label="Nome"):
+    """header_row: lista de células do cabeçalho. data_rows: iterável de listas de células.
 
-    if "nome" not in mapped:
+    `header_aliases`/`required_field`/`required_label` têm defaults pro caso de uso
+    original (importar Componentes Curriculares); o import de linhas de matriz
+    (`MATRIX_HEADER_ALIASES`, ver `parse_matrix_rows`) passa os seus próprios.
+    """
+    normalized = [_normalize_header(h) for h in header_row]
+    mapped = [header_aliases.get(h) for h in normalized]
+
+    if required_field not in mapped:
         raise SpreadsheetImportError(
-            "A planilha precisa de uma coluna 'Nome' (não encontrei essa coluna no cabeçalho)."
+            f"A planilha precisa de uma coluna '{required_label}' (não encontrei essa coluna no cabeçalho)."
         )
 
     rows = []
@@ -122,8 +127,8 @@ def _rows_from_matrix(header_row, data_rows):
     return rows
 
 
-def parse_uploaded_spreadsheet(uploaded_file):
-    """Lê um .xlsx enviado por upload e devolve list[dict] (uma linha = um componente)."""
+def parse_uploaded_spreadsheet(uploaded_file, header_aliases=_HEADER_ALIASES, required_field="nome", required_label="Nome"):
+    """Lê um .xlsx enviado por upload e devolve list[dict] (uma linha = um registro)."""
     try:
         from openpyxl import load_workbook
     except ImportError as e:
@@ -141,7 +146,7 @@ def parse_uploaded_spreadsheet(uploaded_file):
     except StopIteration:
         raise SpreadsheetImportError("A planilha está vazia.")
 
-    return _rows_from_matrix(header_row, rows_iter)
+    return _rows_from_matrix(header_row, rows_iter, header_aliases, required_field, required_label)
 
 
 def _google_sheets_csv_url(url):
@@ -163,7 +168,7 @@ def _google_sheets_csv_url(url):
     return f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
 
 
-def parse_google_sheets_url(url):
+def parse_google_sheets_url(url, header_aliases=_HEADER_ALIASES, required_field="nome", required_label="Nome"):
     """Baixa uma planilha pública do Google Sheets como CSV e devolve list[dict]."""
     csv_url = _google_sheets_csv_url(url)
     try:
@@ -191,7 +196,7 @@ def parse_google_sheets_url(url):
     except StopIteration:
         raise SpreadsheetImportError("A planilha está vazia.")
 
-    return _rows_from_matrix(header_row, reader)
+    return _rows_from_matrix(header_row, reader, header_aliases, required_field, required_label)
 
 
 def _clean_row(row, row_number):
@@ -328,3 +333,105 @@ def apply_import(previews, replace_codigos):
         summary.outcomes.append(p)
 
     return summary
+
+
+# ──────────────────────────────────────────────────────────────
+# Importação de LINHAS DE MATRIZ (disciplina + período + carga horária)
+# ──────────────────────────────────────────────────────────────
+# Diferença chave pro import acima: aqui nada é gravado no banco. O resultado
+# só alimenta o formset da tela "Nova Matriz"/"Editar Matriz" (igual à função já
+# existente "Duplicar a partir de outra Matriz") — a DESUP revisa as linhas e só
+# grava de fato ao clicar em Salvar, com a mesma validação de sempre
+# (MatrixComponentForm.clean()). Por isso não existe conceito de "duplicata"
+# nem tela de confirmação: se a disciplina não bate com nada do catálogo, a
+# linha simplesmente entra como disciplina temporária (ver MatrixComponentForm).
+
+MATRIX_HEADER_ALIASES = {
+    "periodo": "periodo",
+    "período": "periodo",
+    "semestre": "periodo",
+    "codigo": "codigo",
+    "código": "codigo",
+    "cod": "codigo",
+    "disciplina": "nome",
+    "componente": "nome",
+    "componente_curricular": "nome",
+    "nome": "nome",
+    "carga_horaria": "carga_horaria",
+    "carga_horaria_total": "carga_horaria",
+    "ch": "carga_horaria",
+    "ch_total": "carga_horaria",
+}
+
+
+@dataclass
+class MatrixRowPreview:
+    row_number: int
+    periodo: str
+    codigo: str
+    nome: str
+    carga_horaria: object = None
+    componente_curricular_id: object = None  # id do CurricularComponent quando casou por código/nome
+    status: str = "ok"  # 'ok' | 'error'
+    message: str = ""
+
+
+def parse_matrix_rows(rows):
+    """Resolve cada linha da planilha contra o catálogo (por código, senão por
+    nome, case-insensitive). Quando não acha, a linha vira disciplina
+    temporária — precisa então de carga horária na própria planilha, já que não
+    há de onde herdar um padrão."""
+    existentes_por_codigo = {
+        c.codigo: c for c in CurricularComponent.objects.exclude(codigo="")
+    }
+    existentes_por_nome = {
+        c.nome.strip().lower(): c for c in CurricularComponent.objects.all()
+    }
+
+    previews = []
+    for i, row in enumerate(rows, start=2):  # linha 1 é o cabeçalho
+        periodo = str(row.get("periodo", "") or "").strip()
+        codigo = str(row.get("codigo", "") or "").strip()
+        nome = str(row.get("nome", "") or "").strip()
+
+        if not nome:
+            previews.append(MatrixRowPreview(
+                i, periodo, codigo, nome, status="error",
+                message="Sem nome de disciplina — linha ignorada.",
+            ))
+            continue
+
+        ch_raw = row.get("carga_horaria", "")
+        try:
+            carga_horaria = int(float(str(ch_raw).replace(",", "."))) if str(ch_raw).strip() else None
+        except ValueError:
+            carga_horaria = None
+
+        existente = (existentes_por_codigo.get(codigo) if codigo else None) or existentes_por_nome.get(nome.lower())
+
+        if existente:
+            previews.append(MatrixRowPreview(
+                row_number=i,
+                periodo=periodo,
+                codigo=existente.codigo,
+                nome=existente.nome,
+                carga_horaria=carga_horaria or existente.carga_horaria_padrao,
+                componente_curricular_id=existente.id,
+            ))
+            continue
+
+        if not carga_horaria or carga_horaria <= 0:
+            previews.append(MatrixRowPreview(
+                i, periodo, codigo, nome, status="error",
+                message=(
+                    f'"{nome}" não está no catálogo de disciplinas e a planilha não trouxe '
+                    "carga horária — informe a carga horária para importar como disciplina temporária."
+                ),
+            ))
+            continue
+
+        previews.append(MatrixRowPreview(
+            row_number=i, periodo=periodo, codigo=codigo, nome=nome, carga_horaria=carga_horaria,
+        ))
+
+    return previews

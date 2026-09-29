@@ -45,10 +45,20 @@ class CurriculumMatrixForm(forms.ModelForm):
 
 
 class MatrixComponentForm(forms.ModelForm):
+    # Não é campo do model — chave que decide, por linha, se a disciplina vem do
+    # catálogo (`componente_curricular`) ou é digitada na hora (`nome_temporario`).
+    # Ver clean() e _usar_temporaria_ativo().
+    usar_disciplina_temporaria = forms.BooleanField(
+        required=False,
+        label="Disciplina não cadastrada (temporária, só nesta matriz)",
+        widget=forms.CheckboxInput(attrs={'class': 'rounded text-[#1e4e8c] usar-disciplina-temporaria'}),
+    )
+
     class Meta:
         model = MatrixComponent
         fields = [
             'componente_curricular',
+            'nome_temporario',
             'periodo',
             'codigo',
             'carga_horaria',
@@ -63,6 +73,10 @@ class MatrixComponentForm(forms.ModelForm):
         widgets = {
             'componente_curricular': forms.Select(attrs={
                 'class': _FIELD_CSS,
+            }),
+            'nome_temporario': forms.TextInput(attrs={
+                'class': _FIELD_CSS,
+                'placeholder': 'Nome da disciplina (temporária)',
             }),
             'codigo': forms.TextInput(attrs={'class': _FIELD_CSS}),
             'periodo': forms.Select(
@@ -95,7 +109,15 @@ class MatrixComponentForm(forms.ModelForm):
         self.fields['carga_horaria'].required = False
         self.fields['creditos'].required = False
         self.fields['carga_horaria_semanal'].required = False
+        self.fields['nome_temporario'].required = False
+        # FK obrigatória no model, mas aqui a linha pode usar disciplina
+        # temporária em vez de catálogo — quem garante "um dos dois" é o clean().
+        self.fields['componente_curricular'].required = False
         self.fields['componente_curricular'].queryset = CurricularComponent.objects.all().order_by('nome')
+
+        if self.instance.pk and self.instance.componente_curricular_id is None and self.instance.nome_temporario:
+            self.fields['usar_disciplina_temporaria'].initial = True
+
         # CORR-007: na matriz, o usuário só escolhe a **Disciplina** e o **Período**.
         # Todo o resto ('Código', 'CH Total', 'Créditos', 'CH Sem.') deriva da
         # disciplina e NÃO pode ser alterado pela DESUP — só via Django admin
@@ -103,13 +125,57 @@ class MatrixComponentForm(forms.ModelForm):
         # ignorar qualquer valor vindo no POST (à prova de adulteração); o valor
         # correto é recalculado no clean() a partir da disciplina.
         self.fields['codigo'].disabled = True
-        self.fields['carga_horaria'].disabled = True
         self.fields['creditos'].disabled = True
         self.fields['carga_horaria_semanal'].disabled = True
+        # Exceção: disciplina TEMPORÁRIA não existe em lugar nenhum pra derivar a
+        # CH — a DESUP digita direto. Por isso `carga_horaria` só fica travada
+        # (herdada do catálogo) quando a linha NÃO está em modo temporário.
+        self.fields['carga_horaria'].disabled = not self._usar_temporaria_ativo()
+
+    def _usar_temporaria_ativo(self):
+        """Se esta linha (pelo prefixo do formset) está em modo disciplina
+        temporária — decide se `carga_horaria` fica editável nesta renderização.
+        Bound (POST/re-render após erro): olha o valor enviado. Unbound (GET,
+        edição de uma linha já salva como temporária): olha a instance."""
+        if self.is_bound:
+            return bool(self.data.get(self.add_prefix('usar_disciplina_temporaria')))
+        return bool(
+            self.instance.pk
+            and self.instance.componente_curricular_id is None
+            and self.instance.nome_temporario
+        )
 
     def clean(self):
         cleaned_data = super().clean()
         cc = cleaned_data.get('componente_curricular')
+        usar_temporaria = cleaned_data.get('usar_disciplina_temporaria')
+        nome_temp = (cleaned_data.get('nome_temporario') or '').strip()
+
+        if usar_temporaria:
+            if cc is not None:
+                self.add_error(
+                    'componente_curricular',
+                    'Escolha apenas uma opção: disciplina do catálogo OU temporária, não as duas.'
+                )
+                return cleaned_data
+            if not nome_temp:
+                self.add_error('nome_temporario', 'Informe o nome da disciplina temporária.')
+                return cleaned_data
+            ch = cleaned_data.get('carga_horaria')
+            if not ch or ch <= 0:
+                self.add_error('carga_horaria', 'Informe a carga horária desta disciplina temporária.')
+                return cleaned_data
+            cleaned_data['componente_curricular'] = None
+            cleaned_data['nome_temporario'] = nome_temp
+            cleaned_data['codigo'] = cleaned_data.get('codigo') or ''
+            # Mesma regra de derivação de créditos/CH semanal do fluxo de catálogo
+            # (MatrixComponent.save()), só que a partir da CH digitada na hora.
+            cleaned_data['creditos'] = ch // 20
+            cleaned_data['carga_horaria_semanal'] = round(ch / 20, 2)
+            return cleaned_data
+
+        # Fluxo original (disciplina do catálogo) — inalterado.
+        cleaned_data['nome_temporario'] = ''
         if cc is not None:
             # Código sempre espelha o da disciplina selecionada.
             cleaned_data['codigo'] = cc.codigo or ''
@@ -136,6 +202,11 @@ class MatrixComponentForm(forms.ModelForm):
             # CurricularComponentForm.clean() e de MatrixComponent.save().
             cleaned_data['creditos'] = ch // 20
             cleaned_data['carga_horaria_semanal'] = round(ch / 20, 2)
+        else:
+            self.add_error(
+                'componente_curricular',
+                'Selecione uma disciplina do catálogo ou marque "disciplina não cadastrada" e informe o nome.'
+            )
         return cleaned_data
 
 
@@ -169,8 +240,13 @@ class ClassGroupForm(forms.ModelForm):
         }
 
 
-class CurricularComponentImportForm(forms.Form):
-    """Upload de planilha (.xlsx) OU link público do Google Sheets — um dos dois."""
+class SpreadsheetImportForm(forms.Form):
+    """Base: upload de planilha (.xlsx) OU link público do Google Sheets — um dos dois.
+
+    Compartilhada por `CurricularComponentImportForm` (catálogo de disciplinas) e
+    `MatrixComponentImportForm` (linhas de uma matriz) — mesma regra de validação
+    do arquivo/link nos dois casos, só muda o que se faz com as linhas depois.
+    """
 
     arquivo = forms.FileField(
         required=False,
@@ -197,6 +273,19 @@ class CurricularComponentImportForm(forms.Form):
         if arquivo and not arquivo.name.lower().endswith('.xlsx'):
             raise forms.ValidationError("O arquivo precisa ser .xlsx (Excel).")
         return cleaned
+
+
+class CurricularComponentImportForm(SpreadsheetImportForm):
+    """Upload de planilha pra importar o catálogo de Componentes Curriculares."""
+
+
+class MatrixComponentImportForm(SpreadsheetImportForm):
+    """Upload de planilha pra importar as linhas de disciplina de UMA matriz.
+
+    Só habilitado na tela depois que a unidade da matriz é selecionada
+    (ver MatrixImportRowsView e o JS de matrix_form.html) — pedido do cliente
+    pra não deixar importar planilha "solta" antes de saber pra qual unidade ela vale.
+    """
 
 
 class CurricularComponentForm(forms.ModelForm):

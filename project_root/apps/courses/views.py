@@ -11,7 +11,15 @@ from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 from apps.accounts.mixins import PerfilRequiredMixin
 from apps.core.models import Unidade
 
-from .forms import ClassGroupForm, CurriculumMatrixForm, MatrixComponentForm, MatrixComponentFormSet, CurricularComponentForm, CurricularComponentImportForm
+from .forms import (
+    ClassGroupForm,
+    CurriculumMatrixForm,
+    CurricularComponentForm,
+    CurricularComponentImportForm,
+    MatrixComponentForm,
+    MatrixComponentFormSet,
+    MatrixComponentImportForm,
+)
 from .models import ClassGroup, Course, CourseUnit, CurriculumMatrix, MatrixComponent, CurricularComponent
 
 
@@ -550,6 +558,8 @@ class ImportPreviousMatrixView(LoginRequiredMixin, PerfilRequiredMixin, View):
         for i, comp in enumerate(componentes):
             initial_data = {
                 'componente_curricular': comp.componente_curricular_id,
+                'nome_temporario': comp.nome_temporario,
+                'usar_disciplina_temporaria': comp.is_temporario,
                 'periodo': comp.periodo,
                 'codigo': comp.codigo,
                 'carga_horaria': comp.carga_horaria,
@@ -574,6 +584,86 @@ class ImportPreviousMatrixView(LoginRequiredMixin, PerfilRequiredMixin, View):
         )
 
         return HttpResponse(html)
+
+
+class MatrixImportRowsView(LoginRequiredMixin, PerfilRequiredMixin, View):
+    """Lê uma planilha (upload .xlsx ou link do Google Sheets) e devolve, em
+    JSON, as linhas de disciplina prontas pra injetar no formset da matriz que
+    está sendo criada/editada — nada é gravado no banco aqui (ver
+    `import_services.parse_matrix_rows`). O front (matrix_form.html) usa o
+    mesmo mecanismo já existente para "Duplicar a partir de outra Matriz".
+
+    Regra pedida pelo cliente: só importa depois que a(s) unidade(s) da matriz
+    já foram escolhidas na tela — daí a checagem de `unidades` aqui. É reforço
+    server-side do que o botão desabilitado já impede na UI (o botão sozinho
+    não impediria alguém de montar o POST na mão).
+    """
+    allowed_profiles = ['DESUP', 'COORDENADOR_UNIDADE']
+
+    def post(self, request, *args, **kwargs):
+        from django.http import JsonResponse
+
+        if not request.POST.getlist('unidades'):
+            return JsonResponse(
+                {'erro': 'Selecione ao menos uma unidade da matriz antes de importar a planilha.'},
+                status=400,
+            )
+
+        form = MatrixComponentImportForm(request.POST, request.FILES)
+        if not form.is_valid():
+            primeiro_erro = next(iter(form.errors.values()))[0]
+            return JsonResponse({'erro': primeiro_erro}, status=400)
+
+        from .import_services import (
+            MATRIX_HEADER_ALIASES,
+            SpreadsheetImportError,
+            parse_google_sheets_url,
+            parse_matrix_rows,
+            parse_uploaded_spreadsheet,
+        )
+
+        try:
+            if form.cleaned_data.get('arquivo'):
+                rows = parse_uploaded_spreadsheet(
+                    form.cleaned_data['arquivo'],
+                    header_aliases=MATRIX_HEADER_ALIASES,
+                    required_field='nome',
+                    required_label='Disciplina',
+                )
+            else:
+                rows = parse_google_sheets_url(
+                    form.cleaned_data['google_sheets_url'],
+                    header_aliases=MATRIX_HEADER_ALIASES,
+                    required_field='nome',
+                    required_label='Disciplina',
+                )
+        except SpreadsheetImportError as e:
+            return JsonResponse({'erro': str(e)}, status=400)
+
+        if not rows:
+            return JsonResponse({'erro': 'Nenhuma linha de dados encontrada na planilha.'}, status=400)
+
+        previews = parse_matrix_rows(rows)
+        erros = [p for p in previews if p.status == 'error']
+        componentes = [
+            {
+                'periodo': p.periodo,
+                'codigo': p.codigo,
+                'carga_horaria': p.carga_horaria,
+                # Mesma derivação de MatrixComponent.save()/MatrixComponentForm.clean() —
+                # o front só copia esses valores, não recalcula (evita divergir da regra do servidor).
+                'creditos': p.carga_horaria // 20,
+                'carga_horaria_semanal': round(p.carga_horaria / 20, 2),
+                'componente_curricular': p.componente_curricular_id or '',
+                'componente_curricular_nome': p.nome if p.componente_curricular_id else '',
+                'nome_temporario': '' if p.componente_curricular_id else p.nome,
+            }
+            for p in previews if p.status == 'ok'
+        ]
+        return JsonResponse({
+            'componentes': componentes,
+            'erros': [f"Linha {p.row_number}: {p.message}" for p in erros],
+        })
 
 
 # ─────────────────────────────────────────────
@@ -653,6 +743,9 @@ class DadosMatrizCopiarView(LoginRequiredMixin, PerfilRequiredMixin, View):
             componentes.append({
                 'componente_curricular': cc.id if cc else '',
                 'componente_curricular_nome': cc.nome if cc else '',
+                # Disciplina temporária (sem registro no catálogo): a cópia precisa
+                # levar o nome digitado, senão a linha chegaria em branco do outro lado.
+                'nome_temporario': comp.nome_temporario,
                 'codigo': comp.codigo,
                 'periodo': comp.periodo,
                 'carga_horaria': comp.carga_horaria,

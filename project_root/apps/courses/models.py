@@ -182,8 +182,22 @@ class MatrixComponent(models.Model):
     componente_curricular = models.ForeignKey(
         CurricularComponent,
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name='vinculos_matriz',
         verbose_name="Componente Curricular"
+    )
+    nome_temporario = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name="Disciplina temporária",
+        help_text=(
+            "Nome da disciplina quando ela ainda não existe no catálogo de "
+            "Componentes Curriculares (uso pontual, só nesta matriz — não cria "
+            "registro em CurricularComponent). Preenchido no lugar de "
+            "`componente_curricular`, nunca junto."
+        ),
     )
     codigo = models.CharField(max_length=50, blank=True, verbose_name="Codigo na matriz")
     periodo = models.CharField(
@@ -234,6 +248,17 @@ class MatrixComponent(models.Model):
     observacoes = models.TextField(blank=True, verbose_name="Observacoes")
 
     @property
+    def nome_disciplina(self):
+        """Nome de exibição da disciplina: do catálogo quando vinculada, ou o
+        nome temporário digitado direto na matriz (disciplina que só existe
+        aqui, sem registro em CurricularComponent)."""
+        return self.componente_curricular.nome if self.componente_curricular_id else self.nome_temporario
+
+    @property
+    def is_temporario(self):
+        return self.componente_curricular_id is None
+
+    @property
     def ha_semanal(self):
         """Hora-Aula semanal: carga horária semestral / 20 semanas."""
         return (self.carga_horaria or 0) / 20.0
@@ -268,15 +293,30 @@ class MatrixComponent(models.Model):
                 'curso_compartilhado': 'O curso compartilhado deve ser diferente do curso da matriz.'
             })
 
+        # Cada linha da matriz precisa de EXATAMENTE uma fonte de disciplina:
+        # ou vinculada ao catálogo (componente_curricular), ou temporária
+        # (nome_temporario, digitada só para esta matriz). MatrixComponentForm.clean()
+        # já resolve isso antes de chegar aqui — esta validação é o backstop pra
+        # admin/import/shell, que não passam pelo form.
+        if not self.componente_curricular_id and not self.nome_temporario:
+            raise ValidationError({
+                'componente_curricular': 'Selecione uma disciplina do catálogo ou informe o nome de uma disciplina temporária.'
+            })
+        if self.componente_curricular_id and self.nome_temporario:
+            raise ValidationError({
+                'nome_temporario': 'Escolha apenas uma opção: disciplina do catálogo OU nome temporário, não os dois.'
+            })
+
     def save(self, *args, **kwargs):
         cc = self.componente_curricular
-        if not self.codigo and cc.codigo:
-            self.codigo = cc.codigo
-        elif self.codigo and not cc.codigo:
-            cc.codigo = self.codigo
-            cc.save(update_fields=['codigo'])
-        if self.carga_horaria is None:
-            self.carga_horaria = cc.carga_horaria_padrao
+        if cc is not None:
+            if not self.codigo and cc.codigo:
+                self.codigo = cc.codigo
+            elif self.codigo and not cc.codigo:
+                cc.codigo = self.codigo
+                cc.save(update_fields=['codigo'])
+            if self.carga_horaria is None:
+                self.carga_horaria = cc.carga_horaria_padrao
         # Só preenche os calculados quando NÃO informados (respeita o que a DESUP digitou).
         if self.carga_horaria is not None:
             if self.creditos is None:
@@ -286,7 +326,7 @@ class MatrixComponent(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.matriz} - {self.componente_curricular.nome}"
+        return f"{self.matriz} - {self.nome_disciplina}"
 
 class ClassGroup(models.Model):
     """
@@ -324,5 +364,5 @@ class ClassGroup(models.Model):
         unique_together = ('matriz_curricular', 'ano_semestre', 'identificador')
 
     def __str__(self):
-        componente = self.matriz_componente.componente_curricular.nome if self.matriz_componente_id else self.matriz_curricular.curso.sigla
+        componente = self.matriz_componente.nome_disciplina if self.matriz_componente_id else self.matriz_curricular.curso.sigla
         return f"{componente} - Turma {self.identificador} ({self.ano_semestre})"

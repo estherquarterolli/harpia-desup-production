@@ -64,7 +64,33 @@
       <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/70 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
         <div>
           <h2 class="text-sm font-black text-[#025c9f] uppercase tracking-widest">Componentes Curriculares</h2>
-          <p class="text-[11px] text-slate-400 mt-0.5">Cada linha é um componente desta matriz. Selecione a disciplina para preencher o código correspondente.</p>
+          <p class="text-[11px] text-slate-400 mt-0.5">Cada linha é um componente desta matriz. Selecione a disciplina para preencher o código correspondente. Se a disciplina ainda não existe no catálogo, marque "disciplina não cadastrada" na linha.</p>
+        </div>
+        <button type="button" id="btn-abrir-importar-planilha"
+          class="flex items-center gap-2 text-[#025c9f] border border-[#025c9f]/30 hover:bg-blue-50 text-xs font-bold px-3 py-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+          disabled
+          title="Selecione ao menos uma unidade em Identificação antes de importar a planilha.">
+          <i class="ph ph-file-xls text-base"></i> Importar planilha
+        </button>
+      </div>
+
+      <!-- Painel de importação de planilha — só abre depois que uma unidade foi selecionada -->
+      <div id="painel-importar-planilha" class="hidden mx-6 mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+        <p class="text-xs text-slate-500">
+          Envie uma planilha .xlsx ou cole o link de uma planilha pública do Google Sheets com as colunas
+          <strong>Disciplina</strong>, <strong>Período</strong>, <strong>Código</strong> (opcional) e <strong>Carga Horária</strong>.
+          Disciplinas que já existem no catálogo são reconhecidas pelo código ou nome; as demais entram como
+          <strong>temporárias</strong> (só nesta matriz) — nesse caso a Carga Horária é obrigatória na planilha.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-3">
+          <input type="file" id="importar-planilha-arquivo" accept=".xlsx" class="form-field flex-1">
+          <input type="url" id="importar-planilha-url" placeholder="ou link do Google Sheets" class="form-field flex-1">
+        </div>
+        <div class="flex items-center gap-3">
+          <button type="button" id="btn-importar-planilha" class="bg-[#025c9f] hover:bg-[#153e70] text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors">
+            Importar linhas
+          </button>
+          <span id="importar-planilha-status" class="text-xs text-slate-500"></span>
         </div>
       </div>
 
@@ -100,24 +126,36 @@
 
           <div class="grid grid-cols-12 gap-3 items-center">
 
-            <!-- Disciplina — autocomplete -->
+            <!-- Disciplina — autocomplete do catálogo OU nome temporário -->
             <div class="col-span-12 md:col-span-4 relative">
               <label class="md:hidden text-[10px] font-bold text-slate-400 uppercase mb-1 block">Disciplina</label>
 
-              {# Campo hidden que armazena o ID real do componente #}
-              <div class="hidden">{{ component_form.componente_curricular }}</div>
+              <div class="disciplina-catalogo relative {% if component_form.instance.pk and not component_form.instance.componente_curricular_id and component_form.instance.nome_temporario %}hidden{% endif %}">
+                {# Campo hidden que armazena o ID real do componente #}
+                <div class="hidden">{{ component_form.componente_curricular }}</div>
 
-              {# Input visível para o usuário pesquisar #}
-              <input
-                type="text"
-                class="form-field cc-search-input"
-                placeholder="Pesquisar disciplina..."
-                autocomplete="off"
-                data-hidden-id="{{ component_form.componente_curricular.html_name }}"
-                value="{% if component_form.instance.pk and component_form.instance.componente_curricular %}{{ component_form.instance.componente_curricular.nome }}{% endif %}"
-              >
-              {# Dropdown de resultados #}
-              <div class="cc-dropdown hidden absolute z-20 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg mt-1 max-h-56 overflow-y-auto text-sm"></div>
+                {# Input visível para o usuário pesquisar #}
+                <input
+                  type="text"
+                  class="form-field cc-search-input"
+                  placeholder="Pesquisar disciplina..."
+                  autocomplete="off"
+                  data-hidden-id="{{ component_form.componente_curricular.html_name }}"
+                  value="{% if component_form.instance.pk and component_form.instance.componente_curricular %}{{ component_form.instance.componente_curricular.nome }}{% endif %}"
+                >
+                {# Dropdown de resultados #}
+                <div class="cc-dropdown hidden absolute z-20 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg mt-1 max-h-56 overflow-y-auto text-sm"></div>
+              </div>
+
+              <div class="disciplina-temporaria {% if not component_form.instance.pk or component_form.instance.componente_curricular_id or not component_form.instance.nome_temporario %}hidden{% endif %}">
+                {{ component_form.nome_temporario }}
+              </div>
+
+              <label class="flex items-center gap-1.5 mt-1.5 text-[10px] text-slate-500 cursor-pointer">
+                {{ component_form.usar_disciplina_temporaria }}
+                Disciplina não cadastrada (temporária, só nesta matriz)
+              </label>
+              {% if component_form.nome_temporario.errors %}<p class="text-red-500 text-[11px] mt-0.5">{{ component_form.nome_temporario.errors.0 }}</p>{% endif %}
             </div>
 
             <!-- Código — CORR-009: col-span-2 (acompanha o cabeçalho) -->
@@ -274,12 +312,46 @@ if (container) {
       const row = chInput.closest('.component-row');
       const creditosInput = row.querySelector('input[name$="-creditos"]');
       const chSemanalInput = row.querySelector('input[name$="-carga_horaria_semanal"]');
-      
+
       const ch = parseInt(chInput.value || 0);
       if (creditosInput) creditosInput.value = Math.floor(ch / 20);
       if (chSemanalInput) chSemanalInput.value = (ch / 20).toFixed(2);
     }
+
+    // 3. Toggle "disciplina não cadastrada (temporária)" -> troca o autocomplete
+    // do catálogo pelo campo de nome livre e libera a CH Total pra digitação
+    // (sem catálogo, não tem de onde derivar a carga horária padrão).
+    if (e.target && e.target.name && e.target.name.endsWith('-usar_disciplina_temporaria')) {
+      aplicarModoDisciplina(e.target.closest('.component-row'), e.target.checked);
+    }
   });
+}
+
+// Alterna uma linha entre "disciplina do catálogo" (autocomplete) e
+// "disciplina temporária" (nome livre + CH digitada na hora). Chamada pelo
+// toggle da linha, ao clonar uma linha nova e ao injetar linhas importadas.
+function aplicarModoDisciplina(row, temporaria) {
+  if (!row) return;
+  const catalogoWrap = row.querySelector('.disciplina-catalogo');
+  const tempWrap = row.querySelector('.disciplina-temporaria');
+  const chInput = row.querySelector('input[name$="-carga_horaria"]');
+  const hiddenSelect = row.querySelector('select[name$="-componente_curricular"]');
+  const searchInput = row.querySelector('.cc-search-input');
+  const nomeTempInput = row.querySelector('input[name$="-nome_temporario"]');
+  const checkbox = row.querySelector('input[name$="-usar_disciplina_temporaria"]');
+
+  if (catalogoWrap) catalogoWrap.classList.toggle('hidden', temporaria);
+  if (tempWrap) tempWrap.classList.toggle('hidden', !temporaria);
+  if (chInput) chInput.disabled = !temporaria;
+  if (checkbox) checkbox.checked = temporaria;
+
+  if (temporaria) {
+    if (hiddenSelect) hiddenSelect.value = '';
+    if (searchInput) searchInput.value = '';
+  } else {
+    if (nomeTempInput) nomeTempInput.value = '';
+    if (chInput) chInput.value = '';
+  }
 }
 
 // ── Lógica de duplicação ou cópia de matriz ─────────────────────────────────────────────
@@ -340,6 +412,44 @@ function copiarMatriz() {
     .catch(() => alert('Erro ao copiar a matriz.'));
 }
 
+// Preenche UMA linha do formset com os dados de um componente vindos do
+// servidor (duplicar matriz ou importar planilha — mesmo formato de objeto:
+// periodo/codigo/carga_horaria/creditos/carga_horaria_semanal/componente_curricular
+// [+_nome]/nome_temporario). Usada por preencherFormsetComCopia() e por
+// adicionarComponentesImportados().
+function preencherLinhaComponente(row, comp) {
+  const temporaria = !comp.componente_curricular && !!comp.nome_temporario;
+  aplicarModoDisciplina(row, temporaria);
+
+  row.querySelectorAll('input, select').forEach(input => {
+    const name = input.name;
+    if (!name) return;
+    if (name.includes('componente_curricular') && input.tagName === 'SELECT') {
+      // Garante que a option existe no select hidden
+      if (comp.componente_curricular) {
+        let opt = input.querySelector(`option[value="${comp.componente_curricular}"]`);
+        if (!opt) {
+          opt = document.createElement('option');
+          opt.value = comp.componente_curricular;
+          opt.textContent = comp.componente_curricular_nome || '';
+          input.appendChild(opt);
+        }
+        input.value = comp.componente_curricular;
+      }
+      // Atualiza o input visível de busca com o nome do componente
+      const ccInput = row.querySelector(`.cc-search-input[data-hidden-id="${name}"]`);
+      if (ccInput) ccInput.value = comp.componente_curricular_nome || '';
+      return;
+    }
+    if (name.endsWith('-nome_temporario')) { input.value = comp.nome_temporario || ''; return; }
+    if (name.includes('codigo')) input.value = comp.codigo || '';
+    if (name.includes('periodo')) input.value = comp.periodo || '';
+    if (name.includes('carga_horaria') && !name.includes('semanal')) input.value = comp.carga_horaria || '';
+    if (name.includes('creditos')) input.value = comp.creditos || '';
+    if (name.includes('carga_horaria_semanal')) input.value = comp.carga_horaria_semanal || '';
+  });
+}
+
 function preencherFormsetComCopia(componentes) {
   const container = document.getElementById('components-container');
   const totalForms = document.getElementById('id_componentes-TOTAL_FORMS');
@@ -359,38 +469,107 @@ function preencherFormsetComCopia(componentes) {
     totalForms.value = rows.length;
   }
 
-  // Preencher valores
-  componentes.forEach((comp, idx) => {
-    const row = rows[idx];
-    const inputs = row.querySelectorAll('input, select');
-    inputs.forEach(input => {
-      const name = input.name;
-      if (!name) return;
-      if (name.includes('componente_curricular') && input.tagName === 'SELECT') {
-        // Garante que a option existe no select hidden
-        if (comp.componente_curricular) {
-          let opt = input.querySelector(`option[value="${comp.componente_curricular}"]`);
-          if (!opt) {
-            opt = document.createElement('option');
-            opt.value = comp.componente_curricular;
-            opt.textContent = comp.componente_curricular_nome || '';
-            input.appendChild(opt);
-          }
-          input.value = comp.componente_curricular;
-        }
-        // Atualiza o input visível de busca com o nome do componente
-        const ccInput = row.querySelector(`.cc-search-input[data-hidden-id="${name}"]`);
-        if (ccInput) ccInput.value = comp.componente_curricular_nome || '';
-        return;
-      }
-      if (name.includes('codigo')) input.value = comp.codigo || '';
-      if (name.includes('periodo')) input.value = comp.periodo || '';
-      if (name.includes('carga_horaria') && !name.includes('semanal')) input.value = comp.carga_horaria || '';
-      if (name.includes('creditos')) input.value = comp.creditos || '';
-      if (name.includes('carga_horaria_semanal')) input.value = comp.carga_horaria_semanal || '';
-    });
+  componentes.forEach((comp, idx) => preencherLinhaComponente(rows[idx], comp));
+}
+
+// ── Importar planilha (linhas de disciplina de UMA matriz) ──────────────────
+// Ao contrário de "Duplicar matriz" (substitui tudo), a importação ACRESCENTA
+// linhas às que já existirem — a DESUP pode importar mais de uma planilha, ou
+// completar manualmente antes/depois. Nada é gravado no banco aqui: as linhas
+// só entram no formset em memória, e passam pela validação normal de
+// MatrixComponentForm quando a matriz for salva.
+function adicionarComponentesImportados(componentes) {
+  const container = document.getElementById('components-container');
+
+  componentes.forEach(comp => {
+    addComponent();
+    const rows = container.querySelectorAll('.component-row');
+    preencherLinhaComponente(rows[rows.length - 1], comp);
   });
 }
+
+(function() {
+  const btnAbrir = document.getElementById('btn-abrir-importar-planilha');
+  const painel = document.getElementById('painel-importar-planilha');
+  const btnImportar = document.getElementById('btn-importar-planilha');
+  const statusEl = document.getElementById('importar-planilha-status');
+  const inputArquivo = document.getElementById('importar-planilha-arquivo');
+  const inputUrl = document.getElementById('importar-planilha-url');
+  if (!btnAbrir || !painel || !btnImportar) return;
+
+  function unidadesSelecionadas() {
+    return Array.from(document.querySelectorAll('input[name="unidades"]:checked')).map(cb => cb.value);
+  }
+
+  // Regra pedida pelo cliente: só dá pra importar planilha depois de escolher
+  // a(s) unidade(s) da matriz. O botão fica desabilitado até lá (o servidor
+  // também recusa — ver MatrixImportRowsView — isto aqui é só feedback rápido).
+  function atualizarEstadoBotao() {
+    const habilitado = unidadesSelecionadas().length > 0;
+    btnAbrir.disabled = !habilitado;
+    btnAbrir.title = habilitado ? '' : 'Selecione ao menos uma unidade em Identificação antes de importar a planilha.';
+    if (!habilitado) painel.classList.add('hidden');
+  }
+
+  document.querySelectorAll('input[name="unidades"]').forEach(cb => cb.addEventListener('change', atualizarEstadoBotao));
+  atualizarEstadoBotao();
+
+  btnAbrir.addEventListener('click', function() {
+    if (btnAbrir.disabled) return;
+    painel.classList.toggle('hidden');
+  });
+
+  btnImportar.addEventListener('click', function() {
+    const unidades = unidadesSelecionadas();
+    if (!unidades.length) {
+      statusEl.textContent = 'Selecione ao menos uma unidade antes de importar.';
+      return;
+    }
+    const arquivo = inputArquivo.files[0];
+    const url = inputUrl.value.trim();
+    if (!arquivo && !url) {
+      statusEl.textContent = 'Envie um arquivo .xlsx ou cole o link do Google Sheets.';
+      return;
+    }
+
+    const formData = new FormData();
+    unidades.forEach(u => formData.append('unidades', u));
+    if (arquivo) formData.append('arquivo', arquivo);
+    if (url) formData.append('google_sheets_url', url);
+
+    const csrfToken = document.querySelector('#form-matriz input[name=csrfmiddlewaretoken]').value;
+    btnImportar.disabled = true;
+    statusEl.textContent = 'Importando...';
+
+    fetch('{% url "courses:matrix_import_rows" %}', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrfToken },
+      body: formData,
+    })
+      .then(r => r.json().then(data => ({ ok: r.ok, data })))
+      .then(({ ok, data }) => {
+        btnImportar.disabled = false;
+        if (!ok) {
+          statusEl.textContent = data.erro || 'Erro ao importar a planilha.';
+          return;
+        }
+        const linhas = data.componentes || [];
+        adicionarComponentesImportados(linhas);
+        let msg = `${linhas.length} linha(s) importada(s).`;
+        if (data.erros && data.erros.length) {
+          msg += ` ${data.erros.length} linha(s) com erro (veja o console).`;
+          console.warn('Erros na importação da planilha:', data.erros);
+        }
+        statusEl.textContent = msg;
+        inputArquivo.value = '';
+        inputUrl.value = '';
+      })
+      .catch(() => {
+        btnImportar.disabled = false;
+        statusEl.textContent = 'Erro ao importar a planilha.';
+      });
+  });
+})();
 
 // ── Confirmação de remoção com SweetAlert2 ─────────────────────────────────
 function confirmarRemocaoComponenteMatriz(btn) {
@@ -436,6 +615,11 @@ function addComponent() {
   newRow.querySelectorAll('select').forEach(s => s.selectedIndex = 0);
   newRow.querySelectorAll('input[type=checkbox]').forEach(c => c.checked = false);
   newRow.querySelectorAll('input[type=hidden][name*="id"]').forEach(h => h.value = '');
+
+  // A linha clonada pode ter copiado o VISUAL de "disciplina temporária" da
+  // linha de origem (se ela estava nesse modo) — o reset dos checkboxes acima
+  // não desfaz sozinho as classes/disabled disso. Força o modo padrão (catálogo).
+  aplicarModoDisciplina(newRow, false);
 
   container.appendChild(newRow);
   totalForms.value = currentTotal + 1;
