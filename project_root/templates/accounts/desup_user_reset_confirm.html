@@ -29,10 +29,22 @@
 
     <form method="post">
         {% csrf_token %}
+        <div class="mb-3 space-y-2">
+            <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-3">
+                <input type="radio" name="modo" value="link" checked class="mt-1 text-[#025c9f]">
+                <span class="text-sm font-semibold text-slate-700">Enviar link de redefinição por e-mail</span>
+            </label>
+            <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-red-200 p-3">
+                <input type="radio" name="modo" value="forcar" class="mt-1 text-red-600">
+                <span class="text-sm font-semibold text-slate-700">
+                    Forçar reset: define a senha padrão do sistema e exige troca no próximo acesso
+                </span>
+            </label>
+        </div>
         <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-4">
             <input type="checkbox" name="confirmar" value="sim" class="mt-1 rounded text-[#025c9f]">
             <span class="text-sm font-semibold text-slate-700">
-                Confirmo que desejo enviar o link de redefinição para este usuário.
+                Confirmo a ação selecionada para este usuário.
             </span>
         </label>
         <div class="mt-5 flex justify-end gap-3">

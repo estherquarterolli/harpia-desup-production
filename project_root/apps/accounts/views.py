@@ -598,6 +598,24 @@ class DesupUserPasswordResetView(LoginRequiredMixin, View):
                 'error': 'Marque a confirmação antes de enviar o link.',
             })
 
+        if request.POST.get('modo') == 'forcar':
+            self.target.set_password(DEFAULT_USER_PASSWORD)
+            self.target.forcar_troca_senha = True
+            self.target.save(update_fields=['password', 'forcar_troca_senha'])
+            messages.success(
+                request,
+                f'Senha de {self.target.email} redefinida para o padrão. '
+                'A troca será exigida no próximo acesso.',
+            )
+            registrar_auditoria(
+                request,
+                "DESUP_PASSWORD_FORCE_RESET",
+                usuario=request.user,
+                email=request.user.email,
+                detalhes=f"Senha de {self.target.email} redefinida para o padrão com troca obrigatória.",
+            )
+            return redirect('desup_user_list')
+
         result = issue_email_password_reset(
             user=self.target,
             request=request,

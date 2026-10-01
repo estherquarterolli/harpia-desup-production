@@ -7,7 +7,8 @@ from django.contrib.auth.models import Group
 from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
 from django.template.response import TemplateResponse
 from django.utils.translation import gettext_lazy as _
-from .models import User
+from django.contrib import messages
+from .models import DEFAULT_USER_PASSWORD, User
 from .forms import CustomUserCreationForm, CustomUserChangeForm
 from .services import issue_email_password_reset
 
@@ -39,7 +40,7 @@ class CustomUserAdmin(DjangoUserAdmin, ModelAdmin):
     search_fields = ('email',)
     ordering = ('email',)
 
-    actions = ['enviar_redefinicao_email']
+    actions = ['enviar_redefinicao_email', 'forcar_reset_senha']
 
     @admin.action(description="Enviar link seguro de redefinição de senha")
     def enviar_redefinicao_email(self, request, queryset):
@@ -79,6 +80,58 @@ class CustomUserAdmin(DjangoUserAdmin, ModelAdmin):
                 'action_name': 'enviar_redefinicao_email',
             },
         )
+
+    @admin.action(description="Forçar reset de senha (senha padrão + troca obrigatória)")
+    def forcar_reset_senha(self, request, queryset):
+        """Define a senha padrão e exige troca no próximo login. Só superusuário."""
+        from .views import registrar_auditoria
+
+        if not request.user.is_superuser:
+            self.message_user(
+                request, 'Apenas superusuários podem forçar o reset de senha.', level=messages.ERROR,
+            )
+            return None
+        queryset = queryset.exclude(pk=request.user.pk)
+
+        if request.POST.get('confirmar_envio') == 'sim':
+            total = 0
+            for target in queryset:
+                target.set_password(DEFAULT_USER_PASSWORD)
+                target.forcar_troca_senha = True
+                target.save(update_fields=['password', 'forcar_troca_senha'])
+                registrar_auditoria(
+                    request,
+                    'ADMIN_FORCE_PASSWORD_RESET',
+                    usuario=request.user,
+                    email=request.user.email,
+                    detalhes=f'Senha de {target.email} redefinida para o padrão com troca obrigatória.',
+                )
+                total += 1
+            self.message_user(
+                request,
+                f'{total} senha(s) redefinida(s) para o padrão. Troca obrigatória no próximo acesso.',
+            )
+            return None
+
+        return TemplateResponse(
+            request,
+            'admin/accounts/user/password_force_reset_confirmation.html',
+            {
+                **self.admin_site.each_context(request),
+                'title': 'Confirmar reset forçado de senha',
+                'usuarios': queryset,
+                'queryset': queryset,
+                'action_checkbox_name': ACTION_CHECKBOX_NAME,
+                'opts': self.model._meta,
+                'action_name': 'forcar_reset_senha',
+            },
+        )
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if not request.user.is_superuser:
+            actions.pop('forcar_reset_senha', None)
+        return actions
 
     # Campos exibidos na edição do usuário
     fieldsets = (
