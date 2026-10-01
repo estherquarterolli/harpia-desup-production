@@ -253,3 +253,58 @@ class SelfPasswordChangeRequest(models.Model):
 
     def __str__(self):
         return f"Troca de senha: {self.user.email} - {'Usado' if self.usado else 'Pendente'}"
+
+
+class EmailPasswordResetToken(models.Model):
+    """
+    Token de uso único para recuperação de senha por e-mail.
+
+    O valor enviado ao usuário nunca é persistido. Guardamos somente o SHA-256
+    do token aleatório, de forma semelhante ao armazenamento de senhas: um
+    vazamento do banco não entrega links de redefinição ainda válidos.
+    """
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="email_password_reset_tokens",
+        verbose_name="Usuário",
+    )
+    token_hash = models.CharField(max_length=64, unique=True, editable=False)
+    criado_em = models.DateTimeField(auto_now_add=True, db_index=True)
+    expira_em = models.DateTimeField(db_index=True)
+    usado = models.BooleanField(default=False, db_index=True)
+    usado_em = models.DateTimeField(null=True, blank=True)
+    solicitado_ip = models.GenericIPAddressField(null=True, blank=True)
+    solicitado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="password_resets_solicitados",
+        verbose_name="Solicitado por",
+    )
+
+    class Meta:
+        db_table = "harpiadb_contas_token_redefinicao_email"
+        verbose_name = "Token de redefinição por e-mail"
+        verbose_name_plural = "Tokens de redefinição por e-mail"
+        ordering = ["-criado_em"]
+        indexes = [
+            models.Index(
+                fields=["user", "usado", "criado_em"],
+                name="harpia_reset_user_status_idx",
+            ),
+        ]
+
+    @property
+    def expirado(self):
+        return timezone.now() >= self.expira_em
+
+    @property
+    def valido(self):
+        return not self.usado and not self.expirado and self.user.is_active
+
+    def __str__(self):
+        estado = "usado" if self.usado else ("expirado" if self.expirado else "válido")
+        return f"Redefinição de {self.user.email} ({estado})"

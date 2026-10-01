@@ -10,6 +10,9 @@ from apps.accounts.views import (
     CustomPasswordChangeView,
     PasswordChangeConfirmView,
     ForgotPasswordView,
+    EmailPasswordResetConfirmView,
+    DesupUserListView,
+    DesupUserPasswordResetView,
     ApprovePasswordResetView,
     ProfileView,
 )
@@ -28,6 +31,17 @@ urlpatterns = [
     path('accounts/password_change/', CustomPasswordChangeView.as_view(), name='password_change'),
     path('accounts/password_change/confirm/<uuid:token>/', PasswordChangeConfirmView.as_view(), name='password_change_confirm'),
     path('accounts/forgot-password/', ForgotPasswordView.as_view(), name='forgot_password'),
+    path(
+        'accounts/redefinir-senha/<str:token>/',
+        EmailPasswordResetConfirmView.as_view(),
+        name='email_password_reset_confirm',
+    ),
+    path('accounts/usuarios/', DesupUserListView.as_view(), name='desup_user_list'),
+    path(
+        'accounts/usuarios/<int:pk>/redefinir-senha/',
+        DesupUserPasswordResetView.as_view(),
+        name='desup_user_password_reset',
+    ),
     path('accounts/reset/aprovar/<uuid:token>/', ApprovePasswordResetView.as_view(), name='approve_password_reset'),
     
     # Acesso aos outros perfils (admin e unidade)

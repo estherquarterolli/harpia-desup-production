@@ -22,8 +22,12 @@ class PasswordChangeForceMiddleware:
                 except NoReverseMatch:
                     logout_path = '/accounts/logout/'
 
-                # Is it a password confirm link? (contains /accounts/password_change/confirm/)
-                is_confirm_link = '/accounts/password_change/confirm/' in request.path
+                # Links de confirmação precisam funcionar mesmo se o usuário ainda
+                # tiver uma sessão antiga com troca obrigatória pendente.
+                is_confirm_link = (
+                    '/accounts/password_change/confirm/' in request.path
+                    or '/accounts/redefinir-senha/' in request.path
+                )
 
                 # Allow password_change, logout, static files, and media
                 if request.path != change_path and request.path != logout_path and not is_confirm_link:

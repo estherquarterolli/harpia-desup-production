@@ -14,7 +14,12 @@ logger = logging.getLogger(__name__)
 
 
 def custom_500(request):
-    return render(request, '500.html', status=500)
+    return render(
+        request,
+        '500.html',
+        {'request_id': getattr(request, '_harpia_request_id', '')},
+        status=500,
+    )
 
 
 def _safe_redirect_url(request, default='/'):

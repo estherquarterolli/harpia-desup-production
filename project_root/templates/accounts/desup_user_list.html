@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}Usuários - Harpia{% endblock %}
+{% block header_title %}Usuários{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+    <div class="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+                <h2 class="text-lg font-black text-slate-800">Contas do sistema</h2>
+                <p class="mt-1 text-sm text-slate-500">
+                    Consulte o último acesso e envie um link seguro de redefinição de senha.
+                </p>
+            </div>
+            <form method="get" class="flex w-full gap-2 md:w-auto">
+                <input type="search" name="q" value="{{ request.GET.q }}"
+                       placeholder="E-mail, nome ou unidade"
+                       class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm md:w-72">
+                <button type="submit"
+                        class="rounded-lg bg-[#025c9f] px-4 py-2 text-sm font-bold text-white hover:bg-[#153e70]">
+                    Buscar
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-sm">
+        <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50 text-left text-xs font-black uppercase tracking-wide text-slate-500">
+                <tr>
+                    <th class="px-5 py-3">Usuário</th>
+                    <th class="px-5 py-3">Perfil</th>
+                    <th class="px-5 py-3">Unidade</th>
+                    <th class="px-5 py-3">Último acesso</th>
+                    <th class="px-5 py-3">Status</th>
+                    <th class="px-5 py-3 text-right">Ação</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for usuario in usuarios %}
+                <tr class="hover:bg-slate-50/70">
+                    <td class="px-5 py-4">
+                        <div class="font-bold text-slate-800">{{ usuario.get_full_name|default:usuario.email }}</div>
+                        <div class="text-xs text-slate-500">{{ usuario.email }}</div>
+                    </td>
+                    <td class="px-5 py-4 text-slate-600">{{ usuario.get_perfil_display }}</td>
+                    <td class="px-5 py-4 text-slate-600">{{ usuario.unidade|default:'—' }}</td>
+                    <td class="px-5 py-4 text-slate-600">
+                        {% if usuario.last_login %}
+                            {{ usuario.last_login|date:'d/m/Y H:i' }}
+                        {% else %}
+                            Nunca acessou
+                        {% endif %}
+                    </td>
+                    <td class="px-5 py-4">
+                        {% if usuario.is_active %}
+                            <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">Ativo</span>
+                        {% else %}
+                            <span class="rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700">Inativo</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-5 py-4 text-right">
+                        <a href="{% url 'desup_user_password_reset' usuario.pk %}"
+                           class="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800 hover:bg-amber-100">
+                            <i class="ph ph-key"></i>
+                            Redefinir senha
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="px-5 py-10 text-center text-slate-400">Nenhum usuário encontrado.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if is_paginated %}
+    <nav class="flex items-center justify-center gap-3 text-sm font-bold text-slate-600">
+        {% if page_obj.has_previous %}
+            <a class="rounded-lg bg-white px-3 py-2 shadow-sm" href="?q={{ request.GET.q|urlencode }}&page={{ page_obj.previous_page_number }}">Anterior</a>
+        {% endif %}
+        <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+            <a class="rounded-lg bg-white px-3 py-2 shadow-sm" href="?q={{ request.GET.q|urlencode }}&page={{ page_obj.next_page_number }}">Próxima</a>
+        {% endif %}
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

@@ -46,6 +46,12 @@
                 <i class="ph ph-tree-structure text-2xl flex-shrink-0"></i>
                 <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Unidades</span>
             </a>
+
+            <a href="{% url 'desup_user_list' %}"
+                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if '/accounts/usuarios' in request.path %}bg-white/10{% endif %}">
+                <i class="ph ph-users-three text-2xl flex-shrink-0"></i>
+                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Usuários</span>
+            </a>
             {% endif %}
 
             <!-- Professores — DESUP e Coordenador de Unidade -->

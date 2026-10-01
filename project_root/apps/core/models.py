@@ -166,6 +166,48 @@ class AuditoriaGlobal(models.Model):
         return f"{self.criado_em:%Y-%m-%d %H:%M:%S} - {self.acao} - {self.email}"
 
 
+class ErroSistema(models.Model):
+    """Ocorrência técnica capturada para diagnóstico exclusivo do superadmin."""
+
+    usuario = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='erros_sistema',
+        verbose_name='Usuário',
+    )
+    email_usuario = models.EmailField(blank=True, verbose_name='E-mail do usuário')
+    perfil_usuario = models.CharField(max_length=30, blank=True, verbose_name='Perfil')
+    unidade_usuario = models.CharField(max_length=255, blank=True, verbose_name='Unidade')
+    criado_em = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name='Data')
+    metodo = models.CharField(max_length=10, verbose_name='Método HTTP')
+    caminho = models.CharField(max_length=500, db_index=True, verbose_name='Caminho')
+    status_http = models.PositiveSmallIntegerField(db_index=True, verbose_name='Status HTTP')
+    tipo_erro = models.CharField(max_length=255, db_index=True, verbose_name='Tipo do erro')
+    mensagem = models.TextField(blank=True, verbose_name='Mensagem')
+    traceback = models.TextField(blank=True, verbose_name='Traceback')
+    ip = models.GenericIPAddressField(null=True, blank=True, verbose_name='IP')
+    user_agent = models.TextField(blank=True, verbose_name='Navegador/User-Agent')
+    request_id = models.CharField(max_length=32, db_index=True, verbose_name='ID da requisição')
+    fingerprint = models.CharField(max_length=64, db_index=True, verbose_name='Fingerprint')
+
+    class Meta:
+        db_table = 'harpiadb_nucleo_erro_sistema'
+        verbose_name = 'Erro do Sistema'
+        verbose_name_plural = 'Erros do Sistema'
+        ordering = ['-criado_em']
+        indexes = [
+            models.Index(
+                fields=['status_http', 'criado_em'],
+                name='harpia_erro_status_data_idx',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.status_http} {self.tipo_erro} em {self.caminho}"
+
+
 class AtalhoDashboard(models.Model):
     """Atalho configurável do dashboard (por usuário). Guarda a *chave* do
     catálogo (apps/core/atalhos.py) — whitelist, não URL crua."""

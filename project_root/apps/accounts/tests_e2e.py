@@ -28,6 +28,7 @@ from django.utils import timezone
 
 from apps.accounts.models import (
     DEFAULT_USER_PASSWORD,
+    EmailPasswordResetToken,
     PasswordResetRequest,
     SelfPasswordChangeRequest,
     User,
@@ -129,39 +130,49 @@ class PrimeiroAcessoObrigatorioE2ETests(BaseE2ETestCase):
         self.assertEqual(formulario.status_code, 200)
         self.assertTemplateUsed(formulario, 'registration/password_change_form.html')
         self.assertContains(formulario, 'você deve alterar a sua senha antes de prosseguir')
+        self.assertContains(formulario, 'name="old_password"')
         self.assertContains(formulario, 'name="new_password1"')
 
         # 4) Troca efetivada: volta ao login com o aviso de sucesso.
         troca = self.client.post(URL_TROCA_SENHA, {
+            'old_password': self.senha_inicial,
             'new_password1': self.senha_nova,
             'new_password2': self.senha_nova,
         })
         self.assertEqual(troca.status_code, 302)
-        self.assertEqual(troca['Location'], f'{URL_LOGIN}?changed=1')
+        self.assertEqual(troca['Location'], URL_PERFIL)
 
         self.novato.refresh_from_db()
         self.assertFalse(self.novato.forcar_troca_senha)
         self.assertTrue(self.novato.check_password(self.senha_nova))
         self.assertTrue(
-            AuditoriaGlobal.objects.filter(acao="PASSWORD_CHANGED_FIRST_LOGIN").exists()
+            AuditoriaGlobal.objects.filter(acao="PASSWORD_CHANGED_BY_USER").exists()
         )
 
         # 5) A sessão foi encerrada de verdade pela própria view.
-        self.assertFalse(self.esta_autenticado())
-        self.assertMandaParaLogin(self.client.get(URL_DASH_UNIDADE))
+        self.assertTrue(self.esta_autenticado())
+        self.assertEqual(self.client.get(URL_DASH_UNIDADE).status_code, 200)
 
         # 6) A senha antiga não vale mais.
-        recusado = self.fazer_login(self.novato.email, self.senha_inicial)
+        novo_navegador = self.client_class()
+        recusado = self.fazer_login(
+            self.novato.email,
+            self.senha_inicial,
+            client=novo_navegador,
+        )
         self.assertEqual(recusado.status_code, 200)
         self.assertContains(recusado, 'E-mail ou senha inválidos.')
-        self.assertFalse(self.esta_autenticado())
 
         # 7) Com a senha nova ele entra e NÃO é mais forçado a nada.
-        entrada = self.fazer_login(self.novato.email, self.senha_nova)
+        entrada = self.fazer_login(
+            self.novato.email,
+            self.senha_nova,
+            client=novo_navegador,
+        )
         self.assertEqual(entrada.status_code, 302)
         self.assertEqual(entrada['Location'], URL_DASH_UNIDADE)
 
-        dashboard = self.client.get(URL_DASH_UNIDADE)
+        dashboard = novo_navegador.get(URL_DASH_UNIDADE)
         self.assertEqual(dashboard.status_code, 200)
         self.assertContains(dashboard, self.novato.email)
 
@@ -188,6 +199,7 @@ class PrimeiroAcessoObrigatorioE2ETests(BaseE2ETestCase):
         self.fazer_login(self.novato.email, self.senha_inicial)
 
         recusa = self.client.post(URL_TROCA_SENHA, {
+            'old_password': self.senha_inicial,
             'new_password1': 'senha123',
             'new_password2': 'senha123',
         })
@@ -287,6 +299,7 @@ class BloqueioPorTentativasE2ETests(BaseE2ETestCase):
 # ══════════════════════════════════════════════════════════════════════════════
 # Cenário 3, 4 e 5 — Troca de senha voluntária por link de e-mail
 # ══════════════════════════════════════════════════════════════════════════════
+@unittest.skip("Fluxo voluntário por e-mail substituído pela troca direta com senha atual.")
 class TrocaSenhaVoluntariaE2ETests(BaseE2ETestCase):
     """
     Usuário já ambientado (`forcar_troca_senha=False`) pede o link, recebe o
@@ -519,85 +532,56 @@ class EsqueciMinhaSenhaE2ETests(BaseE2ETestCase):
         self.assertEqual(tela.status_code, 200)
         self.assertTemplateUsed(tela, 'registration/forgot_password.html')
 
-        # 2) Pedido registrado + notificação + e-mail para quem aprova.
+        # 2) Token seguro criado e e-mail enviado diretamente ao titular.
         pedido = self._pedir_reset()
         self.assertEqual(pedido.status_code, 200)
-        self.assertContains(pedido, 'Sua solicitação foi enviada para o administrador do DESUP')
+        self.assertContains(pedido, 'Se o e-mail estiver cadastrado e ativo')
 
-        solicitacao = PasswordResetRequest.objects.get(user=self.esquecido)
-        self.assertFalse(solicitacao.finalizado)
+        token = EmailPasswordResetToken.objects.get(user=self.esquecido)
+        self.assertFalse(token.usado)
 
         self.assertEqual(len(mail.outbox), 1)
-        destinatarios = set(mail.outbox[0].to)
-        self.assertIn(self.desup.email, destinatarios)
-        self.assertIn(self.colega_da_unidade.email, destinatarios)
-        self.assertNotIn(self.coord_de_fora.email, destinatarios)
+        self.assertEqual(mail.outbox[0].to, [self.esquecido.email])
+        self.assertFalse(Notificacao.objects.exists())
 
-        self.assertTrue(
-            Notificacao.objects.filter(
-                destinatario=self.desup, titulo="Solicitação de Reset de Senha"
-            ).exists()
-        )
-
-        # 3) A DESUP abre o link de aprovação que veio no e-mail.
-        link = self.extrair_link(mail.outbox[0].body, '/accounts/reset/aprovar/')
-        navegador_desup = self.client_class()
-        self.fazer_login(self.desup.email, self.senha, client=navegador_desup)
-
-        revisao = navegador_desup.get(link)
+        # 3) O próprio usuário abre o link e cadastra a nova senha.
+        link = self.extrair_link(mail.outbox[0].body, '/accounts/redefinir-senha/')
+        navegador_usuario = self.client_class()
+        revisao = navegador_usuario.get(link)
         self.assertEqual(revisao.status_code, 200)
         self.assertContains(revisao, self.esquecido.email)
-        self.assertContains(revisao, 'APROVAR E RESETAR AGORA')
+        self.assertContains(revisao, 'Definir nova senha')
 
-        # 4) Aprovação: senha volta ao padrão e o usuário vira "primeiro acesso".
-        aprovacao = navegador_desup.post(link)
-        self.assertEqual(aprovacao.status_code, 200)
-        self.assertContains(aprovacao, 'resetada com sucesso')
+        nova_senha = 'SenhaRecuperada@2026'
+        conclusao = navegador_usuario.post(link, {
+            'new_password1': nova_senha,
+            'new_password2': nova_senha,
+        })
+        self.assertEqual(conclusao.status_code, 302)
+        self.assertEqual(conclusao['Location'], '/login/?changed=1')
 
         self.esquecido.refresh_from_db()
-        solicitacao.refresh_from_db()
-        self.assertTrue(self.esquecido.check_password(DEFAULT_USER_PASSWORD))
-        self.assertTrue(self.esquecido.forcar_troca_senha)
-        self.assertTrue(solicitacao.finalizado)
-        self.assertIsNotNone(solicitacao.finalizado_em)
-        self.assertEqual(solicitacao.aprovado_por, self.desup)
+        token.refresh_from_db()
+        self.assertTrue(self.esquecido.check_password(nova_senha))
+        self.assertFalse(self.esquecido.forcar_troca_senha)
+        self.assertTrue(token.usado)
 
-        # 5) O usuário entra com a senha padrão e cai no fluxo de troca obrigatória.
-        navegador_usuario = self.client_class()
-        entrada = self.fazer_login(
-            self.esquecido.email, DEFAULT_USER_PASSWORD, client=navegador_usuario
-        )
+        # 4) O usuário já entra normalmente com a senha nova.
+        entrada = self.fazer_login(self.esquecido.email, nova_senha, client=navegador_usuario)
         self.assertEqual(entrada.status_code, 302)
-        self.assertEqual(navegador_usuario.get(URL_DASH_UNIDADE)['Location'], URL_TROCA_SENHA)
+        self.assertEqual(entrada['Location'], URL_DASH_UNIDADE)
 
-    def test_quem_pode_e_quem_nao_pode_aprovar_o_reset(self):
+    def test_link_nao_exige_sessao_mas_exige_o_token_exato(self):
         self._pedir_reset()
-        solicitacao = PasswordResetRequest.objects.get(user=self.esquecido)
-        url = f'/accounts/reset/aprovar/{solicitacao.token}/'
+        link = self.extrair_link(mail.outbox[0].body, '/accounts/redefinir-senha/')
 
-        # Anônimo: nem chega a ver a tela.
-        self.assertMandaParaLogin(self.client_class().get(url))
-
-        # Coordenador de outra unidade: 403 explícito.
-        navegador_forasteiro = self.client_class()
-        self.fazer_login(self.coord_de_fora.email, self.senha, client=navegador_forasteiro)
-        negado = navegador_forasteiro.get(url)
-        self.assertEqual(negado.status_code, 403)
-        # SEC-002: mensagem única para todos os casos de recusa.
-        self.assertIn('não tem permissão', negado.content.decode())
-
-        # E o POST também é barrado (não basta esconder a tela).
-        negado_post = navegador_forasteiro.post(url)
-        self.assertEqual(negado_post.status_code, 403)
-        self.esquecido.refresh_from_db()
-        self.assertFalse(self.esquecido.check_password(DEFAULT_USER_PASSWORD))
-
-        # Coordenador da mesma unidade: pode aprovar.
-        navegador_colega = self.client_class()
-        self.fazer_login(self.colega_da_unidade.email, self.senha, client=navegador_colega)
-        permitido = navegador_colega.get(url)
+        permitido = self.client_class().get(link)
         self.assertEqual(permitido.status_code, 200)
         self.assertContains(permitido, self.esquecido.email)
+
+        invalido = self.client_class().get('/accounts/redefinir-senha/token-incorreto/')
+        self.assertEqual(invalido.status_code, 200)
+        self.assertContains(invalido, 'inválido, expirou ou já foi utilizado')
 
     def test_token_de_aprovacao_inexistente_retorna_404(self):
         navegador_desup = self.client_class()
@@ -610,8 +594,7 @@ class EsqueciMinhaSenhaE2ETests(BaseE2ETestCase):
         self.assertEqual(resposta.status_code, 404)
 
     def test_solicitacao_ja_aprovada_nao_reseta_a_senha_de_novo(self):
-        self._pedir_reset()
-        solicitacao = PasswordResetRequest.objects.get(user=self.esquecido)
+        solicitacao = PasswordResetRequest.objects.create(user=self.esquecido)
         url = f'/accounts/reset/aprovar/{solicitacao.token}/'
 
         navegador_desup = self.client_class()
@@ -630,8 +613,7 @@ class EsqueciMinhaSenhaE2ETests(BaseE2ETestCase):
         self.assertTrue(self.esquecido.check_password("DepoisDoReset@2026"))
 
     def test_solicitacao_expirada_nao_pode_ser_aprovada(self):
-        self._pedir_reset()
-        solicitacao = PasswordResetRequest.objects.get(user=self.esquecido)
+        solicitacao = PasswordResetRequest.objects.create(user=self.esquecido)
         PasswordResetRequest.objects.filter(pk=solicitacao.pk).update(
             criado_em=timezone.now() - timedelta(hours=24, minutes=1)
         )
@@ -651,8 +633,9 @@ class EsqueciMinhaSenhaE2ETests(BaseE2ETestCase):
         resposta = self._pedir_reset(email='ninguem_aqui@teste.com')
 
         self.assertEqual(resposta.status_code, 200)
-        self.assertContains(resposta, 'Não foi encontrado nenhum usuário com o e-mail informado.')
+        self.assertContains(resposta, 'Se o e-mail estiver cadastrado e ativo')
         self.assertEqual(PasswordResetRequest.objects.count(), 0)
+        self.assertEqual(EmailPasswordResetToken.objects.count(), 0)
         self.assertEqual(Notificacao.objects.count(), 0)
         self.assertEqual(len(mail.outbox), 0)
 
@@ -701,8 +684,9 @@ class EsqueciMinhaSenhaE2ETests(BaseE2ETestCase):
         self.assertIsNone(coord_sem_unidade.unidade)
         self.assertIsNone(superusuario.unidade)
 
-        self._pedir_reset(email=superusuario.email)
-        solicitacao = PasswordResetRequest.objects.get(user=superusuario)
+        # O endpoint público agora usa token direto por e-mail. Criamos uma
+        # solicitação antiga explicitamente para testar a proteção legada.
+        solicitacao = PasswordResetRequest.objects.create(user=superusuario)
         url = f'/accounts/reset/aprovar/{solicitacao.token}/'
 
         navegador = self.client_class()
@@ -741,7 +725,7 @@ class EsqueciMinhaSenhaE2ETests(BaseE2ETestCase):
 
         # Esperado: pedidos repetidos em sequência não podem gerar N solicitações
         # nem N e-mails para a coordenação.
-        self.assertEqual(PasswordResetRequest.objects.filter(user=self.esquecido).count(), 1)
+        self.assertEqual(EmailPasswordResetToken.objects.filter(user=self.esquecido).count(), 1)
         self.assertEqual(len(mail.outbox), 1)
 
 

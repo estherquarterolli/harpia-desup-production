@@ -53,6 +53,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'apps.core.middleware.SystemErrorLoggingMiddleware',
     'apps.accounts.middleware.PasswordChangeForceMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -136,6 +137,15 @@ EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=False, cast=bool)
 EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="no-reply@harpia.local")
+EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=15, cast=int)
+
+# Recuperação de senha por e-mail: token de uso único e cooldown anti-spam.
+PASSWORD_RESET_TOKEN_TTL_SECONDS = config(
+    "PASSWORD_RESET_TOKEN_TTL_SECONDS", default=3600, cast=int
+)
+PASSWORD_RESET_COOLDOWN_SECONDS = config(
+    "PASSWORD_RESET_COOLDOWN_SECONDS", default=900, cast=int
+)
 
 # ---------------------------------------------------------------------------
 # Observabilidade de erros 500 (CORR-005)
@@ -429,6 +439,11 @@ UNFOLD = {
                         "title": "Auditoria Global",
                         "icon": "history",
                         "link": "/admin/core/auditoriaglobal/",
+                    },
+                    {
+                        "title": "Erros do Sistema",
+                        "icon": "bug_report",
+                        "link": "/admin/core/errosistema/",
                     },
                 ],
             },

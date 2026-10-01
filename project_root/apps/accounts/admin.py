@@ -4,9 +4,12 @@ from unfold.admin import ModelAdmin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.admin import GroupAdmin as DjangoGroupAdmin
 from django.contrib.auth.models import Group
+from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
+from django.template.response import TemplateResponse
 from django.utils.translation import gettext_lazy as _
 from .models import User
 from .forms import CustomUserCreationForm, CustomUserChangeForm
+from .services import issue_email_password_reset
 
 class HarpiaAdminSite(UnfoldAdminSite):
     site_header = _("Harpia – Administração")
@@ -28,30 +31,53 @@ class CustomUserAdmin(DjangoUserAdmin, ModelAdmin):
     form = CustomUserChangeForm
     model = User
     
-    list_display = ('email', 'perfil', 'unidade', 'is_staff', 'forcar_troca_senha')
+    list_display = (
+        'email', 'perfil', 'unidade', 'last_login', 'is_active',
+        'is_staff', 'forcar_troca_senha',
+    )
     list_filter = ('perfil', 'unidade', 'is_staff', 'is_active', 'forcar_troca_senha')
     search_fields = ('email',)
     ordering = ('email',)
 
-    actions = ['resetar_senha_usuarios', 'ativar_senha_padrao']
+    actions = ['enviar_redefinicao_email']
 
-    @admin.action(description="Resetar senha dos usuários selecionados para a senha padrão e forçar troca")
-    def resetar_senha_usuarios(self, request, queryset):
-        self._aplicar_senha_padrao(request, queryset, "resetada")
+    @admin.action(description="Enviar link seguro de redefinição de senha")
+    def enviar_redefinicao_email(self, request, queryset):
+        """Ação em duas etapas; nenhum reset administrativo ocorre sem confirmação."""
+        if not request.user.is_superuser:
+            queryset = queryset.exclude(is_superuser=True).exclude(perfil=User.Perfil.ADMIN)
 
-    @admin.action(description="Ativar senha padrão para os usuários selecionados")
-    def ativar_senha_padrao(self, request, queryset):
-        self._aplicar_senha_padrao(request, queryset, "ativada")
+        if request.POST.get('confirmar_envio') == 'sim':
+            enviados = 0
+            limitados = 0
+            for target in queryset:
+                result = issue_email_password_reset(
+                    user=target,
+                    request=request,
+                    requested_by=request.user,
+                )
+                if result.sent:
+                    enviados += 1
+                elif result.reason == 'rate_limited':
+                    limitados += 1
+            self.message_user(
+                request,
+                f'{enviados} link(s) enviado(s). {limitados} usuário(s) já tinham um link recente.',
+            )
+            return None
 
-    def _aplicar_senha_padrao(self, request, queryset, operacao):
-        from .models import DEFAULT_USER_PASSWORD
-        for user in queryset:
-            user.set_password(DEFAULT_USER_PASSWORD)
-            user.forcar_troca_senha = True
-            user.save()
-        self.message_user(
+        return TemplateResponse(
             request,
-            f"Senha padrão {operacao} e troca de senha forçada para {queryset.count()} usuários.",
+            'admin/accounts/user/password_reset_confirmation.html',
+            {
+                **self.admin_site.each_context(request),
+                'title': 'Confirmar envio de redefinição de senha',
+                'usuarios': queryset,
+                'queryset': queryset,
+                'action_checkbox_name': ACTION_CHECKBOX_NAME,
+                'opts': self.model._meta,
+                'action_name': 'enviar_redefinicao_email',
+            },
         )
 
     # Campos exibidos na edição do usuário

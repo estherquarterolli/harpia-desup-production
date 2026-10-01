@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
 from django.contrib.auth import authenticate, login
 from django.http import HttpResponse
 from django.core.cache import cache
@@ -131,7 +132,7 @@ def login_view(request):
 
 
 from django.contrib.auth.views import PasswordChangeView
-from django.contrib.auth.forms import SetPasswordForm
+from django.contrib.auth.forms import PasswordChangeForm, SetPasswordForm
 from django.urls import reverse, reverse_lazy
 from django.views import View
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -187,25 +188,15 @@ class ProfileView(LoginRequiredMixin, View):
 
 class CustomPasswordChangeView(LoginRequiredMixin, PasswordChangeView):
     template_name = 'registration/password_change_form.html'
-    form_class = SetPasswordForm
+    form_class = PasswordChangeForm
 
     def get_success_url(self):
-        return str(reverse_lazy('login')) + '?changed=1'
+        return str(reverse_lazy('profile'))
 
     def get(self, request, *args, **kwargs):
-        if not request.user.forcar_troca_senha:
-            # CORR-018: tela de confirmação SEM campo de e-mail — o endereço já é
-            # conhecido (`request.user.email`) e é para ele que o link é enviado.
-            return render(
-                request,
-                'registration/password_change_email_prompt.html',
-                {'user_email': request.user.email},
-            )
         return super().get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
-        if not request.user.forcar_troca_senha:
-            return self._request_email_confirmation(request)
         return super().post(request, *args, **kwargs)
 
     def _request_email_confirmation(self, request):
@@ -320,13 +311,13 @@ class CustomPasswordChangeView(LoginRequiredMixin, PasswordChangeView):
         response = super().form_valid(form)
         # Ao alterar a senha com sucesso, desativa a flag de forçar troca
         self.request.user.forcar_troca_senha = False
-        self.request.user.save()
+        self.request.user.save(update_fields=['forcar_troca_senha'])
         registrar_auditoria(
             self.request,
-            "PASSWORD_CHANGED_FIRST_LOGIN",
+            "PASSWORD_CHANGED_BY_USER",
             usuario=self.request.user,
             email=self.request.user.email,
-            detalhes="Senha alterada no fluxo obrigatorio do primeiro acesso.",
+            detalhes="Senha alterada pelo próprio usuário após confirmação da senha atual.",
         )
         logger.info(
             "Senha alterada pelo usuario autenticado.",
@@ -336,8 +327,7 @@ class CustomPasswordChangeView(LoginRequiredMixin, PasswordChangeView):
                 "path": self.request.path,
             },
         )
-        from django.contrib.auth import logout
-        logout(self.request)
+        messages.success(self.request, "Senha alterada com sucesso.")
         return response
 
 
@@ -402,97 +392,194 @@ class PasswordChangeConfirmView(View):
 
 
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.db.models import Q
+from django.views.generic import ListView
 from django.utils.decorators import method_decorator
-from .models import User, PasswordResetRequest, DEFAULT_USER_PASSWORD
+from .models import (
+    EmailPasswordResetToken,
+    User,
+    PasswordResetRequest,
+    DEFAULT_USER_PASSWORD,
+)
+from .services import issue_email_password_reset, password_reset_token_hash
 
 def is_coordinator_or_desup(user):
     return user.is_authenticated and (user.is_superuser or user.perfil in ['DESUP', 'COORDENADOR_UNIDADE'])
 
 class ForgotPasswordView(View):
+    """Recuperação direta por e-mail, sem revelar se a conta existe."""
+
     def get(self, request):
         return render(request, 'registration/forgot_password.html')
 
     def post(self, request):
-        email = request.POST.get('email')
+        email = (request.POST.get('email') or '').strip()
+        user = User.objects.filter(email__iexact=email, is_active=True).first()
 
-        # Buscar usuário pelo e-mail informado
-        user = User.objects.filter(email=email).first()
-        if user:
-            # SEC-004: já existe pedido em aberto para esta conta → não cria outro,
-            # não notifica de novo e não dispara e-mail. A resposta é a MESMA do
-            # caminho de sucesso: avisar "você já pediu" diria a um terceiro que a
-            # conta existe e que há um reset pendente.
-            if PasswordResetRequest.pedido_pendente(user) is not None:
-                logger.info(
-                    "Pedido de reset ignorado por cooldown.",
-                    extra={"user_id": user.pk, "user_email": user.email},
-                )
-                return render(request, 'registration/forgot_password.html', {
-                    'success': (
-                        "Sua solicitação foi enviada para o administrador do DESUP e para a "
-                        "coordenação acadêmica da sua unidade. Por favor, aguarde o reset."
-                    ),
+        if user is not None:
+            result = issue_email_password_reset(user=user, request=request)
+            registrar_auditoria(
+                request,
+                "PASSWORD_RESET_EMAIL_REQUESTED",
+                usuario=user,
+                email=user.email,
+                detalhes=(
+                    "Link de redefinição enviado ao próprio usuário."
+                    if result.sent else
+                    f"Pedido não reenviado ({result.reason})."
+                ),
+            )
+
+        # Resposta deliberadamente idêntica para e-mail existente ou inexistente.
+        # Isso impede enumeração de contas pelo endpoint público.
+        return render(request, 'registration/forgot_password.html', {
+            'success': (
+                'Se o e-mail estiver cadastrado e ativo, enviaremos um link individual '
+                'para você definir uma nova senha. Verifique também a caixa de spam.'
+            ),
+        })
+
+
+class EmailPasswordResetConfirmView(View):
+    """Valida o token opaco e permite cadastrar uma nova senha uma única vez."""
+
+    template_name = 'registration/password_reset_confirm_email.html'
+
+    def _token(self, raw_token, *, lock=False):
+        queryset = EmailPasswordResetToken.objects.select_related('user')
+        if lock:
+            queryset = queryset.select_for_update()
+        return queryset.filter(token_hash=password_reset_token_hash(raw_token)).first()
+
+    @staticmethod
+    def _invalid(token):
+        return token is None or not token.valido
+
+    def get(self, request, token):
+        reset_token = self._token(token)
+        if self._invalid(reset_token):
+            return render(request, self.template_name, {'invalid': True})
+        return render(request, self.template_name, {
+            'form': SetPasswordForm(reset_token.user),
+            'email': reset_token.user.email,
+        })
+
+    def post(self, request, token):
+        with transaction.atomic():
+            reset_token = self._token(token, lock=True)
+            if self._invalid(reset_token):
+                return render(request, self.template_name, {'invalid': True})
+
+            form = SetPasswordForm(reset_token.user, request.POST)
+            if not form.is_valid():
+                return render(request, self.template_name, {
+                    'form': form,
+                    'email': reset_token.user.email,
                 })
 
-            # Criar a solicitação de reset no banco
-            reset_request = PasswordResetRequest.objects.create(user=user)
-            
-            # Notificar os usuários do DESUP e superusuários
-            destinatarios_qs = User.objects.filter(perfil='DESUP') | User.objects.filter(is_superuser=True)
-            
-            # Acrescentar a coordenação acadêmica da unidade do usuário, se houver.
-            # SEC-002: só quando o solicitante É um coordenador de unidade — a
-            # notificação carrega o token de aprovação no `url_acao`, e coordenador
-            # não aprova reset de conta administrativa. Antes, um pedido de reset
-            # do DESUP entregava o token a todos os coordenadores da unidade dele.
-            if user.unidade and user.perfil == User.Perfil.COORDENADOR_UNIDADE:
-                coordenadores_unidade = User.objects.filter(
-                    perfil=User.Perfil.COORDENADOR_UNIDADE,
-                    unidade=user.unidade,
-                )
-                destinatarios_qs = destinatarios_qs | coordenadores_unidade
-            
-            # Lista de emails para envio (evitando duplicados e nulos)
-            email_recipients = list(destinatarios_qs.exclude(email='').exclude(email__isnull=True).values_list('email', flat=True).distinct())
-            
-            titulo = "Solicitação de Reset de Senha"
-            mensagem = f"O usuário {user.get_full_name() or user.email} ({user.email}) solicitou a redefinição de senha."
-            url_admin = f"{request.build_absolute_uri('/')[:-1]}/admin/accounts/user/{user.id}/change/"
-            from django.urls import reverse
-            url_aprovacao_interna = reverse('approve_password_reset', kwargs={'token': reset_request.token})
-            url_aprovacao_absoluta = request.build_absolute_uri(url_aprovacao_interna)
-            
-            # Enviar notificações no sistema para todos os destinatários únicos identificados
-            for destinatario in destinatarios_qs.distinct():
-                Notificacao.objects.create(
-                    destinatario=destinatario,
-                    titulo=titulo,
-                    mensagem=mensagem,
-                    url_acao=url_aprovacao_interna
-                )
-            
-            # Envio de E-mail
-            if email_recipients:
-                email_body = f"{mensagem}\n\nPara APROVAR este reset, acesse o link de aprovação: {url_aprovacao_absoluta}\n\nOu acesse o painel administrativo: {url_admin}"
-                def _queue_reset_email():
-                    try:
-                        send_email_task.delay(
-                            subject=f"HARPIA - {titulo}",
-                            message=email_body,
-                            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None),
-                            recipient_list=email_recipients,
-                            fail_silently=True,
-                        )
-                    except Exception:
-                        pass  # Falha de fila não deve bloquear o fluxo do usuário
+            user = form.save(commit=False)
+            user.forcar_troca_senha = False
+            user.save(update_fields=['password', 'forcar_troca_senha'])
+            now = timezone.now()
+            EmailPasswordResetToken.objects.filter(
+                user=user,
+                usado=False,
+            ).update(usado=True, usado_em=now)
 
-                transaction.on_commit(_queue_reset_email)
-            
-            msg = "Sua solicitação foi enviada para o administrador do DESUP e para a coordenação acadêmica da sua unidade. Por favor, aguarde o reset."
-            return render(request, 'registration/forgot_password.html', {'success': msg})
+        registrar_auditoria(
+            request,
+            "PASSWORD_RESET_COMPLETED_BY_EMAIL",
+            usuario=user,
+            email=user.email,
+            detalhes="Senha redefinida com token aleatório enviado ao próprio e-mail.",
+        )
+        return redirect(str(reverse_lazy('login')) + '?changed=1')
+
+
+class DesupUserListView(LoginRequiredMixin, ListView):
+    """Gestão operacional de contas disponível somente para o perfil DESUP."""
+
+    model = User
+    template_name = 'accounts/desup_user_list.html'
+    context_object_name = 'usuarios'
+    paginate_by = 30
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
+        if request.user.perfil != User.Perfil.DESUP:
+            return HttpResponse('Você não tem permissão para gerenciar usuários.', status=403)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        queryset = (
+            User.objects
+            .select_related('unidade')
+            .exclude(is_superuser=True)
+            .exclude(perfil=User.Perfil.ADMIN)
+            .order_by('email')
+        )
+        query = (self.request.GET.get('q') or '').strip()
+        if query:
+            queryset = queryset.filter(
+                Q(email__icontains=query)
+                | Q(first_name__icontains=query)
+                | Q(last_name__icontains=query)
+                | Q(unidade__nome__icontains=query)
+                | Q(unidade__sigla__icontains=query)
+            )
+        return queryset
+
+
+class DesupUserPasswordResetView(LoginRequiredMixin, View):
+    template_name = 'accounts/desup_user_reset_confirm.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
+        if request.user.perfil != User.Perfil.DESUP:
+            return HttpResponse('Você não tem permissão para redefinir senhas.', status=403)
+        self.target = get_object_or_404(
+            User.objects.exclude(is_superuser=True).exclude(perfil=User.Perfil.ADMIN),
+            pk=kwargs['pk'],
+        )
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, pk):
+        return render(request, self.template_name, {'target': self.target})
+
+    def post(self, request, pk):
+        if request.POST.get('confirmar') != 'sim':
+            return render(request, self.template_name, {
+                'target': self.target,
+                'error': 'Marque a confirmação antes de enviar o link.',
+            })
+
+        result = issue_email_password_reset(
+            user=self.target,
+            request=request,
+            requested_by=request.user,
+        )
+        if result.sent:
+            messages.success(
+                request,
+                f'Link de redefinição enviado para {self.target.email}.',
+            )
+            registrar_auditoria(
+                request,
+                "DESUP_PASSWORD_RESET_EMAIL_SENT",
+                usuario=request.user,
+                email=request.user.email,
+                detalhes=f"Link de redefinição enviado para {self.target.email}.",
+            )
+        elif result.reason == 'rate_limited':
+            messages.warning(
+                request,
+                'Um link já foi emitido recentemente para este usuário. Aguarde antes de reenviar.',
+            )
         else:
-            msg = "Não foi encontrado nenhum usuário com o e-mail informado."
-            return render(request, 'registration/forgot_password.html', {'error': msg})
+            messages.error(request, 'Não foi possível enviar o link para esta conta.')
+        return redirect('desup_user_list')
 
 
 def _pode_aprovar_reset(aprovador, solicitante):
