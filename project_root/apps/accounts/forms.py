@@ -53,10 +53,9 @@ class DesupUserCreateForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ("first_name", "last_name", "email", "perfil", "unidade")
+        fields = ("first_name", "email", "perfil", "unidade")
         labels = {
             "first_name": "Nome",
-            "last_name": "Sobrenome",
             "email": "E-mail",
             "unidade": "Unidade",
         }
@@ -69,6 +68,11 @@ class DesupUserCreateForm(forms.ModelForm):
         )
         for field in self.fields.values():
             field.widget.attrs["class"] = field_css
+        self.fields["first_name"].required = True
+        self.fields["first_name"].widget.attrs.update({
+            "autocomplete": "name",
+            "placeholder": "Nome do usuário",
+        })
         self.fields["email"].widget.attrs.update({
             "autocomplete": "email",
             "placeholder": "usuario@exemplo.com",

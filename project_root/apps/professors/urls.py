@@ -6,6 +6,7 @@ app_name = 'professors'
 urlpatterns = [
     path('', views.ProfessorListView.as_view(), name='professor_list'),
     path('criar/', views.ProfessorCreateView.as_view(), name='professor_create'),
+    path('<int:pk>/detalhes/', views.ProfessorDetailView.as_view(), name='professor_detail'),
     path('<int:pk>/editar/', views.ProfessorUpdateView.as_view(), name='professor_update'),
     path('<int:pk>/excluir/', views.ProfessorDeleteView.as_view(), name='professor_delete'),
     path('<int:pk>/duplicar/', views.ProfessorDuplicarView.as_view(), name='professor_duplicar'),

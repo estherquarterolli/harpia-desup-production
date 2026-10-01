@@ -20,6 +20,21 @@
 
     <div id="sidebarBackdrop" class="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
 
+    {% if user.is_authenticated and user.perfil == 'DESUP' %}
+    <div id="professorDetailModal"
+         class="hidden fixed inset-0 z-[150] items-center justify-center bg-slate-950/55 p-4"
+         role="dialog" aria-modal="true" aria-label="Detalhes do professor"
+         onclick="if (event.target === this) fecharDetalhesProfessor()">
+        <div class="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+            <div id="professorDetailContent" aria-live="polite">
+                <div class="flex min-h-52 items-center justify-center p-8 text-slate-400">
+                    <i class="ph ph-circle-notch animate-spin text-3xl"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <aside id="sidebar"
         class="sidebar-desktop group w-20 hover:w-64 bg-[#025c9f] text-white transition-all duration-300 flex flex-col h-screen sticky top-0 z-50">
         <div class="p-3 mb-10 flex justify-between items-center border-b border-white/5 rounded-xl mx-2 mt-3 transition-all duration-300">
@@ -377,6 +392,24 @@
             document.getElementById('sidebarBackdrop').classList.remove('active');
         }
 
+        function abrirDetalhesProfessor() {
+            const modal = document.getElementById('professorDetailModal');
+            const content = document.getElementById('professorDetailContent');
+            if (!modal || !content) return;
+            content.innerHTML = '<div class="flex min-h-52 items-center justify-center p-8 text-slate-400"><i class="ph ph-circle-notch animate-spin text-3xl"></i></div>';
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.classList.add('overflow-hidden');
+        }
+
+        function fecharDetalhesProfessor() {
+            const modal = document.getElementById('professorDetailModal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.body.classList.remove('overflow-hidden');
+        }
+
         function toggleElement(id) {
             const el = document.getElementById(id);
             if (el.classList.contains('menu-hidden')) {
@@ -525,6 +558,7 @@
 
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Escape') {
+                fecharDetalhesProfessor();
                 closeWindowLockModal();
                 closeMobileSidebar();
             }

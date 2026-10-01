@@ -15,8 +15,9 @@ As jornadas passam pelas rotas reais do namespace `professors`
 Convenções destes testes:
 - Usuários sempre com `forcar_troca_senha=False` (senão o
   `PasswordChangeForceMiddleware` redireciona tudo para a troca de senha).
-- Permissões conforme as views: criar é exclusivo da DESUP (`pode_criar`);
-  editar/duplicar/excluir são do COORDENADOR_UNIDADE (`CoordenadorOnlyMixin`).
+- Permissões conforme as views: criar e ver detalhes são exclusivos da DESUP;
+  editar/excluir pertencem à DESUP e ao COORDENADOR_UNIDADE dentro do seu escopo;
+  duplicar continua exclusivo do COORDENADOR_UNIDADE.
 - Os testes com docstring "CORRIGIDO" nasceram como BUG-CANDIDATO
   (`@unittest.expectedFailure`): a asserção descreve o comportamento CORRETO,
   o bug foi corrigido e eles passaram a valer como teste de regressão.
@@ -202,7 +203,7 @@ class CrudProfessorE2ETests(ProfessorE2EBase):
             self._mensagens(resposta),
         )
 
-        # 2) O coordenador da unidade edita (a DESUP não edita — ver teste de permissões).
+        # 2) O coordenador da unidade edita dentro do próprio escopo.
         self.client.force_login(self.coord_a)
         url_editar = reverse('professors:professor_update', kwargs={'pk': novo.pk})
 
@@ -273,14 +274,7 @@ class CrudProfessorE2ETests(ProfessorE2EBase):
         self.assertFalse(resposta.context['pode_criar'])
         self.assertNotContains(resposta, 'Novo Professor')
 
-    def test_desup_ve_botao_criar_mas_nao_edita_nem_exclui(self):
-        """
-        Assimetria REAL do produto (documentada, não é asserção enfraquecida):
-        as views de editar/excluir/duplicar usam `CoordenadorOnlyMixin`, então a
-        DESUP — que é justamente quem cria — recebe 403 nelas, apesar de o
-        contexto `pode_crud` (apps/professors/views.py:50-52) afirmar que a DESUP
-        pode editar. Ver relatório: inconsistência entre contexto e permissão.
-        """
+    def test_desup_abre_detalhes_edita_e_acessa_confirmacao_de_exclusao(self):
         self.client.force_login(self.desup)
 
         resposta = self.client.get(self.url_lista)
@@ -289,19 +283,33 @@ class CrudProfessorE2ETests(ProfessorE2EBase):
         self.assertContains(resposta, 'Novo Professor')
 
         alvo = self.prof_a1.pk
-        self.assertEqual(
-            self.client.get(reverse('professors:professor_update', kwargs={'pk': alvo})).status_code,
-            403,
-        )
-        self.assertEqual(
-            self.client.post(reverse('professors:professor_delete', kwargs={'pk': alvo})).status_code,
-            403,
-        )
+        url_detalhes = reverse('professors:professor_detail', kwargs={'pk': alvo})
+        url_editar = reverse('professors:professor_update', kwargs={'pk': alvo})
+        url_excluir = reverse('professors:professor_delete', kwargs={'pk': alvo})
+        self.assertContains(resposta, url_detalhes)
+
+        detalhes = self.client.get(url_detalhes)
+        self.assertEqual(detalhes.status_code, 200)
+        self.assertTemplateUsed(detalhes, 'professors/partials/_professor_detail.html')
+        self.assertContains(detalhes, self.prof_a1.nome)
+        self.assertContains(detalhes, url_editar)
+        self.assertContains(detalhes, url_excluir)
+
+        self.assertEqual(self.client.get(url_editar).status_code, 200)
+        confirmacao = self.client.get(url_excluir)
+        self.assertEqual(confirmacao.status_code, 200)
+        self.assertContains(confirmacao, 'Sim, excluir')
+
+        # Duplicação não foi solicitada para a DESUP e continua restrita à unidade.
         self.assertEqual(
             self.client.post(reverse('professors:professor_duplicar', kwargs={'pk': alvo})).status_code,
             403,
         )
-        self.assertTrue(Professor.objects.filter(pk=alvo).exists())
+
+        exclusao = self.client.post(url_excluir, follow=True)
+        self.assertEqual(exclusao.status_code, 200)
+        self.assertContains(exclusao, 'Professor excluído com sucesso.')
+        self.assertFalse(Professor.objects.filter(pk=alvo).exists())
 
     def test_coordenador_nao_edita_exclui_ou_duplica_professor_de_outra_unidade(self):
         self.client.force_login(self.coord_a)
@@ -320,6 +328,15 @@ class CrudProfessorE2ETests(ProfessorE2EBase):
             404,
         )
         self.assertTrue(Professor.objects.filter(pk=alvo).exists())
+
+    def test_coordenador_nao_acessa_modal_exclusivo_da_desup(self):
+        self.client.force_login(self.coord_a)
+
+        resposta = self.client.get(
+            reverse('professors:professor_detail', kwargs={'pk': self.prof_a1.pk})
+        )
+
+        self.assertEqual(resposta.status_code, 403)
 
     def test_perfil_admin_ti_e_redirecionado_para_o_admin_do_django(self):
         self.client.force_login(self.admin_ti)

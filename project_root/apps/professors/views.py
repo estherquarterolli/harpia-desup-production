@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.db.models import ProtectedError
 from django.shortcuts import redirect, get_object_or_404, render
 from django.urls import reverse_lazy
-from django.views.generic import CreateView, ListView, UpdateView, DeleteView, View
+from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView, View
 
 from apps.accounts.mixins import PerfilRequiredMixin
 from apps.core.models import Unidade
@@ -92,6 +92,21 @@ def _perfil_desup(user):
 class CoordenadorOnlyMixin(LoginRequiredMixin, PerfilRequiredMixin):
     """CRUD de professores: somente coordenador da unidade."""
     allowed_profiles = ['COORDENADOR_UNIDADE']
+
+
+class ProfessorEditDeleteMixin(LoginRequiredMixin, PerfilRequiredMixin):
+    """DESUP gerencia qualquer docente; unidade, somente os próprios."""
+
+    allowed_profiles = ['DESUP', 'COORDENADOR_UNIDADE']
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = Professor.objects.all()
+        if _perfil_desup(user):
+            return queryset
+        if user.unidade_id:
+            return queryset.filter(unidade_principal_id=user.unidade_id)
+        return queryset.none()
 
 
 class ProfessorListView(LoginRequiredMixin, ListView):
@@ -227,6 +242,19 @@ class DesupOnlyMixin(LoginRequiredMixin, PerfilRequiredMixin):
     # entrava na view e quebrava em `AnonymousUser.perfil` (500 em vez de login).
     allowed_profiles = ['DESUP']
 
+
+class ProfessorDetailView(DesupOnlyMixin, DetailView):
+    """Conteúdo do modal de detalhes aberto pelo Administrador DESUP."""
+
+    model = Professor
+    template_name = 'professors/partials/_professor_detail.html'
+    context_object_name = 'professor'
+
+    def get_queryset(self):
+        return Professor.objects.select_related(
+            'tipo_contrato', 'unidade_principal'
+        ).prefetch_related('cursos')
+
 class ProfessorCreateView(DesupOnlyMixin, CreateView):
     model = Professor
     form_class = ProfessorForm
@@ -245,17 +273,11 @@ class ProfessorCreateView(DesupOnlyMixin, CreateView):
         return super().form_valid(form)
 
 
-class ProfessorUpdateView(CoordenadorOnlyMixin, UpdateView):
+class ProfessorUpdateView(ProfessorEditDeleteMixin, UpdateView):
     model = Professor
     form_class = ProfessorForm
     template_name = 'professors/professor_form.html'
     success_url = reverse_lazy('professors:professor_list')
-
-    def get_queryset(self):
-        user = self.request.user
-        if user.is_superuser:
-            return Professor.objects.all()
-        return Professor.objects.filter(unidade_principal=user.unidade)
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -267,16 +289,10 @@ class ProfessorUpdateView(CoordenadorOnlyMixin, UpdateView):
         return super().form_valid(form)
 
 
-class ProfessorDeleteView(CoordenadorOnlyMixin, DeleteView):
+class ProfessorDeleteView(ProfessorEditDeleteMixin, DeleteView):
     model = Professor
     template_name = 'professors/professor_confirm_delete.html'
     success_url = reverse_lazy('professors:professor_list')
-
-    def get_queryset(self):
-        user = self.request.user
-        if user.is_superuser:
-            return Professor.objects.all()
-        return Professor.objects.filter(unidade_principal=user.unidade)
 
     # CORR: `DeleteView.delete()` virou código morto no Django 4.0 (a view passou a usar
     # `FormMixin`, e o POST cai em `form_valid()`) — por isso a mensagem de sucesso nunca

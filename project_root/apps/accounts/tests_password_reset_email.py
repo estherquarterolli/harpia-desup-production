@@ -159,23 +159,30 @@ class DesupUserManagementTests(TestCase):
                 User.Perfil.COORDENADOR_UNIDADE: 'Coordenador de Unidade',
             },
         )
-        self.assertContains(response, 'Confirmo que os dados e o perfil estão corretos')
+        self.assertIn('first_name', response.context['form'].fields)
+        self.assertNotIn('last_name', response.context['form'].fields)
+        self.assertTrue(response.context['form'].fields['first_name'].required)
+        self.assertNotContains(response, 'Confirmo que os dados e o perfil estão corretos')
+        self.assertNotContains(response, 'A senha não será exibida para a DESUP')
+        self.assertNotContains(response, 'Sobrenome')
+        self.assertContains(response, 'Acessa todas as unidades')
+        self.assertContains(response, 'Acessa somente a unidade vinculada')
 
     def test_cria_coordenador_com_unidade_e_envia_link_de_senha(self):
         with patch('apps.accounts.services.send_email_task.delay') as delay:
             with self.captureOnCommitCallbacks(execute=True):
                 response = self.client.post('/accounts/usuarios/criar/', {
                     'first_name': 'Maria',
-                    'last_name': 'Coordenadora',
                     'email': 'nova-coordenadora@teste.com',
                     'perfil': User.Perfil.COORDENADOR_UNIDADE,
                     'unidade': self.unidade.pk,
-                    'confirmar': 'sim',
                 })
 
         self.assertRedirects(response, '/accounts/usuarios/')
         created = User.objects.get(email='nova-coordenadora@teste.com')
         self.assertEqual(created.perfil, User.Perfil.COORDENADOR_UNIDADE)
+        self.assertEqual(created.first_name, 'Maria')
+        self.assertEqual(created.last_name, '')
         self.assertEqual(created.unidade, self.unidade)
         self.assertFalse(created.is_staff)
         self.assertFalse(created.is_superuser)
@@ -190,10 +197,10 @@ class DesupUserManagementTests(TestCase):
             with self.captureOnCommitCallbacks(execute=True):
                 response = self.client.post('/accounts/usuarios/criar/', {
                     'email': 'novo-desup@teste.com',
+                    'first_name': 'Joana',
                     'perfil': User.Perfil.DESUP,
                     # Mesmo manipulado no POST, unidade não se aplica a DESUP.
                     'unidade': self.unidade.pk,
-                    'confirmar': 'sim',
                 })
 
         self.assertRedirects(response, '/accounts/usuarios/')
@@ -205,24 +212,28 @@ class DesupUserManagementTests(TestCase):
 
     def test_coordenador_exige_unidade(self):
         response = self.client.post('/accounts/usuarios/criar/', {
+            'first_name': 'Sem Unidade',
             'email': 'sem-unidade@teste.com',
             'perfil': User.Perfil.COORDENADOR_UNIDADE,
-            'confirmar': 'sim',
         })
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Selecione a unidade do coordenador.')
         self.assertFalse(User.objects.filter(email='sem-unidade@teste.com').exists())
 
-    def test_criacao_exige_confirmacao(self):
+    def test_criacao_exige_nome(self):
         response = self.client.post('/accounts/usuarios/criar/', {
-            'email': 'sem-confirmacao@teste.com',
+            'email': 'sem-nome@teste.com',
             'perfil': User.Perfil.DESUP,
         })
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Marque a confirmação antes de criar o usuário.')
-        self.assertFalse(User.objects.filter(email='sem-confirmacao@teste.com').exists())
+        self.assertFormError(
+            response.context['form'],
+            'first_name',
+            'Este campo é obrigatório.',
+        )
+        self.assertFalse(User.objects.filter(email='sem-nome@teste.com').exists())
 
     def test_reset_exige_tela_e_checkbox_de_confirmacao(self):
         url = f'/accounts/usuarios/{self.target.pk}/redefinir-senha/'

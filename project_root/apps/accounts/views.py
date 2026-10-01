@@ -553,11 +553,7 @@ class DesupUserCreateView(LoginRequiredMixin, View):
 
     def post(self, request):
         form = self._form(request.POST)
-        confirmation_error = None
-        if request.POST.get('confirmar') != 'sim':
-            confirmation_error = 'Marque a confirmação antes de criar o usuário.'
-
-        if form.is_valid() and confirmation_error is None:
+        if form.is_valid():
             with transaction.atomic():
                 created_user = form.save()
                 result = issue_email_password_reset(
@@ -589,10 +585,7 @@ class DesupUserCreateView(LoginRequiredMixin, View):
                 )
             return redirect('desup_user_list')
 
-        return render(request, self.template_name, {
-            'form': form,
-            'confirmation_error': confirmation_error,
-        })
+        return render(request, self.template_name, {'form': form})
 
 
 class DesupUserPasswordResetView(LoginRequiredMixin, View):

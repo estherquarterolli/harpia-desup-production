@@ -20,7 +20,15 @@
             {{ item.prof.nome|slice:":1"|upper }}
           </div>
           <div>
-            <p class="text-sm font-bold text-slate-800">{{ item.prof.nome }}</p>
+            <button type="button"
+                    onclick="abrirDetalhesProfessor()"
+                    hx-get="{% url 'professors:professor_detail' item.prof.pk %}"
+                    hx-target="#professorDetailContent"
+                    hx-swap="innerHTML"
+                    class="text-left text-sm font-bold text-[#025c9f] hover:underline focus:outline-none focus:ring-2 focus:ring-blue-200 rounded"
+                    aria-label="Ver detalhes de {{ item.prof.nome }}">
+              {{ item.prof.nome }}
+            </button>
             <p class="text-[10px] text-slate-400">{{ item.prof.rh_matricula }}</p>
           </div>
         </div>

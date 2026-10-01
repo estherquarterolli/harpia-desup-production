@@ -8,8 +8,7 @@
     <div class="mb-6">
         <h2 class="text-xl font-black text-slate-800">Nova conta do sistema</h2>
         <p class="mt-2 text-sm leading-relaxed text-slate-500">
-            Cadastre um Administrador DESUP ou um Coordenador de Unidade. Após a criação,
-            a pessoa receberá por e-mail um link individual para definir a própria senha.
+            Cadastre um Administrador DESUP ou um Coordenador de Unidade.
         </p>
     </div>
 
@@ -22,15 +21,10 @@
     <form method="post" novalidate>
         {% csrf_token %}
         <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <div>
+            <div class="md:col-span-2">
                 <label for="{{ form.first_name.id_for_label }}" class="field-label">{{ form.first_name.label }}</label>
                 {{ form.first_name }}
                 {% for error in form.first_name.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
-            </div>
-            <div>
-                <label for="{{ form.last_name.id_for_label }}" class="field-label">{{ form.last_name.label }}</label>
-                {{ form.last_name }}
-                {% for error in form.last_name.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
             </div>
             <div class="md:col-span-2">
                 <label for="{{ form.email.id_for_label }}" class="field-label">{{ form.email.label }}</label>
@@ -41,8 +35,7 @@
                 <label for="{{ form.perfil.id_for_label }}" class="field-label">{{ form.perfil.label }}</label>
                 {{ form.perfil }}
                 {% for error in form.perfil.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
-                <p class="mt-1.5 text-xs text-slate-500">
-                    Administrador DESUP acessa as funções operacionais, sem privilégios técnicos de superusuário.
+                <p id="perfilHelp" class="mt-1.5 text-xs leading-relaxed text-slate-500" aria-live="polite">
                 </p>
             </div>
             <div id="unidadeField">
@@ -53,25 +46,6 @@
             </div>
         </div>
 
-        <div class="mt-6 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
-            <div class="flex items-start gap-3">
-                <i class="ph ph-envelope-simple text-xl"></i>
-                <p>A senha não será exibida para a DESUP. O novo usuário deverá cadastrá-la pelo link seguro recebido no e-mail informado.</p>
-            </div>
-        </div>
-
-        <div class="mt-5">
-            <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-4">
-                <input type="checkbox" name="confirmar" value="sim"
-                       {% if request.POST.confirmar == 'sim' %}checked{% endif %}
-                       class="mt-1 rounded text-[#025c9f] focus:ring-[#025c9f]">
-                <span class="text-sm font-semibold text-slate-700">
-                    Confirmo que os dados e o perfil estão corretos e desejo criar este usuário.
-                </span>
-            </label>
-            {% if confirmation_error %}<p class="field-error">{{ confirmation_error }}</p>{% endif %}
-        </div>
-
         <div class="mt-6 flex flex-col-reverse justify-end gap-3 sm:flex-row">
             <a href="{% url 'desup_user_list' %}"
                class="rounded-lg px-5 py-2.5 text-center text-sm font-bold text-slate-600 hover:bg-slate-100">
@@ -80,7 +54,7 @@
             <button type="submit"
                     class="inline-flex items-center justify-center gap-2 rounded-lg bg-[#025c9f] px-5 py-2.5 text-sm font-black text-white hover:bg-[#153e70]">
                 <i class="ph ph-user-plus"></i>
-                Confirmar e criar
+                Criar usuário
             </button>
         </div>
     </form>
@@ -91,18 +65,25 @@
         var perfil = document.getElementById('id_perfil');
         var unidade = document.getElementById('id_unidade');
         var unidadeField = document.getElementById('unidadeField');
-        if (!perfil || !unidade || !unidadeField) return;
+        var perfilHelp = document.getElementById('perfilHelp');
+        if (!perfil || !unidade || !unidadeField || !perfilHelp) return;
 
-        function atualizarUnidade() {
+        var permissoes = {
+            DESUP: 'Acessa todas as unidades, gerencia usuários e professores, acompanha matrizes e analisa as solicitações enviadas à DESUP.',
+            COORDENADOR_UNIDADE: 'Acessa somente a unidade vinculada, gerencia os professores dessa unidade, preenche matrizes e envia informações à DESUP.'
+        };
+
+        function atualizarPerfil() {
             var coordenador = perfil.value === 'COORDENADOR_UNIDADE';
             unidade.disabled = !coordenador;
             unidade.required = coordenador;
             unidadeField.classList.toggle('opacity-60', !coordenador);
             if (!coordenador) unidade.value = '';
+            perfilHelp.textContent = permissoes[perfil.value] || 'Selecione um tipo de usuário para consultar suas permissões.';
         }
 
-        perfil.addEventListener('change', atualizarUnidade);
-        atualizarUnidade();
+        perfil.addEventListener('change', atualizarPerfil);
+        atualizarPerfil();
     })();
 </script>
 {% endblock %}
