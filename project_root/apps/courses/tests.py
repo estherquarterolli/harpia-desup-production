@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django import forms
+from django.db import IntegrityError, transaction
 from django.template.defaultfilters import floatformat
 from django.test import Client, TestCase
 from django.urls import reverse
@@ -47,6 +48,7 @@ class CurriculumMatrixComponentTests(TestCase):
                 'curso': self.curso_global.id,
                 'unidades': [self.unidade.id],
                 'nome': 'Matriz Teste',
+                'turno': 'M',
             }
         )
         matrix = CurriculumMatrix(curso=self.curso_global)
@@ -98,6 +100,30 @@ class CurriculumMatrixComponentTests(TestCase):
             componente_curricular__nome='Estrutura de Dados',
         )
         self.assertEqual(ed_na_matriz.status, MatrixComponent.StatusChoices.INCOMPLETO)
+
+    def test_matrix_form_exige_turno_e_expoe_as_tres_opcoes(self):
+        form = CurriculumMatrixForm(data={'turno': ''})
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('turno', form.errors)
+        self.assertIsInstance(form.fields['turno'].widget, forms.Select)
+        self.assertEqual(
+            list(form.fields['turno'].choices),
+            [
+                ('', 'Selecione o turno'),
+                ('M', 'Manhã'),
+                ('T', 'Tarde'),
+                ('N', 'Noite'),
+            ],
+        )
+
+    def test_banco_recusa_turno_fora_de_m_t_n_e_preserva_nulo_legado(self):
+        legado = CurriculumMatrix.objects.create(curso=self.curso_global, turno=None)
+        self.assertIsNone(legado.turno)
+
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                CurriculumMatrix.objects.create(curso=self.curso_global, turno='X')
 
     def test_matrix_component_uses_component_defaults_when_fields_are_blank(self):
         """Verifica que campos omitidos herdam defaults do CurricularComponent via save()."""
@@ -466,7 +492,8 @@ class MatrixCoexistenciaVigentesTests(TestCase):
         )
         # Matriz de origem já publicada (vigente) do curso.
         self.matriz_origem = CurriculumMatrix.objects.create(
-            curso=self.curso_global, nome='MC-CC-Manha', is_vigente=True, is_rascunho=False,
+            curso=self.curso_global, nome='MC-CC-Manha', turno='M',
+            is_vigente=True, is_rascunho=False,
         )
         self.matriz_origem.unidades.add(self.unidade)
 
@@ -475,12 +502,13 @@ class MatrixCoexistenciaVigentesTests(TestCase):
         )
         self.client.force_login(self.desup)
 
-    def _post_publicar_nova_matriz(self, nome):
+    def _post_publicar_nova_matriz(self, nome, turno='N'):
         """POST no CreateView publicando uma nova matriz do mesmo curso."""
         return self.client.post(reverse('courses:matrix_create'), data={
             'curso': self.curso_global.id,
             'unidades': [self.unidade.id],
             'nome': nome,
+            'turno': turno,
             # publicar (salvar_rascunho ausente/≠ 'true' → is_vigente=True)
             'componentes-TOTAL_FORMS': '1',
             'componentes-INITIAL_FORMS': '0',
@@ -505,6 +533,7 @@ class MatrixCoexistenciaVigentesTests(TestCase):
         nova = CurriculumMatrix.objects.get(nome='MC-CC-Noite')
         self.assertTrue(nova.is_vigente)
         self.assertFalse(nova.is_rascunho)
+        self.assertEqual(nova.turno, 'N')
 
     def test_duas_vigentes_do_mesmo_curso_coexistem(self):
         """Ambas as matrizes do mesmo curso ficam vigentes simultaneamente."""

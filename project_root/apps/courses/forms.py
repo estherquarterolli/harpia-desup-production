@@ -25,7 +25,7 @@ class CurriculumMatrixForm(forms.ModelForm):
 
     class Meta:
         model = CurriculumMatrix
-        fields = ['curso', 'unidades', 'nome']
+        fields = ['curso', 'unidades', 'nome', 'turno']
         widgets = {
             'curso': forms.Select(attrs={'class': _FIELD_CSS}),
             'unidades': forms.CheckboxSelectMultiple(),
@@ -33,6 +33,7 @@ class CurriculumMatrixForm(forms.ModelForm):
                 'class': _FIELD_CSS,
                 'placeholder': 'Ex: MC-ADS-2026',
             }),
+            'turno': forms.Select(attrs={'class': _FIELD_CSS}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -42,6 +43,13 @@ class CurriculumMatrixForm(forms.ModelForm):
         self.fields['curso'].required = False
         self.fields['unidades'].queryset = Unidade.objects.filter(status=True).order_by('nome')
         self.fields['unidades'].required = False
+        # Matrizes legadas podem continuar sem turno no banco até o saneamento,
+        # mas toda criação/edição feita pela aplicação precisa escolher um valor.
+        self.fields['turno'].required = True
+        self.fields['turno'].choices = [
+            ('', 'Selecione o turno'),
+            *CurriculumMatrix._meta.get_field('turno').choices,
+        ]
 
 
 class MatrixComponentForm(forms.ModelForm):

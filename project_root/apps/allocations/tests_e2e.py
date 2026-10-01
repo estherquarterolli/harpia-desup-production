@@ -472,13 +472,13 @@ class AprovarAlocacaoUnidadeE2ETests(AlocacaoE2EBase):
         CORRIGIDO: aprovar a unidade não estoura mais IntegrityError quando a
         matriz vigente não tem turno.
 
-        `CurriculumMatrixForm` (apps/courses/forms.py) nem expõe o campo `turno`,
-        então TODA matriz criada pela tela nasce com `turno=None`, e
-        `AprovarAlocacaoUnidadeView` repassava esse None para
+        Novas matrizes exigem turno no formulário, mas registros legados/importados
+        ainda podem ter `turno=None`. Antes, `AprovarAlocacaoUnidadeView` repassava
+        esse None para
         `AlocacaoCurricular.turno`, que é NOT NULL (models.py:21) —
         IntegrityError/500 em vez de redirect. Agora a matriz sem turno cai no
         `TURNO_PADRAO_ALOCACAO` ('M') e a DESUP recebe um aviso para corrigir a
-        matriz (a correção definitiva é o formulário de matriz exigir o turno).
+        matriz enquanto o legado é saneado.
         """
         self.matriz_a.turno = None
         self.matriz_a.save()

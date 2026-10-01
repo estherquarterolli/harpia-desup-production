@@ -8,11 +8,10 @@ from django.http import JsonResponse
 from apps.allocations.models import AlocacaoCurricular
 from apps.core.services import build_window_lock_context, enforce_window_or_redirect
 
-# `AlocacaoCurricular.turno` é NOT NULL (models.py), mas `CurriculumMatrix.turno` é
-# opcional e o formulário de matriz nem expõe o campo — ou seja, toda matriz criada pela
-# tela nasce sem turno e a aprovação quebrava com IntegrityError/500. Enquanto a matriz
-# não passar a exigir turno, o consolidado assume o primeiro turno do domínio (Manhã) e
-# a DESUP é avisada por mensagem para corrigir a matriz.
+# `AlocacaoCurricular.turno` é NOT NULL. O formulário agora exige o turno para novas
+# matrizes, mas matrizes legadas/importadas ainda podem ter `CurriculumMatrix.turno=NULL`
+# durante o saneamento. Nesses casos o consolidado mantém o fallback para Manhã e avisa
+# a DESUP, evitando IntegrityError/500 sem mascarar que o cadastro precisa ser corrigido.
 TURNO_PADRAO_ALOCACAO = 'M'
 
 class AllocCurricularView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):

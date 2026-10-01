@@ -92,6 +92,12 @@ class CurriculumMatrixListView(MatrixBaseView, ListView):
         if curso_id:
             qs = qs.filter(curso_id=curso_id)
 
+        # Filtro de turno. A lista fechada mantém o filtro coerente com as
+        # opções oficiais da matriz (Manhã, Tarde e Noite).
+        turno = self.request.GET.get('turno')
+        if turno in {'M', 'T', 'N'}:
+            qs = qs.filter(turno=turno)
+
         # Filtro de Status
         status = self.request.GET.get('status', '')
         if status == 'vigente':
@@ -503,6 +509,7 @@ class LoadMatricesForDuplicateView(LoginRequiredMixin, PerfilRequiredMixin, View
                     matriz.pk,
                     matriz.curso.sigla if matriz.curso_id else '?',
                     matriz.nome or 'Matriz',
+                    matriz.get_turno_display() or 'Turno não informado',
                     unidade_siglas or 'Global',
                 )
 
@@ -510,7 +517,7 @@ class LoadMatricesForDuplicateView(LoginRequiredMixin, PerfilRequiredMixin, View
         # vira argumento e as linhas saem por format_html_join, que escapa nome de
         # curso/matriz vindo do banco.
         opcoes = format_html('<option value="">{}</option>', 'Nao duplicar (criar em branco)')
-        opcoes += format_html_join('', '<option value="{}">{} - {} ({})</option>', _linhas())
+        opcoes += format_html_join('', '<option value="{}">{} - {} - {} ({})</option>', _linhas())
         return HttpResponse(opcoes)
 
 

@@ -71,12 +71,13 @@ def linha_componente_temporaria(nome, carga_horaria, periodo='1º Semestre', **e
     return dados
 
 
-def payload_matriz(*, curso, unidades, nome, linhas, rascunho=False, initial_forms=0):
+def payload_matriz(*, curso, unidades, nome, linhas, turno='M', rascunho=False, initial_forms=0):
     """Monta o POST completo do formulário de matriz (form + management form + linhas)."""
     data = {
         'curso': str(curso.id),
         'unidades': [str(u.id) for u in unidades],
         'nome': nome,
+        'turno': turno,
         f'{PREFIXO}-TOTAL_FORMS': str(len(linhas)),
         f'{PREFIXO}-INITIAL_FORMS': str(initial_forms),
         f'{PREFIXO}-MIN_NUM_FORMS': '1',
@@ -158,10 +159,11 @@ class BaseCoursesE2ETests(TestCase):
         return {m.pk for m in resp.context['matrices']}
 
     def criar_matriz(self, *, nome, curso=None, unidades=None, vigente=True, rascunho=False,
-                     disciplinas=()):
+                     turno='M', disciplinas=()):
         """Cria matriz direto no modelo (fixture), sem passar pela tela."""
         matriz = CurriculumMatrix.objects.create(
-            curso=curso or self.curso, nome=nome, is_vigente=vigente, is_rascunho=rascunho,
+            curso=curso or self.curso, nome=nome, turno=turno,
+            is_vigente=vigente, is_rascunho=rascunho,
         )
         for unidade in (unidades or [self.unidade_a]):
             matriz.unidades.add(unidade)
@@ -177,6 +179,68 @@ class BaseCoursesE2ETests(TestCase):
                 carga_horaria_semanal=Decimal(ch) / 20,
             )
         return matriz
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Turno da matriz — seleção obrigatória no sistema, legado nulo preservado
+# ══════════════════════════════════════════════════════════════════════════════
+
+class MatrizTurnoE2ETests(BaseCoursesE2ETests):
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.desup)
+
+    def test_formulario_exibe_select_e_persiste_manha_tarde_noite(self):
+        resposta = self.client.get(reverse('courses:matrix_create'))
+        self.assertContains(resposta, 'name="turno"')
+        self.assertContains(resposta, '>Manhã</option>')
+        self.assertContains(resposta, '>Tarde</option>')
+        self.assertContains(resposta, '>Noite</option>')
+
+        for indice, (codigo, rotulo) in enumerate((('M', 'Manhã'), ('T', 'Tarde'), ('N', 'Noite'))):
+            with self.subTest(turno=codigo):
+                nome = f'MC-TURNO-{codigo}'
+                resposta = self.client.post(
+                    reverse('courses:matrix_create'),
+                    data=payload_matriz(
+                        curso=self.curso,
+                        unidades=[self.unidade_a],
+                        nome=nome,
+                        turno=codigo,
+                        linhas=[linha_componente(self.algoritmos, f'{indice + 1}º Semestre')],
+                    ),
+                )
+                self.assertEqual(resposta.status_code, 302, resposta.content[:400])
+                matriz = CurriculumMatrix.objects.get(nome=nome)
+                self.assertEqual(matriz.turno, codigo)
+                self.assertEqual(matriz.get_turno_display(), rotulo)
+
+    def test_formulario_recusa_matriz_sem_turno(self):
+        dados = payload_matriz(
+            curso=self.curso,
+            unidades=[self.unidade_a],
+            nome='MC-SEM-TURNO',
+            linhas=[linha_componente(self.algoritmos)],
+        )
+        dados['turno'] = ''
+
+        resposta = self.client.post(reverse('courses:matrix_create'), data=dados)
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertContains(resposta, 'Este campo é obrigatório.')
+        self.assertFalse(CurriculumMatrix.objects.filter(nome='MC-SEM-TURNO').exists())
+
+    def test_lista_filtra_por_turno(self):
+        manha = self.criar_matriz(nome='MC-FILTRO-M', turno='M')
+        tarde = self.criar_matriz(nome='MC-FILTRO-T', turno='T')
+        noite = self.criar_matriz(nome='MC-FILTRO-N', turno='N')
+
+        resposta = self.client.get(reverse('courses:matrix_list'), {'turno': 'T'})
+
+        self.assertEqual(self.pks_da_lista(resposta), {tarde.pk})
+        self.assertNotIn(manha.pk, self.pks_da_lista(resposta))
+        self.assertNotIn(noite.pk, self.pks_da_lista(resposta))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -404,12 +468,14 @@ class MatrizDuplicacaoE2ETests(BaseCoursesE2ETests):
         # Matriz de origem publicada pela própria tela.
         self.client.post(reverse('courses:matrix_create'), data=payload_matriz(
             curso=self.curso, unidades=[self.unidade_a], nome='MC-CEA-MANHA',
+            turno='M',
             linhas=[
                 linha_componente(self.algoritmos, '1º Semestre'),
                 linha_componente(self.estrutura, '2º Semestre'),
             ],
         ))
         self.origem = CurriculumMatrix.objects.get(nome='MC-CEA-MANHA')
+        self.assertEqual(self.origem.turno, 'M')
 
     def test_jornada_de_duplicacao_mantem_as_duas_vigentes(self):
         # ── Passo 1: a tela pergunta se já existe matriz para o curso ──
@@ -441,7 +507,8 @@ class MatrizDuplicacaoE2ETests(BaseCoursesE2ETests):
             for c in componentes
         ]
         resp = self.client.post(reverse('courses:matrix_create'), data=payload_matriz(
-            curso=self.curso, unidades=[self.unidade_a], nome='MC-CEA-NOITE', linhas=linhas,
+            curso=self.curso, unidades=[self.unidade_a], nome='MC-CEA-NOITE',
+            turno='N', linhas=linhas,
         ))
         self.assertEqual(resp.status_code, 302, resp.content[:400])
 
@@ -452,6 +519,7 @@ class MatrizDuplicacaoE2ETests(BaseCoursesE2ETests):
         copia = CurriculumMatrix.objects.get(nome='MC-CEA-NOITE')
         self.assertTrue(copia.is_vigente)
         self.assertFalse(copia.is_rascunho)
+        self.assertEqual(copia.turno, 'N')
         self.assertEqual(
             CurriculumMatrix.objects.filter(curso=self.curso, is_vigente=True).count(), 2,
         )

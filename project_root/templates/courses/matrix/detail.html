@@ -43,7 +43,7 @@
         <i class="ph ph-file-text mr-1"></i> Identificação da Matriz
       </h3>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div class="space-y-1">
           <label class="field-label">Unidade(s)</label>
           <div class="data-value">
@@ -64,6 +64,11 @@
             <span class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-black uppercase">Rascunho</span>
             {% endif %}
           </div>
+        </div>
+
+        <div class="space-y-1">
+          <label class="field-label">Turno</label>
+          <div class="data-value">{{ matrix.get_turno_display|default:"Não informado" }}</div>
         </div>
       </div>
     </div>

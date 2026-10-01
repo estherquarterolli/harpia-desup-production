@@ -38,8 +38,8 @@ class MatrixComponentInline(TabularInline):
     )
 
 class CurriculumMatrixAdmin(ModelAdmin):
-    list_display = ('curso', 'total_componentes')
-    list_filter = ('curso',)
+    list_display = ('curso', 'turno', 'total_componentes')
+    list_filter = ('curso', 'turno')
     search_fields = ('curso__nome', 'curso__sigla', 'unidades__nome')
     inlines = (MatrixComponentInline,)
 

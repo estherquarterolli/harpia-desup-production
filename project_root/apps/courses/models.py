@@ -150,6 +150,12 @@ class CurriculumMatrix(models.Model):
         verbose_name = "Matriz Curricular"
         verbose_name_plural = "Matrizes Curriculares"
         ordering = ['curso__nome', 'nome']
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(turno__isnull=True) | models.Q(turno__in=['M', 'T', 'N']),
+                name='harpia_matriz_turno_valido',
+            ),
+        ]
 
     def __str__(self):
         label = self.nome if self.nome else f"Matriz - {self.curso.sigla if self.curso_id else '?'}"

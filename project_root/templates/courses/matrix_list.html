@@ -68,6 +68,20 @@
         </div>
       </div>
 
+      <div class="flex-grow min-w-[160px]">
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Turno</label>
+        <div class="relative">
+          <select name="turno"
+            class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition pr-10 appearance-none select-custom font-semibold text-[#025c9f]">
+            <option value="">Todos os Turnos</option>
+            <option value="M" {% if request.GET.turno == 'M' %}selected{% endif %}>Manhã</option>
+            <option value="T" {% if request.GET.turno == 'T' %}selected{% endif %}>Tarde</option>
+            <option value="N" {% if request.GET.turno == 'N' %}selected{% endif %}>Noite</option>
+          </select>
+          <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
+        </div>
+      </div>
+
       <div class="flex gap-2">
         <button type="submit"
           class="px-5 py-2.5 bg-[#025c9f] hover:bg-[#153e70] text-white text-sm font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm uppercase tracking-wider text-xs">
@@ -96,6 +110,7 @@
             <th class="px-5 py-3">Unidade</th>
             {% endif %}
             <th class="px-5 py-3">Curso</th>
+            <th class="px-5 py-3">Turno</th>
             <th class="px-5 py-3">Código da Matriz</th>
             <th class="px-5 py-3 text-center">Componentes</th>
             <th class="px-5 py-3 text-center">CH Total</th>
@@ -112,6 +127,9 @@
             </td>
             {% endif %}
             <td class="px-5 py-3 font-bold text-slate-800 cursor-pointer" data-label="Curso" onclick="window.location='{% url 'courses:matrix_detail' matrix.pk %}'">{{ matrix.curso.sigla }}</td>
+            <td class="px-5 py-3 text-slate-600 font-semibold cursor-pointer" data-label="Turno" onclick="window.location='{% url 'courses:matrix_detail' matrix.pk %}'">
+              {{ matrix.get_turno_display|default:"Não informado" }}
+            </td>
             <td class="px-5 py-3 text-slate-600 font-semibold cursor-pointer" onclick="window.location='{% url 'courses:matrix_detail' matrix.pk %}'">{{ matrix.nome|default:"—" }}</td>
             <td class="px-5 py-3 text-center font-semibold text-slate-600" data-label="Componentes">{{ matrix.qtd_componentes|default:0 }}</td>
             <td class="px-5 py-3 text-center font-semibold text-slate-600" data-label="CH Total">{{ matrix.ch_total|default:0 }}h</td>
@@ -162,7 +180,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="6" class="px-6 py-16 text-center text-slate-400 font-semibold">
+            <td colspan="{% if is_desup %}8{% else %}7{% endif %}" class="px-6 py-16 text-center text-slate-400 font-semibold">
               <i class="ph ph-file-text text-5xl opacity-20 mb-3 block"></i>
               Nenhuma matriz encontrada.
             </td>
