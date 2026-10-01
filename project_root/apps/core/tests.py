@@ -657,7 +657,7 @@ class EnforceWindowBlockingTests(TestCase):
 
 
 class AtalhoDashboardTests(TestCase):
-    """Feature: atalhos configuráveis do dashboard DESUP (por usuário)."""
+    """Feature: atalhos configuráveis dos dashboards (por usuário e perfil)."""
 
     def setUp(self):
         from django.urls import reverse
@@ -713,12 +713,33 @@ class AtalhoDashboardTests(TestCase):
         self.client.post(self.reverse('core:atalho_add'), {'chave': 'matrix_list'})
         self.assertEqual(AtalhoDashboard.objects.filter(user=self.desup, chave='matrix_list').count(), 1)
 
-    def test_coord_bloqueado(self):
+    def test_coord_adiciona_atalho_permitido(self):
         from apps.core.models import AtalhoDashboard
         self.client.force_login(self.coord)
         resp = self.client.post(self.reverse('core:atalho_add'), {'chave': 'matrix_list'})
-        self.assertEqual(resp.status_code, 403)
+        self.assertRedirects(resp, self.reverse('dashboard_unidade'))
+        self.assertTrue(
+            AtalhoDashboard.objects.filter(user=self.coord, chave='matrix_list').exists()
+        )
+
+    def test_coord_nao_adiciona_atalho_exclusivo_desup(self):
+        from apps.core.models import AtalhoDashboard
+        self.client.force_login(self.coord)
+        resp = self.client.post(self.reverse('core:atalho_add'), {'chave': 'janela_list'})
+        self.assertRedirects(resp, self.reverse('dashboard_unidade'))
         self.assertEqual(AtalhoDashboard.objects.count(), 0)
+
+    def test_coord_remove_o_proprio_atalho(self):
+        from apps.core.models import AtalhoDashboard
+        atalho = AtalhoDashboard.objects.create(user=self.coord, chave='matrix_list')
+        self.client.force_login(self.coord)
+
+        resp = self.client.post(
+            self.reverse('core:atalho_remove', kwargs={'pk': atalho.pk})
+        )
+
+        self.assertRedirects(resp, self.reverse('dashboard_unidade'))
+        self.assertFalse(AtalhoDashboard.objects.filter(pk=atalho.pk).exists())
 
     def test_remove_apenas_do_proprio_usuario(self):
         from apps.core.models import AtalhoDashboard
@@ -746,6 +767,27 @@ class AtalhoDashboardTests(TestCase):
         disponiveis = {op['chave'] for op in resp.context['atalhos_disponiveis']}
         self.assertNotIn('matrix_list', disponiveis)
         self.assertIn('professor_list', disponiveis)
+
+    def test_dashboard_unidade_traz_atalhos_filtrados_por_permissao(self):
+        from apps.core.models import AtalhoDashboard
+        AtalhoDashboard.objects.create(user=self.coord, chave='matrix_list')
+        # Um registro antigo/incompatível não pode aparecer nem autorizar o destino.
+        AtalhoDashboard.objects.create(user=self.coord, chave='janela_list')
+        self.client.force_login(self.coord)
+
+        resp = self.client.get(self.reverse('dashboard_unidade'))
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Atalhos rápidos')
+        self.assertContains(resp, 'Adicionar atalho')
+        atalhos = {atalho['label'] for atalho in resp.context['atalhos_user']}
+        self.assertIn('Matrizes Curriculares', atalhos)
+        self.assertNotIn('Janelas de Entrega', atalhos)
+        disponiveis = {op['chave'] for op in resp.context['atalhos_disponiveis']}
+        self.assertIn('pendencia_create', disponiveis)
+        self.assertIn('dashboard_unidade', disponiveis)
+        self.assertNotIn('janela_list', disponiveis)
+        self.assertNotIn('component_create', disponiveis)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -867,6 +909,16 @@ class SidebarIconesCentralizadosTests(TestCase):
         )
         # O botão "Sair" também virou .sidebar-link (antes ficava de fora).
         self.assertIn('sidebar-link w-full flex items-center justify-center', html)
+
+    def test_menu_principal_exibe_barra_de_rolagem_vertical(self):
+        html = self.client.get('/core/unidades/').content.decode()
+
+        self.assertIn('sidebar-scroll flex-grow min-h-0', html)
+        self.assertIn('overflow-y-scroll', html)
+        self.assertNotIn(
+            '<nav class="flex-grow space-y-1 px-2 overflow-y-auto no-scrollbar">',
+            html,
+        )
 
 
 # ══════════════════════════════════════════════════════════════════════════════

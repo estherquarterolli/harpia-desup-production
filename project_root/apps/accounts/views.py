@@ -531,6 +531,70 @@ class DesupUserListView(LoginRequiredMixin, ListView):
         return queryset
 
 
+class DesupUserCreateView(LoginRequiredMixin, View):
+    """Cria uma conta operacional e envia o link para definição da senha."""
+
+    template_name = 'accounts/desup_user_form.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
+        if request.user.perfil != User.Perfil.DESUP:
+            return HttpResponse('Você não tem permissão para criar usuários.', status=403)
+        return super().dispatch(request, *args, **kwargs)
+
+    @staticmethod
+    def _form(data=None):
+        from .forms import DesupUserCreateForm
+        return DesupUserCreateForm(data=data)
+
+    def get(self, request):
+        return render(request, self.template_name, {'form': self._form()})
+
+    def post(self, request):
+        form = self._form(request.POST)
+        confirmation_error = None
+        if request.POST.get('confirmar') != 'sim':
+            confirmation_error = 'Marque a confirmação antes de criar o usuário.'
+
+        if form.is_valid() and confirmation_error is None:
+            with transaction.atomic():
+                created_user = form.save()
+                result = issue_email_password_reset(
+                    user=created_user,
+                    request=request,
+                    requested_by=request.user,
+                )
+                registrar_auditoria(
+                    request,
+                    'DESUP_USER_CREATED',
+                    usuario=request.user,
+                    email=request.user.email,
+                    detalhes=(
+                        f'Usuário {created_user.email} criado com perfil '
+                        f'{created_user.perfil} e unidade '
+                        f'{created_user.unidade_id or "não aplicável"}.'
+                    ),
+                )
+
+            if result.sent:
+                messages.success(
+                    request,
+                    f'Usuário {created_user.email} criado. Um link para cadastrar a senha foi enviado.',
+                )
+            else:
+                messages.warning(
+                    request,
+                    f'Usuário {created_user.email} criado, mas o link de senha não pôde ser enviado.',
+                )
+            return redirect('desup_user_list')
+
+        return render(request, self.template_name, {
+            'form': form,
+            'confirmation_error': confirmation_error,
+        })
+
+
 class DesupUserPasswordResetView(LoginRequiredMixin, View):
     template_name = 'accounts/desup_user_reset_confirm.html'
 

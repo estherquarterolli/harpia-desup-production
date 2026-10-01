@@ -10,18 +10,25 @@
             <div>
                 <h2 class="text-lg font-black text-slate-800">Contas do sistema</h2>
                 <p class="mt-1 text-sm text-slate-500">
-                    Consulte o último acesso e envie um link seguro de redefinição de senha.
+                    Crie contas, consulte o último acesso e envie links seguros de redefinição de senha.
                 </p>
             </div>
-            <form method="get" class="flex w-full gap-2 md:w-auto">
-                <input type="search" name="q" value="{{ request.GET.q }}"
-                       placeholder="E-mail, nome ou unidade"
-                       class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm md:w-72">
-                <button type="submit"
-                        class="rounded-lg bg-[#025c9f] px-4 py-2 text-sm font-bold text-white hover:bg-[#153e70]">
-                    Buscar
-                </button>
-            </form>
+            <div class="flex w-full flex-col gap-3 md:w-auto md:flex-row">
+                <a href="{% url 'desup_user_create' %}"
+                   class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700">
+                    <i class="ph ph-user-plus"></i>
+                    Criar usuário
+                </a>
+                <form method="get" class="flex w-full gap-2 md:w-auto">
+                    <input type="search" name="q" value="{{ request.GET.q }}"
+                           placeholder="E-mail, nome ou unidade"
+                           class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm md:w-72">
+                    <button type="submit"
+                            class="rounded-lg bg-[#025c9f] px-4 py-2 text-sm font-bold text-white hover:bg-[#153e70]">
+                        Buscar
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -44,7 +51,9 @@
                         <div class="font-bold text-slate-800">{{ usuario.get_full_name|default:usuario.email }}</div>
                         <div class="text-xs text-slate-500">{{ usuario.email }}</div>
                     </td>
-                    <td class="px-5 py-4 text-slate-600">{{ usuario.get_perfil_display }}</td>
+                    <td class="px-5 py-4 text-slate-600">
+                        {% if usuario.perfil == 'DESUP' %}Administrador DESUP{% else %}{{ usuario.get_perfil_display }}{% endif %}
+                    </td>
                     <td class="px-5 py-4 text-slate-600">{{ usuario.unidade|default:'—' }}</td>
                     <td class="px-5 py-4 text-slate-600">
                         {% if usuario.last_login %}

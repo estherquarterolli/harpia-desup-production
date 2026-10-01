@@ -30,7 +30,7 @@ urlpatterns = [
     # Logs
     path('logs/exportar/', views.ExportarLogsView.as_view(), name='exportar_logs'),
 
-    # Atalhos do dashboard (DESUP, por usuário)
+    # Atalhos dos dashboards (DESUP/unidade, por usuário e por perfil)
     path('atalhos/add/', views.AtalhoAddView.as_view(), name='atalho_add'),
     path('atalhos/<int:pk>/remover/', views.AtalhoRemoveView.as_view(), name='atalho_remove'),
 ]

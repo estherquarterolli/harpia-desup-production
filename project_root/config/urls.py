@@ -12,6 +12,7 @@ from apps.accounts.views import (
     ForgotPasswordView,
     EmailPasswordResetConfirmView,
     DesupUserListView,
+    DesupUserCreateView,
     DesupUserPasswordResetView,
     ApprovePasswordResetView,
     ProfileView,
@@ -37,6 +38,7 @@ urlpatterns = [
         name='email_password_reset_confirm',
     ),
     path('accounts/usuarios/', DesupUserListView.as_view(), name='desup_user_list'),
+    path('accounts/usuarios/criar/', DesupUserCreateView.as_view(), name='desup_user_create'),
     path(
         'accounts/usuarios/<int:pk>/redefinir-senha/',
         DesupUserPasswordResetView.as_view(),

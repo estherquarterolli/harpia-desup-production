@@ -13,6 +13,41 @@ from apps.accounts.mixins import PerfilRequiredMixin
 logger = logging.getLogger(__name__)
 
 
+def _contexto_atalhos_dashboard(user):
+    """Monta os atalhos pessoais usando apenas destinos permitidos ao perfil."""
+    from apps.core.atalhos import catalogo_atalhos_para, resolver_atalho
+
+    catalogo = catalogo_atalhos_para(user)
+    atalhos_salvos = list(user.atalhos.all())
+    atalhos_user = []
+    for atalho in atalhos_salvos:
+        if atalho.chave not in catalogo:
+            continue
+        resolvido = resolver_atalho(atalho.chave)
+        if resolvido:
+            atalhos_user.append({'id': atalho.id, **resolvido})
+
+    usadas = {atalho.chave for atalho in atalhos_salvos}
+    return {
+        'atalhos_user': atalhos_user,
+        'atalhos_disponiveis': [
+            {'chave': chave, 'label': dados['label']}
+            for chave, dados in catalogo.items()
+            if chave not in usadas
+        ],
+    }
+
+
+def _dashboard_atalhos_url_name(user):
+    """Dashboard de retorno após adicionar/remover um atalho."""
+    eh_desup = (
+        getattr(user, 'is_superuser', False)
+        or getattr(user, 'perfil', None) == 'DESUP'
+        or user.groups.filter(name='Admin DESUP').exists()
+    )
+    return 'dashboard_desup' if eh_desup else 'dashboard_unidade'
+
+
 def custom_500(request):
     return render(
         request,
@@ -94,52 +129,39 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
             for prof in professores_qs[:50]
         ]
 
-        # Atalhos do dashboard (do usuário) e opções disponíveis para adicionar
-        from apps.core.atalhos import ATALHOS_CATALOGO, resolver_atalho
-        user_atalhos = list(self.request.user.atalhos.all())
-        atalhos_user = []
-        for a in user_atalhos:
-            resolvido = resolver_atalho(a.chave)
-            if resolvido:
-                atalhos_user.append({'id': a.id, **resolvido})
-        ctx['atalhos_user'] = atalhos_user
-        usadas = {a.chave for a in user_atalhos}
-        ctx['atalhos_disponiveis'] = [
-            {'chave': chave, 'label': dados['label']}
-            for chave, dados in ATALHOS_CATALOGO.items()
-            if chave not in usadas
-        ]
+        ctx.update(_contexto_atalhos_dashboard(self.request.user))
         return ctx
 
 
 class AtalhoAddView(LoginRequiredMixin, PerfilRequiredMixin, View):
-    """Adiciona um atalho ao dashboard do usuário (DESUP). Só chaves do catálogo (whitelist)."""
-    allowed_profiles = ['DESUP']
+    """Adiciona atalho pessoal permitido ao perfil (whitelist)."""
+    allowed_profiles = ['DESUP', 'COORDENADOR_UNIDADE']
 
     def post(self, request):
         from apps.core.models import AtalhoDashboard
-        from apps.core.atalhos import ATALHOS_CATALOGO
+        from apps.core.atalhos import catalogo_atalhos_para
+        catalogo = catalogo_atalhos_para(request.user)
         chaves = [c.strip() for c in request.POST.getlist('chave') if c.strip()]
-        validas = [c for c in chaves if c in ATALHOS_CATALOGO]
+        validas = [c for c in chaves if c in catalogo]
         if not validas:
             messages.error(request, 'Selecione ao menos um atalho válido.')
-            return redirect('dashboard_desup')
+            return redirect(_dashboard_atalhos_url_name(request.user))
         for chave in validas:
             AtalhoDashboard.objects.get_or_create(user=request.user, chave=chave)
         messages.success(request, 'Atalho(s) salvo(s).')
-        return redirect('dashboard_desup')
+        return redirect(_dashboard_atalhos_url_name(request.user))
 
 
 class AtalhoRemoveView(LoginRequiredMixin, PerfilRequiredMixin, View):
-    """Remove um atalho do próprio usuário (DESUP)."""
-    allowed_profiles = ['DESUP']
+    """Remove um atalho do próprio usuário."""
+    allowed_profiles = ['DESUP', 'COORDENADOR_UNIDADE']
 
     def post(self, request, pk):
         from apps.core.models import AtalhoDashboard
         atalho = get_object_or_404(AtalhoDashboard, pk=pk, user=request.user)
         atalho.delete()
         messages.success(request, 'Atalho(s) removido(s).')
-        return redirect('dashboard_desup')
+        return redirect(_dashboard_atalhos_url_name(request.user))
 
 
 class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
@@ -187,6 +209,11 @@ class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, T
 class DashboardUnidadeView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
     template_name = 'dashboard/unidade.html'
     allowed_profiles = ['COORDENADOR_UNIDADE']
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(_contexto_atalhos_dashboard(self.request.user))
+        return ctx
 
 # --- CRUD de Unidade ---
 from django.urls import reverse_lazy

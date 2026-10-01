@@ -30,7 +30,8 @@
                 <i class="ph ph-x"></i>
             </button>
         </div>
-        <nav class="flex-grow space-y-1 px-2 overflow-y-auto no-scrollbar">
+        <nav class="sidebar-scroll flex-grow min-h-0 space-y-1 px-2 overflow-y-scroll"
+             aria-label="Menu principal">
 
             <!-- Dashboard — todos os perfis -->
             <a href="{% url 'dashboard' %}"
