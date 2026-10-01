@@ -156,7 +156,7 @@
                         hx-get="{% url 'dashboard_professores_partial' %}"
                         hx-target="#dashboard-professor-table"
                         hx-trigger="keyup changed delay:400ms"
-                        hx-include="[name='unidade_id'],[name='eixo']"
+                        hx-include="[name='unidade_id']"
                         autocomplete="off">
                 </div>
                 <select name="unidade_id"
@@ -164,21 +164,10 @@
                     hx-get="{% url 'dashboard_professores_partial' %}"
                     hx-target="#dashboard-professor-table"
                     hx-trigger="change"
-                    hx-include="[name='q'],[name='eixo']">
+                    hx-include="[name='q']">
                     <option value="">Todas Unidades</option>
                     {% for u in unidades %}
                     <option value="{{ u.id }}">{{ u.sigla }}</option>
-                    {% endfor %}
-                </select>
-                <select name="eixo"
-                    class="w-full sm:w-auto px-3 py-2 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-                    hx-get="{% url 'dashboard_professores_partial' %}"
-                    hx-target="#dashboard-professor-table"
-                    hx-trigger="change"
-                    hx-include="[name='q'],[name='unidade_id']">
-                    <option value="">Todos os Eixos</option>
-                    {% for value, label in eixo_choices %}
-                    <option value="{{ value }}">{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>

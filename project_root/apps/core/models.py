@@ -77,6 +77,14 @@ class UnitBoundQuerySet(models.QuerySet):
     def for_user(self, user):
         if user.is_superuser or user.perfil == 'DESUP':
             return self.all()
+
+        # Professores são uma base institucional compartilhada: todas as
+        # unidades podem consultá-los e utilizá-los na alocação.
+        if (
+            self.model._meta.label_lower == 'professors.professor'
+            and user.perfil == 'COORDENADOR_UNIDADE'
+        ):
+            return self.all()
         
         if user.perfil == 'COORDENADOR_UNIDADE':
 

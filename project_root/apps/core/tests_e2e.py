@@ -984,7 +984,7 @@ class JornadaDashboardsTests(BaseE2ETestCase):
         self.prof_ok = Professor.objects.create(
             id_funcional='IDF-DASH1', rh_matricula='MAT-DASH1', rh_nome='Ana Conforme',
             rh_email='ana@teste.com', unidade_principal=self.unidade_ok,
-            tipo_contrato=contrato, ha=20, materia=Professor.MateriaChoices.INFORMATICA,
+            tipo_contrato=contrato, ha=20,
         )
         self.prof_pendente = Professor.objects.create(
             id_funcional='IDF-DASH2', rh_matricula='MAT-DASH2', rh_nome='Bruno Pendente',

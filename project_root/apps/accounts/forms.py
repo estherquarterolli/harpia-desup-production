@@ -1,5 +1,3 @@
-import secrets
-
 from django import forms
 
 from .models import DEFAULT_USER_PASSWORD, User
@@ -101,9 +99,9 @@ class DesupUserCreateForm(forms.ModelForm):
 
     def save(self, commit=True):
         user = super().save(commit=False)
-        # A senha aleatória não é exibida nem enviada. O usuário recebe um link
-        # individual para definir a própria senha antes do primeiro acesso.
-        user.set_password(secrets.token_urlsafe(48))
+        # Primeiro acesso: entra com a senha padrão do ambiente e é direcionado
+        # imediatamente para a troca obrigatória dentro do sistema.
+        user.set_password(DEFAULT_USER_PASSWORD)
         user.is_active = True
         user.is_staff = False
         user.is_superuser = False

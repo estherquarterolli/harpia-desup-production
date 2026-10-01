@@ -15,8 +15,7 @@ class ProfessorForm(forms.ModelForm):
             'rh_matricula',
             'rh_nome',
             'tipo_contrato',
-            'unidade_principal',
-            'materia',
+            'unidades',
             'cursos',
             'status',
         ]
@@ -25,13 +24,13 @@ class ProfessorForm(forms.ModelForm):
             'rh_matricula': forms.TextInput(attrs={'class': _INPUT_CSS, 'placeholder': 'Matrícula RH'}),
             'rh_nome': forms.TextInput(attrs={'class': _INPUT_CSS, 'placeholder': 'Nome completo'}),
             'tipo_contrato': forms.Select(attrs={'class': _SELECT_CSS}),
-            'unidade_principal': forms.Select(attrs={
-                'class': _SELECT_CSS,
+            'unidades': forms.CheckboxSelectMultiple(attrs={
                 'hx-get': '/professores/htmx/cursos-unidade/',
                 'hx-target': '#cursos-container',
-                'hx-swap': 'innerHTML'
+                'hx-swap': 'innerHTML',
+                'hx-trigger': 'change',
+                'hx-include': '[name="unidades"],[name="cursos"]',
             }),
-            'materia': forms.Select(attrs={'class': _SELECT_CSS}),
             'cursos': forms.CheckboxSelectMultiple(),
             'status': forms.Select(attrs={'class': _SELECT_CSS}),
         }
@@ -40,8 +39,7 @@ class ProfessorForm(forms.ModelForm):
             'rh_matricula': 'Matrícula RH',
             'rh_nome': 'Nome',
             'tipo_contrato': 'Regime / Tipo de Contrato',
-            'unidade_principal': 'Unidade',
-            'materia': 'Eixo',
+            'unidades': 'Unidades',
             'cursos': 'Cursos (Checklist)',
             'status': 'Status',
         }
@@ -57,38 +55,40 @@ class ProfessorForm(forms.ModelForm):
                 and not self.user.is_superuser
             )
             if is_gestor_unidade:
-                # CORR: esconder o widget NÃO protege o campo — o valor do POST continuava
-                # sendo aceito e o coordenador conseguia empurrar o docente para outra
-                # unidade. Com `disabled=True` o Django ignora o que vier no POST e usa
-                # sempre o valor inicial (o da instância na edição), fechando a escrita
-                # cruzada.
-                self.fields['unidade_principal'].widget = forms.HiddenInput()
-                self.fields['unidade_principal'].disabled = True
-                if self.user.unidade:
-                    self.fields['unidade_principal'].initial = self.user.unidade
+                # O coordenador pode consultar todos os docentes, mas não altera os
+                # vínculos institucionais definidos pela DESUP.
+                self.fields['unidades'].disabled = True
 
-        # Configurar queryset de cursos baseado na unidade selecionada (para edição ou erro de form)
-        unidade_id = None
+        unidades_iniciais = list(self.instance.unidades.values_list('pk', flat=True)) if self.instance.pk else []
+        if not unidades_iniciais and self.instance.pk and self.instance.unidade_principal_id:
+            unidades_iniciais = [self.instance.unidade_principal_id]
+        if unidades_iniciais:
+            self.fields['unidades'].initial = unidades_iniciais
+
+        # Cursos oferecidos em qualquer uma das unidades selecionadas.
+        unidade_ids = []
         if is_gestor_unidade:
-            # Mesmo motivo do `disabled` acima: para o gestor de unidade a unidade nunca
-            # vem do POST. Se viesse, um `unidade_principal` adulterado liberaria os cursos
-            # da outra unidade na checklist e o vínculo cruzado entraria pelos `cursos`.
-            if self.instance.pk and self.instance.unidade_principal_id:
-                unidade_id = self.instance.unidade_principal_id
-            elif self.user.unidade:
-                unidade_id = self.user.unidade.id
-        elif 'unidade_principal' in self.data:
-            try:
-                unidade_id = int(self.data.get('unidade_principal'))
-            except (ValueError, TypeError):
-                pass
-        elif self.instance.pk and self.instance.unidade_principal:
-            unidade_id = self.instance.unidade_principal.id
+            unidade_ids = unidades_iniciais
+        elif 'unidades' in self.data:
+            unidade_ids = [int(pk) for pk in self.data.getlist('unidades') if str(pk).isdigit()]
+        else:
+            unidade_ids = unidades_iniciais
 
-        if unidade_id:
+        if unidade_ids:
             self.fields['cursos'].queryset = Course.objects.filter(
-                course_units__unidade_id=unidade_id,
+                course_units__unidade_id__in=unidade_ids,
                 course_units__ativo=True,
             ).order_by('nome').distinct()
         else:
             self.fields['cursos'].queryset = Course.objects.none()
+
+    def save(self, commit=True):
+        professor = super().save(commit=False)
+        unidades = self.cleaned_data.get('unidades')
+        # Compatibilidade temporária com módulos e relatórios legados que ainda
+        # consultam a unidade principal: usa a primeira unidade selecionada.
+        professor.unidade_principal = unidades.order_by('nome').first() if unidades else None
+        if commit:
+            professor.save()
+            self.save_m2m()
+        return professor

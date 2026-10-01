@@ -70,13 +70,8 @@ class AllocCurricularView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView)
         context['alocacao_curricular_preenchida'] = total_componentes > 0 and componentes_sem_docente == 0
         context['componentes_sem_docente'] = componentes_sem_docente
 
-        # Professores da unidade (ou de todas) para popular os selects
-        if unidade_id:
-            professores_qs = Professor.objects.filter(
-                unidade_principal_id=unidade_id
-            ).order_by('rh_nome')
-        else:
-            professores_qs = Professor.objects.all().order_by('rh_nome')
+        # A base de docentes é compartilhada por todas as unidades.
+        professores_qs = Professor.objects.all().order_by('rh_nome')
 
         context['professores_unidade'] = professores_qs
         context.update(build_window_lock_context(
@@ -130,13 +125,8 @@ class AlocarDocenteComponenteView(LoginRequiredMixin, PerfilRequiredMixin, View)
             comp.save()
             messages.success(request, f'Componente {comp.nome_disciplina} marcado como Sem professor.')
         else:
-            # Segurança: Coordenador só pode alocar professores da sua unidade
-            if user.perfil == 'COORDENADOR_UNIDADE':
-                prof = Professor.objects.filter(pk=docente_id, unidade_principal=user.unidade).first()
-                if not prof:
-                    return HttpResponseForbidden('Sem permissão para alocar professores de outra unidade.')
-            
-            comp.docente_id = docente_id
+            # Qualquer unidade pode utilizar um professor da base institucional.
+            comp.docente = get_object_or_404(Professor, pk=docente_id)
             comp.status = MatrixComponent.StatusChoices.COMPLETO
             comp.save()
             messages.success(request, f'Docente alocado para {comp.nome_disciplina} com sucesso!')
@@ -238,11 +228,7 @@ class AprovarAlocacaoUnidadeView(LoginRequiredMixin, PerfilRequiredMixin, View):
 class BuscarProfessoresView(LoginRequiredMixin, PerfilRequiredMixin, View):
     """Endpoint JSON para busca dinâmica de professores (autocomplete).
 
-    Regras de isolamento (server-side):
-    - COORDENADOR_UNIDADE: retorna APENAS professores da unidade do usuário.
-      O parâmetro `unidade_id` da URL é IGNORADO para este perfil.
-    - DESUP: pode buscar em todas as unidades. Se `unidade_id` for informado,
-      filtra por aquela unidade; caso contrário, retorna de todas.
+    A busca é global: todas as unidades consultam a mesma base de docentes.
     """
     allowed_profiles = ['DESUP', 'COORDENADOR_UNIDADE']
 
@@ -253,20 +239,7 @@ class BuscarProfessoresView(LoginRequiredMixin, PerfilRequiredMixin, View):
         from apps.professors.models import Professor
 
         q = request.GET.get('q', '').strip()
-        unidade_id = request.GET.get('unidade_id')
-        user = request.user
-
-        # Segurança: Coordenador SEMPRE restrito à sua unidade
-        if user.perfil == 'COORDENADOR_UNIDADE':
-            if not user.unidade:
-                return JsonResponse({'results': []})
-            qs = Professor.objects.filter(
-                unidade_principal=user.unidade, status='Ativo'
-            )
-        else:  # DESUP — busca global, opcionalmente filtrada por unidade
-            qs = Professor.objects.filter(status='Ativo')
-            if unidade_id:
-                qs = qs.filter(unidade_principal_id=unidade_id)
+        qs = Professor.objects.filter(status='Ativo')
 
         # Regra #3: o ajuste da DESUP (`desup_nome`) prevalece sobre o dado do RH — é o
         # que `Professor.nome` devolve e o que a tela mostra. Antes o endpoint filtrava e
@@ -280,13 +253,13 @@ class BuscarProfessoresView(LoginRequiredMixin, PerfilRequiredMixin, View):
             # Busca pelos dois nomes: quem só conhece o nome antigo do RH continua achando.
             qs = qs.filter(Q(desup_nome__icontains=q) | Q(rh_nome__icontains=q))
 
-        qs = qs.select_related('unidade_principal').order_by('nome_exibicao')[:20]
+        qs = qs.prefetch_related('unidades').order_by('nome_exibicao')[:20]
 
         results = [
             {
                 'id': p.id,
                 'nome': p.nome,
-                'unidade': p.unidade_principal.sigla if p.unidade_principal else '',
+                'unidade': ', '.join(u.sigla for u in p.unidades_exibicao),
             }
             for p in qs
         ]

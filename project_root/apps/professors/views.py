@@ -1,7 +1,7 @@
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
-from django.db.models import ProtectedError
+from django.db.models import ProtectedError, Q
 from django.shortcuts import redirect, get_object_or_404, render
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView, View
@@ -95,7 +95,7 @@ class CoordenadorOnlyMixin(LoginRequiredMixin, PerfilRequiredMixin):
 
 
 class ProfessorEditDeleteMixin(LoginRequiredMixin, PerfilRequiredMixin):
-    """DESUP gerencia qualquer docente; unidade, somente os próprios."""
+    """DESUP gerencia qualquer docente; unidade, somente os vinculados a ela."""
 
     allowed_profiles = ['DESUP', 'COORDENADOR_UNIDADE']
 
@@ -105,7 +105,9 @@ class ProfessorEditDeleteMixin(LoginRequiredMixin, PerfilRequiredMixin):
         if _perfil_desup(user):
             return queryset
         if user.unidade_id:
-            return queryset.filter(unidade_principal_id=user.unidade_id)
+            return queryset.filter(
+                Q(unidades__id=user.unidade_id) | Q(unidade_principal_id=user.unidade_id)
+            ).distinct()
         return queryset.none()
 
 
@@ -117,20 +119,17 @@ class ProfessorListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         qs = Professor.objects.select_related(
             'tipo_contrato', 'unidade_principal'
-        ).prefetch_related('cursos')
+        ).prefetch_related('cursos', 'unidades')
         user = self.request.user
-        if not (user.is_superuser or user.perfil == 'DESUP'):
-            if user.unidade:
-                qs = qs.filter(unidade_principal=user.unidade)
-            else:
-                qs = qs.none()
 
         q = self.request.GET.get('q', '')
         if q:
             qs = qs.filter(rh_nome__icontains=q)
         unidade_id = self.request.GET.get('unidade_id')
         if unidade_id:
-            qs = qs.filter(unidade_principal_id=unidade_id)
+            qs = qs.filter(
+                Q(unidades__id=unidade_id) | Q(unidade_principal_id=unidade_id)
+            ).distinct()
         return qs
 
     def get_context_data(self, **kwargs):
@@ -253,7 +252,7 @@ class ProfessorDetailView(DesupOnlyMixin, DetailView):
     def get_queryset(self):
         return Professor.objects.select_related(
             'tipo_contrato', 'unidade_principal'
-        ).prefetch_related('cursos')
+        ).prefetch_related('cursos', 'unidades')
 
 class ProfessorCreateView(DesupOnlyMixin, CreateView):
     model = Professor
@@ -266,9 +265,6 @@ class ProfessorCreateView(DesupOnlyMixin, CreateView):
         return kwargs
 
     def form_valid(self, form):
-        user = self.request.user
-        if user.perfil == 'COORDENADOR_UNIDADE' and user.unidade:
-            form.instance.unidade_principal = user.unidade
         messages.success(self.request, 'Professor cadastrado com sucesso.')
         return super().form_valid(form)
 
@@ -340,9 +336,12 @@ class ProfessorDuplicarView(CoordenadorOnlyMixin, View):
         user = request.user
         qs = Professor.objects.all()
         if not user.is_superuser:
-            qs = qs.filter(unidade_principal=user.unidade)
+            qs = qs.filter(
+                Q(unidades=user.unidade) | Q(unidade_principal=user.unidade)
+            ).distinct()
         original = get_object_or_404(qs, pk=pk)
         cursos = list(original.cursos.all())
+        unidades = list(original.unidades.all())
         novo_id_funcional = _identificador_unico_de_copia('id_funcional', original.id_funcional)
         nova_matricula = _identificador_unico_de_copia('rh_matricula', original.rh_matricula)
 
@@ -352,6 +351,7 @@ class ProfessorDuplicarView(CoordenadorOnlyMixin, View):
         original.rh_nome = f"[Cópia] {original.rh_nome}"
         original.save()
         original.cursos.set(cursos)
+        original.unidades.set(unidades)
 
         messages.success(
             request,
@@ -373,18 +373,7 @@ def alloc_curricular_view(request):
 
 @login_required
 def htmx_tabela_alocacao(request):
-    user = request.user
-    queryset = Professor.objects.select_related('tipo_contrato', 'unidade_principal')
-    # CORR: antes o escopo saía só do grupo "Admin DESUP"; o usuário com perfil DESUP
-    # (que não tem unidade) caía no ramo de baixo e filtrava por `unidade_principal=None`,
-    # enxergando apenas professores sem unidade em vez da base inteira.
-    is_admin = _perfil_desup(user)
-    if is_admin:
-        unidade_id = request.GET.get('unidade')
-        if unidade_id:
-            queryset = queryset.filter(unidade_principal_id=unidade_id)
-    else:
-        queryset = queryset.filter(unidade_principal=user.unidade)
+    queryset = Professor.objects.select_related('tipo_contrato').prefetch_related('unidades')
 
     # Mesmo motivo do ProfessorListView: ch_justificada/ch_nao_alocada/
     # percentual_alocado como property por linha vira N+1 (essa tabela carrega
@@ -412,16 +401,22 @@ def htmx_tabela_alocacao(request):
 
 
 class ProfessorCursosPartialView(LoginRequiredMixin, View):
-    """HTMX partial para retornar checkboxes de cursos de uma unidade."""
+    """HTMX partial para retornar cursos das unidades selecionadas."""
 
     def get(self, request, *args, **kwargs):
-        unidade_id = request.GET.get('unidade_principal')
-        if not unidade_id:
-            return render(request, 'professors/partials/_cursos_checkboxes.html', {'cursos': []})
+        unidade_ids = [pk for pk in request.GET.getlist('unidades') if str(pk).isdigit()]
+        selecionados = set(request.GET.getlist('cursos'))
+        if not unidade_ids:
+            return render(request, 'professors/partials/_cursos_checkboxes.html', {
+                'cursos': [], 'selecionados': selecionados,
+            })
 
         from apps.courses.models import Course
         cursos = Course.objects.filter(
-            course_units__unidade_id=unidade_id,
+            course_units__unidade_id__in=unidade_ids,
             course_units__ativo=True,
         ).order_by('nome').distinct()
-        return render(request, 'professors/partials/_cursos_checkboxes.html', {'cursos': cursos})
+        return render(request, 'professors/partials/_cursos_checkboxes.html', {
+            'cursos': cursos,
+            'selecionados': selecionados,
+        })

@@ -130,7 +130,7 @@ class AlocacaoE2EBase(TestCase):
     # helpers
     # ------------------------------------------------------------------ #
     def _professor(self, nome, sufixo, unidade, **kwargs):
-        return Professor.objects.create(
+        professor = Professor.objects.create(
             id_funcional=f'IDF-{sufixo}',
             rh_matricula=f'MAT-{sufixo}',
             rh_nome=nome,
@@ -139,6 +139,9 @@ class AlocacaoE2EBase(TestCase):
             tipo_contrato=self.contrato,
             **kwargs,
         )
+        if unidade:
+            professor.unidades.add(unidade)
+        return professor
 
     def _componente(self, matriz, nome, codigo, carga_horaria=80, **kwargs):
         componente = CurricularComponent.objects.create(
@@ -196,10 +199,10 @@ class JornadaAlocacaoCurricularE2ETests(AlocacaoE2EBase):
         # Nenhum componente alocado ainda: 3 sem docente.
         self.assertEqual(resposta.context['componentes_sem_docente'], 3)
         self.assertFalse(resposta.context['alocacao_curricular_preenchida'])
-        # Os professores do select são apenas os da unidade da coordenação.
-        self.assertEqual(
+        # A base de professores é compartilhada entre todas as unidades.
+        self.assertCountEqual(
             list(resposta.context['professores_unidade']),
-            [self.prof_a1, self.prof_a2],
+            [self.prof_a1, self.prof_a2, self.prof_b1],
         )
 
         # 2) Aloca um docente no primeiro componente.
@@ -507,7 +510,7 @@ class BuscarProfessoresE2ETests(AlocacaoE2EBase):
         self.assertEqual(resposta.status_code, 302)
         self.assertIn(reverse('login'), resposta['Location'])
 
-    def test_coordenador_recebe_json_apenas_da_propria_unidade(self):
+    def test_coordenador_recebe_json_da_base_global(self):
         self.client.force_login(self.coord_a)
 
         resposta = self.client.get(self.url_busca)
@@ -515,10 +518,9 @@ class BuscarProfessoresE2ETests(AlocacaoE2EBase):
         self.assertEqual(resposta.status_code, 200)
         self.assertEqual(resposta['Content-Type'], 'application/json')
         nomes = [item['nome'] for item in resposta.json()['results']]
-        self.assertEqual(nomes, ['Ana Alves', 'Bruno Barros'])
-        self.assertNotIn('Carla Costa', nomes)
+        self.assertEqual(nomes, ['Ana Alves', 'Bruno Barros', 'Carla Costa'])
         self.assertEqual(
-            {item['unidade'] for item in resposta.json()['results']}, {'UA'}
+            {item['unidade'] for item in resposta.json()['results']}, {'UA', 'UB'}
         )
 
     def test_coordenador_nao_consegue_espiar_outra_unidade_via_parametro(self):
@@ -528,9 +530,9 @@ class BuscarProfessoresE2ETests(AlocacaoE2EBase):
         resposta = self.client.get(self.url_busca, {'unidade_id': self.unidade_b.id})
 
         nomes = [item['nome'] for item in resposta.json()['results']]
-        self.assertEqual(nomes, ['Ana Alves', 'Bruno Barros'])
+        self.assertEqual(nomes, ['Ana Alves', 'Bruno Barros', 'Carla Costa'])
 
-    def test_desup_busca_global_e_filtra_por_unidade(self):
+    def test_desup_busca_global_mesmo_com_parametro_de_unidade(self):
         self.client.force_login(self.desup)
 
         todos = self.client.get(self.url_busca).json()['results']
@@ -540,7 +542,10 @@ class BuscarProfessoresE2ETests(AlocacaoE2EBase):
         )
 
         so_b = self.client.get(self.url_busca, {'unidade_id': self.unidade_b.id}).json()['results']
-        self.assertEqual([item['nome'] for item in so_b], ['Carla Costa'])
+        self.assertEqual(
+            [item['nome'] for item in so_b],
+            ['Ana Alves', 'Bruno Barros', 'Carla Costa'],
+        )
 
     def test_busca_por_termo_e_ignora_afastados(self):
         self.prof_a2.status = Professor.StatusChoices.AFASTADO
@@ -554,16 +559,19 @@ class BuscarProfessoresE2ETests(AlocacaoE2EBase):
 
         # O afastado some da busca mesmo sem termo.
         nomes = [item['nome'] for item in self.client.get(self.url_busca).json()['results']]
-        self.assertEqual(nomes, ['Ana Alves'])
+        self.assertEqual(nomes, ['Ana Alves', 'Carla Costa'])
 
-    def test_coordenador_sem_unidade_recebe_lista_vazia(self):
+    def test_coordenador_sem_unidade_recebe_base_global(self):
         self.coord_a.unidade = None
         self.coord_a.save()
         self.client.force_login(self.coord_a)
 
         resposta = self.client.get(self.url_busca)
 
-        self.assertEqual(resposta.json(), {'results': []})
+        self.assertEqual(
+            [item['nome'] for item in resposta.json()['results']],
+            ['Ana Alves', 'Bruno Barros', 'Carla Costa'],
+        )
 
     def test_busca_deveria_respeitar_o_nome_ajustado_pela_desup(self):
         """
@@ -679,7 +687,7 @@ class IsolamentoUnidadeAlocacaoE2ETests(AlocacaoE2EBase):
         self.comp_anatomia.refresh_from_db()
         self.assertIsNone(self.comp_anatomia.docente)
 
-    def test_coordenador_a_nao_aloca_docente_de_outra_unidade_no_proprio_componente(self):
+    def test_coordenador_a_aloca_docente_de_outra_unidade_no_proprio_componente(self):
         self.client.force_login(self.coord_a)
 
         resposta = self.client.post(
@@ -687,9 +695,9 @@ class IsolamentoUnidadeAlocacaoE2ETests(AlocacaoE2EBase):
             {'docente_id': self.prof_b1.pk},
         )
 
-        self.assertEqual(resposta.status_code, 403)
+        self.assertEqual(resposta.status_code, 200)
         self.comp_algoritmos.refresh_from_db()
-        self.assertIsNone(self.comp_algoritmos.docente)
+        self.assertEqual(self.comp_algoritmos.docente, self.prof_b1)
 
     def test_coordenador_sem_unidade_nao_ve_nem_altera_nada(self):
         self.coord_a.unidade = None

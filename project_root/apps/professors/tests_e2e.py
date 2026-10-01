@@ -95,7 +95,7 @@ class ProfessorE2EBase(TestCase):
     # helpers
     # ------------------------------------------------------------------ #
     def _professor(self, nome, sufixo, unidade, **kwargs):
-        return Professor.objects.create(
+        professor = Professor.objects.create(
             id_funcional=f'IDF-{sufixo}',
             rh_matricula=f'MAT-{sufixo}',
             rh_nome=nome,
@@ -104,6 +104,9 @@ class ProfessorE2EBase(TestCase):
             tipo_contrato=self.contrato,
             **kwargs,
         )
+        if unidade:
+            professor.unidades.add(unidade)
+        return professor
 
     def _matriz_vigente(self, curso, unidade, turno='M', nome='MC-2026'):
         matriz = CurriculumMatrix.objects.create(
@@ -146,8 +149,7 @@ class ProfessorE2EBase(TestCase):
             'rh_matricula': 'MAT-NOVO',
             'rh_nome': 'Daniel Dias',
             'tipo_contrato': self.contrato.pk,
-            'unidade_principal': self.unidade_a.pk,
-            'materia': Professor.MateriaChoices.INFORMATICA,
+            'unidades': [self.unidade_a.pk],
             'status': Professor.StatusChoices.ATIVO,
             'cursos': [self.curso_ads.pk],
             'limite_horas_extra': '',
@@ -182,6 +184,26 @@ class ProfessorE2EBase(TestCase):
 class CrudProfessorE2ETests(ProfessorE2EBase):
     """Cenário 9: jornada de CRUD completo com as permissões de cada perfil."""
 
+    def test_desup_vincula_professor_a_varias_unidades_sem_eixo(self):
+        self.client.force_login(self.desup)
+
+        formulario = self.client.get(self.url_criar)
+        self.assertNotIn('materia', formulario.context['form'].fields)
+        self.assertIn('unidades', formulario.context['form'].fields)
+
+        resposta = self.client.post(
+            self.url_criar,
+            self._dados_professor(
+                unidades=[self.unidade_a.pk, self.unidade_b.pk],
+                cursos=[self.curso_ads.pk, self.curso_enf.pk],
+            ),
+        )
+
+        self.assertEqual(resposta.status_code, 302)
+        professor = Professor.objects.get(id_funcional='IDF-NOVO')
+        self.assertCountEqual(professor.unidades.all(), [self.unidade_a, self.unidade_b])
+        self.assertCountEqual(professor.cursos.all(), [self.curso_ads, self.curso_enf])
+
     def test_jornada_crud_completa_criar_editar_duplicar_excluir(self):
         # 1) DESUP cria o professor (é o único perfil com `pode_criar`).
         self.client.force_login(self.desup)
@@ -197,6 +219,7 @@ class CrudProfessorE2ETests(ProfessorE2EBase):
         novo = Professor.objects.get(id_funcional='IDF-NOVO')
         self.assertEqual(novo.rh_nome, 'Daniel Dias')
         self.assertEqual(novo.unidade_principal, self.unidade_a)
+        self.assertEqual(list(novo.unidades.all()), [self.unidade_a])
         self.assertEqual(list(novo.cursos.all()), [self.curso_ads])
         self.assertTrue(
             any('cadastrado' in m for m in self._mensagens(resposta)),
@@ -241,6 +264,7 @@ class CrudProfessorE2ETests(ProfessorE2EBase):
         self.assertEqual(copia.rh_matricula, 'COPIA-MAT-NOVO')
         self.assertEqual(copia.rh_nome, '[Cópia] Daniel Dias da Silva')
         self.assertEqual(copia.unidade_principal, self.unidade_a)
+        self.assertEqual(list(copia.unidades.all()), [self.unidade_a])
         self.assertEqual(list(copia.cursos.all()), [self.curso_ads])
         # O original continua intacto.
         novo.refresh_from_db()
@@ -515,17 +539,20 @@ class OverrideDesupProfessorE2ETests(ProfessorE2EBase):
 
 
 class IsolamentoUnidadeProfessorE2ETests(ProfessorE2EBase):
-    """Cenário 11: isolamento por unidade na listagem e no `for_user`."""
+    """Cenário 11: base compartilhada, com escrita limitada aos vínculos."""
 
-    def test_coordenador_ve_apenas_a_propria_unidade_na_listagem(self):
+    def test_coordenador_ve_professores_de_todas_as_unidades_na_listagem(self):
         self.client.force_login(self.coord_a)
 
         resposta = self.client.get(self.url_lista)
 
         self.assertEqual(resposta.status_code, 200)
-        self.assertEqual([p.pk for p in resposta.context['professores']], [self.prof_a1.pk])
+        self.assertCountEqual(
+            [p.pk for p in resposta.context['professores']],
+            [self.prof_a1.pk, self.prof_b1.pk],
+        )
         self.assertContains(resposta, 'Ana Alves')
-        self.assertNotContains(resposta, 'Carla Costa')
+        self.assertContains(resposta, 'Carla Costa')
         self.assertFalse(resposta.context['is_desup'])
         self.assertEqual(resposta.context['unidade_atual'], self.unidade_a)
 
@@ -543,32 +570,37 @@ class IsolamentoUnidadeProfessorE2ETests(ProfessorE2EBase):
         self.assertEqual([p.pk for p in resposta.context['professores']], [self.prof_b1.pk])
         self.assertEqual(resposta.context['unidade_atual'], self.unidade_b)
 
-    def test_busca_por_nome_na_listagem_respeita_a_unidade(self):
+    def test_busca_por_nome_na_listagem_e_global(self):
         self._professor('Ana Aparecida', 'B2', self.unidade_b)
         self.client.force_login(self.coord_a)
 
         resposta = self.client.get(self.url_lista, {'q': 'Ana'})
 
-        self.assertEqual([p.pk for p in resposta.context['professores']], [self.prof_a1.pk])
+        self.assertCountEqual(
+            [p.pk for p in resposta.context['professores']],
+            [self.prof_a1.pk, Professor.objects.get(id_funcional='IDF-B2').pk],
+        )
 
-    def test_coordenador_sem_unidade_nao_ve_professor_algum(self):
+    def test_coordenador_sem_unidade_ainda_ve_a_base_compartilhada(self):
         self.coord_a.unidade = None
         self.coord_a.save()
         self.client.force_login(self.coord_a)
 
         resposta = self.client.get(self.url_lista)
 
-        self.assertEqual(list(resposta.context['professores']), [])
-        self.assertContains(resposta, 'Nenhum professor encontrado')
+        self.assertCountEqual(
+            [p.pk for p in resposta.context['professores']],
+            [self.prof_a1.pk, self.prof_b1.pk],
+        )
 
     def test_for_user_espelha_o_isolamento_da_tela(self):
-        """`Professor.objects.for_user` é a fonte do isolamento por unidade."""
+        """Coordenadores consultam a mesma base institucional."""
         self.assertCountEqual(
             Professor.objects.for_user(self.desup),
             [self.prof_a1, self.prof_b1],
         )
-        self.assertEqual(list(Professor.objects.for_user(self.coord_a)), [self.prof_a1])
-        self.assertEqual(list(Professor.objects.for_user(self.coord_b)), [self.prof_b1])
+        self.assertCountEqual(Professor.objects.for_user(self.coord_a), [self.prof_a1, self.prof_b1])
+        self.assertCountEqual(Professor.objects.for_user(self.coord_b), [self.prof_a1, self.prof_b1])
         # Perfil ADMIN (TI) não é operacional: não enxerga a base pelo `for_user`.
         self.assertEqual(list(Professor.objects.for_user(self.admin_ti)), [])
 
@@ -580,10 +612,9 @@ class IsolamentoUnidadeProfessorE2ETests(ProfessorE2EBase):
         Trocar só o widget para `HiddenInput` (apps/professors/forms.py) não
         protegia nada: o campo seguia vinculado e o valor do POST era aceito, e o
         `ProfessorUpdateView` não refaz o vínculo como o
-        `ProfessorCreateView.form_valid` faz. Agora o campo também é
-        `disabled=True` para o perfil de unidade — o Django ignora o POST e usa o
-        valor da instância. O mesmo vale para `limite_horas_extra` (teto usado no
-        parecer da DESUP via `limite_horas_extra_efetivo`).
+        `ProfessorCreateView.form_valid` faz. Agora a seleção múltipla de unidades
+        fica `disabled=True` para o perfil de unidade — o Django ignora o POST e
+        preserva os vínculos definidos pela DESUP.
         """
         self.client.force_login(self.coord_a)
 
@@ -593,16 +624,14 @@ class IsolamentoUnidadeProfessorE2ETests(ProfessorE2EBase):
                 id_funcional=self.prof_a1.id_funcional,
                 rh_matricula=self.prof_a1.rh_matricula,
                 rh_nome=self.prof_a1.rh_nome,
-                unidade_principal=self.unidade_b.pk,
-                limite_horas_extra='999',
+                unidades=[self.unidade_b.pk],
                 cursos=[],
             ),
         )
 
         self.prof_a1.refresh_from_db()
         self.assertEqual(self.prof_a1.unidade_principal, self.unidade_a)
-        # O teto de horas extras também é da DESUP: o POST do coordenador é ignorado.
-        self.assertIsNone(self.prof_a1.limite_horas_extra)
+        self.assertEqual(list(self.prof_a1.unidades.all()), [self.unidade_a])
 
 
 class HtmxProfessorE2ETests(ProfessorE2EBase):
@@ -619,7 +648,7 @@ class HtmxProfessorE2ETests(ProfessorE2EBase):
         self.assertEqual(resposta.status_code, 302)
         self.assertIn(reverse('login'), resposta['Location'])
 
-    def test_tabela_alocacao_do_coordenador_traz_so_a_unidade_dele(self):
+    def test_tabela_alocacao_do_coordenador_traz_todas_as_unidades(self):
         self.client.force_login(self.coord_a)
 
         resposta = self.client.get(self.url_tabela)
@@ -627,10 +656,13 @@ class HtmxProfessorE2ETests(ProfessorE2EBase):
         self.assertEqual(resposta.status_code, 200)
         self.assertTemplateUsed(resposta, 'professors/partials/_linhas_alocacao.html')
         self.assertContains(resposta, 'Ana Alves')
-        self.assertNotContains(resposta, 'Carla Costa')
-        self.assertEqual([p.pk for p in resposta.context['professores']], [self.prof_a1.pk])
+        self.assertContains(resposta, 'Carla Costa')
+        self.assertCountEqual(
+            [p.pk for p in resposta.context['professores']],
+            [self.prof_a1.pk, self.prof_b1.pk],
+        )
 
-    def test_tabela_alocacao_do_superuser_filtra_pelo_parametro_unidade(self):
+    def test_tabela_alocacao_do_superuser_permanece_global_com_parametro_unidade(self):
         superuser = User.objects.create_superuser(
             email='root.prof@harpia.test', password='pw',
         )
@@ -642,7 +674,10 @@ class HtmxProfessorE2ETests(ProfessorE2EBase):
         )
 
         so_b = self.client.get(self.url_tabela, {'unidade': self.unidade_b.id})
-        self.assertEqual([p.pk for p in so_b.context['professores']], [self.prof_b1.pk])
+        self.assertCountEqual(
+            [p.pk for p in so_b.context['professores']],
+            [self.prof_a1.pk, self.prof_b1.pk],
+        )
 
     def test_tabela_alocacao_mostra_as_horas_calculadas(self):
         matriz = self._matriz_vigente(self.curso_ads, self.unidade_a)
@@ -660,11 +695,10 @@ class HtmxProfessorE2ETests(ProfessorE2EBase):
         # deveria mostrar 14h não alocadas, não 34h).
         # "Total" na tabela continua sendo o ch_total do contrato (40h); só o
         # cálculo de sobra/percentual muda de base.
-        # O parcial imprime o valor cru (sem `floatformat`), e `ch_nao_alocada`
-        # devolve float porque `ha_semanal` é float — daí o "16.0h".
+        # A localização pt-BR usa vírgula decimal no HTML.
         self.assertContains(resposta, '40h')
-        self.assertContains(resposta, '16.0h')
-        self.assertContains(resposta, '20.0%')
+        self.assertContains(resposta, '16,0h')
+        self.assertContains(resposta, '20,0%')
 
     def test_tabela_alocacao_da_desup_deveria_trazer_todas_as_unidades(self):
         """
@@ -690,7 +724,7 @@ class HtmxProfessorE2ETests(ProfessorE2EBase):
     def test_cursos_unidade_lista_apenas_cursos_ativos_da_unidade(self):
         self.client.force_login(self.desup)
 
-        resposta = self.client.get(self.url_cursos, {'unidade_principal': self.unidade_a.id})
+        resposta = self.client.get(self.url_cursos, {'unidades': self.unidade_a.id})
 
         self.assertEqual(resposta.status_code, 200)
         self.assertTemplateUsed(resposta, 'professors/partials/_cursos_checkboxes.html')
@@ -711,7 +745,7 @@ class HtmxProfessorE2ETests(ProfessorE2EBase):
         self.assertContains(resposta, 'Nenhum curso disponível')
 
     def test_cursos_unidade_exige_login(self):
-        resposta = self.client.get(self.url_cursos, {'unidade_principal': self.unidade_a.id})
+        resposta = self.client.get(self.url_cursos, {'unidades': self.unidade_a.id})
 
         self.assertEqual(resposta.status_code, 302)
         self.assertIn(reverse('login'), resposta['Location'])

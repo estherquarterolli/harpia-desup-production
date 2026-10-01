@@ -4,10 +4,9 @@
     <tr class="text-[10px] font-black text-slate-500 uppercase tracking-wider">
       <th class="px-6 py-4">ID</th>
       <th class="px-6 py-4">Nome</th>
-      <th class="px-6 py-4 text-center">Unidade</th>
+      <th class="px-6 py-4 text-center">Unidades</th>
       <th class="px-6 py-4">Disciplinas</th>
       <th class="px-6 py-4 text-center">HA</th>
-      <th class="px-6 py-4">Eixo</th>
     </tr>
   </thead>
   <tbody class="text-sm font-semibold text-slate-700 divide-y divide-slate-50">
@@ -33,10 +32,12 @@
           </div>
         </div>
       </td>
-      <td class="px-6 py-4 text-center" data-label="Unidade">
-        {% if item.unit %}
-          <span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">{{ item.unit.sigla }}</span>
-        {% else %}—{% endif %}
+      <td class="px-6 py-4 text-center" data-label="Unidades">
+        <div class="flex flex-wrap justify-center gap-1">
+          {% for unidade in item.units %}
+            <span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">{{ unidade.sigla }}</span>
+          {% empty %}<span class="text-slate-300">—</span>{% endfor %}
+        </div>
       </td>
       <td class="px-6 py-4" data-label="Disciplinas">
         <div class="flex flex-wrap gap-1">
@@ -48,15 +49,10 @@
         </div>
       </td>
       <td class="px-6 py-4 text-center font-bold text-slate-900" data-label="HA">{{ item.ha }}h</td>
-      <td class="px-6 py-4" data-label="Eixo">
-        {% if item.prof.materia %}
-          <span class="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-bold">{{ item.prof.get_materia_display }}</span>
-        {% else %}<span class="text-slate-300 text-xs">—</span>{% endif %}
-      </td>
     </tr>
     {% empty %}
     <tr>
-      <td colspan="6" class="px-6 py-12 text-center text-slate-400">
+      <td colspan="5" class="px-6 py-12 text-center text-slate-400">
         <i class="ph ph-chalkboard-teacher text-4xl opacity-20 mb-2 block"></i>
         Nenhum professor encontrado com os filtros aplicados ou sem alocações vigentes.
       </td>

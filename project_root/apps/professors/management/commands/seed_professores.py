@@ -31,7 +31,6 @@ class Command(BaseCommand):
                 'rh_matricula': 'MAT001',
                 'rh_nome': 'Dr. João Silva',
                 'rh_email': 'joao.silva@faetec.rj.gov.br',
-                'materia': 'INFO',
                 'ha': 30,
             },
             {
@@ -39,7 +38,6 @@ class Command(BaseCommand):
                 'rh_matricula': 'MAT002',
                 'rh_nome': 'Dra. Maria Santos',
                 'rh_email': 'maria.santos@faetec.rj.gov.br',
-                'materia': 'ELETRO',
                 'ha': 20,
             },
             {
@@ -47,7 +45,6 @@ class Command(BaseCommand):
                 'rh_matricula': 'MAT003',
                 'rh_nome': 'Prof. Carlos Oliveira',
                 'rh_email': 'carlos.oliveira@faetec.rj.gov.br',
-                'materia': 'MECANICA',
                 'ha': 40,
             },
             {
@@ -55,7 +52,6 @@ class Command(BaseCommand):
                 'rh_matricula': 'MAT004',
                 'rh_nome': 'Prof. Ana Costa',
                 'rh_email': 'ana.costa@faetec.rj.gov.br',
-                'materia': 'ADMIN',
                 'ha': 25,
             },
             {
@@ -63,7 +59,6 @@ class Command(BaseCommand):
                 'rh_matricula': 'MAT005',
                 'rh_nome': 'Prof. Pedro Ferreira',
                 'rh_email': 'pedro.ferreira@faetec.rj.gov.br',
-                'materia': 'SAUDE',
                 'ha': 28,
             },
             {
@@ -71,7 +66,6 @@ class Command(BaseCommand):
                 'rh_matricula': 'MAT006',
                 'rh_nome': 'Dra. Fernanda Gomes',
                 'rh_email': 'fernanda.gomes@faetec.rj.gov.br',
-                'materia': 'QUIMICA',
                 'ha': 32,
             },
             {
@@ -79,7 +73,6 @@ class Command(BaseCommand):
                 'rh_matricula': 'MAT007',
                 'rh_nome': 'Prof. Roberto Lima',
                 'rh_email': 'roberto.lima@faetec.rj.gov.br',
-                'materia': 'FORMACAO',
                 'ha': 20,
             },
             {
@@ -87,7 +80,6 @@ class Command(BaseCommand):
                 'rh_matricula': 'MAT008',
                 'rh_nome': 'Prof. Juliana Martins',
                 'rh_email': 'juliana.martins@faetec.rj.gov.br',
-                'materia': 'DESIGN',
                 'ha': 25,
             },
             {
@@ -95,7 +87,6 @@ class Command(BaseCommand):
                 'rh_matricula': 'MAT009',
                 'rh_nome': 'Prof. Leonardo Dias',
                 'rh_email': 'leonardo.dias@faetec.rj.gov.br',
-                'materia': 'TELECOMUNICACOES',
                 'ha': 30,
             },
             {
@@ -103,7 +94,6 @@ class Command(BaseCommand):
                 'rh_matricula': 'MAT010',
                 'rh_nome': 'Prof. Beatriz Rocha',
                 'rh_email': 'beatriz.rocha@faetec.rj.gov.br',
-                'materia': 'TURISMO',
                 'ha': 22,
             },
         ]
@@ -131,10 +121,10 @@ class Command(BaseCommand):
                     rh_email=prof_data['rh_email'],
                     unidade_principal=unidade,
                     tipo_contrato=contrato,
-                    materia=prof_data['materia'],
                     ha=prof_data['ha'],
                     status='Ativo',
                 )
+                prof.unidades.add(unidade)
                 
                 # Associar alguns cursos aleatoriamente
                 cursos = CourseUnit.objects.filter(unidade=unidade)[:2]

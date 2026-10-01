@@ -58,9 +58,7 @@
           <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nome Professor</th>
           <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Regime</th>
           <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tipo</th>
-          {% if is_desup and not unidade_atual %}
-          <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Unidade</th>
-          {% endif %}
+          <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Unidades</th>
           
           {% if colunas_cursos %}
             {% for col in colunas_cursos %}
@@ -111,13 +109,13 @@
           <td class="px-5 py-4" data-label="Tipo">
             <span class="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-bold">{{ prof.categoria_contrato }}</span>
           </td>
-          {% if is_desup and not unidade_atual %}
-          <td class="px-5 py-4 text-sm text-slate-600" data-label="Unidade">
-            {% if prof.unidade_principal %}
-              <span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">{{ prof.unidade_principal.sigla }}</span>
-            {% else %}<span class="text-slate-300">—</span>{% endif %}
+          <td class="px-5 py-4 text-sm text-slate-600" data-label="Unidades">
+            <div class="flex flex-wrap gap-1">
+              {% for unidade in prof.unidades_exibicao %}
+                <span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">{{ unidade.sigla }}</span>
+              {% empty %}<span class="text-slate-300">—</span>{% endfor %}
+            </div>
           </td>
-          {% endif %}
 
           {% if colunas_cursos %}
             {% for col in colunas_cursos %}

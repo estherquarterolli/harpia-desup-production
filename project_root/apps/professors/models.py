@@ -66,6 +66,15 @@ class Professor(models.Model):
         verbose_name="Unidade Principal"
     )
 
+    unidades = models.ManyToManyField(
+        'core.Unidade',
+        blank=True,
+        related_name='professores_vinculados',
+        verbose_name='Unidades',
+        db_table='harpiadb_professores_professor_unidades',
+        help_text='Unidades às quais o professor está vinculado.',
+    )
+
     #  Campos DESUP (Sobrescritas e Ajustes - Regra #3)
     desup_nome = models.CharField(max_length=255, blank=True, null=True, verbose_name="Nome (Ajuste DESUP)")
     desup_email = models.EmailField(blank=True, null=True, verbose_name="E-mail (Ajuste DESUP)")
@@ -92,29 +101,6 @@ class Professor(models.Model):
         related_name='professores_cursos',
         verbose_name="Cursos",
         db_table="harpiadb_professores_professor_cursos",
-    )
-
-    class MateriaChoices(models.TextChoices):
-        INFORMATICA = 'INFO', 'Informática (Computação)'
-        ELETROTECNICA = 'ELETRO', 'Eletrotécnica (Eletrônica)'
-        MECANICA = 'MECANICA', 'Mecânica (Automação)'
-        EDIFICACOES = 'EDIFICACOES', 'Edificações (Civil)'
-        ADMINISTRACAO = 'ADMIN', 'Administração (Gestão)'
-        SAUDE = 'SAUDE', 'Saúde (Enfermagem)'
-        DESIGN = 'DESIGN', 'Design (Moda)'
-        TELECOMUNICACOES = 'TELECOM', 'Telecomunicações'
-        QUIMICA = 'QUIMICA', 'Química (Meio Ambiente)'
-        TURISMO = 'TURISMO', 'Turismo (Hospitalidade)'
-        FORMACAO = 'FORMACAO', 'Formação Geral'
-        OUTROS = 'OUTROS', 'Outros'
-
-    materia = models.CharField(
-        max_length=20,
-        choices=MateriaChoices.choices,
-        blank=True,
-        default='',
-        verbose_name="Eixo",
-        help_text="Área de atuação do professor (ex: Informática, Saúde, etc.)"
     )
 
     status = models.CharField(
@@ -151,6 +137,14 @@ class Professor(models.Model):
     @property
     def email(self):
         return self.desup_email if self.desup_email else self.rh_email
+
+    @property
+    def unidades_exibicao(self):
+        """Relação múltipla, com fallback para cadastros legados ainda não migrados."""
+        unidades = list(self.unidades.all())
+        if not unidades and self.unidade_principal_id:
+            return [self.unidade_principal]
+        return unidades
 
     # --- Propriedades para Dashboard (UC08) e Limites (UC05) ---
 

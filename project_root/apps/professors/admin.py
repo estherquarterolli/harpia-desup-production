@@ -4,9 +4,14 @@ from apps.accounts.admin import admin_site
 from .models import Professor, ContractType, Availability, AbsenceRecord
 
 class ProfessorAdmin(ModelAdmin):
-    list_display = ('nome', 'id_funcional', 'rh_matricula', 'unidade_principal', 'status')
+    list_display = ('nome', 'id_funcional', 'rh_matricula', 'unidades_display', 'status')
     search_fields = ('rh_nome', 'id_funcional', 'rh_matricula')
-    list_filter = ('status', 'unidade_principal', 'tipo_contrato')
+    list_filter = ('status', 'unidades', 'tipo_contrato')
+    filter_horizontal = ('unidades', 'cursos')
+
+    @admin.display(description='Unidades')
+    def unidades_display(self, obj):
+        return ', '.join(unidade.sigla for unidade in obj.unidades_exibicao) or '—'
 
 class ContractTypeAdmin(ModelAdmin):
     list_display = ('nome', 'categoria', 'regime_trabalho', 'dias_presenca_obrigatorios', 'max_class_hours', 'max_total_hours')

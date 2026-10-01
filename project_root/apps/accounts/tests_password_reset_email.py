@@ -146,6 +146,10 @@ class DesupUserManagementTests(TestCase):
         )
         self.assertContains(response, '/accounts/usuarios/criar/')
         self.assertContains(response, 'Criar usuário')
+        self.assertNotContains(
+            response,
+            'Crie contas, consulte o último acesso e envie links seguros',
+        )
 
     def test_formulario_oferece_apenas_desup_e_coordenador(self):
         response = self.client.get('/accounts/usuarios/criar/')
@@ -168,15 +172,14 @@ class DesupUserManagementTests(TestCase):
         self.assertContains(response, 'Acessa todas as unidades')
         self.assertContains(response, 'Acessa somente a unidade vinculada')
 
-    def test_cria_coordenador_com_unidade_e_envia_link_de_senha(self):
+    def test_cria_coordenador_com_senha_padrao_e_troca_obrigatoria(self):
         with patch('apps.accounts.services.send_email_task.delay') as delay:
-            with self.captureOnCommitCallbacks(execute=True):
-                response = self.client.post('/accounts/usuarios/criar/', {
-                    'first_name': 'Maria',
-                    'email': 'nova-coordenadora@teste.com',
-                    'perfil': User.Perfil.COORDENADOR_UNIDADE,
-                    'unidade': self.unidade.pk,
-                })
+            response = self.client.post('/accounts/usuarios/criar/', {
+                'first_name': 'Maria',
+                'email': 'nova-coordenadora@teste.com',
+                'perfil': User.Perfil.COORDENADOR_UNIDADE,
+                'unidade': self.unidade.pk,
+            }, follow=True)
 
         self.assertRedirects(response, '/accounts/usuarios/')
         created = User.objects.get(email='nova-coordenadora@teste.com')
@@ -188,20 +191,20 @@ class DesupUserManagementTests(TestCase):
         self.assertFalse(created.is_superuser)
         self.assertTrue(created.forcar_troca_senha)
         self.assertTrue(created.has_usable_password())
-        self.assertFalse(created.check_password(DEFAULT_USER_PASSWORD))
-        self.assertTrue(EmailPasswordResetToken.objects.filter(user=created).exists())
-        delay.assert_called_once()
+        self.assertTrue(created.check_password(DEFAULT_USER_PASSWORD))
+        self.assertFalse(EmailPasswordResetToken.objects.filter(user=created).exists())
+        delay.assert_not_called()
+        self.assertContains(response, 'Usuário criado com sucesso.')
 
     def test_cria_administrador_desup_sem_unidade_e_sem_superpoderes(self):
-        with patch('apps.accounts.services.send_email_task.delay'):
-            with self.captureOnCommitCallbacks(execute=True):
-                response = self.client.post('/accounts/usuarios/criar/', {
-                    'email': 'novo-desup@teste.com',
-                    'first_name': 'Joana',
-                    'perfil': User.Perfil.DESUP,
-                    # Mesmo manipulado no POST, unidade não se aplica a DESUP.
-                    'unidade': self.unidade.pk,
-                })
+        with patch('apps.accounts.services.send_email_task.delay') as delay:
+            response = self.client.post('/accounts/usuarios/criar/', {
+                'email': 'novo-desup@teste.com',
+                'first_name': 'Joana',
+                'perfil': User.Perfil.DESUP,
+                # Mesmo manipulado no POST, unidade não se aplica a DESUP.
+                'unidade': self.unidade.pk,
+            })
 
         self.assertRedirects(response, '/accounts/usuarios/')
         created = User.objects.get(email='novo-desup@teste.com')
@@ -209,6 +212,8 @@ class DesupUserManagementTests(TestCase):
         self.assertIsNone(created.unidade)
         self.assertFalse(created.is_staff)
         self.assertFalse(created.is_superuser)
+        self.assertTrue(created.check_password(DEFAULT_USER_PASSWORD))
+        delay.assert_not_called()
 
     def test_coordenador_exige_unidade(self):
         response = self.client.post('/accounts/usuarios/criar/', {

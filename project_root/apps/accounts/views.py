@@ -532,7 +532,7 @@ class DesupUserListView(LoginRequiredMixin, ListView):
 
 
 class DesupUserCreateView(LoginRequiredMixin, View):
-    """Cria uma conta operacional e envia o link para definição da senha."""
+    """Cria conta com senha padrão e troca obrigatória no primeiro acesso."""
 
     template_name = 'accounts/desup_user_form.html'
 
@@ -556,11 +556,6 @@ class DesupUserCreateView(LoginRequiredMixin, View):
         if form.is_valid():
             with transaction.atomic():
                 created_user = form.save()
-                result = issue_email_password_reset(
-                    user=created_user,
-                    request=request,
-                    requested_by=request.user,
-                )
                 registrar_auditoria(
                     request,
                     'DESUP_USER_CREATED',
@@ -573,16 +568,7 @@ class DesupUserCreateView(LoginRequiredMixin, View):
                     ),
                 )
 
-            if result.sent:
-                messages.success(
-                    request,
-                    f'Usuário {created_user.email} criado. Um link para cadastrar a senha foi enviado.',
-                )
-            else:
-                messages.warning(
-                    request,
-                    f'Usuário {created_user.email} criado, mas o link de senha não pôde ser enviado.',
-                )
+            messages.success(request, 'Usuário criado com sucesso.')
             return redirect('desup_user_list')
 
         return render(request, self.template_name, {'form': form})

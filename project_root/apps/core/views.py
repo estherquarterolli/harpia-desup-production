@@ -95,7 +95,10 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
         nao_conformes = []
         conformes = 0
         for unidade in unidades_ativas:
-            profs = Professor.objects.filter(unidade_principal=unidade, status='Ativo')
+            profs = Professor.objects.filter(
+                Q(unidades=unidade) | Q(unidade_principal=unidade),
+                status='Ativo',
+            ).distinct()
             if not profs.exists():
                 conformes += 1
                 continue
@@ -114,15 +117,16 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
             ctx['conformidade'] = '0%'
 
         # Professores para a tabela de consulta
-        professores_qs = Professor.objects.select_related('tipo_contrato', 'unidade_principal').order_by('rh_nome')
+        professores_qs = Professor.objects.select_related(
+            'tipo_contrato', 'unidade_principal'
+        ).prefetch_related('unidades').order_by('rh_nome')
         ctx['unidades'] = Unidade.objects.filter(status=True).order_by('nome')
-        ctx['eixo_choices'] = Professor.MateriaChoices.choices
 
         # Estrutura esperada pelo partial _professor_table.html
         ctx['alocacoes_dashboard'] = [
             {
                 'prof': prof,
-                'unit': prof.unidade_principal,
+                'units': prof.unidades_exibicao,
                 'subjects': prof.get_disciplinas_alocadas(),
                 'ha': prof.ha,
             }
@@ -179,17 +183,18 @@ class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, T
         ctx = super().get_context_data(**kwargs)
         from apps.professors.models import Professor
 
-        qs = Professor.objects.select_related('tipo_contrato', 'unidade_principal').order_by('rh_nome')
+        qs = Professor.objects.select_related(
+            'tipo_contrato', 'unidade_principal'
+        ).prefetch_related('unidades').order_by('rh_nome')
 
         q = self.request.GET.get('q', '')
         if q:
             qs = qs.filter(rh_nome__icontains=q)
         unidade_id = self.request.GET.get('unidade_id')
         if unidade_id:
-            qs = qs.filter(unidade_principal_id=unidade_id)
-        eixo = self.request.GET.get('eixo')
-        if eixo:
-            qs = qs.filter(materia=eixo)
+            qs = qs.filter(
+                Q(unidades__id=unidade_id) | Q(unidade_principal_id=unidade_id)
+            ).distinct()
         turno = self.request.GET.get('turno')
         if turno:
             qs = qs.filter(disponibilidades__turno=turno).distinct()
@@ -197,7 +202,7 @@ class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, T
         ctx['alocacoes_dashboard'] = [
             {
                 'prof': prof,
-                'unit': prof.unidade_principal,
+                'units': prof.unidades_exibicao,
                 'subjects': prof.get_disciplinas_alocadas(),
                 'ha': prof.ha,
             }
