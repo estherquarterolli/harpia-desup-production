@@ -1,13 +1,14 @@
 import uuid
 from datetime import timedelta
 
-from decouple import config
 from django.contrib.auth.models import AbstractUser, BaseUserManager, Group, Permission
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-DEFAULT_USER_PASSWORD = config("DEFAULT_USER_PASSWORD", default="Faetec@123")
+# Senha padrão fixa: todo reset/criação de conta usa SEMPRE este valor, sem
+# depender de variável de ambiente (que em produção divergia e confundia).
+DEFAULT_USER_PASSWORD = "Faetec@123"
 
 
 class UserManager(BaseUserManager):

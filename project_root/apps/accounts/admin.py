@@ -69,7 +69,8 @@ class CustomUserAdmin(DjangoUserAdmin, ModelAdmin):
                 total += 1
             self.message_user(
                 request,
-                f'{total} senha(s) redefinida(s) para o padrão. Troca obrigatória no próximo acesso.',
+                f'{total} senha(s) redefinida(s). Senha temporária: {DEFAULT_USER_PASSWORD} '
+                '(diferencia maiúsculas e minúsculas). Troca obrigatória no próximo acesso.',
             )
             return None
 

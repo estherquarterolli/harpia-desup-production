@@ -601,10 +601,13 @@ class DesupUserPasswordResetView(LoginRequiredMixin, View):
         self.target.set_password(DEFAULT_USER_PASSWORD)
         self.target.forcar_troca_senha = True
         self.target.save(update_fields=['password', 'forcar_troca_senha'])
-        messages.success(
+        # Banner fixo (warning não some sozinho) com a senha EXATA em vigor, já que
+        # ela vem de DEFAULT_USER_PASSWORD do ambiente e diferencia maiúsculas/minúsculas.
+        messages.warning(
             request,
-            f'Senha de {self.target.email} redefinida para o padrão. '
-            'A troca será exigida no próximo acesso.',
+            f'Senha de {self.target.email} redefinida. Senha temporária: '
+            f'{DEFAULT_USER_PASSWORD}  (diferencia maiúsculas e minúsculas). '
+            'A troca será exigida no primeiro acesso.',
         )
         registrar_auditoria(
             request,
