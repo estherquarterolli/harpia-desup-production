@@ -11,6 +11,7 @@
 -- O bloco é atômico: qualquer erro desfaz também as exclusões.
 
 DO $substituir_matrizes$
+#variable_conflict use_column
 DECLARE
     unidades jsonb := $dados$[{"key":"DCX","siglas":["DUQ","DCX","FAETERJ DCX"],"nomes":["FAETERJ Duque de Caxias","FAETERJ DUQUE DE CAXIAS","Duque de Caxias"]},{"key":"CGO","siglas":["CAM","CGO","FAETERJ CGO"],"nomes":["FAETERJ Campos dos Goytacazes","Campos dos Goytacazes"]},{"key":"FMO","siglas":["FMO","FAETERJ-FMO"],"nomes":["FAETERJ Fernando Mota","Fernando Mota"]},{"key":"PTR","siglas":["PET","PTR","FAETERJ-PET"],"nomes":["FAETERJ Petrópolis","FAETERJ Petropolis","Petrópolis"]},{"key":"ISERJ","siglas":["ISERJ"],"nomes":["ISERJ","Instituto de Educação do Rio de Janeiro (ISERJ)"]},{"key":"ISEPAM","siglas":["ISEPAM"],"nomes":["ISEPAM","Instituto de Educação Aldo Muylaert (ISEPAM)"]},{"key":"PRC","siglas":["PAR","PRC","FAETERJ-PARACAMBI","FAETERJ-PCB"],"nomes":["FAETERJ Paracambi","Paracambi"]},{"key":"BJI","siglas":["BJI","FAETEC-BJI"],"nomes":["FAETERJ Bom Jesus de Itabapoana","FAETEC Bom Jesus de Itabapoana","Bom Jesus do Itabapoana"]},{"key":"ITP","siglas":["ITA","ITP","FAETEC-ITP"],"nomes":["FAETERJ Itaperuna","FAETEC Itaperuna","Itaperuna"]},{"key":"SAP","siglas":["PAD","SAP","FAETEC-SAdP"],"nomes":["FAETERJ Santo Antônio de Pádua","FAETEC Santo Antônio de Pádua","Santo Antônio de Pádua"]},{"key":"TRS","siglas":["3RIO","TRS","FAETERJ-TR"],"nomes":["FAETERJ Três Rios","FAETEC Três Rios","Três Rios","Trê Rios"]}]$dados$::jsonb;
     cursos jsonb := $dados$[{"key":"PGE","nome":"Tecnologia em Processos Gerenciais","sigla":"PGER","siglas":["PGE","PGER","TPG"],"nomes":["Tecnologia em Processos Gerenciais","Processos Gerenciais"]},{"key":"GPO","nome":"Tecnologia em Gestão Portuária","sigla":"GPORT","siglas":["GPO","GPORT","TGP"],"nomes":["Tecnologia em Gestão Portuária","Gestão Portuária"]},{"key":"ADS","nome":"Tecnologia em Análise e Desenvolvimento de Sistemas","sigla":"ADS","siglas":["ADS"],"nomes":["Tecnologia em Análise e Desenvolvimento de Sistemas","Análise e Desenvolvimento de Sistemas"]},{"key":"SI","nome":"Tecnologia em Sistemas de Informação","sigla":"SI","siglas":["SI","TSI"],"nomes":["Tecnologia em Sistemas de Informação","Tecnologia em Sistemas da Informação","Sistemas de Informação"]},{"key":"PED","nome":"Licenciatura em Pedagogia","sigla":"LICPED","siglas":["PED","LICPED"],"nomes":["Licenciatura em Pedagogia","Pedagogia"]},{"key":"GAM","nome":"Tecnologia em Gestão Ambiental","sigla":"TGA","siglas":["GAM","TGA","GESTAMB"],"nomes":["Tecnologia em Gestão Ambiental","Gestão Ambiental"]},{"key":"LOG","nome":"Tecnologia em Logística","sigla":"LOG","siglas":["LOG"],"nomes":["Tecnologia em Logística","Logística"]}]$dados$::jsonb;
@@ -214,6 +215,11 @@ BEGIN
     DELETE FROM public.harpiadb_cursos_componente_matriz;
     DELETE FROM public.harpiadb_cursos_matriz_unidades;
     DELETE FROM public.harpiadb_cursos_matriz_curricular;
+
+    -- Os DELETEs acima deixam eventos de FK pendentes na transação, e o
+    -- PostgreSQL recusa ALTER TABLE nessa situação (erro 55006). Forçar a
+    -- checagem imediata das FKs esvazia a fila antes dos ALTERs abaixo.
+    SET CONSTRAINTS ALL IMMEDIATE;
 
     -- Agora que a tabela está vazia, finaliza a estrutura necessária sem risco
     -- de um valor legado de turno bloquear a substituição.

@@ -595,51 +595,24 @@ class DesupUserPasswordResetView(LoginRequiredMixin, View):
         if request.POST.get('confirmar') != 'sim':
             return render(request, self.template_name, {
                 'target': self.target,
-                'error': 'Marque a confirmação antes de enviar o link.',
+                'error': 'Marque a confirmação antes de redefinir a senha.',
             })
 
-        if request.POST.get('modo') == 'forcar':
-            self.target.set_password(DEFAULT_USER_PASSWORD)
-            self.target.forcar_troca_senha = True
-            self.target.save(update_fields=['password', 'forcar_troca_senha'])
-            messages.success(
-                request,
-                f'Senha de {self.target.email} redefinida para o padrão. '
-                'A troca será exigida no próximo acesso.',
-            )
-            registrar_auditoria(
-                request,
-                "DESUP_PASSWORD_FORCE_RESET",
-                usuario=request.user,
-                email=request.user.email,
-                detalhes=f"Senha de {self.target.email} redefinida para o padrão com troca obrigatória.",
-            )
-            return redirect('desup_user_list')
-
-        result = issue_email_password_reset(
-            user=self.target,
-            request=request,
-            requested_by=request.user,
+        self.target.set_password(DEFAULT_USER_PASSWORD)
+        self.target.forcar_troca_senha = True
+        self.target.save(update_fields=['password', 'forcar_troca_senha'])
+        messages.success(
+            request,
+            f'Senha de {self.target.email} redefinida para o padrão. '
+            'A troca será exigida no próximo acesso.',
         )
-        if result.sent:
-            messages.success(
-                request,
-                f'Link de redefinição enviado para {self.target.email}.',
-            )
-            registrar_auditoria(
-                request,
-                "DESUP_PASSWORD_RESET_EMAIL_SENT",
-                usuario=request.user,
-                email=request.user.email,
-                detalhes=f"Link de redefinição enviado para {self.target.email}.",
-            )
-        elif result.reason == 'rate_limited':
-            messages.warning(
-                request,
-                'Um link já foi emitido recentemente para este usuário. Aguarde antes de reenviar.',
-            )
-        else:
-            messages.error(request, 'Não foi possível enviar o link para esta conta.')
+        registrar_auditoria(
+            request,
+            "DESUP_PASSWORD_FORCE_RESET",
+            usuario=request.user,
+            email=request.user.email,
+            detalhes=f"Senha de {self.target.email} redefinida para o padrão com troca obrigatória.",
+        )
         return redirect('desup_user_list')
 
 

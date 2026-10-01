@@ -10,7 +10,6 @@ from django.utils.translation import gettext_lazy as _
 from django.contrib import messages
 from .models import DEFAULT_USER_PASSWORD, User
 from .forms import CustomUserCreationForm, CustomUserChangeForm
-from .services import issue_email_password_reset
 
 class HarpiaAdminSite(UnfoldAdminSite):
     site_header = _("Harpia – Administração")
@@ -40,48 +39,9 @@ class CustomUserAdmin(DjangoUserAdmin, ModelAdmin):
     search_fields = ('email',)
     ordering = ('email',)
 
-    actions = ['enviar_redefinicao_email', 'forcar_reset_senha']
+    actions = ['forcar_reset_senha']
 
-    @admin.action(description="Enviar link seguro de redefinição de senha")
-    def enviar_redefinicao_email(self, request, queryset):
-        """Ação em duas etapas; nenhum reset administrativo ocorre sem confirmação."""
-        if not request.user.is_superuser:
-            queryset = queryset.exclude(is_superuser=True).exclude(perfil=User.Perfil.ADMIN)
-
-        if request.POST.get('confirmar_envio') == 'sim':
-            enviados = 0
-            limitados = 0
-            for target in queryset:
-                result = issue_email_password_reset(
-                    user=target,
-                    request=request,
-                    requested_by=request.user,
-                )
-                if result.sent:
-                    enviados += 1
-                elif result.reason == 'rate_limited':
-                    limitados += 1
-            self.message_user(
-                request,
-                f'{enviados} link(s) enviado(s). {limitados} usuário(s) já tinham um link recente.',
-            )
-            return None
-
-        return TemplateResponse(
-            request,
-            'admin/accounts/user/password_reset_confirmation.html',
-            {
-                **self.admin_site.each_context(request),
-                'title': 'Confirmar envio de redefinição de senha',
-                'usuarios': queryset,
-                'queryset': queryset,
-                'action_checkbox_name': ACTION_CHECKBOX_NAME,
-                'opts': self.model._meta,
-                'action_name': 'enviar_redefinicao_email',
-            },
-        )
-
-    @admin.action(description="Forçar reset de senha (senha padrão + troca obrigatória)")
+    @admin.action(description="Redefinir senha (senha padrão + troca obrigatória)")
     def forcar_reset_senha(self, request, queryset):
         """Define a senha padrão e exige troca no próximo login. Só superusuário."""
         from .views import registrar_auditoria

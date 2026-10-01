@@ -239,7 +239,7 @@
             {% endfor %}
         </div>
 
-        {# Sucesso/info: toast centralizado que some em ~1s #}
+        {# Sucesso/info: toast centralizado que some em ~3,5s #}
         <div id="successToast" class="fixed inset-0 z-[130] flex items-start justify-center pt-24 px-4 pointer-events-none">
             {% for message in messages %}
             {% if message.tags != 'error' and message.tags != 'warning' %}
@@ -259,7 +259,7 @@
             setTimeout(function () {
                 items.forEach(function (el) { el.style.opacity = '0'; });
                 setTimeout(function () { toast.remove(); }, 300);
-            }, 1000);
+            }, 3500);
         })();
         </script>
         {% endif %}
@@ -275,10 +275,28 @@
             </div>
             <button type="button"
                     class="ml-auto px-3 py-1.5 rounded-lg text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-colors"
-                    onclick="document.getElementById('windowOpenNotice')?.remove()">
+                    onclick="dismissWindowOpenNotice()">
                 Entendi
             </button>
         </div>
+        <script>
+        (function () {
+            // Depois de fechado, o aviso só volta após 12h (ou se a data de
+            // fechamento da janela mudar). Preferência guardada só neste navegador.
+            var KEY = 'windowOpenNoticeDismissed:{{ janela_data_fim }}';
+            var TTL_MS = 12 * 60 * 60 * 1000;
+            var el = document.getElementById('windowOpenNotice');
+            try {
+                var ts = parseInt(localStorage.getItem(KEY) || '0', 10);
+                if (ts && Date.now() - ts < TTL_MS) { el.remove(); }
+            } catch (e) {}
+            window.dismissWindowOpenNotice = function () {
+                try { localStorage.setItem(KEY, String(Date.now())); } catch (e) {}
+                var n = document.getElementById('windowOpenNotice');
+                if (n) n.remove();
+            };
+        })();
+        </script>
         {% elif janela_fechada %}
         <div id="windowClosedNotice"
              class="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 flex items-start gap-3">
