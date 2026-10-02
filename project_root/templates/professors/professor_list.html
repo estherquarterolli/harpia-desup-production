@@ -51,7 +51,7 @@
   </div>
 
   <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-x-auto">
-    <table class="w-full text-left border-collapse min-w-[720px] stack-table">
+    <table class="w-full text-left border-collapse {% if is_desup %}min-w-[720px]{% endif %} stack-table">
       <thead class="bg-slate-50 border-b border-slate-100">
         <tr>
           <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider w-24">ID</th>
@@ -59,7 +59,9 @@
           <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Regime</th>
           <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tipo</th>
           <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Unidades</th>
-          
+
+          {# Coordenador de unidade vê só ID, Nome, Regime, Tipo e Unidades. #}
+          {% if is_desup %}
           {% if colunas_cursos %}
             {% for col in colunas_cursos %}
             <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center" title="{{ col.nome }}">
@@ -67,11 +69,12 @@
             </th>
             {% endfor %}
           {% endif %}
-          
+
           <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">CH Justificada</th>
           <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">Total de Horas</th>
           <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">Não Alocado</th>
           <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">% Alocado</th>
+          {% endif %}
         </tr>
       </thead>
       <tbody class="divide-y divide-slate-50">
@@ -117,6 +120,7 @@
             </div>
           </td>
 
+          {% if is_desup %}
           {% if colunas_cursos %}
             {% for col in colunas_cursos %}
             <td class="px-5 py-4 text-center border-l border-slate-100 text-sm font-semibold text-slate-700" data-label="{{ col.nome }}">
@@ -144,11 +148,12 @@
               {{ prof.percentual_alocado_total }}%
             </span>
           </td>
+          {% endif %}
 
         </tr>
         {% empty %}
         <tr>
-          <td colspan="9" class="px-6 py-16 text-center text-slate-400">
+          <td colspan="{% if is_desup %}9{% else %}5{% endif %}"class="px-6 py-16 text-center text-slate-400">
             <i class="ph ph-chalkboard-teacher text-5xl opacity-20 mb-3 block"></i>
             Nenhum professor encontrado.
           </td>
