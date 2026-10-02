@@ -14,6 +14,12 @@ from apps.core.services import build_window_lock_context, enforce_window_or_redi
 # a DESUP, evitando IntegrityError/500 sem mascarar que o cadastro precisa ser corrigido.
 TURNO_PADRAO_ALOCACAO = 'M'
 
+
+def _semestre_atual():
+    from django.utils import timezone
+    hoje = timezone.now()
+    return f"{hoje.year}.{'1' if hoje.month <= 6 else '2'}"
+
 class AllocCurricularView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
     template_name = "allocations/alloc_curricular.html"
     allowed_profiles = ['DESUP', 'COORDENADOR_UNIDADE']
@@ -70,6 +76,27 @@ class AllocCurricularView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView)
         context['alocacao_curricular_preenchida'] = total_componentes > 0 and componentes_sem_docente == 0
         context['componentes_sem_docente'] = componentes_sem_docente
 
+        # Estado do botão "Aprovar Alocação": aprovado quando todas as matrizes da
+        # unidade (que têm CourseUnit) já têm o consolidado APROVADO no semestre.
+        alocacao_aprovada = False
+        if unidade_id and matrizes_data:
+            from apps.allocations.models import AlocacaoCurricular
+            from apps.courses.models import CourseUnit
+            semestre = _semestre_atual()
+            esperadas = {
+                (cu.id, m['matriz'].turno or TURNO_PADRAO_ALOCACAO)
+                for m in matrizes_data
+                for cu in [CourseUnit.objects.filter(curso=m['matriz'].curso, unidade_id=unidade_id).first()]
+                if cu
+            }
+            aprovadas = set(AlocacaoCurricular.objects.filter(
+                unidade_id=unidade_id,
+                semestre=semestre,
+                status=AlocacaoCurricular.StatusChoices.APROVADO,
+            ).values_list('curso_id', 'turno'))
+            alocacao_aprovada = bool(esperadas) and esperadas <= aprovadas
+        context['alocacao_aprovada'] = alocacao_aprovada
+
         # A base de docentes é compartilhada por todas as unidades.
         professores_qs = Professor.objects.all().order_by('rh_nome')
 
@@ -110,6 +137,9 @@ class AlocarDocenteComponenteView(LoginRequiredMixin, PerfilRequiredMixin, View)
             fallback_url=request.META.get('HTTP_REFERER', '/alocacao-curricular/'),
         )
         if blocked:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                # A mensagem de janela fechada já foi enfileirada; o cliente recarrega para exibi-la.
+                return JsonResponse({'ok': False, 'reload': True}, status=403)
             return blocked
         
         docente_id = request.POST.get('docente_id')
@@ -118,19 +148,31 @@ class AlocarDocenteComponenteView(LoginRequiredMixin, PerfilRequiredMixin, View)
             comp.docente = None
             comp.status = MatrixComponent.StatusChoices.NAO_OFERECIDA
             comp.save()
-            messages.success(request, f'Componente {comp.nome_disciplina} marcado como Não oferecido.')
+            msg = f'Componente {comp.nome_disciplina} marcado como Não oferecido.'
         elif docente_id == MatrixComponent.StatusChoices.SEM_PROFESSOR or not docente_id:
             comp.docente = None
             comp.status = MatrixComponent.StatusChoices.SEM_PROFESSOR
             comp.save()
-            messages.success(request, f'Componente {comp.nome_disciplina} marcado como Sem professor.')
+            msg = f'Componente {comp.nome_disciplina} marcado como Sem professor.'
         else:
             # Qualquer unidade pode utilizar um professor da base institucional.
             comp.docente = get_object_or_404(Professor, pk=docente_id)
             comp.status = MatrixComponent.StatusChoices.COMPLETO
             comp.save()
-            messages.success(request, f'Docente alocado para {comp.nome_disciplina} com sucesso!')
-            
+            msg = f'Docente alocado para {comp.nome_disciplina} com sucesso!'
+
+        # Salvamento automático (fetch): responde JSON e a página não recarrega.
+        # Sem `messages`, para o aviso não reaparecer numa navegação posterior.
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'ok': True,
+                'message': msg,
+                'status': comp.status,
+                'docente_id': comp.docente_id,
+                'docente_nome': comp.docente.rh_nome if comp.docente_id else '',
+            })
+
+        messages.success(request, msg)
         response = HttpResponse()
         response['HX-Refresh'] = 'true'
         return response
@@ -176,10 +218,8 @@ class AprovarAlocacaoUnidadeView(LoginRequiredMixin, PerfilRequiredMixin, View):
         from django.utils import timezone
         
         # Obtém semestre atual (mesma lógica usada nas pendências)
-        hoje = timezone.now()
-        s = "1" if hoje.month <= 6 else "2"
-        semestre = f"{hoje.year}.{s}"
-        
+        semestre = _semestre_atual()
+
         from apps.courses.models import CourseUnit
         # 1. Aprova todas as alocações curriculares da unidade no semestre
         matrizes = CurriculumMatrix.objects.filter(
@@ -222,6 +262,20 @@ class AprovarAlocacaoUnidadeView(LoginRequiredMixin, PerfilRequiredMixin, View):
                 f'{", ".join(matrizes_sem_turno)}. Ajuste o turno da matriz para o '
                 'consolidado ficar correto.',
             )
+        return redirect(f'/alocacao-curricular/?unidade_id={unidade_id}')
+
+
+class DesfazerAprovacaoUnidadeView(LoginRequiredMixin, PerfilRequiredMixin, View):
+    """Desfaz a aprovação da DESUP: devolve os consolidados do semestre a Rascunho."""
+    allowed_profiles = ['DESUP']
+
+    def post(self, request, unidade_id):
+        revertidas = AlocacaoCurricular.objects.filter(
+            unidade_id=unidade_id,
+            semestre=_semestre_atual(),
+            status=AlocacaoCurricular.StatusChoices.APROVADO,
+        ).update(status=AlocacaoCurricular.StatusChoices.RASCUNHO)
+        messages.success(request, f'Aprovação desfeita para {revertidas} matriz(es). A alocação pode ser alterada novamente.')
         return redirect(f'/alocacao-curricular/?unidade_id={unidade_id}')
 
 

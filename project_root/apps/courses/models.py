@@ -330,6 +330,11 @@ class MatrixComponent(models.Model):
             if self.carga_horaria_semanal is None:
                 self.carga_horaria_semanal = round(self.carga_horaria / 20, 2)
         super().save(*args, **kwargs)
+        # Disciplina temporária não tem código de catálogo: gera um a partir do id
+        # (autoincremento do banco) só para o campo não ficar vazio.
+        if cc is None and not self.codigo and self.pk:
+            self.codigo = f"TEMP-{self.pk:05d}"
+            type(self).objects.filter(pk=self.pk).update(codigo=self.codigo)
 
     def __str__(self):
         return f"{self.matriz} - {self.nome_disciplina}"

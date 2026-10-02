@@ -399,6 +399,12 @@ BEGIN
         RAISE EXCEPTION 'A validação final de turno/unidade falhou. Toda a operação será desfeita.';
     END IF;
 
+    -- Disciplinas temporárias (sem catálogo) recebem código TEMP-<id> para não ficar vazio.
+    UPDATE public.harpiadb_cursos_componente_matriz
+       SET codigo = 'TEMP-' || lpad(id::text, 5, '0')
+     WHERE componente_curricular_id IS NULL
+       AND COALESCE(codigo, '') = '';
+
     RAISE NOTICE 'SUCESSO: % matrizes antigas, % vínculos antigos e % turmas antigas removidos.',
         matrizes_antigas, componentes_antigos, turmas_antigas;
     RAISE NOTICE 'SUCESSO: 29 matrizes por turno e 1181 vínculos inseridos a partir da planilha.';

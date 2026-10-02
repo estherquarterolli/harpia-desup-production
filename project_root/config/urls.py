@@ -19,7 +19,7 @@ from apps.accounts.views import (
 )
 from apps.core.views import DashboardView, DashboardDesupView, DashboardUnidadeView, DashboardProfessoresPartialView
 from django.contrib.auth import views as auth_views
-from apps.allocations.views import AllocCurricularView, LiberarAlocacaoView, AprovarAlocacaoUnidadeView, AlocarDocenteComponenteView, BuscarProfessoresView
+from apps.allocations.views import AllocCurricularView, LiberarAlocacaoView, AprovarAlocacaoUnidadeView, DesfazerAprovacaoUnidadeView, AlocarDocenteComponenteView, BuscarProfessoresView
 
 urlpatterns = [
     # acesso ao perfil SuperAdmin via Admin Site Customizado
@@ -60,6 +60,7 @@ urlpatterns = [
     path('alocacao-curricular/componente/<int:pk>/alocar/', AlocarDocenteComponenteView.as_view(), name='alocar_docente_componente'),
     path('alocacao-curricular/<int:pk>/liberar/', LiberarAlocacaoView.as_view(), name='liberar_alocacao'),
     path('alocacao-curricular/unidade/<int:unidade_id>/aprovar/', AprovarAlocacaoUnidadeView.as_view(), name='aprovar_alocacao_unidade'),
+    path('alocacao-curricular/unidade/<int:unidade_id>/desfazer-aprovacao/', DesfazerAprovacaoUnidadeView.as_view(), name='desfazer_aprovacao_unidade'),
     path('alocacao-curricular/buscar-professores/', BuscarProfessoresView.as_view(), name='buscar_professores'),
     
     # caminho da pag principal, onde os dashboards ficam. 

@@ -40,26 +40,42 @@
     </form>
 
     {% if unidade_selecionada_id and user.perfil == 'DESUP' %}
+    {% if alocacao_aprovada %}
+    <div class="w-full sm:w-auto sm:ml-auto flex flex-wrap items-center gap-2">
+      <button type="button" id="approveAllocBtn" data-approved="true" disabled
+        class="flex-1 sm:flex-none flex items-center justify-center gap-2 text-white font-black text-sm px-5 py-2.5 rounded-xl shadow-md bg-green-800 cursor-default">
+        <i class="ph ph-seal-check text-lg"></i>
+        Alocação aprovada
+      </button>
+      <form method="POST" action="{% url 'desfazer_aprovacao_unidade' unidade_id=unidade_selecionada_id %}" class="m-0"
+            onsubmit="return confirm('Desfazer a aprovação desta unidade? A alocação voltará a ser editável.');">
+        {% csrf_token %}
+        <button type="submit" class="flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-bold text-sm px-4 py-2.5 rounded-xl transition-all">
+          <i class="ph ph-arrow-counter-clockwise text-lg"></i>
+          Desfazer aprovação
+        </button>
+      </form>
+    </div>
+    {% else %}
     <form method="POST" action="{% url 'aprovar_alocacao_unidade' unidade_id=unidade_selecionada_id %}" class="w-full sm:w-auto sm:ml-auto m-0">
       {% csrf_token %}
-      <button type="submit"
+      <button type="submit" id="approveAllocBtn"
         {% if not alocacao_curricular_preenchida %}disabled title="Ainda existem componentes sem docente"{% endif %}
         onclick="if(!confirm('Deseja aprovar a alocação curricular desta unidade para este semestre?')) return false;"
         class="w-full sm:w-auto flex items-center justify-center gap-2 text-white font-black text-sm px-5 py-2.5 rounded-xl shadow-md transition-all {% if alocacao_curricular_preenchida %}bg-emerald-600 hover:bg-emerald-700 hover:scale-105{% else %}bg-slate-300 cursor-not-allowed{% endif %}">
         <i class="ph ph-check-circle text-lg"></i>
         Aprovar Alocação
       </button>
-      {% if not alocacao_curricular_preenchida and componentes_sem_docente %}
-      <p class="mt-1 text-[10px] font-semibold text-amber-700">{{ componentes_sem_docente }} componente(s) sem docente.</p>
-      {% endif %}
+      <p id="approvePendingNote" class="mt-1 text-[10px] font-semibold text-amber-700 {% if alocacao_curricular_preenchida or not componentes_sem_docente %}hidden{% endif %}">{{ componentes_sem_docente }} componente(s) sem docente.</p>
     </form>
+    {% endif %}
     {% endif %}
 
     {% if matrizes_data and user.perfil != 'DESUP' and not window_fechada %}
     <div class="w-full sm:w-auto sm:ml-auto">
       <button type="button" id="saveAllocBtn" onclick="openAllocSavedModal()" class="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#025c9f] hover:bg-[#153e70] text-white font-bold px-5 py-2.5 rounded-xl shadow-md transition-all hover:-translate-y-0.5 text-sm">
-          <i class="ph ph-floppy-disk text-lg"></i>
-          Salvar Alocações
+          <i class="ph ph-floppy-disk text-lg" id="saveAllocIcon"></i>
+          <span id="saveAllocLabel">Salvar Alocações</span>
       </button>
     </div>
     {% endif %}
@@ -99,7 +115,6 @@
             <td class="px-4 py-3 font-mono text-xs text-slate-500" data-label="Código">{{ comp.codigo|default:"-" }}</td>
             <td class="px-4 py-3 font-bold text-slate-800">
               {{ comp.nome_disciplina }}
-              {% if comp.is_temporario %}<span class="ml-1 inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700" title="Disciplina temporária: só existe nesta matriz, não está no catálogo de Componentes Curriculares.">Temporária</span>{% endif %}
             </td>
             <td class="px-4 py-2" data-label="Docente">
               <!-- Autocomplete Docente -->
@@ -189,6 +204,9 @@
 
 </div>
 
+{# Aviso discreto do salvamento automático #}
+<div id="allocToast" class="pointer-events-none fixed bottom-5 right-5 z-[150] hidden items-center gap-2 rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white shadow-lg" role="status" aria-live="polite"></div>
+
 {# Popup de confirmação do botão "Salvar Alocações" #}
 <div id="allocSavedModal" class="hidden fixed inset-0 z-[140] flex items-center justify-center bg-slate-900/50 px-4" role="dialog" aria-modal="true" aria-labelledby="allocSavedTitle">
   <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl text-center">
@@ -234,6 +252,53 @@
       clearTimeout(timer);
       timer = setTimeout(() => fn.apply(this, args), ms);
     };
+  }
+
+  // ─── Aviso discreto (toast) ──────────────────────────────
+  let toastTimer;
+  function showAllocToast(text, isError) {
+    const el = document.getElementById('allocToast');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('bg-red-600', !!isError);
+    el.classList.toggle('bg-slate-800', !isError);
+    el.classList.remove('hidden');
+    el.classList.add('flex');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.classList.add('hidden'); el.classList.remove('flex'); }, 2500);
+  }
+
+  // ─── Resumo / botões ─────────────────────────────────────
+  function countPending() {
+    let n = 0;
+    document.querySelectorAll('.ac-docente').forEach(el => { if (el.dataset.currentId === 'SEM_PROFESSOR') n++; });
+    return n;
+  }
+
+  // Atualiza o botão "Aprovar" (DESUP) conforme restam componentes sem docente.
+  function refreshAllocSummary() {
+    const btn = document.getElementById('approveAllocBtn');
+    if (!btn || btn.type !== 'submit') return;
+    const pend = countPending();
+    const ready = pend === 0 && document.querySelectorAll('.ac-docente').length > 0;
+    btn.disabled = !ready;
+    btn.title = ready ? '' : 'Ainda existem componentes sem docente';
+    btn.classList.toggle('bg-emerald-600', ready);
+    btn.classList.toggle('hover:bg-emerald-700', ready);
+    btn.classList.toggle('hover:scale-105', ready);
+    btn.classList.toggle('bg-slate-300', !ready);
+    btn.classList.toggle('cursor-not-allowed', !ready);
+    const note = document.getElementById('approvePendingNote');
+    if (note) {
+      note.textContent = pend + ' componente(s) sem docente.';
+      note.classList.toggle('hidden', ready);
+    }
+  }
+
+  // Qualquer alteração depois de "Alocação Salva" devolve o botão ao estado inicial.
+  function markAllocationChanged() {
+    refreshAllocSummary();
+    if (typeof window.resetAllocSavedButton === 'function') window.resetAllocSavedButton();
   }
 
   // ─── Autocomplete Controller ─────────────────────────────
@@ -284,20 +349,18 @@
         });
       });
 
-      // Clear button
-      if (this.clearBtn) {
-        this.clearBtn.addEventListener('click', (e) => {
+      // Click on wrap opens dropdown. O botão "remover" é criado/removido a cada
+      // salvamento, então é tratado por delegação aqui.
+      this.wrap.addEventListener('click', (e) => {
+        if (e.target.closest('.ac-clear')) {
           e.stopPropagation();
           if (this.isLocked) {
             this._triggerWindowLock();
             return;
           }
           this._selectValue('SEM_PROFESSOR', 'Sem professor');
-        });
-      }
-
-      // Click on wrap opens dropdown
-      this.wrap.addEventListener('click', () => {
+          return;
+        }
         if (this.isLocked) return;
         if (this.dropdown.classList.contains('hidden')) {
           this.input.focus();
@@ -431,36 +494,91 @@
     async _selectValue(value, label) {
       this._close();
 
-      // Visual feedback: show loading state
-      this.input.value = label;
+      // Escolheu o que já está salvo: nada a enviar.
+      if (String(value) === String(this.currentId)) {
+        this.input.value = this.currentNome;
+        return;
+      }
+
+      // Salvamento automático: a linha é atualizada na hora e o envio roda em
+      // segundo plano, sem recarregar a página nem travar o campo.
+      const prev = { id: this.currentId, nome: this.currentNome };
+      const nome = value === 'SEM_PROFESSOR' ? '' : value === 'NAO_OFERECIDA' ? 'Não oferecido' : label;
+      this._applyState(value, nome);
       this.wrap.classList.add('opacity-60');
-      this.input.disabled = true;
 
       try {
         const resp = await fetch(this.alocarUrl, {
           method: 'POST',
           headers: {
             'X-CSRFToken': getCSRFToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json',
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: `docente_id=${encodeURIComponent(value)}`,
         });
 
-        if (resp.ok) {
-          // Check for HX-Refresh header
-          const hxRefresh = resp.headers.get('HX-Refresh');
-          if (hxRefresh === 'true') {
-            window.location.reload();
-            return;
-          }
+        if (resp.status === 403 || resp.redirected) {
+          // Janela fechada / sem permissão: recarrega para exibir o aviso do servidor.
+          window.location.reload();
+          return;
         }
-        // Fallback: reload anyway
-        window.location.reload();
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) throw new Error('save failed');
+
+        this.wrap.classList.remove('opacity-60');
+        markAllocationChanged();
+        showAllocToast(data.message || 'Alocação salva.', false);
       } catch (err) {
         this.wrap.classList.remove('opacity-60');
-        this.input.disabled = false;
-        this.input.value = this.currentNome;
-        alert('Erro ao alocar docente. Tente novamente.');
+        this._applyState(prev.id, prev.nome);
+        refreshAllocSummary();
+        showAllocToast('Erro ao salvar a alocação. Tente novamente.', true);
+      }
+    }
+
+    // Reflete na linha o estado (docente / sem professor / não oferecido),
+    // espelhando as classes que o template renderiza no carregamento.
+    _applyState(id, nome) {
+      const isNone = id === 'SEM_PROFESSOR';
+      const isNao = id === 'NAO_OFERECIDA';
+      const hasDoc = !isNone && !isNao;
+
+      this.currentId = String(id);
+      this.currentNome = nome || '';
+      this.root.dataset.currentId = this.currentId;
+      this.root.dataset.currentNome = this.currentNome;
+
+      this.input.value = this.currentNome;
+      this.input.placeholder = isNao ? 'Não oferecido' : 'Sem professor';
+      this.input.className = 'ac-input flex-1 bg-transparent outline-none ' +
+        (hasDoc ? 'text-emerald-800 font-semibold' : isNao ? 'text-slate-500 font-semibold' : 'text-slate-400');
+
+      this.wrap.className = 'ac-input-wrap flex items-center gap-1.5 w-full px-3 py-1.5 border rounded text-sm transition cursor-pointer ' +
+        (hasDoc ? 'border-emerald-300 bg-emerald-50' : isNao ? 'border-slate-300 bg-slate-100' : 'border-slate-300 bg-slate-50');
+
+      // Ícone "sem professor" (antes do input)
+      let userIcon = this.wrap.querySelector(':scope > i.ph-user-minus');
+      if (isNone && !userIcon) {
+        userIcon = document.createElement('i');
+        userIcon.className = 'ph ph-user-minus text-base text-slate-400 flex-shrink-0';
+        this.wrap.insertBefore(userIcon, this.input);
+      } else if (!isNone && userIcon) {
+        userIcon.remove();
+      }
+
+      // Botão "remover docente" (só quando há docente)
+      let clear = this.wrap.querySelector('.ac-clear');
+      if (hasDoc && !clear) {
+        clear = document.createElement('button');
+        clear.type = 'button';
+        clear.className = 'ac-clear text-emerald-400 hover:text-red-500 transition-colors flex-shrink-0';
+        clear.title = 'Remover docente';
+        clear.innerHTML = '<i class="ph ph-x-circle text-base"></i>';
+        this.wrap.insertBefore(clear, this.caret);
+      } else if (!hasDoc && clear) {
+        clear.remove();
       }
     }
 
@@ -511,7 +629,22 @@
     if (pend) txt += ' ' + pend + ' ainda sem docente.';
     document.getElementById('allocSavedSummary').textContent = txt;
     document.getElementById('allocSavedModal').classList.remove('hidden');
+    setSavedState(true);
   };
+  // Botão vira "Alocação Salva" (verde) após o envio; volta ao normal se algo mudar.
+  var SAVED_ON = ['bg-green-700', 'hover:bg-green-800'];
+  var SAVED_OFF = ['bg-[#025c9f]', 'hover:bg-[#153e70]'];
+  function setSavedState(saved) {
+    var btn = document.getElementById('saveAllocBtn');
+    if (!btn) return;
+    var label = document.getElementById('saveAllocLabel');
+    var icon = document.getElementById('saveAllocIcon');
+    SAVED_ON.forEach(function (c) { btn.classList.toggle(c, saved); });
+    SAVED_OFF.forEach(function (c) { btn.classList.toggle(c, !saved); });
+    if (label) label.textContent = saved ? 'Alocação Salva' : 'Salvar Alocações';
+    if (icon) icon.className = 'ph ' + (saved ? 'ph-check-circle' : 'ph-floppy-disk') + ' text-lg';
+  }
+  window.resetAllocSavedButton = function () { setSavedState(false); };
   window.closeAllocSavedModal = function () {
     document.getElementById('allocSavedModal').classList.add('hidden');
   };
