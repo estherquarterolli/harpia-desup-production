@@ -28,7 +28,7 @@
                     aria-label="Ver detalhes de {{ item.prof.nome }}">
               {{ item.prof.nome }}
             </button>
-            <p class="text-[10px] text-slate-400">{{ item.prof.rh_matricula }}</p>
+            <p class="text-[10px] text-slate-400">{{ item.prof.rh_matricula|default_if_none:"" }}</p>
           </div>
         </div>
       </td>

@@ -28,6 +28,19 @@
       <div class="p-3 bg-red-50 border border-red-100 text-red-700 rounded-lg text-sm">{{ form.non_field_errors }}</div>
       {% endif %}
 
+      <!-- Abas -->
+      <div class="flex gap-1 border-b border-slate-200" role="tablist">
+        <button type="button" role="tab" id="tab-btn-basicos" data-tab="basicos"
+          class="tab-btn px-5 py-2.5 text-xs font-black uppercase tracking-widest border-b-2 -mb-px transition-colors">
+          Dados Básicos
+        </button>
+        <button type="button" role="tab" id="tab-btn-contrato" data-tab="contrato"
+          class="tab-btn px-5 py-2.5 text-xs font-black uppercase tracking-widest border-b-2 -mb-px transition-colors">
+          Contrato
+        </button>
+      </div>
+
+      <div id="tab-basicos" class="tab-panel space-y-6" role="tabpanel">
       <!-- Dados Básicos -->
       <div>
         <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -45,7 +58,7 @@
 
           <div>
             <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-              Matrícula RH <span class="text-red-400">*</span>
+              Matrícula RH <span class="text-slate-400 normal-case font-medium">(opcional)</span>
             </label>
             {{ form.rh_matricula }}
             {% if form.rh_matricula.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.rh_matricula.errors.0 }}</p>{% endif %}
@@ -61,7 +74,9 @@
 
         </div>
       </div>
+      </div>
 
+      <div id="tab-contrato" class="tab-panel space-y-6 hidden" role="tabpanel">
       <!-- Contrato -->
       <div>
         <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -73,6 +88,18 @@
             <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Regime / Tipo de Contrato <span class="text-red-400">*</span></label>
             {{ form.tipo_contrato }}
             {% if form.tipo_contrato.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.tipo_contrato.errors.0 }}</p>{% endif %}
+          </div>
+
+          <div class="md:col-span-2">
+            <label class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              {{ form.carga_diferenciada }} Professor com carga diferente
+            </label>
+            <div id="carga-custom" class="mt-3 hidden">
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Carga horária total (h)</label>
+              {{ form.carga_horaria_personalizada }}
+              <p class="mt-1 text-xs text-slate-500">Alocação em sala = metade da carga (20h → 10h; 40h → 20h).</p>
+              {% if form.carga_horaria_personalizada.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.carga_horaria_personalizada.errors.0 }}</p>{% endif %}
+            </div>
           </div>
 
           <div class="md:col-span-2">
@@ -128,6 +155,7 @@
           {% if form.cursos.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.cursos.errors.0 }}</p>{% endif %}
         </div>
       </div>
+      </div>
 
       <!-- Botões -->
       <div class="flex items-center gap-3 pt-2 border-t border-slate-100">
@@ -143,4 +171,29 @@
     </form>
   </div>
 </div>
+
+<script>
+(function () {
+  var botoes = document.querySelectorAll('.tab-btn');
+  var paineis = document.querySelectorAll('.tab-panel');
+  function abrir(nome) {
+    paineis.forEach(function (p) { p.classList.toggle('hidden', p.id !== 'tab-' + nome); });
+    botoes.forEach(function (b) {
+      var ativo = b.dataset.tab === nome;
+      b.classList.toggle('border-[#025c9f]', ativo);
+      b.classList.toggle('text-[#025c9f]', ativo);
+      b.classList.toggle('border-transparent', !ativo);
+      b.classList.toggle('text-slate-400', !ativo);
+    });
+  }
+  var chk = document.getElementById('id_carga_diferenciada');
+  var box = document.getElementById('carga-custom');
+  function carga() { box.classList.toggle('hidden', !chk.checked); }
+  chk.addEventListener('change', carga); carga();
+  botoes.forEach(function (b) { b.addEventListener('click', function () { abrir(b.dataset.tab); }); });
+  // Se a validação falhou, abre a aba que contém o primeiro erro.
+  var erro = document.querySelector('.tab-panel p.text-red-500');
+  abrir(erro ? erro.closest('.tab-panel').id.replace('tab-', '') : 'basicos');
+})();
+</script>
 {% endblock %}

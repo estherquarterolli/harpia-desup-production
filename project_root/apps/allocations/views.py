@@ -305,7 +305,8 @@ class BuscarProfessoresView(LoginRequiredMixin, PerfilRequiredMixin, View):
 
         if q:
             # Busca pelos dois nomes: quem só conhece o nome antigo do RH continua achando.
-            qs = qs.filter(Q(desup_nome__icontains=q) | Q(rh_nome__icontains=q))
+            from apps.core.busca import filtrar_contem
+            qs = filtrar_contem(qs, q, ['desup_nome', 'rh_nome'])
 
         qs = qs.prefetch_related('unidades').order_by('nome_exibicao')[:20]
 

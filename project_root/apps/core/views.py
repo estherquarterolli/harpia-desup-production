@@ -189,7 +189,8 @@ class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, T
 
         q = self.request.GET.get('q', '')
         if q:
-            qs = qs.filter(rh_nome__icontains=q)
+            from apps.core.busca import filtrar_contem
+            qs = filtrar_contem(qs, q, ['rh_nome', 'desup_nome'])
         unidade_id = self.request.GET.get('unidade_id')
         if unidade_id:
             qs = qs.filter(

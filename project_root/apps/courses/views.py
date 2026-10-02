@@ -774,8 +774,9 @@ class BuscarComponenteView(LoginRequiredMixin, View):
             return JsonResponse({'resultados': []})
 
         from django.db.models import Q
-        qs = CurricularComponent.objects.filter(
-            Q(nome__icontains=q) | Q(codigo__icontains=q)
+        from apps.core.busca import filtrar_contem
+        qs = filtrar_contem(
+            CurricularComponent.objects.all(), q, ['nome', 'codigo']
         ).order_by('nome')[:30]
 
         resultados = [
@@ -818,11 +819,8 @@ class CurricularComponentListView(DesupOnlyMixin, ListView):
         qs = CurricularComponent.objects.order_by('nome')
         q = self.request.GET.get('q', '').strip()
         if q:
-            from django.db.models import Q
-            qs = qs.filter(
-                Q(nome__icontains=q) |
-                Q(codigo__icontains=q)
-            )
+            from apps.core.busca import filtrar_contem
+            qs = filtrar_contem(qs, q, ['nome', 'codigo'])
         return qs
 
 

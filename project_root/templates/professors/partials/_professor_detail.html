@@ -8,7 +8,7 @@
                 <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Professor</p>
                 <h2 class="truncate text-xl font-black text-slate-800">{{ professor.nome }}</h2>
                 <p class="text-xs font-semibold text-slate-500">
-                    {{ professor.id_funcional }} · Matrícula {{ professor.rh_matricula }}
+                    {{ professor.id_funcional }}{% if professor.rh_matricula %} · Matrícula {{ professor.rh_matricula }}{% endif %}
                 </p>
             </div>
         </div>

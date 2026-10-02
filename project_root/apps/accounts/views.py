@@ -521,12 +521,10 @@ class DesupUserListView(LoginRequiredMixin, ListView):
         )
         query = (self.request.GET.get('q') or '').strip()
         if query:
-            queryset = queryset.filter(
-                Q(email__icontains=query)
-                | Q(first_name__icontains=query)
-                | Q(last_name__icontains=query)
-                | Q(unidade__nome__icontains=query)
-                | Q(unidade__sigla__icontains=query)
+            from apps.core.busca import filtrar_contem
+            queryset = filtrar_contem(
+                queryset, query,
+                ['email', 'first_name', 'last_name', 'unidade__nome', 'unidade__sigla'],
             )
         return queryset
 

@@ -53,7 +53,15 @@ class Professor(models.Model):
         db_column="ID_FUNCIONAL",
         verbose_name="ID Funcional",
     )
-    rh_matricula = models.CharField(max_length=50, unique=True, db_index=True, verbose_name="Matrícula RH")
+    rh_matricula = models.CharField(
+        max_length=50,
+        unique=True,
+        db_index=True,
+        null=True,
+        blank=True,
+        verbose_name="Matrícula RH",
+        help_text="Opcional: nem todo professor possui matrícula.",
+    )
     rh_nome = models.CharField(max_length=255, verbose_name="Nome (RH)")
     rh_email = models.EmailField(blank=True, null=True, verbose_name="E-mail (RH)")
 
@@ -93,6 +101,18 @@ class Professor(models.Model):
         verbose_name="Tipo de Contrato"
     )
 
+    carga_diferenciada = models.BooleanField(
+        default=False,
+        verbose_name="Professor com carga diferente",
+        help_text="Marque quando a carga horária deste professor não é a do tipo de contrato.",
+    )
+    carga_horaria_personalizada = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Carga horária total (h)",
+        help_text="Carga semanal total. A alocação em sala é metade (20h → 10h; 40h → 20h).",
+    )
+
     #  Atributos de Domínio 
     is_cedido = models.BooleanField(default=False, verbose_name="Professor Cedido (Regra #4)", help_text="Tratado como carência se True.")
     
@@ -126,10 +146,18 @@ class Professor(models.Model):
     objects = UnitBoundManager()
 
     def __str__(self):
-        return f"{self.nome} ({self.id_funcional} / {self.rh_matricula})"
+        if self.rh_matricula:
+            return f"{self.nome} ({self.id_funcional} / {self.rh_matricula})"
+        return f"{self.nome} ({self.id_funcional})"
 
     def clean(self):
         super().clean()
+        if self.carga_diferenciada and not self.carga_horaria_personalizada:
+            raise ValidationError({
+                "carga_horaria_personalizada": "Informe a carga horária deste professor.",
+            })
+        if not self.carga_diferenciada:
+            self.carga_horaria_personalizada = None
         if self.id_funcional and self.rh_matricula and self.id_funcional == self.rh_matricula:
             raise ValidationError({
                 "rh_matricula": "A matrícula deve ser diferente do ID Funcional.",
@@ -160,9 +188,23 @@ class Professor(models.Model):
     # --- Propriedades para Dashboard (UC08) e Limites (UC05) ---
 
     @property
+    def carga_total_efetiva(self) -> int:
+        """Carga total: a personalizada (se marcada) ou a do tipo de contrato."""
+        if self.carga_diferenciada and self.carga_horaria_personalizada:
+            return self.carga_horaria_personalizada
+        return self.tipo_contrato.max_total_hours if self.tipo_contrato else 0
+
+    @property
+    def meta_horas_sala(self) -> int:
+        """Limite de horas em sala: metade da carga personalizada, ou o do contrato."""
+        if self.carga_diferenciada and self.carga_horaria_personalizada:
+            return self.carga_horaria_personalizada // 2
+        return self.tipo_contrato.max_class_hours if self.tipo_contrato else 0
+
+    @property
     def ch_total(self) -> int:
         """Retorna o limite de horas total do contrato vinculado."""
-        return self.tipo_contrato.max_total_hours if self.tipo_contrato else 0
+        return self.carga_total_efetiva
 
     @property
     def ch_justificada(self) -> float:
@@ -215,7 +257,7 @@ class Professor(models.Model):
         Limite de horas extracurriculares aprováveis pela DESUP.
         Usa o total já calculado pelo sistema (horas de sala ainda não preenchidas).
         """
-        meta = self.tipo_contrato.max_class_hours if self.tipo_contrato else 0
+        meta = self.meta_horas_sala
         return max(meta - self.ch_alocada, 0)
 
     @property

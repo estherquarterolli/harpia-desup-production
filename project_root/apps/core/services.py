@@ -211,31 +211,9 @@ def create_window_ticket(*, request, area_label, action_label, target_label="", 
         url_acao=reverse("core:janela_list"),
     )
 
-    recipients = get_desup_recipients()
-    email_sent = False
-    if recipients:
-        def _queue_email():
-            try:
-                send_email_task.delay(
-                    subject=titulo,
-                    message=mensagem,
-                    recipient_list=recipients,
-                    from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
-                    fail_silently=False,
-                )
-            except Exception:
-                logger.exception(
-                    "Falha ao enfileirar email do chamado",
-                    extra={
-                        "area": area_label,
-                        "action": action_label,
-                        "target": target_label,
-                        "unit_id": unidade.pk if unidade else None,
-                    },
-                )
-
-        transaction.on_commit(_queue_email)
-        email_sent = True
+    # O e-mail para os administradores DESUP sai do signal de `Notificacao`
+    # (apps/core/signals.py), que cobre todas as notificações endereçadas à DESUP.
+    email_sent = bool(get_desup_recipients())
 
     logger.info(
         "Chamado de alteração criado",

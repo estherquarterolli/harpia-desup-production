@@ -157,17 +157,15 @@ def get_professores_com_pendencia(unidade_id: int, semestre: str, q: str = "") -
         professores = professores.filter(unidade_principal_id=unidade_id)
 
     if q:
-        from django.db.models import Q
-        professores = professores.filter(
-            Q(rh_nome__icontains=q) | Q(desup_nome__icontains=q)
-        )
+        from apps.core.busca import filtrar_contem
+        professores = filtrar_contem(professores, q, ['rh_nome', 'desup_nome'])
 
     professores = list(professores)
     ch_map = _bulk_ch_alocada([p.pk for p in professores])
 
     pendentes = []
     for prof in professores:
-        meta = prof.tipo_contrato.max_class_hours if prof.tipo_contrato else 20
+        meta = prof.meta_horas_sala if prof.tipo_contrato else 20
         if ch_map.get(prof.pk, 0) < meta:
             pendentes.append(prof.pk)
     return Professor.objects.filter(pk__in=pendentes).select_related("tipo_contrato")
@@ -232,7 +230,7 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
 
     result = []
     for prof in professores_pendentes:
-        meta = prof.tipo_contrato.max_class_hours if prof.tipo_contrato else 20
+        meta = prof.meta_horas_sala if prof.tipo_contrato else 20
         ch_alocada = ch_alocada_map.get(prof.pk, 0)
         ch_pendente = max(meta - ch_alocada, 0)
         pendencia = pendencias_existentes.get(prof.pk)

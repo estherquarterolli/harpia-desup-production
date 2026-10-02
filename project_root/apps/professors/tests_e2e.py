@@ -892,3 +892,94 @@ class CalculosCargaHorariaProfessorE2ETests(ProfessorE2EBase):
         self.assertEqual(professor.soma_horas, 0)
         self.assertEqual(prof_novo.ch_alocada, 0)
         self.assertEqual(prof_novo.percentual_alocado, 0.0)
+
+
+class SolicitacaoCadastroEMatriculaOpcionalTests(ProfessorE2EBase):
+    """Matrícula opcional, solicitação de cadastro à DESUP e busca "contém" tolerante."""
+
+    def test_professor_sem_matricula_e_cadastrado(self):
+        self.client.force_login(self.desup)
+
+        resposta = self.client.post(
+            self.url_criar,
+            self._dados_professor(id_funcional='SEM-MAT-1', rh_matricula=''),
+        )
+
+        self.assertEqual(resposta.status_code, 302)
+        professor = Professor.objects.get(id_funcional='SEM-MAT-1')
+        self.assertIsNone(professor.rh_matricula)
+
+    def test_dois_professores_sem_matricula_nao_colidem(self):
+        self.client.force_login(self.desup)
+        for idf in ('SEM-MAT-A', 'SEM-MAT-B'):
+            resposta = self.client.post(
+                self.url_criar, self._dados_professor(id_funcional=idf, rh_matricula='')
+            )
+            self.assertEqual(resposta.status_code, 302)
+        self.assertEqual(Professor.objects.filter(rh_matricula__isnull=True).count(), 2)
+
+    def test_coordenador_solicita_cadastro_e_a_desup_e_notificada_por_email(self):
+        from unittest.mock import patch
+
+        from apps.core.models import Notificacao
+
+        self.client.force_login(self.coord_a)
+        url = reverse('professors:professor_solicitar_cadastro')
+        self.assertContains(self.client.get(self.url_lista), 'Solicitar Cadastro de Professor')
+
+        with patch('apps.core.tasks.send_email_task.delay') as delay, \
+                self.captureOnCommitCallbacks(execute=True):
+            resposta = self.client.post(url, {
+                'nome': 'Professor Novo',
+                'id_funcional': '999',
+                'tipo_contrato': self.contrato.pk,
+                'observacao': 'Turma de ADS',
+            })
+
+        self.assertRedirects(resposta, self.url_lista)
+        notificacao = Notificacao.objects.get(titulo__startswith='Solicitação de cadastro')
+        self.assertIsNone(notificacao.destinatario)
+        self.assertIn('Professor Novo', notificacao.mensagem)
+        self.assertIn(self.unidade_a.sigla, notificacao.mensagem)
+        delay.assert_called_once()
+        self.assertIn(self.desup.email, delay.call_args.kwargs['recipient_list'])
+
+    def test_desup_nao_ve_botao_nem_acessa_solicitacao(self):
+        self.client.force_login(self.desup)
+        self.assertNotContains(self.client.get(self.url_lista), 'Solicitar Cadastro de Professor')
+        resposta = self.client.get(reverse('professors:professor_solicitar_cadastro'))
+        self.assertNotEqual(resposta.status_code, 200)
+
+    def test_busca_contem_perdoa_letra_faltando_e_acento(self):
+        self.client.force_login(self.desup)
+        for termo in ('alves', 'alvs', 'ANA alv', 'IDF-A1', 'MAT-A1'):
+            resposta = self.client.get(self.url_lista, {'q': termo})
+            self.assertIn(
+                self.prof_a1.pk, [p.pk for p in resposta.context['professores']], termo
+            )
+
+    def test_carga_diferenciada_define_meta_de_sala_e_exige_valor(self):
+        self.client.force_login(self.desup)
+        resposta = self.client.post(
+            self.url_criar,
+            self._dados_professor(id_funcional='CARGA-1', carga_diferenciada='on'),
+        )
+        self.assertEqual(resposta.status_code, 200)  # falta a carga
+
+        resposta = self.client.post(
+            self.url_criar,
+            self._dados_professor(
+                id_funcional='CARGA-1', carga_diferenciada='on', carga_horaria_personalizada='30',
+            ),
+        )
+        self.assertEqual(resposta.status_code, 302)
+        prof = Professor.objects.get(id_funcional='CARGA-1')
+        self.assertEqual(prof.carga_total_efetiva, 30)
+        self.assertEqual(prof.meta_horas_sala, 15)
+        self.assertEqual(self.prof_a1.meta_horas_sala, 20)  # contrato padrão
+
+    def test_listagem_mostra_total_de_professores(self):
+        self.client.force_login(self.desup)
+        resposta = self.client.get(self.url_lista)
+        self.assertEqual(resposta.context['total_professores'], 2)
+        self.assertContains(resposta, '2 no sistema')

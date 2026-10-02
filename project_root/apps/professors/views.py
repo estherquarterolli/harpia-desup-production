@@ -3,12 +3,13 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.db.models import ProtectedError, Q
 from django.shortcuts import redirect, get_object_or_404, render
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView, View
 
 from apps.accounts.mixins import PerfilRequiredMixin
-from apps.core.models import Unidade
-from .forms import ProfessorForm
+from apps.core.busca import filtrar_contem
+from apps.core.models import Notificacao, Unidade
+from .forms import ProfessorForm, SolicitacaoCadastroProfessorForm
 from .models import ContractType, Professor
 
 
@@ -124,13 +125,15 @@ class ProfessorListView(LoginRequiredMixin, ListView):
 
         q = self.request.GET.get('q', '')
         if q:
-            qs = qs.filter(Q(rh_nome__icontains=q) | Q(id_funcional__icontains=q))
+            qs = filtrar_contem(
+                qs, q, ['rh_nome', 'desup_nome', 'id_funcional', 'rh_matricula'],
+            )
         regime = self.request.GET.get('regime')
         if regime:
             qs = qs.filter(tipo_contrato__regime_trabalho__iexact=regime)
         tipo = self.request.GET.get('tipo')
-        if tipo:
-            qs = qs.filter(tipo_contrato__categoria=tipo)
+        if tipo and tipo.isdigit():
+            qs = qs.filter(tipo_contrato_id=tipo)
         unidade_id = self.request.GET.get('unidade_id')
         if unidade_id:
             qs = qs.filter(
@@ -146,7 +149,8 @@ class ProfessorListView(LoginRequiredMixin, ListView):
         ctx['regimes'] = sorted(
             set(ContractType.objects.exclude(regime_trabalho='').values_list('regime_trabalho', flat=True))
         )
-        ctx['tipos'] = ContractType.CategoriaChoices.choices
+        ctx['tipos'] = [(str(pk), nome) for pk, nome in ContractType.objects.values_list('pk', 'nome')]
+        ctx['total_professores'] = Professor.objects.count()
         ctx['regime_atual'] = self.request.GET.get('regime', '')
         ctx['tipo_atual'] = self.request.GET.get('tipo', '')
 
@@ -155,6 +159,9 @@ class ProfessorListView(LoginRequiredMixin, ListView):
             user.is_superuser or user.perfil == 'COORDENADOR_UNIDADE' or user.perfil == 'DESUP'
         )
         ctx['pode_criar'] = (user.is_superuser or user.perfil == 'DESUP')
+        ctx['pode_solicitar_cadastro'] = (
+            user.perfil == 'COORDENADOR_UNIDADE' and not user.is_superuser
+        )
 
         unidade_atual = None
         if user.perfil == 'COORDENADOR_UNIDADE' and user.unidade:
@@ -188,7 +195,7 @@ class ProfessorListView(LoginRequiredMixin, ListView):
             # o saldo (ex.: professor 40h com 6h em sala aparecia com 34h de
             # sobra em vez de 14h) — mesma meta já usada em
             # extra_curricular/services.py (get_pendencias_data).
-            meta_horas = prof.tipo_contrato.max_class_hours if prof.tipo_contrato else 0
+            meta_horas = prof.meta_horas_sala
             prof.ch_nao_alocada_total = max(meta_horas - prof.soma_horas, 0)
             prof.percentual_alocado_total = (
                 round(min((prof.soma_horas / meta_horas) * 100, 100.0), 2)
@@ -341,6 +348,48 @@ def _identificador_unico_de_copia(campo, valor_base):
     return candidato
 
 
+class ProfessorSolicitarCadastroView(CoordenadorOnlyMixin, View):
+    """Coordenador pede à DESUP o cadastro de um professor.
+
+    Gera uma Notificacao para a DESUP; o signal de `Notificacao` envia o mesmo
+    aviso por e-mail aos administradores DESUP.
+    """
+
+    template_name = 'professors/professor_solicitar_cadastro.html'
+
+    def get(self, request):
+        return render(request, self.template_name, {'form': SolicitacaoCadastroProfessorForm()})
+
+    def post(self, request):
+        form = SolicitacaoCadastroProfessorForm(request.POST)
+        if not form.is_valid():
+            return render(request, self.template_name, {'form': form})
+
+        dados = form.cleaned_data
+        unidade = request.user.unidade
+        unidade_label = f'{unidade.sigla} - {unidade.nome}' if unidade else 'Sem unidade vinculada'
+        solicitante = request.user.get_full_name() or request.user.email
+        tipo = dados['tipo_contrato'].nome if dados['tipo_contrato'] else 'Não informado'
+        mensagem = (
+            f'O coordenador {solicitante} ({request.user.email}) solicitou o cadastro de um professor.\n\n'
+            f'Unidade: {unidade_label}\n'
+            f'Nome: {dados["nome"]}\n'
+            f'ID Funcional: {dados["id_funcional"] or "Não informado"}\n'
+            f'Matrícula RH: {dados["rh_matricula"] or "Não informada"}\n'
+            f'Tipo de contrato: {tipo}\n'
+            f'Observações: {dados["observacao"] or "Sem observações."}'
+        )
+        Notificacao.objects.create(
+            destinatario=None,
+            unidade_destino=None,
+            titulo=f'Solicitação de cadastro de professor - {unidade.sigla if unidade else "Geral"}',
+            mensagem=mensagem,
+            url_acao=reverse('professors:professor_create'),
+        )
+        messages.success(request, 'Solicitação de cadastro enviada para a DESUP.')
+        return redirect('professors:professor_list')
+
+
 class ProfessorDuplicarView(CoordenadorOnlyMixin, View):
     """Duplica um professor criando uma cópia com o ID funcional alterado."""
 
@@ -355,7 +404,10 @@ class ProfessorDuplicarView(CoordenadorOnlyMixin, View):
         cursos = list(original.cursos.all())
         unidades = list(original.unidades.all())
         novo_id_funcional = _identificador_unico_de_copia('id_funcional', original.id_funcional)
-        nova_matricula = _identificador_unico_de_copia('rh_matricula', original.rh_matricula)
+        nova_matricula = (
+            _identificador_unico_de_copia('rh_matricula', original.rh_matricula)
+            if original.rh_matricula else None
+        )
 
         original.pk = None
         original.id_funcional = novo_id_funcional
@@ -402,7 +454,7 @@ def htmx_tabela_alocacao(request):
         # Mesma correção do ProfessorListView: "não alocado" e "% alocado"
         # são relativos à meta de horas EM SALA (max_class_hours), não ao
         # total do contrato (ch_total/max_total_hours).
-        meta_horas = prof.tipo_contrato.max_class_hours if prof.tipo_contrato else 0
+        meta_horas = prof.meta_horas_sala
         prof.ch_nao_alocada_total = max(meta_horas - soma, 0)
         prof.percentual_alocado_total = (
             round(min((soma / meta_horas) * 100, 100.0), 2)

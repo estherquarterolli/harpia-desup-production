@@ -1,5 +1,5 @@
 from django import forms
-from .models import Professor
+from .models import ContractType, Professor
 from apps.courses.models import Course
 
 
@@ -15,13 +15,15 @@ class ProfessorForm(forms.ModelForm):
             'rh_matricula',
             'rh_nome',
             'tipo_contrato',
+            'carga_diferenciada',
+            'carga_horaria_personalizada',
             'unidades',
             'cursos',
             'status',
         ]
         widgets = {
             'id_funcional': forms.TextInput(attrs={'class': _INPUT_CSS, 'placeholder': 'Ex: 1234567'}),
-            'rh_matricula': forms.TextInput(attrs={'class': _INPUT_CSS, 'placeholder': 'Matrícula RH'}),
+            'rh_matricula': forms.TextInput(attrs={'class': _INPUT_CSS, 'placeholder': 'Matrícula RH (se houver)'}),
             'rh_nome': forms.TextInput(attrs={'class': _INPUT_CSS, 'placeholder': 'Nome completo'}),
             'tipo_contrato': forms.Select(attrs={'class': _SELECT_CSS}),
             'unidades': forms.CheckboxSelectMultiple(attrs={
@@ -33,10 +35,12 @@ class ProfessorForm(forms.ModelForm):
             }),
             'cursos': forms.CheckboxSelectMultiple(),
             'status': forms.Select(attrs={'class': _SELECT_CSS}),
+            'carga_diferenciada': forms.CheckboxInput(attrs={'class': 'w-4 h-4'}),
+            'carga_horaria_personalizada': forms.NumberInput(attrs={'class': _INPUT_CSS, 'min': 1, 'max': 60, 'placeholder': 'Ex: 30'}),
         }
         labels = {
             'id_funcional': 'ID',
-            'rh_matricula': 'Matrícula RH',
+            'rh_matricula': 'Matrícula RH (opcional)',
             'rh_nome': 'Nome',
             'tipo_contrato': 'Regime / Tipo de Contrato',
             'unidades': 'Unidades',
@@ -92,3 +96,36 @@ class ProfessorForm(forms.ModelForm):
             professor.save()
             self.save_m2m()
         return professor
+
+
+class SolicitacaoCadastroProfessorForm(forms.Form):
+    """Pedido do coordenador de unidade à DESUP para cadastrar um professor."""
+
+    nome = forms.CharField(
+        label='Nome do professor', max_length=255,
+        widget=forms.TextInput(attrs={'class': _INPUT_CSS, 'placeholder': 'Nome completo'}),
+    )
+    id_funcional = forms.CharField(
+        label='ID Funcional', max_length=50, required=False,
+        widget=forms.TextInput(attrs={'class': _INPUT_CSS, 'placeholder': 'Se já souber'}),
+    )
+    rh_matricula = forms.CharField(
+        label='Matrícula RH (opcional)', max_length=50, required=False,
+        widget=forms.TextInput(attrs={'class': _INPUT_CSS, 'placeholder': 'Se houver'}),
+    )
+    tipo_contrato = forms.ModelChoiceField(
+        label='Tipo de contrato', queryset=ContractType.objects.none(), required=False,
+        empty_label='Não sei informar',
+        widget=forms.Select(attrs={'class': _SELECT_CSS}),
+    )
+    observacao = forms.CharField(
+        label='Observações', required=False,
+        widget=forms.Textarea(attrs={
+            'class': _INPUT_CSS, 'rows': 4,
+            'placeholder': 'Cursos, disciplinas, motivo da solicitação...',
+        }),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['tipo_contrato'].queryset = ContractType.objects.order_by('nome')
