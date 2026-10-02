@@ -51,6 +51,7 @@ class ProfessorForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
+        self.fields['tipo_contrato'].queryset = ContractType.objects.permitidos().order_by('nome')
 
         is_gestor_unidade = False
         if self.user:
@@ -128,4 +129,4 @@ class SolicitacaoCadastroProfessorForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['tipo_contrato'].queryset = ContractType.objects.order_by('nome')
+        self.fields['tipo_contrato'].queryset = ContractType.objects.permitidos().order_by('nome')

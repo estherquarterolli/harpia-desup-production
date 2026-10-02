@@ -323,4 +323,26 @@ h1, h2, h3, h4, h5, h6, .font-black {
     color: #94a3b8;
     font-size: 0.75rem;
 }
-
+
+
+
+/* --- Barra de filtros em grade (.filter-grid) ---------------------------
+   Colunas que se ajustam a largura disponivel: nada quebra linha de forma
+   desordenada; no celular vira uma coluna so. Filhos ocupam a celula toda. */
+.filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0.9rem 1rem;
+    align-items: end;
+    width: 100%;
+}
+.filter-grid > * {
+    width: auto !important;
+    min-width: 0;
+}
+.filter-grid .filter-wide {
+    grid-column: span 2;
+}
+@media (max-width: 639px) {
+    .filter-grid .filter-wide { grid-column: span 1; }
+}

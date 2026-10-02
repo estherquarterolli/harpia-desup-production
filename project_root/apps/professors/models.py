@@ -2,6 +2,26 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from apps.core.models import UnitBoundManager
 
+TIPOS_CONTRATO_PERMITIDOS = [
+    'PROF FAETEC ENS SUP 40H',
+    'PROFESSOR FAETEC I 20 H',
+    'PROFESSOR FAETEC I 40 H',
+    'PROFESSOR FAETEC II - 40 H/ QD SUPL',
+    "PROFESSOR INSPETOR ESCOLAR L9146'2020",
+    "PROFESSOR SUPERVISOR EDUCACIONAL L9146'2020",
+    'SUPERVISOR EDUCACIONAL',
+    'TÉCNICO SUPERIOR',
+    'ORIENTADOR EDUCACIONAL',
+    'PROFESSOR CEDIDO',
+]
+
+
+class ContractTypeQuerySet(models.QuerySet):
+    def permitidos(self):
+        """Somente os tipos de contrato oficiais (lista da DESUP)."""
+        return self.filter(nome__in=TIPOS_CONTRATO_PERMITIDOS)
+
+
 class ContractType(models.Model):
     """
     Tipo de Contrato do Professor.
@@ -27,6 +47,8 @@ class ContractType(models.Model):
     max_class_hours = models.PositiveIntegerField(verbose_name="Limite de horas em sala")
     max_total_hours = models.PositiveIntegerField(verbose_name="Limite total de horas", default=40, help_text="Teto global (ex: 40h)")
     max_classes = models.PositiveIntegerField(verbose_name="Limite de turmas")
+
+    objects = ContractTypeQuerySet.as_manager()
 
     class Meta:
         db_table = "harpiadb_professores_tipo_contrato"

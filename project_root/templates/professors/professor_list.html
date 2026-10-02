@@ -7,12 +7,44 @@
 {% block content %}
 <div class="space-y-6">
 
-  <div class="flex flex-wrap items-end gap-4 bg-white rounded-xl shadow-sm border border-slate-100 p-5">
-    <form method="get" class="flex flex-wrap items-end gap-4 flex-1">
+  <!-- Barra superior: contagem + ações -->
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="flex items-center gap-2 bg-[#e8f0fb] text-[#025c9f] rounded-xl px-4 py-2 text-sm font-black" title="Professores cadastrados no sistema">
+        <i class="ph ph-users-three text-base"></i>
+        {{ total_professores }} no sistema
+      </div>
+      {% if filtros_ativos %}
+      <div class="flex items-center gap-2 bg-amber-50 text-amber-700 rounded-xl px-4 py-2 text-sm font-bold">
+        <i class="ph ph-funnel text-base"></i>
+        {{ total_filtrados }} encontrado{{ total_filtrados|pluralize }}
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2">
+      {% if pode_solicitar_cadastro %}
+      <a href="{% url 'professors:professor_solicitar_cadastro' %}"
+        class="flex items-center justify-center gap-2 bg-[#ffb800] hover:bg-yellow-400 text-[#025c9f] px-4 py-2.5 rounded-xl text-sm font-black transition-colors shadow-md">
+        <i class="ph ph-paper-plane-tilt"></i> Solicitar Cadastro de Professor
+      </a>
+      {% endif %}
+      {% if pode_criar %}
+      <a href="{% url 'professors:professor_create' %}"
+        class="flex items-center justify-center gap-2 bg-[#ffb800] hover:bg-yellow-400 text-[#025c9f] px-4 py-2.5 rounded-xl text-sm font-black transition-colors shadow-md">
+        <i class="ph ph-plus"></i> Novo Professor
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-4 md:p-5">
+    <form method="get" class="filter-grid">
 
       {% if is_desup %}
-      <div class="w-full sm:w-64">
-        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Unidade</label>
+      <div>
+        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Unidade</label>
         <select name="unidade_id" onchange="this.form.submit()"
           class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition">
           <option value="">Todas as Unidades</option>
@@ -22,14 +54,17 @@
         </select>
       </div>
       {% elif unidade_atual %}
-      <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm">
-        <i class="ph ph-buildings text-base text-[#025c9f]"></i>
-        {{ unidade_atual.sigla }} — {{ unidade_atual.nome }}
+      <div>
+        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Unidade</label>
+        <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-bold text-[#025c9f]">
+          <i class="ph ph-buildings text-base"></i>
+          <span class="truncate">{{ unidade_atual.sigla }} — {{ unidade_atual.nome }}</span>
+        </div>
       </div>
       {% endif %}
 
-      <div class="w-full sm:w-44">
-        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Regime</label>
+      <div>
+        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Regime</label>
         <select name="regime" onchange="this.form.submit()"
           class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition">
           <option value="">Todos</option>
@@ -39,8 +74,8 @@
         </select>
       </div>
 
-      <div class="w-full sm:w-64">
-        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tipo de contrato</label>
+      <div>
+        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tipo de contrato</label>
         <select name="tipo" onchange="this.form.submit()"
           class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition">
           <option value="">Todos</option>
@@ -50,46 +85,30 @@
         </select>
       </div>
 
-      <!-- Search Box (Optional if they want to search by name) -->
-      <div class="w-full sm:w-64">
-        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Buscar</label>
-        <div class="relative">
-          <input type="text" name="q" value="{{ request.GET.q }}" placeholder="Nome, ID ou matrícula..."
-                 class="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition js-autocomplete" autocomplete="off">
-          <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+      <div class="filter-wide">
+        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Buscar</label>
+        <div class="flex gap-2">
+          <div class="relative flex-1 min-w-0">
+            <input type="text" name="q" value="{{ request.GET.q }}" placeholder="Nome, ID ou matrícula..."
+                   class="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition js-autocomplete" autocomplete="off">
+            <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          </div>
+          <button type="submit" class="px-4 py-2.5 bg-[#025c9f] hover:bg-[#153e70] text-white rounded-lg text-sm font-bold transition-colors">Buscar</button>
+          {% if filtros_ativos %}
+          <a href="{% url 'professors:professor_list' %}" title="Limpar filtros"
+             class="px-3 py-2.5 border border-slate-200 text-slate-500 hover:bg-slate-50 rounded-lg text-sm font-bold transition-colors flex items-center gap-1">
+            <i class="ph ph-x"></i><span class="hidden sm:inline">Limpar</span>
+          </a>
+          {% endif %}
         </div>
       </div>
 
     </form>
-
-    <div class="flex items-center gap-2 bg-[#e8f0fb] text-[#025c9f] rounded-xl px-4 py-2.5 text-sm font-black" title="Professores cadastrados no sistema">
-      <i class="ph ph-users-three text-base"></i>
-      {{ total_professores }} no sistema
-      {% if professores|length != total_professores %}<span class="font-semibold text-slate-500">· {{ professores|length }} exibido{{ professores|length|pluralize }}</span>{% endif %}
-    </div>
-
-    {% if pode_solicitar_cadastro %}
-    <div class="w-full sm:w-auto sm:ml-auto">
-      <a href="{% url 'professors:professor_solicitar_cadastro' %}"
-        class="flex items-center justify-center gap-2 bg-[#ffb800] hover:bg-yellow-400 text-[#025c9f] px-4 py-2.5 rounded-xl text-sm font-black transition-colors shadow-md w-full sm:w-auto">
-        <i class="ph ph-paper-plane-tilt"></i> Solicitar Cadastro de Professor
-      </a>
-    </div>
-    {% endif %}
-
-    {% if pode_criar %}
-    <div class="w-full sm:w-auto sm:ml-auto">
-      <a href="{% url 'professors:professor_create' %}"
-        class="flex items-center justify-center gap-2 bg-[#ffb800] hover:bg-yellow-400 text-[#025c9f] px-4 py-2.5 rounded-xl text-sm font-black transition-colors shadow-md w-full sm:w-auto">
-        <i class="ph ph-plus"></i> Novo Professor
-      </a>
-    </div>
-    {% endif %}
   </div>
 
-  <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-auto max-h-[70vh]">
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-x-auto">
     <table class="w-full text-left border-collapse {% if is_desup %}min-w-[720px]{% endif %} stack-table">
-      <thead class="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
+      <thead class="bg-slate-50 border-b border-slate-100">
         <tr>
           <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider w-24">ID</th>
           <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nome Professor</th>
@@ -147,7 +166,7 @@
             {% else %}<span class="text-slate-300">—</span>{% endif %}
           </td>
           <td class="px-5 py-4" data-label="Tipo">
-            <span class="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-bold">{{ prof.tipo_contrato.nome|default:"—" }}</span>
+            <span class="inline-block max-w-[14rem] truncate align-middle whitespace-nowrap px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-bold" title="{{ prof.tipo_contrato.nome }}">{{ prof.tipo_contrato.nome|default:"—" }}</span>
           </td>
           <td class="px-5 py-4 text-sm text-slate-600" data-label="Unidades">
             <div class="flex flex-wrap gap-1">
@@ -203,5 +222,21 @@
       </tbody>
     </table>
   </div>
+
+  {% if is_paginated %}
+  <nav class="flex flex-wrap items-center justify-between gap-3 text-sm" aria-label="Paginação">
+    <p class="text-slate-500">Página <strong>{{ page_obj.number }}</strong> de {{ paginator.num_pages }}</p>
+    <div class="flex items-center gap-2">
+      {% if page_obj.has_previous %}
+      <a href="?{% if querystring %}{{ querystring }}&{% endif %}page=1" class="px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 font-bold text-slate-600" title="Primeira">«</a>
+      <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.previous_page_number }}" class="px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 font-bold text-slate-600">Anterior</a>
+      {% endif %}
+      {% if page_obj.has_next %}
+      <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.next_page_number }}" class="px-3 py-2 rounded-lg border border-slate-200 bg-[#025c9f] hover:bg-[#153e70] font-bold text-white">Próxima</a>
+      <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ paginator.num_pages }}" class="px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 font-bold text-slate-600" title="Última">»</a>
+      {% endif %}
+    </div>
+  </nav>
+  {% endif %}
 </div>
 {% endblock %}

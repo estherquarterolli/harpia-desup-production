@@ -116,6 +116,7 @@ class ProfessorListView(LoginRequiredMixin, ListView):
     model = Professor
     template_name = 'professors/professor_list.html'
     context_object_name = 'professores'
+    paginate_by = 50
 
     def get_queryset(self):
         qs = Professor.objects.select_related(
@@ -147,10 +148,18 @@ class ProfessorListView(LoginRequiredMixin, ListView):
         ctx['unidades'] = Unidade.objects.filter(status=True).order_by('nome')
         ctx['is_desup'] = user.is_superuser or user.perfil == 'DESUP'
         ctx['regimes'] = sorted(
-            set(ContractType.objects.exclude(regime_trabalho='').values_list('regime_trabalho', flat=True))
+            set(ContractType.objects.permitidos().exclude(regime_trabalho='').values_list('regime_trabalho', flat=True))
         )
-        ctx['tipos'] = [(str(pk), nome) for pk, nome in ContractType.objects.values_list('pk', 'nome')]
+        ctx['tipos'] = [(str(pk), nome) for pk, nome in ContractType.objects.permitidos().order_by('nome').values_list('pk', 'nome')]
         ctx['total_professores'] = Professor.objects.count()
+        ctx['total_professores'] = Professor.objects.count()
+        ctx['total_filtrados'] = ctx['paginator'].count if ctx.get('paginator') else len(ctx['professores'])
+        params = self.request.GET.copy()
+        params.pop('page', None)
+        ctx['querystring'] = params.urlencode()
+        ctx['filtros_ativos'] = any(
+            self.request.GET.get(k) for k in ('q', 'regime', 'tipo', 'unidade_id')
+        )
         ctx['regime_atual'] = self.request.GET.get('regime', '')
         ctx['tipo_atual'] = self.request.GET.get('tipo', '')
 
