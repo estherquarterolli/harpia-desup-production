@@ -9,7 +9,7 @@ from django.views.generic import CreateView, DeleteView, DetailView, ListView, U
 from apps.accounts.mixins import PerfilRequiredMixin
 from apps.core.models import Unidade
 from .forms import ProfessorForm
-from .models import Professor
+from .models import ContractType, Professor
 
 
 def _bulk_ch_alocada(professor_ids):
@@ -124,7 +124,13 @@ class ProfessorListView(LoginRequiredMixin, ListView):
 
         q = self.request.GET.get('q', '')
         if q:
-            qs = qs.filter(rh_nome__icontains=q)
+            qs = qs.filter(Q(rh_nome__icontains=q) | Q(id_funcional__icontains=q))
+        regime = self.request.GET.get('regime')
+        if regime:
+            qs = qs.filter(tipo_contrato__regime_trabalho__iexact=regime)
+        tipo = self.request.GET.get('tipo')
+        if tipo:
+            qs = qs.filter(tipo_contrato__categoria=tipo)
         unidade_id = self.request.GET.get('unidade_id')
         if unidade_id:
             qs = qs.filter(
@@ -137,7 +143,13 @@ class ProfessorListView(LoginRequiredMixin, ListView):
         user = self.request.user
         ctx['unidades'] = Unidade.objects.filter(status=True).order_by('nome')
         ctx['is_desup'] = user.is_superuser or user.perfil == 'DESUP'
-        
+        ctx['regimes'] = sorted(
+            set(ContractType.objects.exclude(regime_trabalho='').values_list('regime_trabalho', flat=True))
+        )
+        ctx['tipos'] = ContractType.CategoriaChoices.choices
+        ctx['regime_atual'] = self.request.GET.get('regime', '')
+        ctx['tipo_atual'] = self.request.GET.get('tipo', '')
+
         # Coordenador não pode mais CRIAR (CRUD parcial) mas pode visualizar e editar
         ctx['pode_crud'] = (
             user.is_superuser or user.perfil == 'COORDENADOR_UNIDADE' or user.perfil == 'DESUP'

@@ -75,6 +75,13 @@ class Professor(models.Model):
         help_text='Unidades às quais o professor está vinculado.',
     )
 
+    locais_lotacao = models.TextField(
+        blank=True,
+        default='',
+        verbose_name="Locais de lotação (não são unidades)",
+        help_text="Setores de origem que não correspondem a uma unidade do sistema, separados por ' | '.",
+    )
+
     #  Campos DESUP (Sobrescritas e Ajustes - Regra #3)
     desup_nome = models.CharField(max_length=255, blank=True, null=True, verbose_name="Nome (Ajuste DESUP)")
     desup_email = models.EmailField(blank=True, null=True, verbose_name="E-mail (Ajuste DESUP)")
@@ -145,6 +152,10 @@ class Professor(models.Model):
         if not unidades and self.unidade_principal_id:
             return [self.unidade_principal]
         return unidades
+
+    @property
+    def locais_lotacao_lista(self):
+        return [l.strip() for l in (self.locais_lotacao or '').split('|') if l.strip()]
 
     # --- Propriedades para Dashboard (UC08) e Limites (UC05) ---
 
