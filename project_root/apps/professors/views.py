@@ -13,6 +13,9 @@ from .forms import ProfessorForm, SolicitacaoCadastroProfessorForm
 from .models import ContractType, Professor
 
 
+ALLOCATION_TABLE_PAGE_SIZE = 20
+
+
 def _bulk_ch_alocada(professor_ids):
     """
     `Professor.ch_alocada` pra vários professores numa query só, em vez de N.
@@ -447,12 +450,23 @@ def alloc_curricular_view(request):
 
 @login_required
 def htmx_tabela_alocacao(request):
-    queryset = Professor.objects.select_related('tipo_contrato').prefetch_related('unidades')
+    from django.core.paginator import Paginator
+
+    queryset = Professor.objects.select_related('tipo_contrato').prefetch_related(
+        'unidades'
+    ).order_by('rh_nome')
+
+    # Esta tela legada era o Ãºltimo ponto que ainda materializava todos os
+    # professores antes de calcular suas cargas. Paginar antes dos cÃ¡lculos
+    # mantÃ©m o custo constante mesmo quando a base cresce.
+    page_obj = Paginator(queryset, ALLOCATION_TABLE_PAGE_SIZE).get_page(
+        request.GET.get('page')
+    )
 
     # Mesmo motivo do ProfessorListView: ch_justificada/ch_nao_alocada/
     # percentual_alocado como property por linha vira N+1 (essa tabela carrega
     # sozinha via hx-trigger="load" assim que a página abre).
-    professores = list(queryset)
+    professores = list(page_obj.object_list)
     professor_ids = [p.pk for p in professores]
     ch_alocada_map = _bulk_ch_alocada(professor_ids)
     ch_justificada_map = _bulk_ch_justificada(professor_ids)
@@ -471,7 +485,11 @@ def htmx_tabela_alocacao(request):
             if meta_horas else 0.0
         )
 
-    return render(request, 'professors/partials/_linhas_alocacao.html', {'professores': professores})
+    return render(request, 'professors/partials/_linhas_alocacao.html', {
+        'professores': professores,
+        'page_obj': page_obj,
+        'unidade_id': request.GET.get('unidade', ''),
+    })
 
 
 class ProfessorCursosPartialView(LoginRequiredMixin, View):

@@ -3,17 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}HARPIA{% endblock %}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- flatpickr: date picker com formato dd/mm/aaaa fixo (independe do idioma do navegador) -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/pt.js"></script>
     {% load static %}
+    <title>{% block title %}HARPIA{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/tailwind.min.css' %}">
     <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    <script defer src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script defer src="https://unpkg.com/htmx.org@1.9.10"></script>
     {% block extra_head %}{% endblock %}
 </head>
 <body class="bg-dashboard bg-pattern min-h-screen flex no-scrollbar">
@@ -464,11 +459,8 @@
             }
         }
         
-        // Inicialização do Lucide
+        // Inicialização de recursos opcionais da página
         document.addEventListener("DOMContentLoaded", function() {
-            if (window.lucide) {
-                lucide.createIcons();
-            }
             // Date picker pt-BR: exibe dd/mm/aaaa e envia ISO (Y-m-d) num input oculto,
             // garantindo o formato independentemente do idioma do navegador.
             if (window.flatpickr) {

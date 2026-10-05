@@ -1,6 +1,6 @@
 import logging
 from django import forms
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -86,27 +86,46 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         from apps.professors.models import Professor
+        from apps.professors.views import _bulk_ch_alocada, _bulk_ch_justificada
+        from apps.courses.models import MatrixComponent
         from apps.core.models import Unidade
 
         ctx['total_professores'] = Professor.objects.count()
-        unidades_ativas = Unidade.objects.filter(status=True)
-        ctx['total_unidades'] = unidades_ativas.count()
+        unidades_ativas = list(Unidade.objects.filter(status=True).order_by('nome'))
+        ctx['total_unidades'] = len(unidades_ativas)
 
-        nao_conformes = []
-        conformes = 0
-        for unidade in unidades_ativas:
-            profs = Professor.objects.filter(
-                Q(unidades=unidade) | Q(unidade_principal=unidade),
-                status='Ativo',
-            ).distinct()
-            if not profs.exists():
-                conformes += 1
+        # A versÃ£o anterior fazia uma consulta por unidade e mais consultas de
+        # carga para cada professor. Em bases reais isso virava centenas de
+        # idas ao banco antes de o dashboard aparecer. Agora as cargas e os
+        # vÃ­nculos sÃ£o buscados em lote e a conformidade Ã© calculada em memÃ³ria.
+        professores_ativos = list(
+            Professor.objects.filter(status=Professor.StatusChoices.ATIVO)
+            .select_related('tipo_contrato', 'unidade_principal')
+            .prefetch_related('unidades')
+        )
+        professor_ids = [prof.pk for prof in professores_ativos]
+        ch_alocada = _bulk_ch_alocada(professor_ids)
+        ch_justificada = _bulk_ch_justificada(professor_ids)
+        unidades_nao_conformes_ids = set()
+        unidades_ativas_ids = {unidade.pk for unidade in unidades_ativas}
+
+        for prof in professores_ativos:
+            total = ch_alocada.get(prof.pk, 0) + ch_justificada.get(prof.pk, 0.0)
+            meta = prof.ch_total
+            percentual = min((total / meta) * 100, 100.0) if meta else 0.0
+            if percentual >= 100:
                 continue
-            todos_ok = all(p.percentual_alocado >= 100 for p in profs)
-            if todos_ok:
-                conformes += 1
-            else:
-                nao_conformes.append({'id': unidade.id, 'nome': unidade.nome})
+            ids = {unidade.pk for unidade in prof.unidades.all()}
+            if prof.unidade_principal_id:
+                ids.add(prof.unidade_principal_id)
+            unidades_nao_conformes_ids.update(ids & unidades_ativas_ids)
+
+        nao_conformes = [
+            {'id': unidade.id, 'nome': unidade.nome}
+            for unidade in unidades_ativas
+            if unidade.id in unidades_nao_conformes_ids
+        ]
+        conformes = ctx['total_unidades'] - len(nao_conformes)
 
         ctx['unidades_nao_conformes'] = nao_conformes
         ctx['unidades_conformes_count'] = conformes
@@ -117,10 +136,20 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
             ctx['conformidade'] = '0%'
 
         # Professores para a tabela de consulta
+        componentes_vigentes = MatrixComponent.objects.filter(
+            matriz__is_vigente=True,
+        ).select_related('componente_curricular')
         professores_qs = Professor.objects.select_related(
             'tipo_contrato', 'unidade_principal'
-        ).prefetch_related('unidades').order_by('rh_nome')
-        ctx['unidades'] = Unidade.objects.filter(status=True).order_by('nome')
+        ).prefetch_related(
+            'unidades',
+            Prefetch(
+                'componentes_matriz',
+                queryset=componentes_vigentes,
+                to_attr='componentes_vigentes',
+            ),
+        ).order_by('rh_nome')
+        ctx['unidades'] = unidades_ativas
 
         # Estrutura esperada pelo partial _professor_table.html
         from django.core.paginator import Paginator
@@ -129,7 +158,11 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
             {
                 'prof': prof,
                 'units': prof.unidades_exibicao,
-                'subjects': prof.get_disciplinas_alocadas(),
+                'subjects': sorted({
+                    componente.nome_disciplina
+                    for componente in prof.componentes_vigentes
+                    if componente.nome_disciplina
+                }),
                 'ha': prof.ha,
             }
             for prof in page_obj.object_list
@@ -185,10 +218,22 @@ class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, T
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         from apps.professors.models import Professor
+        from apps.courses.models import MatrixComponent
+
+        componentes_vigentes = MatrixComponent.objects.filter(
+            matriz__is_vigente=True,
+        ).select_related('componente_curricular')
 
         qs = Professor.objects.select_related(
             'tipo_contrato', 'unidade_principal'
-        ).prefetch_related('unidades').order_by('rh_nome')
+        ).prefetch_related(
+            'unidades',
+            Prefetch(
+                'componentes_matriz',
+                queryset=componentes_vigentes,
+                to_attr='componentes_vigentes',
+            ),
+        ).order_by('rh_nome')
 
         q = self.request.GET.get('q', '')
         if q:
@@ -209,7 +254,11 @@ class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, T
             {
                 'prof': prof,
                 'units': prof.unidades_exibicao,
-                'subjects': prof.get_disciplinas_alocadas(),
+                'subjects': sorted({
+                    componente.nome_disciplina
+                    for componente in prof.componentes_vigentes
+                    if componente.nome_disciplina
+                }),
                 'ha': prof.ha,
             }
             for prof in page_obj.object_list

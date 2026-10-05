@@ -5,6 +5,12 @@
 {% block title %}{% if form.instance.pk %}Editar Janela{% else %}Nova Janela de Entrega{% endif %} — Harpia-DESUP{% endblock %}
 {% block header_title %}{% if form.instance.pk %}Editar Janela{% else %}Nova Janela de Entrega{% endif %}{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/pt.js"></script>
+{% endblock %}
+
 {% block content %}
 <div class="p-6 max-w-2xl mx-auto">
     <div class="mb-6">
@@ -59,7 +65,7 @@
                     Cancelar
                 </a>
                 <button type="submit" class="px-4 py-2 bg-[#025c9f] hover:bg-[#153e70] text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2">
-                    <i data-lucide="save" class="w-4 h-4"></i>
+                    <i class="ph ph-floppy-disk text-base"></i>
                     Salvar
                 </button>
             </div>

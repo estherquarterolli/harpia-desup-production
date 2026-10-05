@@ -13,7 +13,7 @@
             <p class="text-sm text-slate-500">Gestão dos prazos para preenchimento da alocação pelas unidades.</p>
         </div>
         <a href="{% url 'core:janela_create' %}" class="w-full sm:w-auto justify-center bg-[#025c9f] hover:bg-[#153e70] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2">
-            <i data-lucide="plus" class="w-4 h-4"></i>
+            <i class="ph ph-plus text-base"></i>
             Nova Janela
         </a>
     </div>
@@ -44,7 +44,7 @@
 
             <button type="submit"
                     class="px-4 py-2.5 bg-[#025c9f] hover:bg-[#153e70] text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2">
-                <i data-lucide="search" class="w-4 h-4"></i>
+                <i class="ph ph-magnifying-glass text-base"></i>
                 Filtrar
             </button>
         </form>
@@ -84,14 +84,14 @@
                     </td>
                     <td class="px-6 py-4 text-right">
                         <a href="{% url 'core:janela_update' janela.pk %}" class="text-slate-400 hover:text-[#025c9f] transition-colors">
-                            <i data-lucide="edit-3" class="w-4 h-4 inline"></i>
+                            <i class="ph ph-pencil-simple text-base inline"></i>
                         </a>
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
                     <td colspan="5" class="px-6 py-10 text-center text-slate-400">
-                        <i data-lucide="clock" class="w-8 h-8 mx-auto mb-2 opacity-20"></i>
+                        <i class="ph ph-clock block text-3xl mx-auto mb-2 opacity-20"></i>
                         Nenhuma janela de entrega cadastrada.
                     </td>
                 </tr>

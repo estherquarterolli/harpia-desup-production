@@ -38,3 +38,33 @@
     </td>
 </tr>
 {% endfor %}
+
+{% if page_obj.has_other_pages %}
+<tr class="bg-slate-50/70">
+    <td colspan="10" class="p-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <span class="text-xs font-semibold text-slate-500">
+                {{ page_obj.start_index }}â€“{{ page_obj.end_index }} de {{ page_obj.paginator.count }} professores
+            </span>
+            <div class="flex gap-2">
+                {% if page_obj.has_previous %}
+                <button type="button"
+                    hx-get="{% url 'htmx_tabela_alocacao' %}?page={{ page_obj.previous_page_number }}{% if unidade_id %}&amp;unidade={{ unidade_id }}{% endif %}"
+                    hx-target="#tableBody" hx-swap="innerHTML"
+                    class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100">
+                    Anteriores
+                </button>
+                {% endif %}
+                {% if page_obj.has_next %}
+                <button type="button"
+                    hx-get="{% url 'htmx_tabela_alocacao' %}?page={{ page_obj.next_page_number }}{% if unidade_id %}&amp;unidade={{ unidade_id }}{% endif %}"
+                    hx-target="#tableBody" hx-swap="innerHTML"
+                    class="rounded-lg bg-[#025c9f] px-5 py-2 text-xs font-black text-white hover:bg-[#153e70]">
+                    Ver mais
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </td>
+</tr>
+{% endif %}
