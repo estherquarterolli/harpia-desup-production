@@ -81,7 +81,7 @@
     {% endif %}
   </div>
 
-  {% if unidade_selecionada_id or user.perfil == 'DESUP' or user.is_superuser %}
+  {% if unidade_selecionada_id %}
   
   {% for item in matrizes_data %}
   <div class="mb-8">
@@ -193,6 +193,8 @@
     <p class="text-slate-400">Esta unidade não possui matrizes curriculares vigentes cadastradas.</p>
   </div>
   {% endfor %}
+
+  {% include 'partials/pagination.html' %}
 
   {% else %}
   <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-16 text-center">

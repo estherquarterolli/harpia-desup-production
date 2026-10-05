@@ -130,6 +130,25 @@
 
     <main class="main-content flex-grow p-4 md:p-8">
 
+        {% if superadmin_visualizando %}
+        <div class="mb-5 flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 shadow-sm sm:flex-row sm:items-center">
+            <div class="flex min-w-0 items-center gap-3">
+                <i class="ph ph-eye text-2xl text-amber-600"></i>
+                <div class="min-w-0">
+                    <p class="text-xs font-black uppercase tracking-wider">Modo de visualização</p>
+                    <p class="truncate text-sm font-semibold">Você está vendo o sistema como {{ superadmin_modo_label }}.</p>
+                </div>
+            </div>
+            <form method="post" action="{% url 'superadmin_visualizacao' %}" class="sm:ml-auto">
+                {% csrf_token %}
+                <input type="hidden" name="modo" value="ADMIN">
+                <button type="submit" class="w-full rounded-lg bg-amber-600 px-4 py-2 text-xs font-black text-white transition-colors hover:bg-amber-700 sm:w-auto">
+                    Voltar à administração
+                </button>
+            </form>
+        </div>
+        {% endif %}
+
         <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
             <div class="flex items-center gap-4">
                 <button type="button" id="mobileMenuButton" onclick="toggleMobileSidebar()" class="lg:hidden text-3xl text-[#025c9f]"><i class="ph ph-list"></i></button>
@@ -214,7 +233,7 @@
                         {% endcomment %}
                         <a href="{% url 'profile' %}" class="block px-4 py-2 hover:bg-slate-50"><i class="ph ph-user mr-2"></i> Meu Perfil</a>
                         <a href="{% url 'password_change' %}" class="block px-4 py-2 hover:bg-slate-50"><i class="ph ph-key mr-2"></i> Alterar senha</a>
-                        {% if user.is_superuser %}
+                        {% if is_real_superadmin %}
                         <a href="/admin/" class="block px-4 py-2 hover:bg-slate-50"><i class="ph ph-shield-check mr-2"></i> Administração</a>
                         {% endif %}
                         <hr class="my-2">

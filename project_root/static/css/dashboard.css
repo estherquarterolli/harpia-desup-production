@@ -346,3 +346,41 @@ h1, h2, h3, h4, h5, h6, .font-black {
 @media (max-width: 639px) {
     .filter-grid .filter-wide { grid-column: span 1; }
 }
+
+/* ─── Modo leve de movimento ───────────────────────────────────────
+   Evita repaints/GPU excessivos em computadores modestos. Mantemos apenas
+   respostas curtas de interface e o spinner de carregamento, que comunica
+   trabalho em andamento. */
+.transition-all,
+.transition-colors,
+.transition-opacity,
+.transition-transform,
+.sidebar-desktop {
+    transition-duration: 0.12s !important;
+}
+
+.animate-pulse,
+.animate-ping,
+tbody tr,
+.formset-row {
+    animation: none !important;
+}
+
+.backdrop-blur-sm {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+}
+
+[class*="hover:scale-"]:hover,
+[class*="hover:-translate-"]:hover {
+    transform: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+    }
+}

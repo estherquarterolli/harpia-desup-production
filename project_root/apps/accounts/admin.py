@@ -16,6 +16,22 @@ class HarpiaAdminSite(UnfoldAdminSite):
     site_title = _("Harpia")
     index_title = _("Painel de Controle")
 
+    def index(self, request, extra_context=None):
+        if not request.user.is_superuser:
+            return super().index(request, extra_context)
+
+        from apps.core.models import ErroSistema, Unidade
+        from apps.professors.models import Professor
+
+        resumo = {
+            'total_usuarios': User.objects.count(),
+            'total_unidades': Unidade.objects.filter(status=True).count(),
+            'total_professores': Professor.objects.filter(status='Ativo').count(),
+            'total_erros': ErroSistema.objects.count(),
+            'unidades_visualizacao': Unidade.objects.filter(status=True).order_by('nome'),
+        }
+        return super().index(request, {**resumo, **(extra_context or {})})
+
     def each_context(self, request):
         context = super().each_context(request)
         from apps.core.context_processors import notificacoes
@@ -25,6 +41,14 @@ class HarpiaAdminSite(UnfoldAdminSite):
 admin_site = HarpiaAdminSite(name='alloc_admin')
 
 from django.utils.html import mark_safe
+
+
+class HarpiaModelAdmin(ModelAdmin):
+    """Configuração leve compartilhada pelas listagens do superadmin."""
+
+    list_per_page = 25
+    show_full_result_count = False
+
 
 class CustomUserAdmin(DjangoUserAdmin, ModelAdmin):
     add_form = CustomUserCreationForm
@@ -40,6 +64,8 @@ class CustomUserAdmin(DjangoUserAdmin, ModelAdmin):
     ordering = ('email',)
 
     actions = ['forcar_reset_senha']
+    list_per_page = 25
+    show_full_result_count = False
 
     @admin.action(description="Redefinir senha (senha padrão + troca obrigatória)")
     def forcar_reset_senha(self, request, queryset):
@@ -119,7 +145,8 @@ class CustomUserAdmin(DjangoUserAdmin, ModelAdmin):
         return readonly_fields
 
 class CustomGroupAdmin(DjangoGroupAdmin, ModelAdmin):
-    pass
+    list_per_page = 25
+    show_full_result_count = False
 
 admin_site.register(User, CustomUserAdmin)
 admin_site.register(Group, CustomGroupAdmin)

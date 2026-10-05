@@ -1,0 +1,98 @@
+{% extends 'admin/base.html' %}
+{% load i18n %}
+
+{% block title %}Painel do superadministrador | Harpia{% endblock %}
+
+{% block branding %}
+    {% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% block content %}
+{% if request.user.is_superuser %}
+<div class="space-y-8">
+    <section class="rounded-2xl bg-gradient-to-br from-primary-700 to-primary-900 p-6 text-white shadow-sm md:p-8">
+        <div class="max-w-3xl">
+            <p class="mb-2 text-xs font-semibold uppercase tracking-[.18em] text-primary-100">Central administrativa</p>
+            <h1 class="text-2xl font-bold md:text-3xl">Olá, {{ request.user.email }}</h1>
+            <p class="mt-2 text-sm leading-6 text-primary-100">
+                Administre os dados técnicos ou confira o sistema exatamente como a DESUP e cada unidade o enxergam.
+            </p>
+        </div>
+    </section>
+
+    <section>
+        <div class="mb-4">
+            <h2 class="text-lg font-semibold text-font-important-light dark:text-font-important-dark">Visualizar o sistema</h2>
+            <p class="mt-1 text-sm text-font-subtle-light dark:text-font-subtle-dark">A simulação não altera seu cadastro nem os seus privilégios.</p>
+        </div>
+
+        <div class="grid gap-4 lg:grid-cols-2">
+            <form method="post" action="{% url 'superadmin_visualizacao' %}" class="rounded-xl border border-base-200 bg-white p-5 shadow-sm dark:border-base-800 dark:bg-base-900">
+                {% csrf_token %}
+                <input type="hidden" name="modo" value="DESUP">
+                <div class="flex items-start gap-4">
+                    <span class="material-symbols-outlined rounded-xl bg-primary-50 p-3 text-2xl text-primary-700 dark:bg-primary-950 dark:text-primary-300">apartment</span>
+                    <div class="grow">
+                        <h3 class="font-semibold text-font-important-light dark:text-font-important-dark">Visão DESUP</h3>
+                        <p class="mt-1 text-sm text-font-subtle-light dark:text-font-subtle-dark">Acesse o painel geral, pareceres, matrizes, entregas e dados de todas as unidades.</p>
+                        <button type="submit" class="mt-4 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700">Entrar como DESUP</button>
+                    </div>
+                </div>
+            </form>
+
+            <form method="post" action="{% url 'superadmin_visualizacao' %}" class="rounded-xl border border-base-200 bg-white p-5 shadow-sm dark:border-base-800 dark:bg-base-900">
+                {% csrf_token %}
+                <input type="hidden" name="modo" value="COORDENADOR_UNIDADE">
+                <div class="flex items-start gap-4">
+                    <span class="material-symbols-outlined rounded-xl bg-amber-50 p-3 text-2xl text-amber-700 dark:bg-amber-950 dark:text-amber-300">school</span>
+                    <div class="grow">
+                        <h3 class="font-semibold text-font-important-light dark:text-font-important-dark">Visão da unidade</h3>
+                        <p class="mt-1 text-sm text-font-subtle-light dark:text-font-subtle-dark">Confira menus, dados e restrições de uma unidade específica.</p>
+                        <label for="unidade_id" class="mt-4 block text-xs font-semibold text-font-default-light dark:text-font-default-dark">Unidade</label>
+                        <div class="mt-1 flex flex-col gap-2 sm:flex-row">
+                            <select id="unidade_id" name="unidade_id" required class="min-w-0 grow rounded-lg border border-base-300 bg-white px-3 py-2 text-sm dark:border-base-700 dark:bg-base-800">
+                                <option value="">Selecione uma unidade</option>
+                                {% for unidade in unidades_visualizacao %}
+                                    <option value="{{ unidade.pk }}">{{ unidade.sigla }} — {{ unidade.nome }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700">Entrar como unidade</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <section>
+        <h2 class="mb-4 text-lg font-semibold text-font-important-light dark:text-font-important-dark">Resumo do sistema</h2>
+        <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <a href="/admin/accounts/user/" class="rounded-xl border border-base-200 bg-white p-5 shadow-sm transition hover:border-primary-400 dark:border-base-800 dark:bg-base-900">
+                <p class="text-sm text-font-subtle-light dark:text-font-subtle-dark">Usuários</p><p class="mt-2 text-3xl font-bold">{{ total_usuarios }}</p>
+            </a>
+            <a href="/admin/core/unidade/" class="rounded-xl border border-base-200 bg-white p-5 shadow-sm transition hover:border-primary-400 dark:border-base-800 dark:bg-base-900">
+                <p class="text-sm text-font-subtle-light dark:text-font-subtle-dark">Unidades ativas</p><p class="mt-2 text-3xl font-bold">{{ total_unidades }}</p>
+            </a>
+            <a href="/admin/professors/professor/" class="rounded-xl border border-base-200 bg-white p-5 shadow-sm transition hover:border-primary-400 dark:border-base-800 dark:bg-base-900">
+                <p class="text-sm text-font-subtle-light dark:text-font-subtle-dark">Professores ativos</p><p class="mt-2 text-3xl font-bold">{{ total_professores }}</p>
+            </a>
+            <a href="/admin/core/errosistema/" class="rounded-xl border border-base-200 bg-white p-5 shadow-sm transition hover:border-primary-400 dark:border-base-800 dark:bg-base-900">
+                <p class="text-sm text-font-subtle-light dark:text-font-subtle-dark">Erros registrados</p><p class="mt-2 text-3xl font-bold">{{ total_erros }}</p>
+            </a>
+        </div>
+    </section>
+
+    <section class="rounded-xl border border-base-200 bg-white p-5 shadow-sm dark:border-base-800 dark:bg-base-900">
+        <h2 class="font-semibold text-font-important-light dark:text-font-important-dark">Administração técnica</h2>
+        <p class="mt-1 text-sm text-font-subtle-light dark:text-font-subtle-dark">As funções completas estão organizadas por assunto no menu lateral. A página inicial mostra apenas os acessos mais importantes para evitar repetição.</p>
+    </section>
+</div>
+{% else %}
+<div class="flex flex-col lg:flex-row lg:gap-8">
+    <div class="grow">
+        {% include "unfold/helpers/app_list_default.html" %}
+    </div>
+    {% include "unfold/helpers/history.html" %}
+</div>
+{% endif %}
+{% endblock %}

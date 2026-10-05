@@ -153,6 +153,80 @@ class UserRedirectTests(TestCase):
         self.assertEqual(response.content, b'')
 
 
+class SuperadminVisualizationTests(TestCase):
+    def setUp(self):
+        from apps.core.models import Unidade
+
+        self.password = 'Visualizacao@2026'
+        self.superadmin = User.objects.create_superuser(
+            email='superadmin_visualizacao@teste.com',
+            password=self.password,
+        )
+        self.unidade = Unidade.objects.create(
+            nome='Unidade de Visualização',
+            sigla='UVS',
+        )
+        self.client.force_login(self.superadmin)
+
+    def test_painel_admin_tem_escolha_de_visualizacao_sem_lista_repetida(self):
+        response = self.client.get('/admin/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'admin/index.html')
+        self.assertContains(response, 'Visualizar o sistema')
+        self.assertContains(response, 'Visão DESUP')
+        self.assertContains(response, 'Visão da unidade')
+        self.assertContains(response, self.unidade.nome)
+        self.assertContains(response, 'Buscar aplicações e modelos...')
+        self.assertNotContains(response, 'Search apps and models...')
+
+    def test_superadmin_pode_visualizar_como_desup_e_retornar(self):
+        response = self.client.post('/accounts/visualizacao/', {'modo': 'DESUP'})
+        self.assertRedirects(response, '/dashboard/desup/', fetch_redirect_response=False)
+
+        dashboard = self.client.get('/dashboard/desup/')
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertEqual(dashboard.wsgi_request.user.perfil, User.Perfil.DESUP)
+        self.assertFalse(dashboard.wsgi_request.user.is_superuser)
+        self.assertContains(dashboard, 'Você está vendo o sistema como DESUP')
+
+        retorno = self.client.post('/accounts/visualizacao/', {'modo': 'ADMIN'})
+        self.assertRedirects(retorno, '/admin/', fetch_redirect_response=False)
+        self.assertNotIn('superadmin_modo_visualizacao', self.client.session)
+
+    def test_superadmin_pode_visualizar_uma_unidade_com_escopo_real(self):
+        response = self.client.post('/accounts/visualizacao/', {
+            'modo': 'COORDENADOR_UNIDADE',
+            'unidade_id': self.unidade.pk,
+        })
+        self.assertRedirects(response, '/dashboard/unidade/', fetch_redirect_response=False)
+
+        dashboard = self.client.get('/dashboard/unidade/')
+        user = dashboard.wsgi_request.user
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertEqual(user.perfil, User.Perfil.COORDENADOR_UNIDADE)
+        self.assertEqual(user.unidade, self.unidade)
+        self.assertFalse(user.is_superuser)
+        self.assertContains(dashboard, 'Unidade · UVS')
+
+        # A simulação deve respeitar as mesmas barreiras de um coordenador real.
+        self.assertEqual(self.client.get('/dashboard/desup/').status_code, 403)
+
+    def test_usuario_comum_nao_pode_ativar_visualizacao(self):
+        coordenador = User.objects.create_user(
+            email='coordenador_visualizacao@teste.com',
+            password=self.password,
+            perfil=User.Perfil.COORDENADOR_UNIDADE,
+            unidade=self.unidade,
+            forcar_troca_senha=False,
+        )
+        self.client.force_login(coordenador)
+
+        response = self.client.post('/accounts/visualizacao/', {'modo': 'DESUP'})
+
+        self.assertEqual(response.status_code, 403)
+
+
 from apps.core.models import Notificacao
 from django.core.exceptions import ValidationError
 from apps.accounts.validators import ComplexPasswordValidator

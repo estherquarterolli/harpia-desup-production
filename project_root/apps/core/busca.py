@@ -19,7 +19,8 @@ def normalizar(texto) -> str:
 def _token_casa(token: str, haystack: str, palavras: list) -> bool:
     if token in haystack:
         return True
-    if len(token) < 4:
+    # Códigos/IDs (com dígitos) só casam por trecho exato; o perdão de letras é só para palavras.
+    if len(token) < 4 or not token.isalpha():
         return False
     for palavra in palavras:
         if abs(len(palavra) - len(token)) > 2:

@@ -123,6 +123,8 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
         ctx['unidades'] = Unidade.objects.filter(status=True).order_by('nome')
 
         # Estrutura esperada pelo partial _professor_table.html
+        from django.core.paginator import Paginator
+        page_obj = Paginator(professores_qs, 20).get_page(1)
         ctx['alocacoes_dashboard'] = [
             {
                 'prof': prof,
@@ -130,8 +132,9 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
                 'subjects': prof.get_disciplinas_alocadas(),
                 'ha': prof.ha,
             }
-            for prof in professores_qs[:50]
+            for prof in page_obj.object_list
         ]
+        ctx['dashboard_page_obj'] = page_obj
 
         ctx.update(_contexto_atalhos_dashboard(self.request.user))
         return ctx
@@ -200,6 +203,8 @@ class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, T
         if turno:
             qs = qs.filter(disponibilidades__turno=turno).distinct()
 
+        from django.core.paginator import Paginator
+        page_obj = Paginator(qs, 20).get_page(self.request.GET.get('page'))
         ctx['alocacoes_dashboard'] = [
             {
                 'prof': prof,
@@ -207,8 +212,9 @@ class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, T
                 'subjects': prof.get_disciplinas_alocadas(),
                 'ha': prof.ha,
             }
-            for prof in qs[:50]
+            for prof in page_obj.object_list
         ]
+        ctx['dashboard_page_obj'] = page_obj
         return ctx
 
 
@@ -234,6 +240,7 @@ class UnidadeListView(UnidadeBaseView, ListView):
     model = Unidade
     template_name = 'core/unidade_list.html'
     context_object_name = 'unidades'
+    paginate_by = 18
 
 class UnidadeCreateView(UnidadeBaseView, CreateView):
     model = Unidade
@@ -262,6 +269,7 @@ class CursoListView(CursoBaseView, ListView):
     model = CourseUnit
     template_name = 'core/curso_list.html'
     context_object_name = 'cursos'
+    paginate_by = 20
 
     def get_queryset(self):
         return CourseUnit.objects.filter(unidade_id=self.kwargs['unidade_pk']).order_by('curso__nome')
@@ -497,6 +505,7 @@ class JanelaEntregaListView(JanelaEntregaBaseView, ListView):
     model = JanelaEntrega
     template_name = 'core/janela_list.html'
     context_object_name = 'janelas'
+    paginate_by = 20
 
     def get_queryset(self):
         from django.db.models import Q
@@ -524,6 +533,9 @@ class JanelaEntregaListView(JanelaEntregaBaseView, ListView):
         ctx['filtro_unidade'] = self.request.GET.get('unidade_id', '')
         ctx['selected_status'] = ctx['filtro_status']
         ctx['selected_unidade_id'] = ctx['filtro_unidade']
+        params = self.request.GET.copy()
+        params.pop('page', None)
+        ctx['querystring'] = params.urlencode()
         return ctx
 
 class JanelaEntregaCreateView(JanelaEntregaBaseView, CreateView):

@@ -223,20 +223,6 @@
     </table>
   </div>
 
-  {% if is_paginated %}
-  <nav class="flex flex-wrap items-center justify-between gap-3 text-sm" aria-label="Paginação">
-    <p class="text-slate-500">Página <strong>{{ page_obj.number }}</strong> de {{ paginator.num_pages }}</p>
-    <div class="flex items-center gap-2">
-      {% if page_obj.has_previous %}
-      <a href="?{% if querystring %}{{ querystring }}&{% endif %}page=1" class="px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 font-bold text-slate-600" title="Primeira">«</a>
-      <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.previous_page_number }}" class="px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 font-bold text-slate-600">Anterior</a>
-      {% endif %}
-      {% if page_obj.has_next %}
-      <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.next_page_number }}" class="px-3 py-2 rounded-lg border border-slate-200 bg-[#025c9f] hover:bg-[#153e70] font-bold text-white">Próxima</a>
-      <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ paginator.num_pages }}" class="px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 font-bold text-slate-600" title="Última">»</a>
-      {% endif %}
-    </div>
-  </nav>
-  {% endif %}
+  {% include 'partials/pagination.html' %}
 </div>
 {% endblock %}

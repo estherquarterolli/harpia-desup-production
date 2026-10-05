@@ -1,27 +1,26 @@
 from django.contrib import admin
-from unfold.admin import ModelAdmin
-from apps.accounts.admin import admin_site
+from apps.accounts.admin import HarpiaModelAdmin, admin_site
 from .models import Unidade, JanelaEntrega, Notificacao, AuditoriaGlobal, ErroSistema
 from .forms import JanelaEntregaForm
 
-class UnidadeAdmin(ModelAdmin):
+class UnidadeAdmin(HarpiaModelAdmin):
     list_display = ('nome', 'sigla', 'status')
     search_fields = ('nome', 'sigla')
     list_filter = ('status',)
 
-class JanelaEntregaAdmin(ModelAdmin):
+class JanelaEntregaAdmin(HarpiaModelAdmin):
     form = JanelaEntregaForm
     list_display = ('semestre', 'data_inicio', 'data_fim', 'status', 'unidade')
     list_filter = ('status', 'semestre', 'unidade')
     search_fields = ('semestre',)
 
-class NotificacaoAdmin(ModelAdmin):
+class NotificacaoAdmin(HarpiaModelAdmin):
     list_display = ('titulo', 'destinatario', 'unidade_destino', 'lida', 'data_criacao')
     list_filter = ('lida', 'unidade_destino', 'data_criacao')
     search_fields = ('titulo', 'mensagem')
     ordering = ('-data_criacao',)
 
-class AuditoriaGlobalAdmin(ModelAdmin):
+class AuditoriaGlobalAdmin(HarpiaModelAdmin):
     list_display = ('criado_em', 'acao', 'email', 'usuario', 'ip')
     list_filter = ('acao', 'criado_em')
     search_fields = ('email', 'acao', 'detalhes', 'ip')
@@ -29,7 +28,7 @@ class AuditoriaGlobalAdmin(ModelAdmin):
     ordering = ('-criado_em',)
 
 
-class ErroSistemaAdmin(ModelAdmin):
+class ErroSistemaAdmin(HarpiaModelAdmin):
     list_display = (
         'criado_em', 'status_http', 'tipo_erro', 'metodo', 'caminho',
         'email_usuario', 'request_id',

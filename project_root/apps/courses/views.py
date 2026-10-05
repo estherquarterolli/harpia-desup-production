@@ -60,6 +60,7 @@ class CurriculumMatrixListView(MatrixBaseView, ListView):
     model = CurriculumMatrix
     template_name = 'courses/matrix_list.html'
     context_object_name = 'matrices'
+    paginate_by = 12
 
     def _get_queryset_base(self):
         return CurriculumMatrix.objects.select_related(
@@ -110,12 +111,15 @@ class CurriculumMatrixListView(MatrixBaseView, ListView):
         return qs
 
     def get_queryset(self):
-        return self._apply_filters(self._get_queryset_base())
+        from django.db.models import Count, Sum
+
+        return self._apply_filters(self._get_queryset_base()).annotate(
+            qtd_componentes=Count('componentes_da_matriz'),
+            ch_total=Sum('componentes_da_matriz__carga_horaria'),
+        )
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        from django.db.models import Sum, Count
-        
         ctx['pode_editar'] = True
         ctx['is_desup'] = self.request.user.perfil == 'DESUP' or self.request.user.is_superuser
         ctx['unidades'] = Unidade.objects.filter(status=True).order_by('nome')
@@ -133,13 +137,9 @@ class CurriculumMatrixListView(MatrixBaseView, ListView):
         ctx['cursos'] = cursos_qs.distinct().order_by('nome')
         ctx['unidade_selecionada_id'] = unidade_id
 
-        # Annotate matrices with total components and total hours for display
-        matrices = ctx.get('matrices', self.get_queryset())
-        matrices = matrices.annotate(
-            qtd_componentes=Count('componentes_da_matriz'),
-            ch_total=Sum('componentes_da_matriz__carga_horaria')
-        )
-        ctx['matrices'] = matrices
+        params = self.request.GET.copy()
+        params.pop('page', None)
+        ctx['querystring'] = params.urlencode()
 
         return ctx
 
@@ -814,6 +814,7 @@ class CurricularComponentListView(DesupOnlyMixin, ListView):
     model = CurricularComponent
     template_name = 'courses/component_list.html'
     context_object_name = 'componentes'
+    paginate_by = 25
 
     def get_queryset(self):
         qs = CurricularComponent.objects.order_by('nome')
@@ -822,6 +823,14 @@ class CurricularComponentListView(DesupOnlyMixin, ListView):
             from apps.core.busca import filtrar_contem
             qs = filtrar_contem(qs, q, ['nome', 'codigo'])
         return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        params = self.request.GET.copy()
+        params.pop('page', None)
+        ctx['querystring'] = params.urlencode()
+        ctx['total_componentes'] = ctx['paginator'].count
+        return ctx
 
 
 class CurricularComponentImportView(DesupOnlyMixin, View):

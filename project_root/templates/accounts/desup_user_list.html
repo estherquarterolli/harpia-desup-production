@@ -81,16 +81,6 @@
         </table>
     </div>
 
-    {% if is_paginated %}
-    <nav class="flex items-center justify-center gap-3 text-sm font-bold text-slate-600">
-        {% if page_obj.has_previous %}
-            <a class="rounded-lg bg-white px-3 py-2 shadow-sm" href="?q={{ request.GET.q|urlencode }}&page={{ page_obj.previous_page_number }}">Anterior</a>
-        {% endif %}
-        <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
-        {% if page_obj.has_next %}
-            <a class="rounded-lg bg-white px-3 py-2 shadow-sm" href="?q={{ request.GET.q|urlencode }}&page={{ page_obj.next_page_number }}">Próxima</a>
-        {% endif %}
-    </nav>
-    {% endif %}
+    {% include 'partials/pagination.html' %}
 </div>
 {% endblock %}

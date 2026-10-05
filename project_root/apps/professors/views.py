@@ -116,7 +116,9 @@ class ProfessorListView(LoginRequiredMixin, ListView):
     model = Professor
     template_name = 'professors/professor_list.html'
     context_object_name = 'professores'
-    paginate_by = 50
+    # As colunas de carga horária exigem cálculos em lote. Um lote menor reduz
+    # DOM, memória e tempo de resposta sem perder a busca sobre a base inteira.
+    paginate_by = 20
 
     def get_queryset(self):
         qs = Professor.objects.select_related(
@@ -151,7 +153,6 @@ class ProfessorListView(LoginRequiredMixin, ListView):
             set(ContractType.objects.permitidos().exclude(regime_trabalho='').values_list('regime_trabalho', flat=True))
         )
         ctx['tipos'] = [(str(pk), nome) for pk, nome in ContractType.objects.permitidos().order_by('nome').values_list('pk', 'nome')]
-        ctx['total_professores'] = Professor.objects.count()
         ctx['total_professores'] = Professor.objects.count()
         ctx['total_filtrados'] = ctx['paginator'].count if ctx.get('paginator') else len(ctx['professores'])
         params = self.request.GET.copy()

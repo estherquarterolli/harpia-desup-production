@@ -61,7 +61,7 @@ class ProfessorE2EBase(TestCase):
         self.course_unit_enf_b = CourseUnit.objects.create(curso=self.curso_enf, unidade=self.unidade_b)
 
         self.contrato = ContractType.objects.create(
-            nome='Ensino Superior',
+            nome='PROFESSOR FAETEC I 40 H',
             regime_trabalho='40h DE',
             max_class_hours=20,
             max_total_hours=40,
@@ -983,3 +983,18 @@ class SolicitacaoCadastroEMatriculaOpcionalTests(ProfessorE2EBase):
         resposta = self.client.get(self.url_lista)
         self.assertEqual(resposta.context['total_professores'], 2)
         self.assertContains(resposta, '2 no sistema')
+
+    def test_formulario_e_filtro_so_oferecem_os_tipos_oficiais(self):
+        ContractType.objects.create(
+            nome='Agente Administrativo', max_class_hours=20, max_total_hours=40, max_classes=4,
+        )
+        self.client.force_login(self.desup)
+
+        resposta = self.client.get(self.url_criar)
+        nomes_form = [t.nome for t in resposta.context['form'].fields['tipo_contrato'].queryset]
+        self.assertIn('PROFESSOR FAETEC I 40 H', nomes_form)
+        self.assertNotIn('Agente Administrativo', nomes_form)
+
+        resposta = self.client.get(self.url_lista)
+        nomes_filtro = [nome for _, nome in resposta.context['tipos']]
+        self.assertNotIn('Agente Administrativo', nomes_filtro)

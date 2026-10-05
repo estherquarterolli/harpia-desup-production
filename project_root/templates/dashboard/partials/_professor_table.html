@@ -60,3 +60,30 @@
     {% endfor %}
   </tbody>
 </table>
+{% if dashboard_page_obj.has_other_pages %}
+<div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-3 text-sm">
+  <span class="text-slate-500">
+    {{ dashboard_page_obj.start_index }}–{{ dashboard_page_obj.end_index }} de {{ dashboard_page_obj.paginator.count }}
+  </span>
+  <div class="flex gap-2">
+    {% if dashboard_page_obj.has_previous %}
+    <button type="button"
+            hx-get="{% url 'dashboard_professores_partial' %}?page={{ dashboard_page_obj.previous_page_number }}"
+            hx-target="#dashboard-professor-table"
+            hx-include="[name='q'],[name='unidade_id']"
+            class="rounded-lg border border-slate-200 bg-white px-4 py-2 font-bold text-slate-600 hover:bg-slate-100">
+      Anteriores
+    </button>
+    {% endif %}
+    {% if dashboard_page_obj.has_next %}
+    <button type="button"
+            hx-get="{% url 'dashboard_professores_partial' %}?page={{ dashboard_page_obj.next_page_number }}"
+            hx-target="#dashboard-professor-table"
+            hx-include="[name='q'],[name='unidade_id']"
+            class="rounded-lg bg-[#025c9f] px-5 py-2 font-black text-white hover:bg-[#153e70]">
+      Ver mais
+    </button>
+    {% endif %}
+  </div>
+</div>
+{% endif %}

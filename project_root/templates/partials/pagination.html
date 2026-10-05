@@ -1,0 +1,21 @@
+{% if is_paginated %}
+<nav class="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm" aria-label="Carregamento da lista">
+  <p class="text-slate-500">
+    Exibindo {{ page_obj.start_index }}–{{ page_obj.end_index }} de {{ paginator.count }}
+  </p>
+  <div class="flex items-center gap-2">
+    {% if page_obj.has_previous %}
+    <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.previous_page_number }}"
+       class="rounded-lg border border-slate-200 bg-white px-4 py-2 font-bold text-slate-600 hover:bg-slate-50">
+      <i class="ph ph-arrow-left mr-1"></i> Anteriores
+    </a>
+    {% endif %}
+    {% if page_obj.has_next %}
+    <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.next_page_number }}"
+       class="rounded-lg bg-[#025c9f] px-5 py-2 font-black text-white hover:bg-[#153e70]">
+      Ver mais <i class="ph ph-arrow-right ml-1"></i>
+    </a>
+    {% endif %}
+  </div>
+</nav>
+{% endif %}

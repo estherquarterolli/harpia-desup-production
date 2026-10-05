@@ -16,6 +16,7 @@ from apps.accounts.views import (
     DesupUserPasswordResetView,
     ApprovePasswordResetView,
     ProfileView,
+    SuperadminVisualizationView,
 )
 from apps.core.views import DashboardView, DashboardDesupView, DashboardUnidadeView, DashboardProfessoresPartialView
 from django.contrib.auth import views as auth_views
@@ -28,6 +29,11 @@ urlpatterns = [
     # CORR-017: página "Meu Perfil" (somente leitura) — antes o item do menu
     # apontava direto para a troca de senha.
     path('accounts/perfil/', ProfileView.as_view(), name='profile'),
+    path(
+        'accounts/visualizacao/',
+        SuperadminVisualizationView.as_view(),
+        name='superadmin_visualizacao',
+    ),
 
     path('accounts/password_change/', CustomPasswordChangeView.as_view(), name='password_change'),
     path('accounts/password_change/confirm/<uuid:token>/', PasswordChangeConfirmView.as_view(), name='password_change_confirm'),

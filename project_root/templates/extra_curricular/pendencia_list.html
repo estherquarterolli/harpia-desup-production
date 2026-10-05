@@ -118,15 +118,25 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
       <div class="w-full sm:flex-1 sm:min-w-[260px]">
         <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Pesquisar Docente</label>
         <div class="relative">
-          <input type="text" id="search-docente" placeholder="Buscar por nome do docente..."
-            class="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-sm font-semibold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] js-autocomplete" autocomplete="off">
+          <input type="text" id="search-docente" name="q" value="{{ q }}" placeholder="Buscar por nome do docente..."
+            hx-get="{% url 'extra_curricular:pendencia_list' %}"
+            hx-target="#pendencias-content"
+            hx-select="#pendencias-content"
+            hx-trigger="input changed delay:500ms"
+            hx-include="#filter-semestre,#filter-unidade,#search-docente,#filter-status,#filter-justificativa"
+            class="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-sm font-semibold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f]" autocomplete="off">
           <i class="ph ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-base"></i>
         </div>
       </div>
       <div class="w-full sm:w-48">
         <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Filtrar por Status</label>
         <div class="relative">
-          <select id="filter-status"
+          <select id="filter-status" name="status"
+            hx-get="{% url 'extra_curricular:pendencia_list' %}"
+            hx-target="#pendencias-content"
+            hx-select="#pendencias-content"
+            hx-trigger="change"
+            hx-include="#filter-semestre,#filter-unidade,#search-docente,#filter-status,#filter-justificativa"
             class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-semibold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer pr-10 appearance-none">
             {% comment %}
             CORR-015: os values são os MESMOS tokens usados pelo filtro server-side
@@ -145,17 +155,22 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
       <div class="w-full sm:w-56">
         <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Filtrar por Justificativa</label>
         <div class="relative">
-          <select id="filter-justificativa"
+          <select id="filter-justificativa" name="justificativa"
+            hx-get="{% url 'extra_curricular:pendencia_list' %}"
+            hx-target="#pendencias-content"
+            hx-select="#pendencias-content"
+            hx-trigger="change"
+            hx-include="#filter-semestre,#filter-unidade,#search-docente,#filter-status,#filter-justificativa"
             class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-semibold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer pr-10 appearance-none">
             {% comment %}
             CORR-015: tokens sem acento, alinhados com o data-justificativa das linhas.
             O antigo value="Sem registro" nunca casava (linha sem item tinha tipo vazio).
             {% endcomment %}
             <option value="">Todos os Tipos</option>
-            <option value="tcc">Orientação de TCC</option>
-            <option value="extensao">Atividade Extensionista</option>
-            <option value="reducao">Redução de CH</option>
-            <option value="sem_registro">Sem registro</option>
+            <option value="tcc" {% if justificativa_filtro == 'tcc' %}selected{% endif %}>Orientação de TCC</option>
+            <option value="extensao" {% if justificativa_filtro == 'extensao' %}selected{% endif %}>Atividade Extensionista</option>
+            <option value="reducao" {% if justificativa_filtro == 'reducao' %}selected{% endif %}>Redução de CH</option>
+            <option value="sem_registro" {% if justificativa_filtro == 'sem_registro' %}selected{% endif %}>Sem registro</option>
           </select>
           <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
         </div>
@@ -335,7 +350,7 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
     {# Rodapé #}
     <div class="px-5 py-3 border-t border-slate-100 bg-slate-50/50 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
       <p class="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">
-        {{ pendencias_data|length }} linha{{ pendencias_data|length|pluralize }} de justificativa em {{ semestre }}
+        Exibindo {{ pendencias_data|length }} de {{ total_pendencias }} linha{{ total_pendencias|pluralize }} em {{ semestre }}
       </p>
       {% if unidade_selecionada %}
       <p class="text-[10px] text-slate-400 font-semibold">{{ unidade_selecionada.sigla }} — {{ unidade_selecionada.nome }}</p>
@@ -344,53 +359,9 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
   </div>
   {% endif %}
 
+  {% include 'partials/pagination.html' %}
+
   </div>{# /pendencias-content #}
 
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-  function initClientFilters() {
-    const searchInput = document.getElementById("search-docente");
-    const filterStatus = document.getElementById("filter-status");
-    const filterJustificativa = document.getElementById("filter-justificativa");
-    const rows = document.querySelectorAll(".pendencia-row");
-    const noResultsRow = document.getElementById("no-results-row");
-
-    function filterTable() {
-      const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : "";
-      const statusValue = filterStatus ? filterStatus.value : "";
-      const justificativaValue = filterJustificativa ? filterJustificativa.value : "";
-      let visibleCount = 0;
-      rows.forEach(row => {
-        const docente = row.getAttribute("data-docente") || "";
-        const status = row.getAttribute("data-status") || "";
-        const justificativa = row.getAttribute("data-justificativa") || "";
-        const matchesSearch = docente.includes(searchTerm);
-        const matchesStatus = !statusValue || status === statusValue;
-        const matchesJustificativa = !justificativaValue || justificativa === justificativaValue;
-        if (matchesSearch && matchesStatus && matchesJustificativa) {
-          row.style.display = "";
-          visibleCount++;
-        } else {
-          row.style.display = "none";
-        }
-      });
-      if (noResultsRow) noResultsRow.style.display = visibleCount === 0 ? "" : "none";
-    }
-
-    if (searchInput) { searchInput.removeEventListener("input", filterTable); searchInput.addEventListener("input", filterTable); }
-    if (filterStatus) { filterStatus.removeEventListener("change", filterTable); filterStatus.addEventListener("change", filterTable); }
-    if (filterJustificativa) { filterJustificativa.removeEventListener("change", filterTable); filterJustificativa.addEventListener("change", filterTable); }
-    filterTable();
-  }
-
-  document.addEventListener("DOMContentLoaded", initClientFilters);
-  document.body.addEventListener("htmx:afterSwap", function(e) {
-    if (e.detail.target && e.detail.target.id === "pendencias-content") {
-      initClientFilters();
-    }
-  });
-</script>
 {% endblock %}

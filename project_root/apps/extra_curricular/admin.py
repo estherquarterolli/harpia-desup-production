@@ -1,6 +1,6 @@
 from django.contrib import admin
-from unfold.admin import ModelAdmin, TabularInline
-from apps.accounts.admin import admin_site
+from unfold.admin import TabularInline
+from apps.accounts.admin import HarpiaModelAdmin, admin_site
 from apps.extra_curricular.models import (
     AtividadeExtensionista,
     OrientacaoTCC,
@@ -31,7 +31,7 @@ class ReducaoCargaHorariaInline(TabularInline):
 
 
 # ── PendenciaExtra Admin ──────────────────────────────────────────────────────
-class PendenciaExtraAdmin(ModelAdmin):
+class PendenciaExtraAdmin(HarpiaModelAdmin):
     list_display  = [
         "professor", "unidade", "semestre", "status",
         "sei_numero", "ch_total_justificada_display", "data_atualizacao",

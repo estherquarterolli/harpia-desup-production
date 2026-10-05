@@ -32,6 +32,8 @@ class AllocCurricularView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView)
         from apps.core.models import Unidade
         from apps.professors.models import Professor
         from apps.courses.models import CurriculumMatrix, MatrixComponent
+        from django.core.paginator import Paginator
+        from django.db.models import Prefetch
 
         context['unidades'] = Unidade.objects.filter(status=True).order_by('nome')
         unidade_id = self.request.GET.get('unidade_id')
@@ -48,33 +50,71 @@ class AllocCurricularView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView)
             
         unidade_selecionada = Unidade.objects.filter(id=unidade_id).first() if unidade_id else None
         context['unidade_selecionada'] = unidade_selecionada
-            
-        # Matrizes Vigentes da unidade (ou de todas se unidade_id for vazio)
-        if unidade_id:
-            matrizes_vigentes = CurriculumMatrix.objects.filter(
-                unidades__id=unidade_id,
-                is_vigente=True
-            ).select_related('curso').prefetch_related('unidades').order_by('curso__nome', 'turno').distinct()
-        else:
-            matrizes_vigentes = CurriculumMatrix.objects.filter(
-                is_vigente=True
-            ).select_related('curso').prefetch_related('unidades').order_by('curso__nome', 'turno')
+
+        # A base de docentes é consultada sob demanda pelo autocomplete. Este
+        # queryset permanece no contexto apenas por compatibilidade com integrações
+        # existentes; o template não o materializa.
+        context['professores_unidade'] = Professor.objects.all().order_by('rh_nome')
+
+        # Antes, abrir a tela DESUP sem filtro carregava matrizes e componentes de
+        # TODAS as unidades. Além de confuso, era o principal pico de memória/DOM.
+        if not unidade_id:
+            context.update({
+                'matrizes_data': [],
+                'alocacao_curricular_preenchida': False,
+                'componentes_sem_docente': 0,
+                'alocacao_aprovada': False,
+            })
+            context.update(build_window_lock_context(
+                user,
+                unidade=None,
+                area_label='Alocação',
+                action_label='alocar docente',
+                target_label='componente curricular',
+            ))
+            return context
+
+        componentes_qs = MatrixComponent.objects.select_related(
+            'componente_curricular', 'docente'
+        ).order_by('periodo', 'codigo')
+        matrizes_vigentes = CurriculumMatrix.objects.filter(
+            unidades__id=unidade_id,
+            is_vigente=True,
+        ).select_related('curso').prefetch_related(
+            'unidades',
+            Prefetch(
+                'componentes_da_matriz',
+                queryset=componentes_qs,
+                to_attr='componentes_carregados',
+            ),
+        ).order_by('curso__nome', 'turno').distinct()
+
+        ids_matrizes = matrizes_vigentes.order_by().values('pk')
+        componentes_da_unidade = MatrixComponent.objects.filter(
+            matriz_id__in=ids_matrizes,
+        )
+        total_componentes = componentes_da_unidade.count()
+        componentes_sem_docente = componentes_da_unidade.filter(
+            docente__isnull=True,
+        ).exclude(status=MatrixComponent.StatusChoices.NAO_OFERECIDA).count()
+
+        paginator = Paginator(matrizes_vigentes, 3)
+        page_obj = paginator.get_page(self.request.GET.get('page'))
 
         matrizes_data = []
-        total_componentes = 0
-        componentes_sem_docente = 0
-        for matriz in matrizes_vigentes:
-            componentes = matriz.componentes_da_matriz.select_related('componente_curricular', 'docente').order_by('periodo', 'codigo')
-            total_componentes += componentes.count()
-            componentes_sem_docente += componentes.filter(docente__isnull=True).exclude(status=MatrixComponent.StatusChoices.NAO_OFERECIDA).count()
+        for matriz in page_obj.object_list:
             matrizes_data.append({
                 'matriz': matriz,
-                'componentes': componentes
+                'componentes': matriz.componentes_carregados,
             })
-            
+
         context['matrizes_data'] = matrizes_data
         context['alocacao_curricular_preenchida'] = total_componentes > 0 and componentes_sem_docente == 0
         context['componentes_sem_docente'] = componentes_sem_docente
+        context['page_obj'] = page_obj
+        context['paginator'] = paginator
+        context['is_paginated'] = page_obj.has_other_pages()
+        context['querystring'] = f'unidade_id={unidade_id}'
 
         # Estado do botão "Aprovar Alocação": aprovado quando todas as matrizes da
         # unidade (que têm CourseUnit) já têm o consolidado APROVADO no semestre.
@@ -83,11 +123,17 @@ class AllocCurricularView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView)
             from apps.allocations.models import AlocacaoCurricular
             from apps.courses.models import CourseUnit
             semestre = _semestre_atual()
+            matrizes_curso_turno = list(
+                matrizes_vigentes.values_list('curso_id', 'turno')
+            )
+            course_units = dict(CourseUnit.objects.filter(
+                curso_id__in=[curso_id for curso_id, _ in matrizes_curso_turno],
+                unidade_id=unidade_id,
+            ).values_list('curso_id', 'id'))
             esperadas = {
-                (cu.id, m['matriz'].turno or TURNO_PADRAO_ALOCACAO)
-                for m in matrizes_data
-                for cu in [CourseUnit.objects.filter(curso=m['matriz'].curso, unidade_id=unidade_id).first()]
-                if cu
+                (course_units[curso_id], turno or TURNO_PADRAO_ALOCACAO)
+                for curso_id, turno in matrizes_curso_turno
+                if curso_id in course_units
             }
             aprovadas = set(AlocacaoCurricular.objects.filter(
                 unidade_id=unidade_id,
@@ -97,10 +143,6 @@ class AllocCurricularView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView)
             alocacao_aprovada = bool(esperadas) and esperadas <= aprovadas
         context['alocacao_aprovada'] = alocacao_aprovada
 
-        # A base de docentes é compartilhada por todas as unidades.
-        professores_qs = Professor.objects.all().order_by('rh_nome')
-
-        context['professores_unidade'] = professores_qs
         context.update(build_window_lock_context(
             user,
             unidade=unidade_selecionada,

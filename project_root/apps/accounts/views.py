@@ -7,6 +7,9 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.conf import settings
 from django.db import transaction
+from django.views import View
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import PermissionDenied
 import logging
 
 _cache_logger = logging.getLogger(__name__)
@@ -64,6 +67,53 @@ def get_dashboard_url_for_user(user):
     elif user.perfil == 'COORDENADOR_UNIDADE' or user.groups.filter(name='Gestor Unidade').exists():
         return '/dashboard/unidade/'
     return '/dashboard/'
+
+
+class SuperadminVisualizationView(LoginRequiredMixin, View):
+    """Alterna entre o painel técnico e as visões operacionais do sistema."""
+
+    def post(self, request, *args, **kwargs):
+        from apps.accounts.middleware import (
+            MODO_VISUALIZACAO_SESSAO,
+            UNIDADE_VISUALIZACAO_SESSAO,
+        )
+        from apps.core.models import Unidade
+
+        if not request.user.is_superuser:
+            raise PermissionDenied('Apenas o superadministrador pode alterar a visualização.')
+
+        modo = request.POST.get('modo', 'ADMIN')
+        if modo == 'ADMIN':
+            request.session.pop(MODO_VISUALIZACAO_SESSAO, None)
+            request.session.pop(UNIDADE_VISUALIZACAO_SESSAO, None)
+            messages.success(request, 'Visualização administrativa restaurada.')
+            return redirect('/admin/')
+
+        if modo == 'DESUP':
+            request.session[MODO_VISUALIZACAO_SESSAO] = 'DESUP'
+            request.session.pop(UNIDADE_VISUALIZACAO_SESSAO, None)
+            messages.info(request, 'Você está visualizando o sistema como DESUP.')
+            return redirect('/dashboard/desup/')
+
+        if modo == 'COORDENADOR_UNIDADE':
+            unidade_id = request.POST.get('unidade_id', '')
+            if not unidade_id.isdigit():
+                messages.error(request, 'Selecione uma unidade para iniciar a visualização.')
+                return redirect('/admin/')
+            unidade = get_object_or_404(
+                Unidade.objects.filter(status=True),
+                pk=unidade_id,
+            )
+            request.session[MODO_VISUALIZACAO_SESSAO] = 'COORDENADOR_UNIDADE'
+            request.session[UNIDADE_VISUALIZACAO_SESSAO] = unidade.pk
+            messages.info(
+                request,
+                f'Você está visualizando o sistema como a unidade {unidade.sigla}.',
+            )
+            return redirect('/dashboard/unidade/')
+
+        messages.error(request, 'Modo de visualização inválido.')
+        return redirect('/admin/')
 
 
 @never_cache
@@ -134,10 +184,7 @@ def login_view(request):
 from django.contrib.auth.views import PasswordChangeView
 from django.contrib.auth.forms import PasswordChangeForm, SetPasswordForm
 from django.urls import reverse, reverse_lazy
-from django.views import View
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils import timezone
-import logging
 from apps.core.models import AuditoriaGlobal, Notificacao
 from apps.core.tasks import send_email_task
 from .models import User
@@ -502,7 +549,7 @@ class DesupUserListView(LoginRequiredMixin, ListView):
     model = User
     template_name = 'accounts/desup_user_list.html'
     context_object_name = 'usuarios'
-    paginate_by = 30
+    paginate_by = 20
 
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -527,6 +574,13 @@ class DesupUserListView(LoginRequiredMixin, ListView):
                 ['email', 'first_name', 'last_name', 'unidade__nome', 'unidade__sigla'],
             )
         return queryset
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        params = self.request.GET.copy()
+        params.pop('page', None)
+        ctx['querystring'] = params.urlencode()
+        return ctx
 
 
 class DesupUserCreateView(LoginRequiredMixin, View):

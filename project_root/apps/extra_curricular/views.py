@@ -17,6 +17,7 @@ from django.urls import reverse_lazy, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import ListView, DetailView, CreateView, UpdateView
+from django.core.paginator import Paginator
 
 from apps.accounts.mixins import PerfilRequiredMixin
 from apps.core.models import Unidade
@@ -89,6 +90,7 @@ class PendenciaListView(LoginRequiredMixin, PerfilRequiredMixin, View):
         # CORR-015: normaliza para o token canônico. O `replace(" ", "_")` mantém
         # compatível qualquer URL antiga com `?status=Sem registro`.
         status_filtro = request.GET.get("status", "").strip().lower().replace(" ", "_")
+        justificativa_filtro = request.GET.get("justificativa", "").strip().lower()
 
         # Dados de pendência
         unidade_id_to_filter = unidade.id if unidade else None
@@ -101,12 +103,24 @@ class PendenciaListView(LoginRequiredMixin, PerfilRequiredMixin, View):
         # services.status_token(), o MESMO consumido pelos <option value> e pelo
         # data-status das linhas (filtro instantâneo em JS). Antes cada camada usava
         # um vocabulário próprio e "Sem registro" nunca casava com 'sem_registro'.
+        pendencias_data = raw_data
         if status_filtro:
             pendencias_data = [
-                item for item in raw_data if item.get("status_token") == status_filtro
+                item for item in pendencias_data
+                if item.get("status_token") == status_filtro
             ]
-        else:
-            pendencias_data = raw_data
+        if justificativa_filtro:
+            pendencias_data = [
+                item for item in pendencias_data
+                if item.get("justificativa_token") == justificativa_filtro
+            ]
+
+        # Limita o HTML e o trabalho do navegador. Os filtros continuam sendo
+        # aplicados sobre a base inteira antes de separar o lote atual.
+        paginator = Paginator(pendencias_data, 20)
+        page_obj = paginator.get_page(request.GET.get('page'))
+        params = request.GET.copy()
+        params.pop('page', None)
 
         # Semestres para o filtro
         semestres = _gerar_semestres()
@@ -116,10 +130,16 @@ class PendenciaListView(LoginRequiredMixin, PerfilRequiredMixin, View):
             "unidade_selecionada": unidade,
             "semestre": semestre,
             "semestres": semestres,
-            "pendencias_data": pendencias_data,
+            "pendencias_data": page_obj.object_list,
+            "page_obj": page_obj,
+            "paginator": paginator,
+            "is_paginated": page_obj.has_other_pages(),
+            "querystring": params.urlencode(),
+            "total_pendencias": paginator.count,
             "q": q,
             "is_desup": (perfil == "DESUP" or user.is_superuser),
             "status_filtro": status_filtro,
+            "justificativa_filtro": justificativa_filtro,
         }
         try:
             ctx.update(build_window_lock_context(

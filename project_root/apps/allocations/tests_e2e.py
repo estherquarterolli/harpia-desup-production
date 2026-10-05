@@ -276,15 +276,19 @@ class JornadaAlocacaoCurricularE2ETests(AlocacaoE2EBase):
         self.prof_a1.refresh_from_db()
         self.assertEqual(self.prof_a1.ch_alocada, 0)
 
-    def test_desup_ve_todas_as_matrizes_vigentes_sem_filtro_de_unidade(self):
+    def test_desup_escolhe_unidade_antes_de_carregar_matrizes(self):
         self.client.force_login(self.desup)
 
         resposta = self.client.get(self.url_tela)
 
         self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(resposta.context['matrizes_data'], [])
+        self.assertContains(resposta, 'Selecione uma Unidade')
+
+        resposta = self.client.get(self.url_tela, {'unidade_id': self.unidade_a.pk})
         matrizes = [item['matriz'] for item in resposta.context['matrizes_data']]
-        self.assertIn(self.matriz_a, matrizes)
-        self.assertIn(self.matriz_b, matrizes)
+        self.assertEqual(matrizes, [self.matriz_a])
+        self.assertNotIn(self.matriz_b, matrizes)
 
     def test_matriz_nao_vigente_nao_aparece_na_tela(self):
         self.matriz_a.is_vigente = False

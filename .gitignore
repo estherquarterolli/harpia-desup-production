@@ -54,6 +54,9 @@ cover/
 # Translations
 *.mo
 *.pot
+# O catálogo do django-unfold precisa estar compilado no deploy, onde o
+# utilitário GNU gettext não está disponível.
+!project_root/locale/pt_BR/LC_MESSAGES/django.mo
 
 # Django stuff:
 *.log

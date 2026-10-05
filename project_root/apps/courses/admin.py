@@ -1,18 +1,18 @@
 from django.contrib import admin
-from unfold.admin import ModelAdmin, TabularInline
-from apps.accounts.admin import admin_site
+from unfold.admin import TabularInline
+from apps.accounts.admin import HarpiaModelAdmin, admin_site
 from .models import Course, CurricularComponent, CurriculumMatrix, MatrixComponent, ClassGroup, CourseUnit
 
-class CourseAdmin(ModelAdmin):
+class CourseAdmin(HarpiaModelAdmin):
     list_display = ('nome', 'sigla')
     search_fields = ('nome', 'sigla')
 
-class CourseUnitAdmin(ModelAdmin):
+class CourseUnitAdmin(HarpiaModelAdmin):
     list_display = ('curso', 'unidade', 'ativo')
     search_fields = ('curso__nome', 'curso__sigla', 'unidade__nome')
     list_filter = ('unidade', 'ativo')
 
-class CurricularComponentAdmin(ModelAdmin):
+class CurricularComponentAdmin(HarpiaModelAdmin):
     list_display = ('nome', 'codigo', 'carga_horaria_padrao', 'creditos')
     search_fields = ('nome', 'codigo')
     filter_horizontal = ('pre_requisitos',)
@@ -37,13 +37,13 @@ class MatrixComponentInline(TabularInline):
         'status',
     )
 
-class CurriculumMatrixAdmin(ModelAdmin):
+class CurriculumMatrixAdmin(HarpiaModelAdmin):
     list_display = ('curso', 'turno', 'total_componentes')
     list_filter = ('curso', 'turno')
     search_fields = ('curso__nome', 'curso__sigla', 'unidades__nome')
     inlines = (MatrixComponentInline,)
 
-class MatrixComponentAdmin(ModelAdmin):
+class MatrixComponentAdmin(HarpiaModelAdmin):
     list_display = (
         'matriz',
         'componente_curricular',
@@ -65,7 +65,7 @@ class MatrixComponentAdmin(ModelAdmin):
     autocomplete_fields = ('matriz', 'componente_curricular', 'docente', 'curso_compartilhado')
     filter_horizontal = ('pre_requisitos',)
 
-class ClassGroupAdmin(ModelAdmin):
+class ClassGroupAdmin(HarpiaModelAdmin):
     list_display = ('identificador', 'matriz_curricular', 'matriz_componente', 'ano_semestre')
     list_filter = ('ano_semestre',)
 

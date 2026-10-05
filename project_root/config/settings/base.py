@@ -53,6 +53,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'apps.accounts.middleware.SuperadminVisualizationMiddleware',
     'apps.core.middleware.SystemErrorLoggingMiddleware',
     'apps.accounts.middleware.PasswordChangeForceMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -71,6 +72,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'apps.accounts.context_processors.superadmin_visualization',
                 'apps.core.context_processors.notificacoes',
                 'apps.core.context_processors.delivery_window_context',
             ],
@@ -297,7 +299,10 @@ CELERY_TIMEZONE = TIME_ZONE
 UNFOLD = {
     "SITE_TITLE": "Harpia",
     "SITE_HEADER": "Harpia",
-    "SITE_URL": "/dashboard/",
+    # O acesso ao sistema operacional é escolhido no painel inicial (DESUP
+    # ou uma unidade). O link genérico do Unfold causava um redirecionamento
+    # circular para o superadmin e repetia essa função.
+    "SITE_URL": None,
     "SITE_ICON": {
         "light": lambda request: static("img/logo-harpia-colorida-modificada.PNG"),
         "dark": lambda request: static("img/logo-harpia-colorida-modificada.PNG"),

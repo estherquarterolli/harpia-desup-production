@@ -21,11 +21,10 @@
 --     vínculo (ex.: 20h + 40h) fica com o de maior carga.
 --   * Só entram no mapeamento as linhas do PDF cujo cargo está na lista acima (1855 IDs funcionais).
 --     Cargos fora da lista (agente administrativo, inspetor de alunos, instrutor, contrato temporário
---     "PROFESSOR I ... DEC 49208" etc.) NÃO são alterados — veja o relatório do bloco 5.
+--     "PROFESSOR I ... DEC 49208" etc.) NÃO são alterados — veja os relatórios dos blocos 5 e 6.
 --   * A matrícula deixa de ser obrigatória (coluna passa a aceitar NULL; matrículas provisórias
 --     "SEM-MATRICULA-..." viram NULL).
 --
--- Sem tabelas temporárias (o SQL Editor do Supabase não as mantém entre comandos).
 -- Seguro para rodar mais de uma vez. Faça backup antes. Rode tudo de uma vez no SQL Editor.
 
 -- 0) colunas novas (equivalem às migrations 0009 e 0010 do Django)
@@ -79,7 +78,52 @@ BEGIN
     END LOOP;
 END $$;
 
--- 2) aplica o tipo de cada professor segundo o PDF (ID funcional -> tipo), num único comando
+-- 1b) converte os tipos ANTIGOS (ex.: "Professor Concursado 20h", "Professor FAETEC Ensino Superior 40h")
+--     para os tipos oficiais, pelo nome. Roda antes do mapeamento por ID do PDF, que refina em seguida.
+--     * 25h e "FAETEC II 20h" não têm tipo oficial próprio: o professor vai para o tipo mais próximo e
+--       fica marcado como "carga diferente" com a carga original (25h / 20h).
+--     * "Instrutor" e demais cargos que não são de professor NÃO são convertidos (ver relatório no fim).
+UPDATE harpiadb_professores_professor p
+   SET carga_diferenciada = TRUE,
+       carga_horaria_personalizada = CASE WHEN o.nome ~* '25' THEN 25 ELSE 20 END
+  FROM harpiadb_professores_tipo_contrato o
+ WHERE p.tipo_contrato_id = o.id
+   AND o.nome NOT IN (
+    'PROF FAETEC ENS SUP 40H','PROFESSOR FAETEC I 20 H','PROFESSOR FAETEC I 40 H',
+    'PROFESSOR FAETEC II - 40 H/ QD SUPL','PROFESSOR INSPETOR ESCOLAR L9146''2020',
+    'PROFESSOR SUPERVISOR EDUCACIONAL L9146''2020','SUPERVISOR EDUCACIONAL',
+    'TÉCNICO SUPERIOR','ORIENTADOR EDUCACIONAL','PROFESSOR CEDIDO')
+   AND (o.nome ~* '25 ?h' OR o.nome ~* 'faetec ii.*20');
+
+UPDATE harpiadb_professores_professor p
+   SET tipo_contrato_id = n.id
+  FROM (
+        SELECT o.id AS old_id,
+               CASE
+                 WHEN o.nome ILIKE '%cedido%'                                   THEN 'PROFESSOR CEDIDO'
+                 WHEN o.nome ILIKE '%orientador%'                               THEN 'ORIENTADOR EDUCACIONAL'
+                 WHEN o.nome ILIKE '%inspetor escolar%'                         THEN 'PROFESSOR INSPETOR ESCOLAR L9146''2020'
+                 WHEN o.nome ILIKE '%supervisor%' AND o.nome ILIKE '%9146%'     THEN 'PROFESSOR SUPERVISOR EDUCACIONAL L9146''2020'
+                 WHEN o.nome ILIKE '%supervisor%'                               THEN 'SUPERVISOR EDUCACIONAL'
+                 WHEN o.nome ILIKE '%cnico superior%'                           THEN 'TÉCNICO SUPERIOR'
+                 WHEN o.nome ILIKE '%ensino superior%' OR o.nome ILIKE '%ens sup%' THEN 'PROF FAETEC ENS SUP 40H'
+                 WHEN o.nome ILIKE '%faetec ii%'                                THEN 'PROFESSOR FAETEC II - 40 H/ QD SUPL'
+                 WHEN (o.nome ILIKE 'professor%' OR o.nome ILIKE '%faetec%') AND (o.nome ~* '(20|25) ?h') THEN 'PROFESSOR FAETEC I 20 H'
+                 WHEN (o.nome ILIKE 'professor%' OR o.nome ILIKE '%faetec%') AND (o.nome ~* '40 ?h')      THEN 'PROFESSOR FAETEC I 40 H'
+               END AS novo_nome
+          FROM harpiadb_professores_tipo_contrato o
+         WHERE o.nome NOT IN (
+    'PROF FAETEC ENS SUP 40H','PROFESSOR FAETEC I 20 H','PROFESSOR FAETEC I 40 H',
+    'PROFESSOR FAETEC II - 40 H/ QD SUPL','PROFESSOR INSPETOR ESCOLAR L9146''2020',
+    'PROFESSOR SUPERVISOR EDUCACIONAL L9146''2020','SUPERVISOR EDUCACIONAL',
+    'TÉCNICO SUPERIOR','ORIENTADOR EDUCACIONAL','PROFESSOR CEDIDO')
+       ) m
+  JOIN harpiadb_professores_tipo_contrato n ON n.nome = m.novo_nome
+ WHERE p.tipo_contrato_id = m.old_id
+   AND m.novo_nome IS NOT NULL;
+
+-- 2) tipo de cada professor segundo o PDF (ID funcional -> tipo), num ÚNICO comando
+--    (sem tabela auxiliar: o SQL Editor do Supabase não mantém tabela entre comandos)
 UPDATE harpiadb_professores_professor p
    SET tipo_contrato_id = tc.id
   FROM (VALUES
@@ -1960,7 +2004,7 @@ DELETE FROM harpiadb_professores_tipo_contrato tc
  ) AS ok(nome))
    AND NOT EXISTS (SELECT 1 FROM harpiadb_professores_professor p WHERE p.tipo_contrato_id = tc.id);
 
--- 5) RELATÓRIO: professores que continuam num tipo fora da lista permitida
+-- 5) RELATÓRIO: professores cadastrados que continuam num tipo fora da lista
 --    (cargo não permitido no PDF ou ID funcional ausente da lista). Decida caso a caso.
 SELECT p."ID_FUNCIONAL" AS id_funcional, p.rh_nome, tc.nome AS tipo_atual
   FROM harpiadb_professores_professor p
@@ -1971,3 +2015,10 @@ SELECT p."ID_FUNCIONAL" AS id_funcional, p.rh_nome, tc.nome AS tipo_atual
     'PROFESSOR SUPERVISOR EDUCACIONAL L9146''2020','SUPERVISOR EDUCACIONAL',
     'TÉCNICO SUPERIOR','ORIENTADOR EDUCACIONAL','PROFESSOR CEDIDO')
  ORDER BY tc.nome, p.rh_nome;
+
+-- 6) RESUMO: quantos professores em cada tipo (todos devem ser tipos oficiais; "Instrutor" etc. = sobras)
+SELECT tc.nome AS tipo, COUNT(p.id) AS professores
+  FROM harpiadb_professores_tipo_contrato tc
+  LEFT JOIN harpiadb_professores_professor p ON p.tipo_contrato_id = tc.id
+ GROUP BY tc.nome
+ ORDER BY professores DESC, tc.nome;
