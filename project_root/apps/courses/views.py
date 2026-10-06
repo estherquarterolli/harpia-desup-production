@@ -83,6 +83,24 @@ class CurriculumMatrixListView(MatrixBaseView, ListView):
             # a unidade nunca enxerga matrizes em rascunho (nem forçando ?status=rascunho).
             qs = qs.exclude(is_rascunho=True)
 
+        # Busca textual ampla no modo "contém" tolerante: aceita partes do texto,
+        # ignora acentos/maiúsculas e perdoa pequenos erros de digitação.
+        q = self.request.GET.get('q', '').strip()
+        if q:
+            from apps.core.busca import filtrar_contem
+
+            qs = filtrar_contem(
+                qs,
+                q,
+                [
+                    'nome',
+                    'curso__nome',
+                    'curso__sigla',
+                    'unidades__nome',
+                    'unidades__sigla',
+                ],
+            )
+
         # Filtro de unidade (Admin DESUP pode selecionar)
         unidade_id = self.request.GET.get('unidade_id')
         if unidade_id and (user.perfil == 'DESUP' or user.is_superuser):

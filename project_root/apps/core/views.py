@@ -561,6 +561,15 @@ class JanelaEntregaListView(JanelaEntregaBaseView, ListView):
         from apps.core.services import fechar_janelas_expiradas
         fechar_janelas_expiradas()
         qs = JanelaEntrega.objects.all()
+        q = self.request.GET.get('q', '').strip()
+        if q:
+            from apps.core.busca import filtrar_contem
+
+            qs = filtrar_contem(
+                qs,
+                q,
+                ['semestre', 'status', 'unidade__nome', 'unidade__sigla'],
+            )
         status = self.request.GET.get('status')
         if status:
             qs = qs.filter(status=status)
@@ -578,6 +587,7 @@ class JanelaEntregaListView(JanelaEntregaBaseView, ListView):
         from apps.core.models import Unidade
         ctx['status_choices'] = JanelaEntrega.StatusChoices.choices
         ctx['unidades'] = Unidade.objects.filter(status=True).order_by('nome')
+        ctx['filtro_q'] = self.request.GET.get('q', '')
         ctx['filtro_status'] = self.request.GET.get('status', '')
         ctx['filtro_unidade'] = self.request.GET.get('unidade_id', '')
         ctx['selected_status'] = ctx['filtro_status']

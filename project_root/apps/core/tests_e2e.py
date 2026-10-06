@@ -634,6 +634,24 @@ class JornadaCicloDeVidaJanelaTests(AlocacaoFixtureMixin, BaseE2ETestCase):
         vencida.refresh_from_db()
         self.assertEqual(vencida.status, JanelaEntrega.StatusChoices.FECHADO)
 
+    def test_listagem_pesquisa_por_contem_em_semestre_unidade_e_status(self):
+        janela_unidade = self.criar_janela(
+            unidade=self.unidade,
+            semestre='2027.1',
+            status=JanelaEntrega.StatusChoices.REABERTO,
+        )
+        outra = self.criar_janela(unidade=None, semestre='2028.2')
+        self.client.force_login(self.desup)
+        url = reverse('core:janela_list')
+
+        for termo in ('2027', 'Unidde Janela', 'reab'):
+            with self.subTest(termo=termo):
+                resp = self.client.get(url, {'q': termo})
+                self.assertIn(janela_unidade, list(resp.context['janelas']))
+                self.assertNotIn(outra, list(resp.context['janelas']))
+
+        self.assertContains(self.client.get(url), 'name="q"')
+
     def test_coordenador_nao_acessa_a_area_de_janelas(self):
         self.client.force_login(self.coord)
         for nome in ('janela_list', 'janela_create'):

@@ -243,6 +243,31 @@ class MatrizTurnoE2ETests(BaseCoursesE2ETests):
         self.assertNotIn(noite.pk, self.pks_da_lista(resposta))
 
 
+class MatrizBuscaContemE2ETests(BaseCoursesE2ETests):
+    """A pesquisa livre encontra matrizes por trechos e termos semelhantes."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.desup)
+        self.alfa = self.criar_matriz(nome='MC-TECNOLOGIA-2026')
+        self.beta = self.criar_matriz(
+            nome='MC-SAude-2026', curso=self.curso_b, unidades=[self.unidade_b],
+        )
+
+    def test_busca_contem_codigo_curso_e_unidade(self):
+        url = reverse('courses:matrix_list')
+        for termo in ('tecnologia', 'Crso E2E Alfa', 'Unidde E2E Alfa', 'UEA'):
+            with self.subTest(termo=termo):
+                resposta = self.client.get(url, {'q': termo})
+                self.assertIn(self.alfa.pk, self.pks_da_lista(resposta))
+                self.assertNotIn(self.beta.pk, self.pks_da_lista(resposta))
+
+    def test_listagem_exibe_campo_de_pesquisa_livre(self):
+        resposta = self.client.get(reverse('courses:matrix_list'))
+        self.assertContains(resposta, 'name="q"')
+        self.assertContains(resposta, 'Matriz, curso ou unidade...')
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Cenário 1 — Ciclo de vida completo da matriz (jornada única, ponta a ponta)
 # ══════════════════════════════════════════════════════════════════════════════

@@ -10,6 +10,16 @@
   <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
     <form method="get" class="filter-grid" id="matrix-filter-form">
 
+      <div class="flex-grow min-w-[200px]">
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Pesquisar</label>
+        <div class="relative">
+          <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input type="search" name="q" value="{{ request.GET.q }}"
+            placeholder="Matriz, curso ou unidade..."
+            class="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition font-semibold text-[#025c9f]">
+        </div>
+      </div>
+
       {% if is_desup %}
       <div class="flex-grow min-w-[160px]">
         <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Unidade</label>
