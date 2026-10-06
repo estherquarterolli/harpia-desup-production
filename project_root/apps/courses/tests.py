@@ -443,6 +443,25 @@ class MatrixPermissaoUnidadeTests(TestCase):
         resp = self.client.get(url)
         self.assertEqual(resp.status_code, 200)
 
+    def test_desup_edita_matriz_vigente(self):
+        """DESUP acessa a edição excepcional e recebe o alerta de vigência."""
+        self.client.force_login(self.desup)
+        url = reverse('courses:matrix_update', kwargs={'pk': self.matriz_vigente.pk})
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.context['editando_vigente'])
+        self.assertContains(resp, 'Você está editando uma matriz vigente')
+        self.assertContains(resp, 'Salvar alterações na matriz vigente')
+        self.assertNotContains(resp, 'Salvar como Rascunho')
+
+    def test_unidade_nao_edita_matriz_vigente(self):
+        """A exceção de edição da matriz vigente não se estende à unidade."""
+        self.client.force_login(self.coord)
+        url = reverse('courses:matrix_update', kwargs={'pk': self.matriz_vigente.pk})
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.url, reverse('courses:matrix_list'))
+
     # ── Visibilidade: rascunho invisível para a unidade ─────────────
     def test_unidade_nao_ve_rascunho_na_lista(self):
         """Na lista da unidade aparece a vigente, nunca o rascunho — nem forçando o filtro."""

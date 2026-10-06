@@ -149,21 +149,24 @@
                 class="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-xs font-bold transition-colors border border-amber-200">
                 <i class="ph ph-pencil-simple"></i> Editar Rascunho
               </a>
+              {% elif matrix.is_vigente and is_desup %}
+              <a href="{% url 'courses:matrix_update' matrix.pk %}"
+                class="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-[#025c9f] hover:bg-blue-100 rounded-lg text-xs font-bold transition-colors border border-blue-200">
+                <i class="ph ph-pencil-simple"></i> Editar Vigente
+              </a>
+              <form method="post" action="{% url 'courses:matrix_archive' matrix.pk %}"
+                onsubmit="return confirm('Arquivar esta matriz? Ela sairá de Vigentes e irá para o Histórico.');" class="inline">
+                {% csrf_token %}
+                <button type="submit"
+                  class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg text-xs font-bold transition-colors border border-slate-200">
+                  <i class="ph ph-archive"></i> Arquivar
+                </button>
+              </form>
               {% else %}
-              <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-50 text-slate-300 rounded-lg text-[10px] font-bold border border-slate-100" title="Apenas rascunhos podem ser editados">
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-50 text-slate-300 rounded-lg text-[10px] font-bold border border-slate-100" title="Matrizes do histórico devem ser reativadas antes da edição">
                 <i class="ph ph-lock-simple"></i> Bloqueado
               </span>
               {% if is_desup %}
-                {% if matrix.is_vigente %}
-                <form method="post" action="{% url 'courses:matrix_archive' matrix.pk %}"
-                  onsubmit="return confirm('Arquivar esta matriz? Ela sairá de Vigentes e irá para o Histórico.');" class="inline">
-                  {% csrf_token %}
-                  <button type="submit"
-                    class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg text-xs font-bold transition-colors border border-slate-200">
-                    <i class="ph ph-archive"></i> Arquivar
-                  </button>
-                </form>
-                {% else %}
                 <form method="post" action="{% url 'courses:matrix_reactivate' matrix.pk %}"
                   onsubmit="return confirm('Reativar esta matriz? Ela voltará para Vigentes.');" class="inline">
                   {% csrf_token %}
@@ -172,7 +175,6 @@
                     <i class="ph ph-arrow-counter-clockwise"></i> Reativar
                   </button>
                 </form>
-                {% endif %}
               {% endif %}
               {% endif %}
               </div>

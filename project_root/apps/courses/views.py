@@ -177,6 +177,13 @@ class CurriculumMatrixFormsetMixin:
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx['component_formset'] = kwargs.get('component_formset') or self.get_component_formset()
+        matrix = getattr(self, 'object', None)
+        ctx['editando_vigente'] = bool(
+            matrix
+            and matrix.pk
+            and matrix.is_vigente
+            and not matrix.is_rascunho
+        )
         unidade = getattr(self.request.user, 'unidade', None)
         if self.request.user.perfil == 'DESUP':
             uid = self.request.GET.get('unidade_id') or self.request.POST.get('unidade')
@@ -203,6 +210,14 @@ class CurriculumMatrixFormsetMixin:
         return ctx
 
     def form_valid(self, form):
+        # O status da matriz não faz parte do ModelForm. Guardamos o estado atual
+        # antes do save para impedir que um POST forjado rebaixe uma matriz vigente
+        # para rascunho durante a edição excepcional permitida à DESUP.
+        editando_vigente = bool(
+            form.instance.pk
+            and form.instance.is_vigente
+            and not form.instance.is_rascunho
+        )
         self.object = form.save(commit=False)
         component_formset = self.get_component_formset()
 
@@ -211,9 +226,16 @@ class CurriculumMatrixFormsetMixin:
                 self.get_context_data(form=form, component_formset=component_formset)
             )
 
-        # Salvar Rascunho vs Salvar e Publicar
-        salvar_rascunho = self.request.POST.get('salvar_rascunho') == 'true'
-        if salvar_rascunho:
+        # Uma matriz já vigente continua vigente. A opção rascunho existe somente
+        # nos fluxos de criação e de edição de um rascunho.
+        salvar_rascunho = (
+            not editando_vigente
+            and self.request.POST.get('salvar_rascunho') == 'true'
+        )
+        if editando_vigente:
+            self.object.is_rascunho = False
+            self.object.is_vigente = True
+        elif salvar_rascunho:
             self.object.is_rascunho = True
             self.object.is_vigente = False
         else:
@@ -227,7 +249,23 @@ class CurriculumMatrixFormsetMixin:
         form.save_m2m()
         component_formset.instance = self.object
         component_formset.save()
-        messages.success(self.request, 'Matriz salva com sucesso.')
+
+        if editando_vigente:
+            from apps.accounts.views import registrar_auditoria
+
+            sigla = self.object.curso.sigla if self.object.curso_id else '?'
+            registrar_auditoria(
+                self.request,
+                acao='MATRIZ_VIGENTE_EDITADA',
+                usuario=self.request.user,
+                detalhes=(
+                    f'Matriz vigente #{self.object.pk} "{self.object.nome}" '
+                    f'({sigla}) editada.'
+                ),
+            )
+            messages.success(self.request, 'Matriz vigente atualizada com sucesso.')
+        else:
+            messages.success(self.request, 'Matriz salva com sucesso.')
         return redirect(self.get_success_url())
 
 
@@ -283,9 +321,13 @@ class CurriculumMatrixUpdateView(CurriculumMatrixFormsetMixin, MatrixBaseView, U
 
         obj = self.get_object()
 
-        # Regra principal: APENAS matrizes em rascunho podem ser editadas
-        if not obj.is_rascunho:
-            messages.error(request, 'Somente matrizes com status Rascunho podem ser editadas.')
+        # A DESUP pode editar rascunhos e, excepcionalmente, matrizes vigentes.
+        # Matrizes históricas continuam bloqueadas: devem ser reativadas primeiro.
+        if not obj.is_rascunho and not obj.is_vigente:
+            messages.error(
+                request,
+                'Matrizes do histórico não podem ser editadas. Reative a matriz primeiro.',
+            )
             return redirect('courses:matrix_list')
 
         return super().dispatch(request, *args, **kwargs)

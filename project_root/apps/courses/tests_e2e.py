@@ -355,12 +355,31 @@ class MatrizCicloDeVidaE2ETests(BaseCoursesE2ETests):
         resp = self.client.get(reverse('courses:matrix_list'), {'status': 'rascunho'})
         self.assertNotIn(matriz.pk, self.pks_da_lista(resp))
 
-        # ── Passo 8: matriz publicada não é mais editável ─────────────
+        # ── Passo 8: DESUP edita a vigente, sem poder rebaixá-la ──────
         resp = self.client.get(url_edicao)
-        self.assertEqual(resp.status_code, 302)
-        self.assertEqual(resp.url, reverse('courses:matrix_list'))
-        self.assertIn('Somente matrizes com status Rascunho podem ser editadas.',
-                      self.mensagens(resp))
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.context['editando_vigente'])
+        self.assertContains(resp, 'Você está editando uma matriz vigente')
+
+        # Mesmo forjando salvar_rascunho='true', a matriz editada permanece vigente.
+        resp = self.client.post(url_edicao, data=payload_matriz(
+            curso=self.curso, unidades=[self.unidade_a], nome='MC-CEA-2026',
+            linhas=[
+                linha_componente(self.algoritmos, '1º Semestre', id=comp.pk),
+                linha_componente(self.calculo, '3º Semestre', id=calc.pk),
+            ],
+            rascunho=True, initial_forms=2,
+        ))
+        self.assertEqual(resp.status_code, 302, resp.content[:400])
+        matriz.refresh_from_db()
+        calc.refresh_from_db()
+        self.assertTrue(matriz.is_vigente)
+        self.assertFalse(matriz.is_rascunho)
+        self.assertEqual(calc.periodo, '3º Semestre')
+
+        auditoria = AuditoriaGlobal.objects.get(acao='MATRIZ_VIGENTE_EDITADA')
+        self.assertEqual(auditoria.usuario_id, self.desup.id)
+        self.assertIn(f'#{matriz.pk}', auditoria.detalhes)
 
         # ── Passo 9: detalhe da matriz publicada ──────────────────────
         resp = self.client.get(reverse('courses:matrix_detail', kwargs={'pk': matriz.pk}))
@@ -385,6 +404,15 @@ class MatrizCicloDeVidaE2ETests(BaseCoursesE2ETests):
         self.assertIn(matriz.pk, self.pks_da_lista(resp))
         resp = self.client.get(reverse('courses:matrix_list'), {'status': 'vigente'})
         self.assertNotIn(matriz.pk, self.pks_da_lista(resp))
+
+        # Histórico continua protegido: a DESUP precisa reativar antes de editar.
+        resp = self.client.get(url_edicao)
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.url, reverse('courses:matrix_list'))
+        self.assertIn(
+            'Matrizes do histórico não podem ser editadas. Reative a matriz primeiro.',
+            self.mensagens(resp),
+        )
 
         # ── Passo 11: REATIVAR → volta para Vigentes ──────────────────
         resp = self.client.post(reverse('courses:matrix_reactivate', kwargs={'pk': matriz.pk}))

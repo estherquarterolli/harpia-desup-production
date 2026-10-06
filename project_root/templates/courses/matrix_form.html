@@ -14,6 +14,16 @@
     <span class="breadcrumb-item-active">{% if form.instance.pk %}Editar{% else %}Nova Matriz{% endif %}</span>
   </nav>
 
+  {% if editando_vigente %}
+  <div class="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800" role="alert">
+    <i class="ph ph-warning-circle mt-0.5 text-xl" aria-hidden="true"></i>
+    <div>
+      <p class="text-sm font-black">Você está editando uma matriz vigente</p>
+      <p class="mt-1 text-xs font-semibold">As alterações entrarão em uso imediatamente após salvar. A matriz continuará com o status Vigente.</p>
+    </div>
+  </div>
+  {% endif %}
+
   <form method="POST" id="form-matriz" class="space-y-6">
     {% csrf_token %}
 
@@ -236,6 +246,12 @@
         class="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-black py-3.5 rounded-xl text-xs transition-colors uppercase shadow-sm">
         <i class="ph ph-x-circle text-base"></i> Cancelar
       </a>
+      {% if editando_vigente %}
+      <button type="submit" onclick="document.getElementById('id_salvar_rascunho').value='false';"
+        class="flex-1 flex items-center justify-center gap-2 bg-[#025c9f] hover:bg-[#153e70] text-white font-bold py-3.5 rounded-xl text-sm transition-colors uppercase">
+        <i class="ph ph-check-circle text-base"></i> Salvar alterações na matriz vigente
+      </button>
+      {% else %}
       <button type="submit" onclick="document.getElementById('id_salvar_rascunho').value='true';"
         class="flex-1 flex items-center justify-center bg-slate-500 hover:bg-slate-600 text-white font-bold py-3.5 rounded-xl text-sm transition-all hover:scale-105 uppercase">
         Salvar como Rascunho
@@ -244,6 +260,7 @@
         class="flex-1 flex items-center justify-center bg-[#025c9f] hover:bg-[#153e70] text-white font-bold py-3.5 rounded-xl text-sm transition-all hover:scale-105 uppercase">
         Salvar e Publicar
       </button>
+      {% endif %}
     </div>
   </form>
 </div>
