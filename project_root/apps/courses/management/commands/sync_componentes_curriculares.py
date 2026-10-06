@@ -1,6 +1,6 @@
 """
 Sincroniza o catálogo de Componentes Curriculares com a lista oficial da DESUP
-(seeds/data/componentes_curriculares.csv). Idempotente: pode ser rodado várias vezes.
+(apps/courses/data/componentes_curriculares.csv). Idempotente: pode ser rodado várias vezes.
 
 Casa componentes já existentes SOMENTE por codigo exato (ex.: uma rodada
 anterior parcial ja tenha usado o codigo certo). Nao tenta casar por
@@ -32,7 +32,13 @@ from django.db.models import ProtectedError
 
 from apps.courses.models import CurricularComponent
 
-DEFAULT_CSV_PATH = Path(settings.BASE_DIR) / "seeds" / "data" / "componentes_curriculares.csv"
+DEFAULT_CSV_PATH = (
+    Path(settings.BASE_DIR)
+    / "apps"
+    / "courses"
+    / "data"
+    / "componentes_curriculares.csv"
+)
 
 
 def _normalizar(texto):

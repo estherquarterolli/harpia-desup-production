@@ -2,9 +2,6 @@
   "scripts": {
     "build:css": "tailwindcss -c tailwind.config.js -i project_root/static/css/tailwind-input.css -o project_root/static/css/tailwind.min.css --minify"
   },
-  "dependencies": {
-    "lucide-react": "^1.8.0"
-  },
   "devDependencies": {
     "tailwindcss": "^3.4.17"
   }
