@@ -83,8 +83,8 @@ def payload_matriz(*, curso, unidades, nome, linhas, turno='M', rascunho=False, 
         f'{PREFIXO}-MIN_NUM_FORMS': '1',
         f'{PREFIXO}-MAX_NUM_FORMS': '1000',
     }
-    # 'salvar_rascunho' != 'true' significa publicar (a tela envia 'false').
-    data['salvar_rascunho'] = 'true' if rascunho else 'false'
+    # O botão clicado define explicitamente a ação, sem depender de JavaScript.
+    data['acao'] = 'salvar_rascunho' if rascunho else 'publicar'
     for i, linha in enumerate(linhas):
         for campo, valor in linha.items():
             data[f'{PREFIXO}-{i}-{campo}'] = valor
@@ -284,8 +284,11 @@ class MatrizCicloDeVidaE2ETests(BaseCoursesE2ETests):
         resp = self.client.get(reverse('courses:matrix_create'))
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(resp.context['is_desup'])
-        # A tela nasce com 4 linhas em branco: max(initial, min_num=1) + extra=3.
-        self.assertEqual(resp.context['component_formset'].total_form_count(), 4)
+        # A tela nasce com uma única linha; outras são adicionadas sob demanda.
+        self.assertEqual(resp.context['component_formset'].total_form_count(), 1)
+        self.assertContains(resp, 'name="acao"')
+        self.assertContains(resp, 'value="salvar_rascunho"')
+        self.assertContains(resp, 'value="publicar"')
 
         # ── Passo 2: salvar como RASCUNHO com 1 componente ────────────
         resp = self.client.post(
@@ -297,7 +300,10 @@ class MatrizCicloDeVidaE2ETests(BaseCoursesE2ETests):
             ),
         )
         self.assertEqual(resp.status_code, 302, resp.content[:400])
-        self.assertEqual(resp.url, reverse('courses:matrix_list'))
+        self.assertEqual(
+            resp.url,
+            f"{reverse('courses:matrix_list')}?status=rascunho",
+        )
 
         matriz = CurriculumMatrix.objects.get(nome='MC-CEA-2026')
         self.assertTrue(matriz.is_rascunho)
@@ -322,7 +328,9 @@ class MatrizCicloDeVidaE2ETests(BaseCoursesE2ETests):
 
         # ── Passo 4: editar o rascunho ADICIONANDO um componente ──────
         url_edicao = reverse('courses:matrix_update', kwargs={'pk': matriz.pk})
-        self.assertEqual(self.client.get(url_edicao).status_code, 200)
+        resp_edicao = self.client.get(url_edicao)
+        self.assertEqual(resp_edicao.status_code, 200)
+        self.assertEqual(resp_edicao.context['component_formset'].total_form_count(), 1)
 
         resp = self.client.post(url_edicao, data=payload_matriz(
             curso=self.curso, unidades=[self.unidade_a], nome='MC-CEA-2026',
@@ -333,6 +341,10 @@ class MatrizCicloDeVidaE2ETests(BaseCoursesE2ETests):
             rascunho=True, initial_forms=1,
         ))
         self.assertEqual(resp.status_code, 302, resp.content[:400])
+        self.assertEqual(
+            resp.url,
+            f"{reverse('courses:matrix_list')}?status=rascunho",
+        )
         self.assertEqual(matriz.componentes_da_matriz.count(), 2)
         novo = matriz.componentes_da_matriz.get(componente_curricular=self.estrutura)
         self.assertEqual(novo.carga_horaria, 60)   # CH padrão da disciplina
@@ -349,12 +361,16 @@ class MatrizCicloDeVidaE2ETests(BaseCoursesE2ETests):
             rascunho=True, initial_forms=2,
         ))
         self.assertEqual(resp.status_code, 302, resp.content[:400])
+        self.assertEqual(
+            resp.url,
+            f"{reverse('courses:matrix_list')}?status=rascunho",
+        )
         self.assertEqual(matriz.componentes_da_matriz.count(), 1)
         self.assertFalse(MatrixComponent.objects.filter(pk=novo.pk).exists())
         matriz.refresh_from_db()
         self.assertTrue(matriz.is_rascunho, 'Salvar rascunho não pode publicar a matriz.')
 
-        # ── Passo 6: PUBLICAR (salvar_rascunho='false') ───────────────
+        # ── Passo 6: PUBLICAR (ação explícita do botão) ───────────────
         resp = self.client.post(url_edicao, data=payload_matriz(
             curso=self.curso, unidades=[self.unidade_a], nome='MC-CEA-2026',
             linhas=[
@@ -364,6 +380,10 @@ class MatrizCicloDeVidaE2ETests(BaseCoursesE2ETests):
             rascunho=False, initial_forms=1,
         ))
         self.assertEqual(resp.status_code, 302, resp.content[:400])
+        self.assertEqual(
+            resp.url,
+            f"{reverse('courses:matrix_list')}?status=vigente",
+        )
         matriz.refresh_from_db()
         self.assertTrue(matriz.is_vigente)
         self.assertFalse(matriz.is_rascunho)
@@ -386,7 +406,7 @@ class MatrizCicloDeVidaE2ETests(BaseCoursesE2ETests):
         self.assertTrue(resp.context['editando_vigente'])
         self.assertContains(resp, 'Você está editando uma matriz vigente')
 
-        # Mesmo forjando salvar_rascunho='true', a matriz editada permanece vigente.
+        # Mesmo pedindo a ação de rascunho, a matriz editada permanece vigente.
         resp = self.client.post(url_edicao, data=payload_matriz(
             curso=self.curso, unidades=[self.unidade_a], nome='MC-CEA-2026',
             linhas=[

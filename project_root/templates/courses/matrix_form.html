@@ -240,23 +240,22 @@
     </div>
 
     <!-- Botões de Ação -->
-    <input type="hidden" name="salvar_rascunho" id="id_salvar_rascunho" value="false">
     <div class="flex flex-col sm:flex-row gap-3 mt-6">
       <a href="{% url 'courses:matrix_list' %}"
         class="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-black py-3.5 rounded-xl text-xs transition-colors uppercase shadow-sm">
         <i class="ph ph-x-circle text-base"></i> Cancelar
       </a>
       {% if editando_vigente %}
-      <button type="submit" onclick="document.getElementById('id_salvar_rascunho').value='false';"
+      <button type="submit" name="acao" value="salvar_vigente"
         class="flex-1 flex items-center justify-center gap-2 bg-[#025c9f] hover:bg-[#153e70] text-white font-bold py-3.5 rounded-xl text-sm transition-colors uppercase">
         <i class="ph ph-check-circle text-base"></i> Salvar alterações na matriz vigente
       </button>
       {% else %}
-      <button type="submit" onclick="document.getElementById('id_salvar_rascunho').value='true';"
+      <button type="submit" name="acao" value="salvar_rascunho"
         class="flex-1 flex items-center justify-center bg-slate-500 hover:bg-slate-600 text-white font-bold py-3.5 rounded-xl text-sm transition-all hover:scale-105 uppercase">
         Salvar como Rascunho
       </button>
-      <button type="submit" onclick="document.getElementById('id_salvar_rascunho').value='false';"
+      <button type="submit" name="acao" value="publicar"
         class="flex-1 flex items-center justify-center bg-[#025c9f] hover:bg-[#153e70] text-white font-bold py-3.5 rounded-xl text-sm transition-all hover:scale-105 uppercase">
         Salvar e Publicar
       </button>

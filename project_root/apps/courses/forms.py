@@ -223,7 +223,10 @@ MatrixComponentFormSet = inlineformset_factory(
     MatrixComponent,
     form=MatrixComponentForm,
     fields=MatrixComponentForm.Meta.fields,
-    extra=3,
+    # Na criação, min_num garante uma linha inicial. Na edição, mostrar apenas
+    # os componentes realmente salvos; novas linhas são adicionadas pelo botão
+    # "Adicionar componente". Evita três linhas vazias a cada reabertura.
+    extra=0,
     can_delete=True,
     min_num=1,
     validate_min=True,

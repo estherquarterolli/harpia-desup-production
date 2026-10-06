@@ -244,11 +244,22 @@ class CurriculumMatrixFormsetMixin:
                 self.get_context_data(form=form, component_formset=component_formset)
             )
 
+        # Os botões enviam a ação nativamente, sem depender de JavaScript. O campo
+        # antigo continua aceito para compatibilidade com integrações e abas que
+        # possam ter sido abertas antes desta atualização.
+        acao = self.request.POST.get('acao')
+        if acao == 'salvar_rascunho':
+            solicitou_rascunho = True
+        elif acao in {'publicar', 'salvar_vigente'}:
+            solicitou_rascunho = False
+        else:
+            solicitou_rascunho = self.request.POST.get('salvar_rascunho') == 'true'
+
         # Uma matriz já vigente continua vigente. A opção rascunho existe somente
         # nos fluxos de criação e de edição de um rascunho.
         salvar_rascunho = (
             not editando_vigente
-            and self.request.POST.get('salvar_rascunho') == 'true'
+            and solicitou_rascunho
         )
         if editando_vigente:
             self.object.is_rascunho = False
@@ -284,7 +295,11 @@ class CurriculumMatrixFormsetMixin:
             messages.success(self.request, 'Matriz vigente atualizada com sucesso.')
         else:
             messages.success(self.request, 'Matriz salva com sucesso.')
-        return redirect(self.get_success_url())
+
+        # Leva o usuário diretamente à lista correspondente ao que acabou de
+        # salvar. Assim o rascunho não "some" entre matrizes vigentes/paginação.
+        status_destino = 'rascunho' if self.object.is_rascunho else 'vigente'
+        return redirect(f'{self.get_success_url()}?status={status_destino}')
 
 
 class CurriculumMatrixCreateView(CurriculumMatrixFormsetMixin, MatrixBaseView, CreateView):

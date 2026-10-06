@@ -70,7 +70,7 @@
           <select name="status"
             class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition pr-10 appearance-none select-custom font-semibold text-[#025c9f]">
             <option value="">Todos os Status</option>
-            <option value="vigente" {% if request.GET.status == 'vigente' or not request.GET.status and request.GET.status != '' %}selected{% endif %}>Vigentes</option>
+            <option value="vigente" {% if request.GET.status == 'vigente' %}selected{% endif %}>Vigentes</option>
             <option value="rascunho" {% if request.GET.status == 'rascunho' %}selected{% endif %}>Rascunhos</option>
             <option value="historico" {% if request.GET.status == 'historico' %}selected{% endif %}>Histórico (Anteriores)</option>
           </select>
