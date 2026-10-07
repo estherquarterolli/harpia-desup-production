@@ -52,6 +52,29 @@ class CurriculumMatrixForm(forms.ModelForm):
         ]
 
 
+class CatalogoChoiceField(forms.ModelChoiceField):
+    """ModelChoiceField que valida contra um dicionário já carregado.
+
+    Num formset com dezenas de linhas, o ModelChoiceField padrão faz um
+    ``queryset.get()`` por linha no POST. Com o banco remoto, cada ida e volta
+    custa caro; aqui o catálogo é lido uma única vez pelo formset.
+    """
+
+    catalogo_cache = None
+
+    def to_python(self, value):
+        if self.catalogo_cache is None or value in self.empty_values:
+            return super().to_python(value)
+        try:
+            return self.catalogo_cache[int(value)]
+        except (KeyError, TypeError, ValueError):
+            raise forms.ValidationError(
+                self.error_messages['invalid_choice'],
+                code='invalid_choice',
+                params={'value': value},
+            )
+
+
 class MatrixComponentForm(forms.ModelForm):
     # Não é campo do model — chave que decide, por linha, se a disciplina vem do
     # catálogo (`componente_curricular`) ou é digitada na hora (`nome_temporario`).
@@ -64,6 +87,7 @@ class MatrixComponentForm(forms.ModelForm):
 
     class Meta:
         model = MatrixComponent
+        field_classes = {'componente_curricular': CatalogoChoiceField}
         fields = [
             'componente_curricular',
             'nome_temporario',
@@ -111,7 +135,7 @@ class MatrixComponentForm(forms.ModelForm):
             'observacoes': forms.HiddenInput(),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, catalogo_cache=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['codigo'].required = False
         self.fields['carga_horaria'].required = False
@@ -122,6 +146,12 @@ class MatrixComponentForm(forms.ModelForm):
         # temporária em vez de catálogo — quem garante "um dos dois" é o clean().
         self.fields['componente_curricular'].required = False
         self.fields['componente_curricular'].queryset = CurricularComponent.objects.all().order_by('nome')
+        self.fields['componente_curricular'].catalogo_cache = catalogo_cache
+        # A tela escolhe a disciplina pelo autocomplete (o <select> fica oculto e o
+        # JS cria as <option> sob demanda). Renderizar o catálogo inteiro em cada
+        # linha gerava uma consulta e centenas de <option> por linha; aqui o
+        # select leva só a disciplina atualmente escolhida.
+        self.fields['componente_curricular'].widget.choices = self._choices_disciplina_atual(catalogo_cache)
 
         if self.instance.pk and self.instance.componente_curricular_id is None and self.instance.nome_temporario:
             self.fields['usar_disciplina_temporaria'].initial = True
@@ -139,6 +169,20 @@ class MatrixComponentForm(forms.ModelForm):
         # CH — a DESUP digita direto. Por isso `carga_horaria` só fica travada
         # (herdada do catálogo) quando a linha NÃO está em modo temporário.
         self.fields['carga_horaria'].disabled = not self._usar_temporaria_ativo()
+
+    def _choices_disciplina_atual(self, catalogo_cache):
+        choices = [('', '---------')]
+        if self.is_bound:
+            raw = self.data.get(self.add_prefix('componente_curricular'))
+            try:
+                atual = catalogo_cache.get(int(raw)) if catalogo_cache and raw else None
+            except (TypeError, ValueError):
+                atual = None
+        else:
+            atual = self.instance.componente_curricular if self.instance.componente_curricular_id else None
+        if atual is not None:
+            choices.append((atual.pk, str(atual)))
+        return choices
 
     def _usar_temporaria_ativo(self):
         """Se esta linha (pelo prefixo do formset) está em modo disciplina
@@ -229,6 +273,13 @@ class MatrixComponentBaseFormSet(BaseInlineFormSet):
     """
 
     def __init__(self, *args, **kwargs):
+        if kwargs.get('queryset') is None:
+            kwargs['queryset'] = MatrixComponent.objects.select_related('componente_curricular')
+        bound = kwargs.get('data') is not None or (args and args[0] is not None)
+        if bound:
+            # Um único SELECT para validar todas as linhas (ver CatalogoChoiceField).
+            catalogo = {c.pk: c for c in CurricularComponent.objects.all()}
+            kwargs['form_kwargs'] = {**(kwargs.get('form_kwargs') or {}), 'catalogo_cache': catalogo}
         super().__init__(*args, **kwargs)
         for form in self.extra_forms:
             form.empty_permitted = True
