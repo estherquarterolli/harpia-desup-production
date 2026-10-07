@@ -144,6 +144,21 @@
       </div>
       {% endif %}
 
+      <div id="component-bulk-actions" class="mx-4 mt-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 sm:mx-6 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <label class="inline-flex cursor-pointer items-center gap-2 text-xs font-bold text-[#025c9f]">
+            <input type="checkbox" id="select-all-components" class="h-4 w-4 rounded border-slate-300 text-[#025c9f] focus:ring-[#025c9f]">
+            Selecionar todos
+          </label>
+          <span id="selected-components-count" class="text-xs font-semibold text-slate-500">0 selecionados</span>
+        </div>
+        <button type="button" id="delete-selected-components" disabled
+          class="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-xs font-bold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto">
+          <i class="ph ph-trash text-base"></i>
+          Excluir selecionados
+        </button>
+      </div>
+
       <!-- Cabeçalho da tabela de componentes -->
       <div class="hidden md:grid grid-cols-12 gap-3 px-6 pt-4 pb-2">
         {% comment %}
@@ -162,9 +177,13 @@
 
       <div id="components-container" class="divide-y divide-slate-50 px-6">
         {% for component_form in component_formset %}
-        <div class="component-row py-4 {% if component_form.instance.pk and component_form.DELETE.value %}opacity-40{% endif %}">
+        <div class="component-row relative py-4 pl-9 {% if component_form.instance.pk and component_form.DELETE.value %}opacity-40{% endif %}">
           {{ component_form.id }}
           {% for hidden in component_form.hidden_fields %}{{ hidden }}{% endfor %}
+
+          <input type="checkbox"
+                 class="component-bulk-select absolute left-1 top-5 h-4 w-4 rounded border-slate-300 text-[#025c9f] focus:ring-[#025c9f]"
+                 aria-label="Selecionar componente para exclusão">
 
           <div class="grid grid-cols-12 gap-3 items-center">
 
@@ -647,21 +666,103 @@ function confirmarRemocaoComponenteMatriz(btn) {
   }).then(function(result) {
     if (result.isConfirmed) {
       const row = btn.closest('.component-row');
-      if (row) {
-        // A linha tem outros checkboxes (principalmente o modo "temporária").
-        // Marcar o primeiro deles ativava esse modo sem limpar a disciplina do
-        // catálogo e gerava o erro "Escolha apenas uma opção" ao salvar.
-        const checkbox = row.querySelector('input[name$="-DELETE"]');
-        if (!checkbox) return;
-        checkbox.checked = true;
-        row.style.transition = 'opacity .2s, transform .2s';
-        row.style.opacity = '0';
-        row.style.transform = 'translateY(-6px)';
-        setTimeout(() => row.style.display = 'none', 200);
-      }
+      if (row) marcarLinhaComponenteParaExclusao(row);
     }
   });
 }
+
+function linhasComponentesAtivas() {
+  if (!container) return [];
+  return Array.from(container.querySelectorAll('.component-row')).filter(row => {
+    const campoDelete = row.querySelector('input[name$="-DELETE"]');
+    return !(campoDelete && campoDelete.checked) && row.style.display !== 'none';
+  });
+}
+
+function atualizarAcoesEmLoteComponentes() {
+  const selecionarTodos = document.getElementById('select-all-components');
+  const excluirSelecionados = document.getElementById('delete-selected-components');
+  const contador = document.getElementById('selected-components-count');
+  if (!selecionarTodos || !excluirSelecionados || !contador) return;
+
+  const linhas = linhasComponentesAtivas();
+  const selecionadas = linhas.filter(row => {
+    const checkbox = row.querySelector('.component-bulk-select');
+    return checkbox && checkbox.checked;
+  });
+
+  selecionarTodos.disabled = linhas.length === 0;
+  selecionarTodos.checked = linhas.length > 0 && selecionadas.length === linhas.length;
+  selecionarTodos.indeterminate = selecionadas.length > 0 && selecionadas.length < linhas.length;
+  excluirSelecionados.disabled = selecionadas.length === 0;
+  contador.textContent = `${selecionadas.length} selecionado${selecionadas.length === 1 ? '' : 's'}`;
+}
+
+function marcarLinhaComponenteParaExclusao(row) {
+  // A linha contém outros checkboxes, principalmente o modo temporário e a
+  // seleção em lote. Somente o campo DELETE do formset pode excluir no banco.
+  const campoDelete = row.querySelector('input[name$="-DELETE"]');
+  if (!campoDelete) return;
+  campoDelete.checked = true;
+  const seletor = row.querySelector('.component-bulk-select');
+  if (seletor) seletor.checked = false;
+  row.style.transition = 'opacity .2s, transform .2s';
+  row.style.opacity = '0';
+  row.style.transform = 'translateY(-6px)';
+  setTimeout(() => {
+    row.style.display = 'none';
+    atualizarAcoesEmLoteComponentes();
+  }, 200);
+}
+
+const selecionarTodosComponentes = document.getElementById('select-all-components');
+const excluirComponentesSelecionados = document.getElementById('delete-selected-components');
+
+if (container) {
+  container.addEventListener('change', function(event) {
+    if (event.target.classList.contains('component-bulk-select')) {
+      atualizarAcoesEmLoteComponentes();
+    }
+  });
+}
+
+if (selecionarTodosComponentes) {
+  selecionarTodosComponentes.addEventListener('change', function() {
+    linhasComponentesAtivas().forEach(row => {
+      const checkbox = row.querySelector('.component-bulk-select');
+      if (checkbox) checkbox.checked = selecionarTodosComponentes.checked;
+    });
+    atualizarAcoesEmLoteComponentes();
+  });
+}
+
+if (excluirComponentesSelecionados) {
+  excluirComponentesSelecionados.addEventListener('click', function() {
+    const selecionadas = linhasComponentesAtivas().filter(row => {
+      const checkbox = row.querySelector('.component-bulk-select');
+      return checkbox && checkbox.checked;
+    });
+    if (!selecionadas.length) return;
+
+    Swal.fire({
+      title: `Excluir ${selecionadas.length} componente${selecionadas.length === 1 ? '' : 's'}?`,
+      text: 'As linhas selecionadas serão removidas quando a matriz for salva.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Sim, excluir',
+      cancelButtonText: 'Cancelar'
+    }).then(function(result) {
+      if (result.isConfirmed) {
+        selecionadas.forEach(marcarLinhaComponenteParaExclusao);
+        atualizarAcoesEmLoteComponentes();
+      }
+    });
+  });
+}
+
+atualizarAcoesEmLoteComponentes();
 
 // ── Adicionar componente dinamicamente ────────────────────────────────────
 function addComponent() {
@@ -705,6 +806,7 @@ function addComponent() {
   document.dispatchEvent(new CustomEvent('matrix:component-added', {
     detail: { row: newRow },
   }));
+  atualizarAcoesEmLoteComponentes();
 }
 
 const addComponentButton = document.getElementById('add-component');

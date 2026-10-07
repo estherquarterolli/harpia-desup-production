@@ -1349,6 +1349,13 @@ class FormsetMatrizE2ETests(BaseCoursesE2ETests):
         self.assertIn("row.querySelector('input[name$=\"-DELETE\"]')", html)
         self.assertNotIn("row.querySelector('input[type=\"checkbox\"]')", html)
 
+    def test_tela_permite_selecionar_e_excluir_varios_componentes(self):
+        html = self.client.get(reverse('courses:matrix_create')).content.decode()
+        self.assertIn('id="select-all-components"', html)
+        self.assertIn('class="component-bulk-select', html)
+        self.assertIn('id="delete-selected-components"', html)
+        self.assertIn('selecionadas.forEach(marcarLinhaComponenteParaExclusao)', html)
+
     def test_adicionar_componente_usa_evento_direto_sem_sobrescrever_funcao(self):
         html = self.client.get(reverse('courses:matrix_create')).content.decode()
         self.assertIn("addComponentButton.addEventListener('click', addComponent)", html)
@@ -1455,6 +1462,59 @@ class FormsetMatrizE2ETests(BaseCoursesE2ETests):
         matriz.refresh_from_db()
         self.assertTrue(matriz.is_rascunho)
         self.assertEqual(matriz.componentes_da_matriz.count(), 0)
+
+    def test_excluir_varios_componentes_de_uma_vez(self):
+        self.client.post(reverse('courses:matrix_create'), data=payload_matriz(
+            curso=self.curso,
+            unidades=[self.unidade_a],
+            nome='MC-EXCLUSAO-LOTE',
+            linhas=[
+                linha_componente(self.algoritmos, '1º Semestre'),
+                linha_componente(self.estrutura, '2º Semestre'),
+                linha_componente(self.calculo, '3º Semestre'),
+            ],
+            rascunho=True,
+        ))
+        matriz = CurriculumMatrix.objects.get(nome='MC-EXCLUSAO-LOTE')
+        componentes = {
+            componente.componente_curricular_id: componente
+            for componente in matriz.componentes_da_matriz.all()
+        }
+
+        resp = self.client.post(
+            reverse('courses:matrix_update', kwargs={'pk': matriz.pk}),
+            data=payload_matriz(
+                curso=self.curso,
+                unidades=[self.unidade_a],
+                nome='MC-EXCLUSAO-LOTE',
+                linhas=[
+                    linha_componente(
+                        self.algoritmos,
+                        '1º Semestre',
+                        id=componentes[self.algoritmos.pk].pk,
+                        DELETE='on',
+                    ),
+                    linha_componente(
+                        self.estrutura,
+                        '2º Semestre',
+                        id=componentes[self.estrutura.pk].pk,
+                        DELETE='on',
+                    ),
+                    linha_componente(
+                        self.calculo,
+                        '3º Semestre',
+                        id=componentes[self.calculo.pk].pk,
+                    ),
+                ],
+                rascunho=True,
+                initial_forms=3,
+            ),
+        )
+
+        self.assertEqual(resp.status_code, 302, resp.content[:400])
+        restantes = matriz.componentes_da_matriz.all()
+        self.assertEqual(restantes.count(), 1)
+        self.assertEqual(restantes.get().componente_curricular_id, self.calculo.pk)
 
     def test_criar_rascunho_sem_componentes_e_permitido(self):
         resp = self.client.post(reverse('courses:matrix_create'), data=payload_matriz(
