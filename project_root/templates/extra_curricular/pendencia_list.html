@@ -26,33 +26,11 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
 (COORDENADOR_UNIDADE; DESUP/superuser fazem bypass da janela).
 {% endcomment %}
 
-  {# ── Barra de filtros ── #}
-  <div class="flex flex-wrap items-end gap-3 mb-6">
-
-    {# Semestre #}
-    <div class="flex flex-col gap-1">
-      <label class="text-[10px] font-black text-[#025c9f] uppercase tracking-wide">Semestre</label>
-      <div class="relative">
-        <select id="filter-semestre" name="semestre"
-          hx-get="{% url 'extra_curricular:pendencia_list' %}"
-          hx-target="#pendencias-content"
-          hx-select="#pendencias-content"
-          hx-push-url="false"
-          hx-trigger="change"
-          hx-include="#filter-semestre,#filter-unidade"
-          class="bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer pr-10 appearance-none">
-          {% for s in semestres %}
-          <option value="{{ s }}" {% if s == semestre %}selected{% endif %}>{{ s }}</option>
-          {% endfor %}
-        </select>
-        <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
-      </div>
-    </div>
-
-    {# Unidade (só DESUP) #}
+  {# Unidade permanece visível; os demais filtros ficam recolhidos. #}
+  <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div class="w-full min-w-0 sm:max-w-md">
+      <label class="mb-1 block text-[10px] font-black uppercase tracking-wide text-[#025c9f]">Unidade</label>
     {% if is_desup %}
-    <div class="flex flex-col gap-1">
-      <label class="text-[10px] font-black text-[#025c9f] uppercase tracking-wide">Unidade</label>
       <div class="relative">
         <select id="filter-unidade" name="unidade_id"
           hx-get="{% url 'extra_curricular:pendencia_list' %}"
@@ -61,7 +39,8 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
           hx-push-url="false"
           hx-trigger="change"
           hx-include="#filter-semestre,#filter-unidade"
-          class="bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer pr-10 appearance-none">
+          hx-include="#filter-semestre,#filter-unidade,#search-docente,#filter-status,#filter-justificativa"
+          class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer pr-10 appearance-none">
           <option value="">Todas as Unidades</option>
           {% for u in unidades %}
           <option value="{{ u.pk }}" {% if unidade_selecionada and unidade_selecionada.pk == u.pk %}selected{% endif %}>
@@ -71,16 +50,13 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
         </select>
         <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
       </div>
-    </div>
     {% else %}
-    {# Coordenador: exibe somente a própria unidade #}
-    <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm opacity-80 select-none">
+    <div class="flex min-h-[42px] w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm opacity-80 select-none">
       <i class="ph ph-buildings text-base"></i>
       {% if unidade_selecionada %}{{ unidade_selecionada.sigla }} — {{ unidade_selecionada.nome }}{% else %}—{% endif %}
     </div>
     {% endif %}
-
-    <div class="flex-1"></div>
+    </div>
 
     {% if not is_desup %}
     <a href="{% url 'extra_curricular:pendencia_create' %}"
@@ -89,8 +65,96 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
       Nova Justificativa
     </a>
     {% endif %}
-
   </div>
+
+  <details class="group mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-[#025c9f] sm:px-5">
+      <span class="flex min-w-0 items-center gap-2">
+        <i class="ph ph-funnel text-lg"></i>
+        Filtros e pesquisa
+      </span>
+      <span class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+        Clique para abrir
+        <i class="ph ph-caret-down text-base transition-transform group-open:rotate-180"></i>
+      </span>
+    </summary>
+
+    <div class="filter-grid border-t border-slate-100 bg-slate-50/50 p-4 sm:p-5">
+      <div>
+        <label class="mb-1 block text-[10px] font-black uppercase tracking-wide text-[#025c9f]">Semestre</label>
+        <div class="relative">
+          <select id="filter-semestre" name="semestre"
+            hx-get="{% url 'extra_curricular:pendencia_list' %}"
+            hx-target="#pendencias-content"
+            hx-select="#pendencias-content"
+            hx-push-url="false"
+            hx-trigger="change"
+            hx-include="#filter-semestre,#filter-unidade,#search-docente,#filter-status,#filter-justificativa"
+            class="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm font-bold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer">
+            {% for s in semestres %}
+            <option value="{{ s }}" {% if s == semestre %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+          <i class="ph ph-caret-down pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[#025c9f]"></i>
+        </div>
+      </div>
+
+      <div class="filter-wide">
+        <label class="mb-1 block text-[10px] font-black uppercase tracking-wide text-[#025c9f]">Pesquisar docente</label>
+        <div class="relative">
+          <input type="text" id="search-docente" name="q" value="{{ q }}" placeholder="Buscar por nome do docente..."
+            hx-get="{% url 'extra_curricular:pendencia_list' %}"
+            hx-target="#pendencias-content"
+            hx-select="#pendencias-content"
+            hx-trigger="input changed delay:500ms"
+            hx-include="#filter-semestre,#filter-unidade,#search-docente,#filter-status,#filter-justificativa"
+            class="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm font-semibold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f]" autocomplete="off">
+          <i class="ph ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-base text-slate-400"></i>
+        </div>
+      </div>
+
+      <div>
+        <label class="mb-1 block text-[10px] font-black uppercase tracking-wide text-[#025c9f]">Status</label>
+        <div class="relative">
+          <select id="filter-status" name="status"
+            hx-get="{% url 'extra_curricular:pendencia_list' %}"
+            hx-target="#pendencias-content"
+            hx-select="#pendencias-content"
+            hx-trigger="change"
+            hx-include="#filter-semestre,#filter-unidade,#search-docente,#filter-status,#filter-justificativa"
+            class="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm font-semibold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer">
+            <option value="">Todos os status</option>
+            <option value="rascunho" {% if status_filtro == 'rascunho' %}selected{% endif %}>Rascunho</option>
+            <option value="pendente" {% if status_filtro == 'pendente' %}selected{% endif %}>Pendente</option>
+            <option value="finalizado" {% if status_filtro == 'finalizado' %}selected{% endif %}>Finalizado</option>
+            <option value="indeferido" {% if status_filtro == 'indeferido' %}selected{% endif %}>Indeferido</option>
+            <option value="sem_registro" {% if status_filtro == 'sem_registro' %}selected{% endif %}>Sem registro</option>
+          </select>
+          <i class="ph ph-caret-down pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[#025c9f]"></i>
+        </div>
+      </div>
+
+      <div>
+        <label class="mb-1 block text-[10px] font-black uppercase tracking-wide text-[#025c9f]">Justificativa</label>
+        <div class="relative">
+          <select id="filter-justificativa" name="justificativa"
+            hx-get="{% url 'extra_curricular:pendencia_list' %}"
+            hx-target="#pendencias-content"
+            hx-select="#pendencias-content"
+            hx-trigger="change"
+            hx-include="#filter-semestre,#filter-unidade,#search-docente,#filter-status,#filter-justificativa"
+            class="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm font-semibold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer">
+            <option value="">Todos os tipos</option>
+            <option value="tcc" {% if justificativa_filtro == 'tcc' %}selected{% endif %}>Orientação de TCC</option>
+            <option value="extensao" {% if justificativa_filtro == 'extensao' %}selected{% endif %}>Atividade extensionista</option>
+            <option value="reducao" {% if justificativa_filtro == 'reducao' %}selected{% endif %}>Redução de CH</option>
+            <option value="sem_registro" {% if justificativa_filtro == 'sem_registro' %}selected{% endif %}>Sem registro</option>
+          </select>
+          <i class="ph ph-caret-down pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[#025c9f]"></i>
+        </div>
+      </div>
+    </div>
+  </details>
 
   <div id="pendencias-content">
 
@@ -112,72 +176,6 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
   {# ── Tabela de pendências ── #}
   {% else %}
   
-  {# Barra de filtros instantâneos #}
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6">
-    <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center gap-4">
-      <div class="w-full sm:flex-1 sm:min-w-[260px]">
-        <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Pesquisar Docente</label>
-        <div class="relative">
-          <input type="text" id="search-docente" name="q" value="{{ q }}" placeholder="Buscar por nome do docente..."
-            hx-get="{% url 'extra_curricular:pendencia_list' %}"
-            hx-target="#pendencias-content"
-            hx-select="#pendencias-content"
-            hx-trigger="input changed delay:500ms"
-            hx-include="#filter-semestre,#filter-unidade,#search-docente,#filter-status,#filter-justificativa"
-            class="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-sm font-semibold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f]" autocomplete="off">
-          <i class="ph ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-base"></i>
-        </div>
-      </div>
-      <div class="w-full sm:w-48">
-        <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Filtrar por Status</label>
-        <div class="relative">
-          <select id="filter-status" name="status"
-            hx-get="{% url 'extra_curricular:pendencia_list' %}"
-            hx-target="#pendencias-content"
-            hx-select="#pendencias-content"
-            hx-trigger="change"
-            hx-include="#filter-semestre,#filter-unidade,#search-docente,#filter-status,#filter-justificativa"
-            class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-semibold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer pr-10 appearance-none">
-            {% comment %}
-            CORR-015: os values são os MESMOS tokens usados pelo filtro server-side
-            (views.PendenciaListView, ?status=...) e pelo data-status das linhas.
-            {% endcomment %}
-            <option value="">Todos os Status</option>
-            <option value="rascunho" {% if status_filtro == 'rascunho' %}selected{% endif %}>Rascunho</option>
-            <option value="pendente" {% if status_filtro == 'pendente' %}selected{% endif %}>Pendente</option>
-            <option value="finalizado" {% if status_filtro == 'finalizado' %}selected{% endif %}>Finalizado</option>
-            <option value="indeferido" {% if status_filtro == 'indeferido' %}selected{% endif %}>Indeferido</option>
-            <option value="sem_registro" {% if status_filtro == 'sem_registro' %}selected{% endif %}>Sem registro</option>
-          </select>
-          <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
-        </div>
-      </div>
-      <div class="w-full sm:w-56">
-        <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Filtrar por Justificativa</label>
-        <div class="relative">
-          <select id="filter-justificativa" name="justificativa"
-            hx-get="{% url 'extra_curricular:pendencia_list' %}"
-            hx-target="#pendencias-content"
-            hx-select="#pendencias-content"
-            hx-trigger="change"
-            hx-include="#filter-semestre,#filter-unidade,#search-docente,#filter-status,#filter-justificativa"
-            class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm font-semibold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer pr-10 appearance-none">
-            {% comment %}
-            CORR-015: tokens sem acento, alinhados com o data-justificativa das linhas.
-            O antigo value="Sem registro" nunca casava (linha sem item tinha tipo vazio).
-            {% endcomment %}
-            <option value="">Todos os Tipos</option>
-            <option value="tcc" {% if justificativa_filtro == 'tcc' %}selected{% endif %}>Orientação de TCC</option>
-            <option value="extensao" {% if justificativa_filtro == 'extensao' %}selected{% endif %}>Atividade Extensionista</option>
-            <option value="reducao" {% if justificativa_filtro == 'reducao' %}selected{% endif %}>Redução de CH</option>
-            <option value="sem_registro" {% if justificativa_filtro == 'sem_registro' %}selected{% endif %}>Sem registro</option>
-          </select>
-          <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
     <div class="overflow-x-auto">
       <table class="w-full text-left min-w-[1000px] stack-table" id="pendencias-table">
