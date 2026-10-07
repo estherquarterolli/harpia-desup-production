@@ -302,7 +302,7 @@ class PendenciaLoteView(LoginRequiredMixin, PerfilRequiredMixin, View):
             unidade=user.unidade if user.perfil == "COORDENADOR_UNIDADE" else None,
             area_label='Justificativas',
             action_label='alterar justificativas extracurriculares',
-            target_label='mesa de trabalho',
+            target_label='alocação extracurricular em lote',
         ))
         return render(request, self.template_name, ctx)
 
@@ -466,7 +466,7 @@ class _BaseLoteItemSaveView(LoginRequiredMixin, PerfilRequiredMixin, View):
             request,
             area_label='Justificativas',
             action_label='alterar justificativas extracurriculares',
-            target_label='mesa de trabalho',
+            target_label='alocação extracurricular em lote',
             unidade=unidade,
             fallback_url=reverse_lazy('extra_curricular:pendencia_lote'),
         )
@@ -630,7 +630,7 @@ class EnviarParaDesupLoteView(LoginRequiredMixin, PerfilRequiredMixin, View):
             request,
             area_label='Justificativas',
             action_label='enviar justificativas para a DESUP',
-            target_label='mesa de trabalho',
+            target_label='alocação extracurricular em lote',
             unidade=request.user.unidade,
             fallback_url=reverse_lazy('extra_curricular:pendencia_lote'),
         )
@@ -687,7 +687,7 @@ class PendenciaSEIUpdateLoteView(LoginRequiredMixin, PerfilRequiredMixin, View):
             request,
             area_label='Justificativas',
             action_label='alterar SEI das justificativas',
-            target_label='mesa de trabalho',
+            target_label='alocação extracurricular em lote',
             unidade=request.user.unidade if request.user.perfil == "COORDENADOR_UNIDADE" else None,
             fallback_url=reverse_lazy('extra_curricular:pendencia_lote'),
         )

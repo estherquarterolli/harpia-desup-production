@@ -3,19 +3,19 @@
 
   {# Cabeçalho #}
   <button type="button" onclick="toggleAccordion('red')"
-    class="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50/60 transition-colors group">
-    <div class="flex items-center gap-3">
-      <span class="flex items-center justify-center w-9 h-9 rounded-xl bg-amber-50 border border-amber-100 text-amber-600 group-hover:bg-amber-100 transition-colors">
+    class="group flex w-full items-start justify-between gap-3 px-4 py-4 text-left transition-colors hover:bg-slate-50/60 sm:items-center sm:px-6">
+    <div class="flex min-w-0 items-start gap-3 sm:items-center">
+      <span class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-amber-100 bg-amber-50 text-amber-600 transition-colors group-hover:bg-amber-100">
         <i class="ph ph-scales text-lg"></i>
       </span>
-      <div>
+      <div class="min-w-0">
         <p class="text-sm font-black text-[#025c9f]">Redução de Carga Horária</p>
         <p class="text-[10px] text-slate-400">
           Somente reduções previstas pela legislação ou formalmente aprovadas
         </p>
       </div>
     </div>
-    <div class="flex items-center gap-3">
+    <div class="flex flex-shrink-0 items-center gap-2 sm:gap-3">
       <span class="text-xs font-bold text-slate-500">
         {{ red_items|length }} item{{ red_items|length|pluralize }}
       </span>
@@ -28,7 +28,7 @@
     <div class="border-t border-slate-100">
 
       {# Nota informativa #}
-      <div class="px-6 py-3 bg-amber-50/40 border-b border-amber-100/60 text-xs text-amber-700 flex items-center gap-2">
+      <div class="flex items-start gap-2 border-b border-amber-100/60 bg-amber-50/40 px-4 py-3 text-xs text-amber-700 sm:items-center sm:px-6">
         <i class="ph ph-file-text flex-shrink-0"></i>
         <span>
           <strong>Justificativa SEI obrigatória:</strong> Documentação comprobatória da legislação ou aprovação que fundamenta a redução de carga horária.
@@ -151,7 +151,7 @@
 
       {# ── Formulário de inserção (somente Coordenador) ── #}
       {% if is_coordenador %}
-      <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/30">
+      <div class="border-t border-slate-100 bg-slate-50/30 px-4 py-4 sm:px-6">
         <p class="text-[10px] font-black text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1">
           <i class="ph ph-plus-circle"></i> Adicionar Redução de CH
         </p>
@@ -191,7 +191,7 @@
           </div>
 
           <div class="mt-3 flex items-center gap-3">
-            <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#025c9f] text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors">
+            <button type="submit" class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#025c9f] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-[#153e70] sm:w-auto">
               <i class="ph ph-plus-circle"></i> <span id="btn-text-red">Adicionar professor ou redução</span>
             </button>
           </div>

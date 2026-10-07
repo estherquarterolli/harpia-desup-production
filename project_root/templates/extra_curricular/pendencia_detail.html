@@ -97,8 +97,8 @@
 
   {# ── Breadcrumb ── #}
   <nav class="breadcrumb-container mb-5" aria-label="Breadcrumb">
-    <a href="{% url 'extra_curricular:pendencia_list' %}" class="breadcrumb-item-link flex items-center gap-1">
-      <i class="ph ph-arrow-left"></i> Pendências
+    <a href="{% url 'extra_curricular:pendencia_list' %}" class="breadcrumb-item-link">
+      <i class="ph ph-arrow-left" aria-hidden="true"></i><span>Pendências</span>
     </a>
     <i class="ph ph-caret-right breadcrumb-separator"></i>
     <span class="breadcrumb-item-active">{{ object.professor.nome }}</span>

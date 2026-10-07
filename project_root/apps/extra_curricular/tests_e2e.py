@@ -552,6 +552,18 @@ class FluxoLoteUnidadeTests(_BaseFluxoE2E):
     def _ids(self, *professores):
         return ",".join(str(p.pk) for p in professores)
 
+    def test_tela_usa_nome_alocacao_extracurricular_em_lote(self):
+        self._login(self.coord_a)
+        resp = self.client.get(
+            reverse("extra_curricular:pendencia_lote"),
+            {"ids": self._ids(self.prof_a, self.prof_a2)},
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Alocação Extracurricular em Lote")
+        self.assertNotContains(resp, "Mesa de Trabalho Lote")
+        self.assertNotContains(resp, "Mesa de Justificativas em Lote")
+
     def test_jornada_em_lote_dois_docentes(self):
         resp = self._criar_pendencia_pela_rota([self.prof_a, self.prof_a2])
         ids = self._ids(self.prof_a, self.prof_a2)
@@ -1692,6 +1704,17 @@ class ListagemPendenciasTests(_BaseFluxoE2E):
         self.assertEqual(pks, {self.prof_a.pk, self.prof_a2.pk})
         self.assertEqual(resp.context["unidade_selecionada"], self.unidade_a)
         self.assertFalse(resp.context["is_desup"])
+
+    def test_filtros_iniciam_recolhidos_e_so_unidade_fica_fora(self):
+        self._login(self.desup)
+        resp = self.client.get(self.url, {"semestre": self.semestre})
+        html = resp.content.decode()
+
+        details_at = html.index('<details class="group')
+        self.assertLess(html.index('id="filter-unidade"'), details_at)
+        self.assertGreater(html.index('id="filter-semestre"'), details_at)
+        self.assertGreater(html.index('id="filter-status"'), details_at)
+        self.assertNotIn('<details open', html)
 
     def test_desup_ve_todas_as_unidades_e_filtra_por_unidade(self):
         self._login(self.desup)

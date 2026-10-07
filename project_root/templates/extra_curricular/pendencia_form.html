@@ -5,7 +5,7 @@
 {% block header_title %}Nova Justificativa Extracurricular{% endblock %}
 
 {% block content %}
-<div class="p-2 md:p-0 max-w-3xl">
+<div class="mx-auto w-full max-w-4xl p-1 sm:p-2 md:p-0">
 
   {% comment %}
   CORR-014: o aviso "Janela de entrega fechada" fica SÓ no base.html (o ramo de
@@ -17,26 +17,26 @@
 
   {# Breadcrumb #}
   <nav class="breadcrumb-container mb-5" aria-label="Breadcrumb">
-    <a href="{% url 'extra_curricular:pendencia_list' %}" class="breadcrumb-item-link flex items-center gap-1">
-      <i class="ph ph-arrow-left"></i> Pendências
+    <a href="{% url 'extra_curricular:pendencia_list' %}" class="breadcrumb-item-link">
+      <i class="ph ph-arrow-left" aria-hidden="true"></i><span>Pendências</span>
     </a>
     <i class="ph ph-caret-right breadcrumb-separator"></i>
     <span class="breadcrumb-item-active">Nova Justificativa</span>
   </nav>
 
   {# ── Tabela com Checkboxes de Docentes Pendentes ── #}
-  <form method="POST" class="mt-4"
+  <form method="POST" class="mt-4 min-w-0"
         {% if window_fechada and not is_desup %}data-window-lock="true" data-window-area="{{ window_area_label }}" data-window-action="{{ window_action_label }}" data-window-target="{{ window_target_label }}" data-window-message="{{ window_message }}"{% endif %}>
     {% csrf_token %}
     
-    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
-      <h3 class="text-sm font-black text-[#025c9f] uppercase tracking-wide">
+    <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <h3 class="text-sm font-black uppercase tracking-wide text-[#025c9f]">
         <i class="ph ph-chalkboard-teacher mr-1"></i> Docentes com Pendência (Semestre: {{ semestre_atual }})
       </h3>
       <p class="text-[10px] text-slate-400">Selecione os docentes para os quais deseja criar a justificativa em lote.</p>
     </div>
 
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto mb-6">
+    <div class="mb-6 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
       <table class="w-full text-left min-w-[500px] stack-table">
         <thead>
           <tr class="bg-slate-50 text-[10px] font-black text-[#025c9f] uppercase tracking-widest border-b border-slate-100">
@@ -51,16 +51,16 @@
         <tbody class="divide-y divide-slate-100">
           {% for prof in professores %}
           <tr class="hover:bg-slate-50/50 transition-colors">
-            <td class="px-5 py-3 text-center">
+            <td class="px-3 py-3 text-center sm:px-5" data-label="Selecionar">
               <input type="checkbox" name="professor_id" value="{{ prof.pk }}" class="prof-checkbox rounded border-slate-300 text-[#025c9f] focus:ring-[#025c9f] cursor-pointer">
             </td>
-            <td class="px-5 py-3">
+            <td class="px-3 py-3 sm:px-5">
               <span class="text-sm font-bold text-[#025c9f]">{{ prof.rh_nome }}</span>
             </td>
-            <td class="px-5 py-3 text-center" data-label="ID">
+            <td class="px-3 py-3 text-center sm:px-5" data-label="ID">
               <span class="text-xs text-slate-500">ID: {{ prof.id_funcional }}</span>
             </td>
-            <td class="px-5 py-3 text-center" data-label="CH Alocada / Meta">
+            <td class="px-3 py-3 text-center sm:px-5" data-label="CH Alocada / Meta">
               <span class="text-xs font-bold text-amber-600">{{ prof.ch_alocada }}h</span>
               <span class="text-xs text-slate-400 mx-1">/</span>
               <span class="text-xs font-bold text-slate-700">{{ prof.meta_horas_sala|default:20 }}h</span>
@@ -80,14 +80,14 @@
 
     {# Ações #}
     {% if professores %}
-    <div class="flex gap-3">
+    <div class="flex flex-col gap-3 sm:flex-row">
       <button type="submit"
-        class="flex-1 flex items-center justify-center gap-2 bg-[#025c9f] hover:bg-[#025c9f] text-white font-black py-3.5 px-6 rounded-xl shadow-md text-sm transition-all hover:scale-[1.01]">
+        class="flex w-full flex-1 items-center justify-center gap-2 rounded-xl bg-[#025c9f] px-4 py-3.5 text-sm font-black text-white shadow-md transition-colors hover:bg-[#153e70] sm:px-6">
         <i class="ph ph-arrow-right text-lg"></i>
         Prosseguir (Criar Rascunhos e Inserir Dados)
       </button>
       <a href="{% url 'extra_curricular:pendencia_list' %}"
-         class="px-5 py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl text-xs transition-colors text-center uppercase shadow-sm flex items-center justify-center gap-2">
+         class="flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-3.5 text-center text-xs font-black uppercase text-white shadow-sm transition-colors hover:bg-red-700 sm:w-auto">
         Cancelar
       </a>
     </div>

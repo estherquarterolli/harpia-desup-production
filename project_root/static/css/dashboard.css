@@ -297,20 +297,31 @@ h1, h2, h3, h4, h5, h6, .font-black {
 .breadcrumb-container {
     display: inline-flex;
     align-items: center;
+    flex-wrap: nowrap;
     gap: 0.5rem;
+    max-width: 100%;
     background-color: rgba(248, 250, 252, 0.85);
     border: 1px solid rgba(226, 232, 240, 0.7);
     padding: 0.45rem 1.15rem;
     border-radius: 0.75rem;
     font-size: 0.75rem;
     font-weight: 600;
+    line-height: 1.25rem;
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
 }
 .breadcrumb-item-active {
     color: #025c9f;
     font-weight: 800;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .breadcrumb-item-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: 0 0 auto;
     color: #64748b;
     transition: color 0.15s;
     font-weight: 600;
@@ -320,8 +331,24 @@ h1, h2, h3, h4, h5, h6, .font-black {
     color: #025c9f;
 }
 .breadcrumb-separator {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
     color: #94a3b8;
     font-size: 0.75rem;
+}
+.breadcrumb-container .ph {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+}
+
+@media (max-width: 639px) {
+    .breadcrumb-container {
+        gap: 0.35rem;
+        padding: 0.4rem 0.75rem;
+        font-size: 0.6875rem;
+    }
 }
 
 
