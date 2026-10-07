@@ -246,6 +246,22 @@ class DisciplinaTemporariaTests(TestCase):
         self.assertFalse(formset.is_valid())
         self.assertIn('nome_temporario', formset.errors[0])
 
+    def test_carga_semanal_temporaria_usa_decimal_com_duas_casas(self):
+        matrix, formset = self._formset({
+            'usar_disciplina_temporaria': 'on',
+            'nome_temporario': 'Disciplina de 53 horas',
+            'carga_horaria': '53',
+            'periodo': '5º Semestre',
+        })
+
+        self.assertTrue(formset.is_valid(), formset.errors)
+        matrix.save()
+        formset.instance = matrix
+        formset.save()
+
+        componente = matrix.componentes_da_matriz.get()
+        self.assertEqual(componente.carga_horaria_semanal, Decimal('2.65'))
+
     def test_modo_temporario_descarta_vinculo_de_catalogo_residual(self):
         """O checkbox define o modo mesmo se o autocomplete oculto ficou sujo."""
         cc = CurricularComponent.objects.create(

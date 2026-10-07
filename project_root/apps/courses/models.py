@@ -1,6 +1,14 @@
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import models
+
+
+def calcular_carga_horaria_semanal(carga_horaria):
+    """Calcula CH semanal em Decimal, sem resíduos de ponto flutuante."""
+    return (Decimal(str(carga_horaria)) / Decimal('20')).quantize(
+        Decimal('0.01'),
+        rounding=ROUND_HALF_UP,
+    )
 
 class Course(models.Model):
     """
@@ -283,7 +291,6 @@ class MatrixComponent(models.Model):
         db_table = "harpiadb_cursos_componente_matriz"
         verbose_name = "Componente da Matriz"
         verbose_name_plural = "Componentes da Matriz"
-        unique_together = ('matriz', 'componente_curricular')
         ordering = ['matriz', 'periodo', 'componente_curricular__nome']
 
     def clean(self):
@@ -328,7 +335,7 @@ class MatrixComponent(models.Model):
             if self.creditos is None:
                 self.creditos = self.carga_horaria // 20
             if self.carga_horaria_semanal is None:
-                self.carga_horaria_semanal = round(self.carga_horaria / 20, 2)
+                self.carga_horaria_semanal = calcular_carga_horaria_semanal(self.carga_horaria)
         super().save(*args, **kwargs)
         # Disciplina temporária não tem código de catálogo: gera um a partir do id
         # (autoincremento do banco) só para o campo não ficar vazio.

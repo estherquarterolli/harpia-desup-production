@@ -2,7 +2,15 @@
 from django import forms
 from django.forms import BaseInlineFormSet, inlineformset_factory
 
-from .models import ClassGroup, Course, CourseUnit, CurriculumMatrix, MatrixComponent, CurricularComponent
+from .models import (
+    ClassGroup,
+    Course,
+    CourseUnit,
+    CurriculumMatrix,
+    MatrixComponent,
+    CurricularComponent,
+    calcular_carga_horaria_semanal,
+)
 from apps.core.models import Unidade
 
 
@@ -156,6 +164,11 @@ class MatrixComponentForm(forms.ModelForm):
         if self.instance.pk and self.instance.componente_curricular_id is None and self.instance.nome_temporario:
             self.fields['usar_disciplina_temporaria'].initial = True
 
+        # O template precisa deste estado também ao re-renderizar um POST com
+        # erro. Basear-se apenas na instance escondia o nome temporário e deixava
+        # o campo de pesquisa do catálogo vazio, embora o checkbox estivesse marcado.
+        self.modo_temporario_ativo = self._usar_temporaria_ativo()
+
         # CORR-007: na matriz, o usuário só escolhe a **Disciplina** e o **Período**.
         # Todo o resto ('Código', 'CH Total', 'Créditos', 'CH Sem.') deriva da
         # disciplina e NÃO pode ser alterado pela DESUP — só via Django admin
@@ -168,7 +181,7 @@ class MatrixComponentForm(forms.ModelForm):
         # Exceção: disciplina TEMPORÁRIA não existe em lugar nenhum pra derivar a
         # CH — a DESUP digita direto. Por isso `carga_horaria` só fica travada
         # (herdada do catálogo) quando a linha NÃO está em modo temporário.
-        self.fields['carga_horaria'].disabled = not self._usar_temporaria_ativo()
+        self.fields['carga_horaria'].disabled = not self.modo_temporario_ativo
 
     def _choices_disciplina_atual(self, catalogo_cache):
         choices = [('', '---------')]
@@ -180,6 +193,7 @@ class MatrixComponentForm(forms.ModelForm):
                 atual = None
         else:
             atual = self.instance.componente_curricular if self.instance.componente_curricular_id else None
+        self.componente_curricular_nome_exibicao = atual.nome if atual is not None else ''
         if atual is not None:
             choices.append((atual.pk, str(atual)))
         return choices
@@ -225,7 +239,7 @@ class MatrixComponentForm(forms.ModelForm):
             # Mesma regra de derivação de créditos/CH semanal do fluxo de catálogo
             # (MatrixComponent.save()), só que a partir da CH digitada na hora.
             cleaned_data['creditos'] = ch // 20
-            cleaned_data['carga_horaria_semanal'] = round(ch / 20, 2)
+            cleaned_data['carga_horaria_semanal'] = calcular_carga_horaria_semanal(ch)
             return cleaned_data
 
         # Fluxo original (disciplina do catálogo) — inalterado.
@@ -255,7 +269,7 @@ class MatrixComponentForm(forms.ModelForm):
             # Créditos e CH semanal derivam da CH total, mesma regra de
             # CurricularComponentForm.clean() e de MatrixComponent.save().
             cleaned_data['creditos'] = ch // 20
-            cleaned_data['carga_horaria_semanal'] = round(ch / 20, 2)
+            cleaned_data['carga_horaria_semanal'] = calcular_carga_horaria_semanal(ch)
         else:
             self.add_error(
                 'componente_curricular',

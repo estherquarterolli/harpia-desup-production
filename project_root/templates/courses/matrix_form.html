@@ -191,7 +191,7 @@
             <div class="col-span-12 md:col-span-4 relative">
               <label class="md:hidden text-[10px] font-bold text-slate-400 uppercase mb-1 block">Disciplina</label>
 
-              <div class="disciplina-catalogo relative {% if component_form.instance.pk and not component_form.instance.componente_curricular_id and component_form.instance.nome_temporario %}hidden{% endif %}">
+              <div class="disciplina-catalogo relative {% if component_form.modo_temporario_ativo %}hidden{% endif %}">
                 {# Campo hidden que armazena o ID real do componente #}
                 <div class="hidden">{{ component_form.componente_curricular }}</div>
 
@@ -202,13 +202,13 @@
                   placeholder="Pesquisar disciplina..."
                   autocomplete="off"
                   data-hidden-id="{{ component_form.componente_curricular.html_name }}"
-                  value="{% if component_form.instance.pk and component_form.instance.componente_curricular %}{{ component_form.instance.componente_curricular.nome }}{% endif %}"
+                  value="{{ component_form.componente_curricular_nome_exibicao }}"
                 >
                 {# Dropdown de resultados #}
                 <div class="cc-dropdown hidden absolute z-20 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg mt-1 max-h-56 overflow-y-auto text-sm"></div>
               </div>
 
-              <div class="disciplina-temporaria {% if not component_form.instance.pk or component_form.instance.componente_curricular_id or not component_form.instance.nome_temporario %}hidden{% endif %}">
+              <div class="disciplina-temporaria {% if not component_form.modo_temporario_ativo %}hidden{% endif %}">
                 {{ component_form.nome_temporario }}
               </div>
 

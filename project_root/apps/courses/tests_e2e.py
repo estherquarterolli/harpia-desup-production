@@ -1530,8 +1530,8 @@ class FormsetMatrizE2ETests(BaseCoursesE2ETests):
         self.assertTrue(matriz.is_rascunho)
         self.assertEqual(matriz.componentes_da_matriz.count(), 0)
 
-    def test_disciplina_repetida_na_mesma_matriz_e_recusada(self):
-        """unique_together (matriz, componente_curricular) barra duplicidade."""
+    def test_disciplina_repetida_na_mesma_matriz_e_permitida(self):
+        """Cada ocorrência do componente é uma linha independente da matriz."""
         resp = self.client.post(reverse('courses:matrix_create'), data=payload_matriz(
             curso=self.curso, unidades=[self.unidade_a], nome='MC-DUP',
             linhas=[
@@ -1539,9 +1539,13 @@ class FormsetMatrizE2ETests(BaseCoursesE2ETests):
                 linha_componente(self.algoritmos, '2º Semestre'),
             ],
         ))
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.context['component_formset'].non_form_errors())
-        self.assertFalse(CurriculumMatrix.objects.filter(nome='MC-DUP').exists())
+        self.assertEqual(resp.status_code, 302, resp.content[:400])
+        matriz = CurriculumMatrix.objects.get(nome='MC-DUP')
+        self.assertEqual(matriz.componentes_da_matriz.count(), 2)
+        self.assertEqual(
+            set(matriz.componentes_da_matriz.values_list('periodo', flat=True)),
+            {'1º Semestre', '2º Semestre'},
+        )
 
     def _trocar_disciplina_do_rascunho(self):
         """Cria um rascunho com Algoritmos (80h) e troca a linha para Banco (40h)."""
