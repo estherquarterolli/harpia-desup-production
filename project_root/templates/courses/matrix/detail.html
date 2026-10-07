@@ -1,5 +1,5 @@
 ﻿{% extends 'base.html' %}
-{% load static %}
+{% load static l10n %}
 
 {% block title %}Visualizar Matriz Curricular — Harpia-DESUP{% endblock %}
 {% block header_title %}Matriz Curricular{% endblock %}
@@ -86,6 +86,9 @@
         <table class="w-full text-left text-sm text-slate-600 whitespace-nowrap stack-table">
           <thead class="bg-slate-100/50 text-xs font-bold text-[#025c9f] uppercase tracking-wider border-b border-slate-200">
             <tr>
+              <th class="px-4 py-3 w-10">
+                <input type="checkbox" id="sel-todos" class="rounded text-[#025c9f]" title="Selecionar todos" aria-label="Selecionar todos os componentes">
+              </th>
               <th class="px-4 py-3">Período</th>
               <th class="px-4 py-3">Cód</th>
               <th class="px-4 py-3">Disciplina</th>
@@ -96,7 +99,13 @@
           </thead>
           <tbody class="divide-y divide-slate-100">
             {% for comp in componentes %}
-            <tr class="hover:bg-slate-50">
+            <tr class="hover:bg-slate-50 linha-comp"
+                data-cred="{{ comp.creditos|default:0 }}"
+                data-ha="{{ comp.carga_horaria|default:0 }}"
+                data-hr="{{ comp.hr_total|unlocalize }}">
+              <td class="px-4 py-3">
+                <input type="checkbox" class="sel-comp rounded text-[#025c9f]" aria-label="Selecionar {{ comp.nome_disciplina }}">
+              </td>
               <td class="px-4 py-3 font-semibold" data-label="Período">{{ comp.periodo|default:"—" }}</td>
               <td class="px-4 py-3" data-label="Cód">{{ comp.codigo }}</td>
               <td class="px-4 py-3 font-bold text-slate-800">
@@ -108,11 +117,31 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="6" class="px-4 py-8 text-center text-slate-400">Nenhum componente cadastrado nesta matriz.</td>
+              <td colspan="7" class="px-4 py-8 text-center text-slate-400">Nenhum componente cadastrado nesta matriz.</td>
             </tr>
             {% endfor %}
           </tbody>
+          {% if componentes %}
+          <tfoot class="bg-slate-100/70 border-t-2 border-slate-200 font-black text-[#025c9f]">
+            <tr>
+              <td class="px-4 py-3"></td>
+              <td class="px-4 py-3 uppercase text-xs tracking-wider" colspan="3">Total da matriz ({{ componentes|length }} componente{{ componentes|length|pluralize }})</td>
+              <td class="px-4 py-3" data-label="Crédito">{{ total_creditos }}</td>
+              <td class="px-4 py-3" data-label="HA">{{ total_ha }}h</td>
+              <td class="px-4 py-3" data-label="HR">{{ total_hr|floatformat:2 }}h</td>
+            </tr>
+          </tfoot>
+          {% endif %}
         </table>
+      </div>
+
+      {# Soma dos componentes marcados — aparece só quando há seleção #}
+      <div id="soma-selecao" class="hidden items-center justify-between flex-wrap gap-x-6 gap-y-1 px-6 py-3 bg-blue-50 border-t border-blue-100 text-sm text-[#025c9f]" aria-live="polite">
+        <span class="font-black uppercase text-xs tracking-wider"><span id="soma-qtd">0</span> selecionado(s)</span>
+        <span class="font-bold">Crédito: <span id="soma-cred">0</span></span>
+        <span class="font-bold">HA: <span id="soma-ha">0</span>h</span>
+        <span class="font-bold">HR: <span id="soma-hr">0,00</span>h</span>
+        <button type="button" id="soma-limpar" class="text-xs font-bold underline hover:no-underline">Limpar seleção</button>
       </div>
     </div>
 
@@ -127,4 +156,41 @@
 
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const checks = Array.from(document.querySelectorAll('.sel-comp'));
+  const todos = document.getElementById('sel-todos');
+  const barra = document.getElementById('soma-selecao');
+  if (!barra || !checks.length) return;
+  const fmt = (n, c) => n.toLocaleString('pt-BR', { minimumFractionDigits: c, maximumFractionDigits: c });
+
+  function atualizar() {
+    let qtd = 0, cred = 0, ha = 0, hr = 0;
+    checks.forEach(chk => {
+      const linha = chk.closest('.linha-comp');
+      linha.classList.toggle('bg-blue-50', chk.checked);
+      if (!chk.checked) return;
+      qtd++;
+      cred += parseFloat(linha.dataset.cred) || 0;
+      ha += parseFloat(linha.dataset.ha) || 0;
+      hr += parseFloat(linha.dataset.hr) || 0;
+    });
+    document.getElementById('soma-qtd').textContent = qtd;
+    document.getElementById('soma-cred').textContent = fmt(cred, 0);
+    document.getElementById('soma-ha').textContent = fmt(ha, 0);
+    document.getElementById('soma-hr').textContent = fmt(hr, 2);
+    barra.classList.toggle('hidden', qtd === 0);
+    barra.classList.toggle('flex', qtd > 0);
+    todos.checked = qtd === checks.length;
+    todos.indeterminate = qtd > 0 && qtd < checks.length;
+  }
+
+  checks.forEach(c => c.addEventListener('change', atualizar));
+  todos.addEventListener('change', () => { checks.forEach(c => { c.checked = todos.checked; }); atualizar(); });
+  document.getElementById('soma-limpar').addEventListener('click', () => { checks.forEach(c => { c.checked = false; }); atualizar(); });
+})();
+</script>
 {% endblock %}

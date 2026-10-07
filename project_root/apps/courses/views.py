@@ -386,7 +386,11 @@ class CurriculumMatrixDetailView(MatrixBaseView, DetailView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx['componentes'] = self.object.componentes_da_matriz.select_related('componente_curricular').all()
+        componentes = list(self.object.componentes_da_matriz.select_related('componente_curricular'))
+        ctx['componentes'] = componentes
+        ctx['total_creditos'] = sum(c.creditos or 0 for c in componentes)
+        ctx['total_ha'] = sum(c.carga_horaria or 0 for c in componentes)
+        ctx['total_hr'] = sum(c.hr_total for c in componentes)
         ctx['is_desup'] = self.request.user.perfil == 'DESUP' or self.request.user.is_superuser
         return ctx
 
