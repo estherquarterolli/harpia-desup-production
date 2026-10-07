@@ -588,17 +588,13 @@ class MatrixPermissaoUnidadeTests(TestCase):
         url = reverse('courses:matrix_detail', kwargs={'pk': self.matriz_rascunho.pk})
         self.assertEqual(self.client.get(url).status_code, 200)
 
-    def test_filtros_da_lista_iniciam_recolhidos_com_unidade_fora(self):
+    def test_filtros_da_lista_iniciam_recolhidos_sem_seletor_de_unidade(self):
         self.client.force_login(self.desup)
         html = self.client.get(reverse('courses:matrix_list')).content.decode()
 
-        self.assertIn('id="matrix-unit-filter"', html)
         self.assertIn('id="matrix-secondary-filters"', html)
         self.assertNotIn('id="matrix-secondary-filters" open', html)
-        self.assertLess(
-            html.index('id="matrix-unit-filter"'),
-            html.index('id="matrix-secondary-filters"'),
-        )
+        self.assertNotIn('id="id_unidade_select"', html)
 
 
 class MatrixCoexistenciaVigentesTests(TestCase):

@@ -8,38 +8,6 @@
 <div class="space-y-6">
 
   <form method="get" class="space-y-3" id="matrix-filter-form">
-    {# A unidade fica sempre visível; os demais filtros começam recolhidos. #}
-    <div id="matrix-unit-filter" class="flex flex-col gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm sm:flex-row sm:items-end sm:justify-between sm:p-5">
-      {% if is_desup %}
-      <div class="w-full min-w-0 sm:max-w-md">
-        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Unidade</label>
-        <div class="relative">
-          <select name="unidade_id" id="id_unidade_select"
-            onchange="this.form.submit()"
-            class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition pr-10 appearance-none select-custom font-semibold text-[#025c9f]">
-            <option value="">Todas as Unidades</option>
-            {% for u in unidades %}
-            <option value="{{ u.id }}" {% if request.GET.unidade_id == u.id|stringformat:"s" %}selected{% endif %}>
-              {{ u.sigla }} — {{ u.nome }}
-            </option>
-            {% endfor %}
-          </select>
-          <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
-        </div>
-      </div>
-      {% else %}
-      {% if request.user.unidade %}
-      <div class="w-full min-w-0 sm:max-w-md">
-        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Unidade</label>
-        <div class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm">
-          <i class="ph ph-buildings text-[#025c9f] text-base"></i>
-          <span class="truncate">{{ request.user.unidade.sigla }} — {{ request.user.unidade.nome }}</span>
-        </div>
-      </div>
-      {% endif %}
-      {% endif %}
-    </div>
-
     <details id="matrix-secondary-filters" class="group overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
       <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-[#025c9f] sm:px-5">
         <span class="flex min-w-0 items-center gap-2">
