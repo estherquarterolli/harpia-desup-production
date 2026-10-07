@@ -54,7 +54,7 @@
             <!-- Unidades — apenas DESUP -->
             <a href="{% url 'core:unidade_list' %}"
                 class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if '/core/unidades' in request.path %}bg-white/10{% endif %}">
-                <i class="ph ph-tree-structure text-2xl flex-shrink-0"></i>
+                <i class="ph ph-buildings text-2xl flex-shrink-0"></i>
                 <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Unidades</span>
             </a>
 
@@ -226,7 +226,7 @@
                         os dois apontavam para `password_change` — o link de senha se
                         disfarçava de "Meu Perfil" para quem não era superuser.
                         {% endcomment %}
-                        <a href="{% url 'profile' %}" class="block px-4 py-2 hover:bg-slate-50"><i class="ph ph-user mr-2"></i> Meu Perfil</a>
+                        <a href="{% url 'profile' %}" class="block px-4 py-2 hover:bg-slate-50"><i class="ph ph-user-circle mr-2"></i> Meu Perfil</a>
                         <a href="{% url 'password_change' %}" class="block px-4 py-2 hover:bg-slate-50"><i class="ph ph-key mr-2"></i> Alterar senha</a>
                         {% if is_real_superadmin %}
                         <a href="/admin/" class="block px-4 py-2 hover:bg-slate-50"><i class="ph ph-shield-check mr-2"></i> Administração</a>

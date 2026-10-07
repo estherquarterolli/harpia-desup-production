@@ -55,7 +55,7 @@
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
         <h3 class="text-sm font-black text-[#025c9f] uppercase tracking-wide">
-          <i class="ph ph-warning mr-1 text-amber-500"></i> Códigos já existentes ({{ preview_duplicates|length }})
+          <i class="ph ph-warning-circle mr-1 text-amber-500"></i> Códigos já existentes ({{ preview_duplicates|length }})
         </h3>
         <label class="flex items-center gap-2 text-xs font-bold text-slate-500 cursor-pointer">
           <input type="checkbox" id="toggle-all" class="rounded text-[#025c9f]">
@@ -203,7 +203,7 @@
     <div class="flex flex-col sm:flex-row gap-3 pb-4">
       <button type="submit"
         class="flex-1 flex items-center justify-center gap-2 bg-[#ffb800] hover:bg-yellow-500 text-[#025c9f] font-black py-3.5 px-6 rounded-xl shadow-md text-sm transition-all hover:scale-[1.01] active:scale-[.99]">
-        <i class="ph ph-upload-simple text-lg"></i> IMPORTAR
+        <i class="ph ph-file-arrow-up text-lg"></i> IMPORTAR
       </button>
       <a href="{% url 'courses:component_list' %}"
         class="px-5 py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl text-xs transition-colors text-center uppercase shadow-sm flex items-center justify-center gap-2">

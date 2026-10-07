@@ -85,7 +85,7 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
     {% if not is_desup %}
     <a href="{% url 'extra_curricular:pendencia_create' %}"
        class="flex items-center justify-center gap-2 w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white font-black text-sm px-5 py-2.5 rounded-xl shadow-md transition-all hover:scale-105 active:scale-100">
-      <i class="ph ph-plus text-lg"></i>
+      <i class="ph ph-plus-circle text-lg"></i>
       Nova Justificativa
     </a>
     {% endif %}
@@ -292,7 +292,7 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
             <td class="px-5 py-4 text-center" data-label="Não alocado">
               <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-black
                 {% if item.ch_faltante > 0 %}bg-orange-50 text-orange-700{% else %}bg-emerald-50 text-emerald-700{% endif %}">
-                {% if item.ch_faltante > 0 %}<i class="ph ph-warning text-sm"></i>{% endif %}
+                {% if item.ch_faltante > 0 %}<i class="ph ph-warning-circle text-sm"></i>{% endif %}
                 {{ item.ch_faltante }}h
               </span>
             </td>

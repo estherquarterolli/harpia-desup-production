@@ -1,6 +1,8 @@
 from .base import *
 import dj_database_url
 
+from .database_options import configure_for_transaction_pooler
+
 # Configurações de Desenvolvimento
 DEBUG = True
 ALLOWED_HOSTS = ["*"]
@@ -15,10 +17,12 @@ DEFAULT_FROM_EMAIL = "dev@harpia.local"
 database_url = config("DATABASE_URL", default="").strip()
 
 if database_url:
-    default_db = dj_database_url.config(
-        default=database_url,
-        conn_max_age=0,
-        conn_health_checks=False,
+    default_db = configure_for_transaction_pooler(
+        dj_database_url.config(
+            default=database_url,
+            conn_max_age=0,
+            conn_health_checks=False,
+        )
     )
 else:
     default_db = {

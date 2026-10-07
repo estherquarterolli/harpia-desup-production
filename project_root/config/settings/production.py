@@ -1,6 +1,8 @@
 from .base import *
 import dj_database_url
 
+from .database_options import configure_for_transaction_pooler
+
 DEBUG = False
 ALLOWED_HOSTS = config(
     "ALLOWED_HOSTS",
@@ -25,10 +27,12 @@ database_url = config("DATABASE_URL", default="").strip()
 
 if database_url:
     DATABASES = {
-        'default': dj_database_url.config(
-            default=database_url,
-            conn_max_age=0,
-            conn_health_checks=False,
+        'default': configure_for_transaction_pooler(
+            dj_database_url.config(
+                default=database_url,
+                conn_max_age=0,
+                conn_health_checks=False,
+            )
         )
     }
 else:

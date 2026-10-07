@@ -50,7 +50,7 @@
         </a>
         <a href="{% url 'courses:component_create' %}"
           class="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#ffb800] hover:bg-yellow-400 text-[#025c9f] px-4 py-2.5 rounded-xl text-sm font-black transition-colors shadow-md">
-          <i class="ph ph-plus"></i> Novo Componente
+          <i class="ph ph-plus-circle"></i> Novo Componente
         </a>
       </div>
     </div>
@@ -76,14 +76,14 @@
             <td class="px-5 py-3 text-center">
               <a href="{% url 'courses:component_edit' comp.pk %}"
                 class="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-[#025c9f] hover:bg-blue-100 rounded-lg text-xs font-bold transition-colors">
-                <i class="ph ph-pencil"></i> Editar
+                <i class="ph ph-pencil-simple"></i> Editar
               </a>
             </td>
           </tr>
           {% empty %}
           <tr>
             <td colspan="5" class="px-6 py-16 text-center text-slate-400 font-semibold">
-              <i class="ph ph-books text-5xl opacity-20 mb-3 block"></i>
+              <i class="ph ph-book-open text-5xl opacity-20 mb-3 block"></i>
               Nenhum componente curricular encontrado.
             </td>
           </tr>

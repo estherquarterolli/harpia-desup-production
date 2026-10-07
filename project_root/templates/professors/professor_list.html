@@ -11,7 +11,7 @@
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div class="flex flex-wrap items-center gap-2">
       <div class="flex items-center gap-2 bg-[#e8f0fb] text-[#025c9f] rounded-xl px-4 py-2 text-sm font-black" title="Professores cadastrados no sistema">
-        <i class="ph ph-users-three text-base"></i>
+        <i class="ph ph-chalkboard-teacher text-base"></i>
         {{ total_professores }} no sistema
       </div>
       {% if filtros_ativos %}
@@ -32,7 +32,7 @@
       {% if pode_criar %}
       <a href="{% url 'professors:professor_create' %}"
         class="flex items-center justify-center gap-2 bg-[#ffb800] hover:bg-yellow-400 text-[#025c9f] px-4 py-2.5 rounded-xl text-sm font-black transition-colors shadow-md">
-        <i class="ph ph-plus"></i> Novo Professor
+        <i class="ph ph-plus-circle"></i> Novo Professor
       </a>
       {% endif %}
     </div>

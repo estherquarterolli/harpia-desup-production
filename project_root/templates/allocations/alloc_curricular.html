@@ -44,7 +44,7 @@
     <div class="w-full sm:w-auto sm:ml-auto flex flex-wrap items-center gap-2">
       <button type="button" id="approveAllocBtn" data-approved="true" disabled
         class="flex-1 sm:flex-none flex items-center justify-center gap-2 text-white font-black text-sm px-5 py-2.5 rounded-xl shadow-md bg-green-800 cursor-default">
-        <i class="ph ph-seal-check text-lg"></i>
+        <i class="ph ph-check-circle text-lg"></i>
         Alocação aprovada
       </button>
       <form method="POST" action="{% url 'desfazer_aprovacao_unidade' unidade_id=unidade_selecionada_id %}" class="m-0"
@@ -87,7 +87,7 @@
   <div class="mb-8">
     <div class="flex items-center gap-3 mb-4">
       <h3 class="text-lg font-black text-[#025c9f] uppercase tracking-wide flex items-center gap-2">
-        <i class="ph ph-table text-xl text-[#025c9f]"></i>
+        <i class="ph ph-file-text text-xl text-[#025c9f]"></i>
         Matriz - {{ item.matriz.curso.sigla }}
         {% if item.matriz.turno %}
         <span class="text-sm font-bold text-slate-400">({{ item.matriz.get_turno_display }})</span>
@@ -129,7 +129,7 @@
                   {% if comp.docente %}border-emerald-300 bg-emerald-50{% elif comp.status == 'NAO_OFERECIDA' %}border-slate-300 bg-slate-100{% elif comp.status == 'SEM_PROFESSOR' %}border-slate-300 bg-slate-50{% else %}border-slate-200 bg-slate-50{% endif %}"
                 >
                   {% if not comp.docente and comp.status == 'SEM_PROFESSOR' %}
-                  <i class="ph ph-user-minus text-base text-slate-400 flex-shrink-0"></i>
+                  <i class="ph ph-chalkboard-teacher text-base text-slate-400 flex-shrink-0"></i>
                   {% endif %}
                   <input type="text"
                          class="ac-input flex-1 bg-transparent outline-none
@@ -141,7 +141,7 @@
                   >
                   {% if comp.docente %}
                   <button type="button" class="ac-clear text-emerald-400 hover:text-red-500 transition-colors flex-shrink-0" title="Remover docente">
-                    <i class="ph ph-x-circle text-base"></i>
+                    <i class="ph ph-trash text-base"></i>
                   </button>
                   {% endif %}
                   <i class="ph ph-caret-down text-xs text-slate-400 flex-shrink-0 ac-caret transition-transform"></i>
@@ -154,7 +154,7 @@
                   <div class="ac-fixed-options border-b border-slate-100">
                     <div class="ac-option px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 flex items-center gap-2 text-slate-500 transition-colors"
                          data-value="SEM_PROFESSOR">
-                      <i class="ph ph-user-minus text-base"></i> Sem professor
+                      <i class="ph ph-chalkboard-teacher text-base"></i> Sem professor
                     </div>
                     <div class="ac-option px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 flex items-center gap-2 text-slate-400 transition-colors"
                          data-value="NAO_OFERECIDA">
@@ -188,7 +188,7 @@
   </div>
   {% empty %}
   <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-16 text-center">
-    <i class="ph ph-warning-circle text-6xl text-slate-200 mb-4 inline-block"></i>
+    <i class="ph ph-file-text text-6xl text-slate-200 mb-4 inline-block"></i>
     <h2 class="text-xl font-bold text-slate-600 mb-2">Nenhuma Matriz Encontrada</h2>
     <p class="text-slate-400">Esta unidade não possui matrizes curriculares vigentes cadastradas.</p>
   </div>
@@ -459,7 +459,7 @@
       if (!items.length) {
         this.results.innerHTML = `
           <div class="px-3 py-4 text-xs text-center text-slate-400">
-            <i class="ph ph-user-list text-lg block mb-1"></i>
+            <i class="ph ph-chalkboard-teacher text-lg block mb-1"></i>
             Nenhum professor encontrado.
           </div>`;
         return;
@@ -469,7 +469,7 @@
         <div class="ac-option-result px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 flex items-center justify-between gap-2 transition-colors ${p.id == this.currentId ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-slate-700'}"
              data-id="${p.id}" data-nome="${this._escapeAttr(p.nome)}">
           <span class="flex items-center gap-2 truncate">
-            <i class="ph ph-user text-base text-slate-400 flex-shrink-0"></i>
+            <i class="ph ph-chalkboard-teacher text-base text-slate-400 flex-shrink-0"></i>
             <span class="truncate">${this._escapeHtml(p.nome)}</span>
           </span>
           ${p.unidade ? `<span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded flex-shrink-0">${this._escapeHtml(p.unidade)}</span>` : ''}
@@ -561,10 +561,10 @@
         (hasDoc ? 'border-emerald-300 bg-emerald-50' : isNao ? 'border-slate-300 bg-slate-100' : 'border-slate-300 bg-slate-50');
 
       // Ícone "sem professor" (antes do input)
-      let userIcon = this.wrap.querySelector(':scope > i.ph-user-minus');
+      let userIcon = this.wrap.querySelector(':scope > i.ph-chalkboard-teacher');
       if (isNone && !userIcon) {
         userIcon = document.createElement('i');
-        userIcon.className = 'ph ph-user-minus text-base text-slate-400 flex-shrink-0';
+        userIcon.className = 'ph ph-chalkboard-teacher text-base text-slate-400 flex-shrink-0';
         this.wrap.insertBefore(userIcon, this.input);
       } else if (!isNone && userIcon) {
         userIcon.remove();
@@ -577,7 +577,7 @@
         clear.type = 'button';
         clear.className = 'ac-clear text-emerald-400 hover:text-red-500 transition-colors flex-shrink-0';
         clear.title = 'Remover docente';
-        clear.innerHTML = '<i class="ph ph-x-circle text-base"></i>';
+        clear.innerHTML = '<i class="ph ph-trash text-base"></i>';
         this.wrap.insertBefore(clear, this.caret);
       } else if (!hasDoc && clear) {
         clear.remove();

@@ -31,7 +31,7 @@
             
             <!-- Professores (Página Atual - Fica destacada com bg diferente) -->
             <a href="{% url 'alloc_curricular' %}" class="flex items-center p-3 bg-[#025c9f] rounded-lg transition-colors">
-                <i class="ph ph-users text-2xl"></i>
+                <i class="ph ph-chalkboard-teacher text-2xl"></i>
                 <span class="ml-4 hidden group-hover:block">Professores</span>
             </a>
             
@@ -128,7 +128,7 @@
                 <tbody id="tableBody" hx-get="{% url 'htmx_tabela_alocacao' %}" hx-trigger="load">
                     <tr>
                         <td colspan="10" class="text-center py-8 text-slate-400">
-                            <i class="ph ph-spinner animate-spin text-2xl mb-2 inline-block"></i><br>
+                            <i class="ph ph-circle-notch animate-spin text-2xl mb-2 inline-block"></i><br>
                             Carregando dados da alocação...
                         </td>
                     </tr>
