@@ -7,27 +7,15 @@
 {% block content %}
 <div class="space-y-6">
 
-  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
-    <form method="get" class="filter-grid" id="matrix-filter-form">
-
-      <div class="flex-grow min-w-[200px]">
-        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Pesquisar</label>
-        <div class="relative">
-          <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-          <input type="search" name="q" value="{{ request.GET.q }}"
-            placeholder="Matriz, curso ou unidade..."
-            class="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition font-semibold text-[#025c9f]">
-        </div>
-      </div>
-
+  <form method="get" class="space-y-3" id="matrix-filter-form">
+    {# A unidade fica sempre visível; os demais filtros começam recolhidos. #}
+    <div id="matrix-unit-filter" class="flex flex-col gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm sm:flex-row sm:items-end sm:justify-between sm:p-5">
       {% if is_desup %}
-      <div class="flex-grow min-w-[160px]">
+      <div class="w-full min-w-0 sm:max-w-md">
         <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Unidade</label>
         <div class="relative">
           <select name="unidade_id" id="id_unidade_select"
-            hx-get="{% url 'courses:load_courses_by_unit' %}?global=1"
-            hx-target="#id_curso_select"
-            hx-trigger="change"
+            onchange="this.form.submit()"
             class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition pr-10 appearance-none select-custom font-semibold text-[#025c9f]">
             <option value="">Todas as Unidades</option>
             {% for u in unidades %}
@@ -41,65 +29,97 @@
       </div>
       {% else %}
       {% if request.user.unidade %}
-      <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm mb-0.5">
-        <i class="ph ph-buildings text-[#025c9f] text-base"></i>
-        {{ request.user.unidade.sigla }} — {{ request.user.unidade.nome }}
+      <div class="w-full min-w-0 sm:max-w-md">
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Unidade</label>
+        <div class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm">
+          <i class="ph ph-buildings text-[#025c9f] text-base"></i>
+          <span class="truncate">{{ request.user.unidade.sigla }} — {{ request.user.unidade.nome }}</span>
+        </div>
       </div>
       {% endif %}
       {% endif %}
+    </div>
 
-      <div class="flex-grow min-w-[160px]">
-        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Curso</label>
-        <div class="relative">
-          <select name="curso_id" id="id_curso_select"
-            class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition pr-10 appearance-none select-custom font-semibold text-[#025c9f]">
-            <option value="">Todos os Cursos</option>
-            {% for c in cursos %}
-            <option value="{{ c.id }}" {% if request.GET.curso_id == c.id|stringformat:"s" %}selected{% endif %}>
-              {{ c.sigla }} — {{ c.nome }}
-            </option>
-            {% endfor %}
-          </select>
-          <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
+    <details id="matrix-secondary-filters" class="group overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
+      <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-[#025c9f] sm:px-5">
+        <span class="flex min-w-0 items-center gap-2">
+          <i class="ph ph-funnel text-lg"></i>
+          Filtros e pesquisa
+        </span>
+        <span class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+          Clique para abrir
+          <i class="ph ph-caret-down text-base transition-transform group-open:rotate-180"></i>
+        </span>
+      </summary>
+
+      <div class="filter-grid border-t border-slate-100 bg-slate-50/50 p-4 sm:p-5">
+        <div class="flex-grow min-w-[200px]">
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Pesquisar</label>
+          <div class="relative">
+            <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+            <input type="search" name="q" value="{{ request.GET.q }}"
+              placeholder="Matriz, curso ou unidade..."
+              class="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:border-[#025c9f] outline-none transition font-semibold text-[#025c9f]">
+          </div>
+        </div>
+
+        <div class="flex-grow min-w-[160px]">
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Curso</label>
+          <div class="relative">
+            <select name="curso_id" id="id_curso_select"
+              class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:border-[#025c9f] outline-none transition pr-10 appearance-none select-custom font-semibold text-[#025c9f]">
+              <option value="">Todos os Cursos</option>
+              {% for c in cursos %}
+              <option value="{{ c.id }}" {% if request.GET.curso_id == c.id|stringformat:"s" %}selected{% endif %}>
+                {{ c.sigla }} — {{ c.nome }}
+              </option>
+              {% endfor %}
+            </select>
+            <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
+          </div>
+        </div>
+
+        <div class="flex-grow min-w-[160px]">
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Status</label>
+          <div class="relative">
+            <select name="status"
+              class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:border-[#025c9f] outline-none transition pr-10 appearance-none select-custom font-semibold text-[#025c9f]">
+              <option value="">Todos os Status</option>
+              <option value="vigente" {% if request.GET.status == 'vigente' %}selected{% endif %}>Vigentes</option>
+              <option value="rascunho" {% if request.GET.status == 'rascunho' %}selected{% endif %}>Rascunhos</option>
+              <option value="historico" {% if request.GET.status == 'historico' %}selected{% endif %}>Histórico (Anteriores)</option>
+            </select>
+            <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
+          </div>
+        </div>
+
+        <div class="flex-grow min-w-[160px]">
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Turno</label>
+          <div class="relative">
+            <select name="turno"
+              class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:border-[#025c9f] outline-none transition pr-10 appearance-none select-custom font-semibold text-[#025c9f]">
+              <option value="">Todos os Turnos</option>
+              <option value="M" {% if request.GET.turno == 'M' %}selected{% endif %}>Manhã</option>
+              <option value="T" {% if request.GET.turno == 'T' %}selected{% endif %}>Tarde</option>
+              <option value="N" {% if request.GET.turno == 'N' %}selected{% endif %}>Noite</option>
+            </select>
+            <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
+          </div>
+        </div>
+
+        <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:self-end">
+          <a href="{% url 'courses:matrix_list' %}"
+            class="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-500 transition-colors hover:bg-slate-100">
+            Limpar
+          </a>
+          <button type="submit"
+            class="flex items-center justify-center gap-2 rounded-lg bg-[#025c9f] px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-sm transition-colors hover:bg-[#153e70]">
+            <i class="ph ph-funnel text-base"></i> Filtrar
+          </button>
         </div>
       </div>
-
-      <div class="flex-grow min-w-[160px]">
-        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Status</label>
-        <div class="relative">
-          <select name="status"
-            class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition pr-10 appearance-none select-custom font-semibold text-[#025c9f]">
-            <option value="">Todos os Status</option>
-            <option value="vigente" {% if request.GET.status == 'vigente' %}selected{% endif %}>Vigentes</option>
-            <option value="rascunho" {% if request.GET.status == 'rascunho' %}selected{% endif %}>Rascunhos</option>
-            <option value="historico" {% if request.GET.status == 'historico' %}selected{% endif %}>Histórico (Anteriores)</option>
-          </select>
-          <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
-        </div>
-      </div>
-
-      <div class="flex-grow min-w-[160px]">
-        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Turno</label>
-        <div class="relative">
-          <select name="turno"
-            class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition pr-10 appearance-none select-custom font-semibold text-[#025c9f]">
-            <option value="">Todos os Turnos</option>
-            <option value="M" {% if request.GET.turno == 'M' %}selected{% endif %}>Manhã</option>
-            <option value="T" {% if request.GET.turno == 'T' %}selected{% endif %}>Tarde</option>
-            <option value="N" {% if request.GET.turno == 'N' %}selected{% endif %}>Noite</option>
-          </select>
-          <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
-        </div>
-      </div>
-
-      <div class="flex gap-2">
-        <button type="submit"
-          class="px-5 py-2.5 bg-[#025c9f] hover:bg-[#153e70] text-white text-sm font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm uppercase tracking-wider text-xs">
-          <i class="ph ph-funnel text-base"></i> Filtrar
-        </button>
-      </div>
-    </form>
-  </div>
+    </details>
+  </form>
 
   <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
     <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center px-6 py-4 border-b border-slate-100">

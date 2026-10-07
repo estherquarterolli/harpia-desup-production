@@ -711,6 +711,10 @@ class MatrixImportRowsView(LoginRequiredMixin, PerfilRequiredMixin, View):
                     header_aliases=MATRIX_HEADER_ALIASES,
                     required_field='nome',
                     required_label='Disciplina',
+                    required_fields=(
+                        ('periodo', 'Período'),
+                        ('carga_horaria', 'Carga Horária'),
+                    ),
                 )
             else:
                 rows = parse_google_sheets_url(
@@ -718,6 +722,10 @@ class MatrixImportRowsView(LoginRequiredMixin, PerfilRequiredMixin, View):
                     header_aliases=MATRIX_HEADER_ALIASES,
                     required_field='nome',
                     required_label='Disciplina',
+                    required_fields=(
+                        ('periodo', 'Período'),
+                        ('carga_horaria', 'Carga Horária'),
+                    ),
                 )
         except SpreadsheetImportError as e:
             return JsonResponse({'erro': str(e)}, status=400)

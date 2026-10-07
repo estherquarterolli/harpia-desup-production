@@ -14,12 +14,15 @@ Regras exercitadas de ponta a ponta:
   • CORR-012 — arquivar/reativar é manual, DESUP-only e registra auditoria.
 """
 
+import io
 import re
 from decimal import Decimal
 
 from django.contrib.messages import get_messages
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
+from openpyxl import Workbook
 
 from apps.accounts.models import User
 from apps.core.models import AuditoriaGlobal, Unidade
@@ -1564,6 +1567,50 @@ class DisciplinaTemporariaEImportacaoE2ETests(BaseCoursesE2ETests):
         )
         self.assertEqual(resp.status_code, 400)
         self.assertIn('erro', resp.json())
+
+    def _planilha(self, cabecalho, linha):
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.append(cabecalho)
+        worksheet.append(linha)
+        conteudo = io.BytesIO()
+        workbook.save(conteudo)
+        return SimpleUploadedFile(
+            'matriz.xlsx',
+            conteudo.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+
+    def test_importacao_usa_nome_carga_e_periodo_da_planilha(self):
+        arquivo = self._planilha(
+            ['Disciplina', 'Período', 'Código', 'Carga Horária'],
+            [self.algoritmos.nome, '3o período', self.algoritmos.codigo, 60],
+        )
+        resp = self.client.post(
+            reverse('courses:matrix_import_rows'),
+            data={'unidades': [str(self.unidade_a.id)], 'arquivo': arquivo},
+        )
+
+        self.assertEqual(resp.status_code, 200, resp.content)
+        componente = resp.json()['componentes'][0]
+        self.assertEqual(componente['periodo'], '3º Semestre')
+        self.assertEqual(componente['carga_horaria'], 60)
+        self.assertEqual(componente['componente_curricular'], '')
+        self.assertEqual(componente['nome_temporario'], self.algoritmos.nome)
+        self.assertEqual(componente['codigo'], '')
+
+    def test_importacao_exige_coluna_periodo(self):
+        arquivo = self._planilha(
+            ['Disciplina', 'Carga Horária'],
+            [self.algoritmos.nome, self.algoritmos.carga_horaria_padrao],
+        )
+        resp = self.client.post(
+            reverse('courses:matrix_import_rows'),
+            data={'unidades': [str(self.unidade_a.id)], 'arquivo': arquivo},
+        )
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('Período', resp.json()['erro'])
 
 
 # ══════════════════════════════════════════════════════════════════════════════

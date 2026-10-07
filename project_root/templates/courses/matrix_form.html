@@ -120,8 +120,9 @@
         <p class="text-xs text-slate-500">
           Envie uma planilha .xlsx ou cole o link de uma planilha pública do Google Sheets com as colunas
           <strong>Disciplina</strong>, <strong>Período</strong>, <strong>Código</strong> (opcional) e <strong>Carga Horária</strong>.
-          Disciplinas que já existem no catálogo são reconhecidas pelo código ou nome; as demais entram como
-          <strong>temporárias</strong> (só nesta matriz) — nesse caso a Carga Horária é obrigatória na planilha.
+          O catálogo é reconhecido pela combinação de <strong>Disciplina + Carga Horária</strong>.
+          Se o nome existir com outra carga, a linha entra como <strong>temporária</strong> (só nesta matriz).
+          Disciplina, Período e Carga Horária são obrigatórios; o Código é opcional.
         </p>
         <div class="flex flex-col sm:flex-row gap-3">
           <input type="file" id="importar-planilha-arquivo" accept=".xlsx" class="form-field flex-1">
@@ -368,6 +369,7 @@ function aplicarModoDisciplina(row, temporaria) {
   const hiddenSelect = row.querySelector('select[name$="-componente_curricular"]');
   const searchInput = row.querySelector('.cc-search-input');
   const nomeTempInput = row.querySelector('input[name$="-nome_temporario"]');
+  const codeInput = row.querySelector('input[name$="-codigo"]');
   const checkbox = row.querySelector('input[name$="-usar_disciplina_temporaria"]');
 
   if (catalogoWrap) catalogoWrap.classList.toggle('hidden', temporaria);
@@ -378,9 +380,14 @@ function aplicarModoDisciplina(row, temporaria) {
   if (temporaria) {
     if (hiddenSelect) hiddenSelect.value = '';
     if (searchInput) searchInput.value = '';
+    if (codeInput) {
+      codeInput.value = '';
+      codeInput.placeholder = 'Gerado ao salvar';
+    }
   } else {
     if (nomeTempInput) nomeTempInput.value = '';
     if (chInput) chInput.value = '';
+    if (codeInput) codeInput.placeholder = '';
   }
 }
 

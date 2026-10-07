@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 
 from django.core.exceptions import ValidationError
 
+from apps.core.busca import normalizar
+
 from .models import CurricularComponent
 
 
@@ -98,20 +100,30 @@ def _parse_bool(value, default=True):
     return default
 
 
-def _rows_from_matrix(header_row, data_rows, header_aliases=_HEADER_ALIASES, required_field="nome", required_label="Nome"):
+def _rows_from_matrix(
+    header_row,
+    data_rows,
+    header_aliases=_HEADER_ALIASES,
+    required_field="nome",
+    required_label="Nome",
+    required_fields=(),
+):
     """header_row: lista de células do cabeçalho. data_rows: iterável de listas de células.
 
     `header_aliases`/`required_field`/`required_label` têm defaults pro caso de uso
     original (importar Componentes Curriculares); o import de linhas de matriz
-    (`MATRIX_HEADER_ALIASES`, ver `parse_matrix_rows`) passa os seus próprios.
+    (`MATRIX_HEADER_ALIASES`, ver `parse_matrix_rows`) passa os seus próprios e
+    exige também Período e Carga Horária por meio de `required_fields`.
     """
     normalized = [_normalize_header(h) for h in header_row]
     mapped = [header_aliases.get(h) for h in normalized]
 
-    if required_field not in mapped:
-        raise SpreadsheetImportError(
-            f"A planilha precisa de uma coluna '{required_label}' (não encontrei essa coluna no cabeçalho)."
-        )
+    for field_name, field_label in [(required_field, required_label), *required_fields]:
+        if field_name not in mapped:
+            raise SpreadsheetImportError(
+                f"A planilha precisa de uma coluna '{field_label}' "
+                "(não encontrei essa coluna no cabeçalho)."
+            )
 
     rows = []
     for raw in data_rows:
@@ -127,7 +139,13 @@ def _rows_from_matrix(header_row, data_rows, header_aliases=_HEADER_ALIASES, req
     return rows
 
 
-def parse_uploaded_spreadsheet(uploaded_file, header_aliases=_HEADER_ALIASES, required_field="nome", required_label="Nome"):
+def parse_uploaded_spreadsheet(
+    uploaded_file,
+    header_aliases=_HEADER_ALIASES,
+    required_field="nome",
+    required_label="Nome",
+    required_fields=(),
+):
     """Lê um .xlsx enviado por upload e devolve list[dict] (uma linha = um registro)."""
     try:
         from openpyxl import load_workbook
@@ -146,7 +164,14 @@ def parse_uploaded_spreadsheet(uploaded_file, header_aliases=_HEADER_ALIASES, re
     except StopIteration:
         raise SpreadsheetImportError("A planilha está vazia.")
 
-    return _rows_from_matrix(header_row, rows_iter, header_aliases, required_field, required_label)
+    return _rows_from_matrix(
+        header_row,
+        rows_iter,
+        header_aliases,
+        required_field,
+        required_label,
+        required_fields,
+    )
 
 
 def _google_sheets_csv_url(url):
@@ -168,7 +193,13 @@ def _google_sheets_csv_url(url):
     return f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
 
 
-def parse_google_sheets_url(url, header_aliases=_HEADER_ALIASES, required_field="nome", required_label="Nome"):
+def parse_google_sheets_url(
+    url,
+    header_aliases=_HEADER_ALIASES,
+    required_field="nome",
+    required_label="Nome",
+    required_fields=(),
+):
     """Baixa uma planilha pública do Google Sheets como CSV e devolve list[dict]."""
     csv_url = _google_sheets_csv_url(url)
     try:
@@ -196,7 +227,14 @@ def parse_google_sheets_url(url, header_aliases=_HEADER_ALIASES, required_field=
     except StopIteration:
         raise SpreadsheetImportError("A planilha está vazia.")
 
-    return _rows_from_matrix(header_row, reader, header_aliases, required_field, required_label)
+    return _rows_from_matrix(
+        header_row,
+        reader,
+        header_aliases,
+        required_field,
+        required_label,
+        required_fields,
+    )
 
 
 def _clean_row(row, row_number):
@@ -377,16 +415,17 @@ class MatrixRowPreview:
 
 
 def parse_matrix_rows(rows):
-    """Resolve cada linha da planilha contra o catálogo (por código, senão por
-    nome, case-insensitive). Quando não acha, a linha vira disciplina
-    temporária — precisa então de carga horária na própria planilha, já que não
-    há de onde herdar um padrão."""
-    existentes_por_codigo = {
-        c.codigo: c for c in CurricularComponent.objects.exclude(codigo="")
-    }
-    existentes_por_nome = {
-        c.nome.strip().lower(): c for c in CurricularComponent.objects.all()
-    }
+    """Resolve cada linha da planilha pelo par nome + carga horária.
+
+    Um nome igual com carga horária diferente representa uma oferta específica
+    daquela matriz e, portanto, entra como disciplina temporária. O código da
+    planilha não pode forçar o vínculo com uma disciplina de carga diferente.
+    Período e carga horária são obrigatórios em todas as linhas.
+    """
+    existentes_por_nome_ch = {}
+    for componente in CurricularComponent.objects.all().order_by('pk'):
+        chave = (normalizar(componente.nome), componente.carga_horaria_padrao)
+        existentes_por_nome_ch.setdefault(chave, componente)
 
     previews = []
     for i, row in enumerate(rows, start=2):  # linha 1 é o cabeçalho
@@ -401,37 +440,63 @@ def parse_matrix_rows(rows):
             ))
             continue
 
+        periodo_normalizado = _normalizar_periodo_matriz(periodo)
+        if not periodo_normalizado:
+            previews.append(MatrixRowPreview(
+                i, periodo, codigo, nome, status="error",
+                message=(
+                    "Período ausente ou inválido — informe um valor entre "
+                    "1º e 8º semestre na coluna Período."
+                ),
+            ))
+            continue
+
         ch_raw = row.get("carga_horaria", "")
         try:
             carga_horaria = int(float(str(ch_raw).replace(",", "."))) if str(ch_raw).strip() else None
         except ValueError:
             carga_horaria = None
 
-        existente = (existentes_por_codigo.get(codigo) if codigo else None) or existentes_por_nome.get(nome.lower())
+        if not carga_horaria or carga_horaria <= 0:
+            previews.append(MatrixRowPreview(
+                i, periodo_normalizado, codigo, nome, status="error",
+                message="Carga horária ausente ou inválida — informe a Carga Horária da disciplina.",
+            ))
+            continue
+
+        existente = existentes_por_nome_ch.get((normalizar(nome), carga_horaria))
 
         if existente:
             previews.append(MatrixRowPreview(
                 row_number=i,
-                periodo=periodo,
+                periodo=periodo_normalizado,
                 codigo=existente.codigo,
                 nome=existente.nome,
-                carga_horaria=carga_horaria or existente.carga_horaria_padrao,
+                carga_horaria=existente.carga_horaria_padrao,
                 componente_curricular_id=existente.id,
             ))
             continue
 
-        if not carga_horaria or carga_horaria <= 0:
-            previews.append(MatrixRowPreview(
-                i, periodo, codigo, nome, status="error",
-                message=(
-                    f'"{nome}" não está no catálogo de disciplinas e a planilha não trouxe '
-                    "carga horária — informe a carga horária para importar como disciplina temporária."
-                ),
-            ))
-            continue
-
         previews.append(MatrixRowPreview(
-            row_number=i, periodo=periodo, codigo=codigo, nome=nome, carga_horaria=carga_horaria,
+            row_number=i,
+            periodo=periodo_normalizado,
+            codigo='',
+            nome=nome,
+            carga_horaria=carga_horaria,
         ))
 
     return previews
+
+
+def _normalizar_periodo_matriz(periodo):
+    """Converte variações comuns da planilha para as opções do formulário."""
+    texto = normalizar(periodo)
+    if not texto:
+        return None
+
+    inicio = re.match(r"^([1-8])(?:\s|º|°|o|a|$)", texto)
+    invertido = re.search(r"(?:semestre|periodo)\s*([1-8])$", texto)
+    match = inicio or invertido
+    if not match:
+        return None
+    return f"{match.group(1)}º Semestre"

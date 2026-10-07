@@ -218,7 +218,10 @@ class MatrixComponentForm(forms.ModelForm):
                 return cleaned_data
             cleaned_data['componente_curricular'] = None
             cleaned_data['nome_temporario'] = nome_temp
-            cleaned_data['codigo'] = cleaned_data.get('codigo') or ''
+            # Ao converter uma disciplina de catálogo em temporária, nunca
+            # preserve o código antigo. MatrixComponent.save() gera TEMP-xxxxx
+            # usando o id da linha, inclusive durante a edição de uma matriz.
+            cleaned_data['codigo'] = ''
             # Mesma regra de derivação de créditos/CH semanal do fluxo de catálogo
             # (MatrixComponent.save()), só que a partir da CH digitada na hora.
             cleaned_data['creditos'] = ch // 20
