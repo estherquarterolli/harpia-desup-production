@@ -1434,8 +1434,8 @@ class FormsetMatrizE2ETests(BaseCoursesE2ETests):
         self.assertIn('componente_curricular', resp.context['component_formset'].errors[0])
         self.assertEqual(CurriculumMatrix.objects.count(), antes)
 
-    def test_remover_todos_os_componentes_na_edicao_e_recusado(self):
-        """Marcar DELETE em todas as linhas deixaria a matriz vazia — validate_min barra."""
+    def test_remover_todos_os_componentes_e_salvar_rascunho(self):
+        """Rascunho pode ficar vazio e as exclusões devem ser persistidas."""
         self.client.post(reverse('courses:matrix_create'), data=payload_matriz(
             curso=self.curso, unidades=[self.unidade_a], nome='MC-DEL-TUDO',
             linhas=[linha_componente(self.algoritmos)], rascunho=True,
@@ -1451,9 +1451,24 @@ class FormsetMatrizE2ETests(BaseCoursesE2ETests):
                 rascunho=True, initial_forms=1,
             ),
         )
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.context['component_formset'].non_form_errors())
-        self.assertEqual(matriz.componentes_da_matriz.count(), 1)
+        self.assertEqual(resp.status_code, 302, resp.content[:400])
+        matriz.refresh_from_db()
+        self.assertTrue(matriz.is_rascunho)
+        self.assertEqual(matriz.componentes_da_matriz.count(), 0)
+
+    def test_criar_rascunho_sem_componentes_e_permitido(self):
+        resp = self.client.post(reverse('courses:matrix_create'), data=payload_matriz(
+            curso=self.curso,
+            unidades=[self.unidade_a],
+            nome='MC-RASCUNHO-VAZIO',
+            linhas=[],
+            rascunho=True,
+        ))
+
+        self.assertEqual(resp.status_code, 302, resp.content[:400])
+        matriz = CurriculumMatrix.objects.get(nome='MC-RASCUNHO-VAZIO')
+        self.assertTrue(matriz.is_rascunho)
+        self.assertEqual(matriz.componentes_da_matriz.count(), 0)
 
     def test_disciplina_repetida_na_mesma_matriz_e_recusada(self):
         """unique_together (matriz, componente_curricular) barra duplicidade."""

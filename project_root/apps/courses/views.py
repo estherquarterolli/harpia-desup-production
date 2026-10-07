@@ -237,12 +237,6 @@ class CurriculumMatrixFormsetMixin:
             and not form.instance.is_rascunho
         )
         self.object = form.save(commit=False)
-        component_formset = self.get_component_formset()
-
-        if not component_formset.is_valid():
-            return self.render_to_response(
-                self.get_context_data(form=form, component_formset=component_formset)
-            )
 
         # Os botões enviam a ação nativamente, sem depender de JavaScript. O campo
         # antigo continua aceito para compatibilidade com integrações e abas que
@@ -261,6 +255,19 @@ class CurriculumMatrixFormsetMixin:
             not editando_vigente
             and solicitou_rascunho
         )
+
+        component_formset = self.get_component_formset()
+        # Rascunhos podem ficar temporariamente sem componentes. Na publicação
+        # (e na edição de uma matriz vigente), continua obrigatório manter ao
+        # menos uma linha. Sem esta distinção, apagar tudo invalidava o POST e
+        # fazia as linhas reaparecerem porque nenhuma exclusão era persistida.
+        component_formset.validate_min = not salvar_rascunho
+
+        if not component_formset.is_valid():
+            return self.render_to_response(
+                self.get_context_data(form=form, component_formset=component_formset)
+            )
+
         if editando_vigente:
             self.object.is_rascunho = False
             self.object.is_vigente = True
