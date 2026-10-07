@@ -245,6 +245,53 @@ class DisciplinaTemporariaTests(TestCase):
         self.assertFalse(formset.is_valid())
         self.assertIn('nome_temporario', formset.errors[0])
 
+    def test_modo_temporario_descarta_vinculo_de_catalogo_residual(self):
+        """O checkbox define o modo mesmo se o autocomplete oculto ficou sujo."""
+        cc = CurricularComponent.objects.create(
+            nome='Disciplina residual', codigo='RES001', carga_horaria_padrao=80, creditos=4,
+        )
+        matrix, formset = self._formset({
+            'componente_curricular': str(cc.pk),
+            'usar_disciplina_temporaria': 'on',
+            'nome_temporario': 'Tópicos importados',
+            'carga_horaria': '40',
+            'periodo': '1º Semestre',
+        })
+
+        self.assertTrue(formset.is_valid(), formset.errors)
+        matrix.save()
+        formset.instance = matrix
+        formset.save()
+
+        componente = MatrixComponent.objects.get(matriz=matrix)
+        self.assertIsNone(componente.componente_curricular_id)
+        self.assertEqual(componente.nome_temporario, 'Tópicos importados')
+
+    def test_linha_inicial_vazia_nao_bloqueia_linha_importada(self):
+        """Simula a planilha acrescentada depois da primeira linha do formset."""
+        cc = CurricularComponent.objects.create(
+            nome='Disciplina importada', codigo='IMP001', carga_horaria_padrao=60, creditos=3,
+        )
+        matrix = CurriculumMatrix(curso=self.curso_global)
+        data = {
+            'componentes-TOTAL_FORMS': '2',
+            'componentes-INITIAL_FORMS': '0',
+            'componentes-MIN_NUM_FORMS': '1',
+            'componentes-MAX_NUM_FORMS': '1000',
+            'componentes-0-status': MatrixComponent.StatusChoices.SEM_PROFESSOR,
+            'componentes-1-componente_curricular': str(cc.pk),
+            'componentes-1-periodo': '2º Semestre',
+            'componentes-1-status': MatrixComponent.StatusChoices.SEM_PROFESSOR,
+        }
+        formset = MatrixComponentFormSet(data=data, instance=matrix, prefix='componentes')
+
+        self.assertTrue(formset.is_valid(), formset.errors)
+        matrix.save()
+        formset.instance = matrix
+        formset.save()
+        self.assertEqual(matrix.componentes_da_matriz.count(), 1)
+        self.assertEqual(matrix.componentes_da_matriz.get().componente_curricular_id, cc.pk)
+
     def test_linha_sem_catalogo_e_sem_temporaria_e_recusada(self):
         """Sem marcar temporária e sem escolher disciplina do catálogo: erro
         continua no mesmo campo de sempre (componente_curricular)."""

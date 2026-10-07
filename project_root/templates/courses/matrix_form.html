@@ -232,7 +232,7 @@
 
       <!-- Adicionar linha -->
       <div class="px-6 pb-4 pt-2">
-        <button type="button" id="add-component" onclick="addComponent()"
+        <button type="button" id="add-component"
           class="flex items-center gap-2 text-[#025c9f] hover:text-blue-800 text-sm font-bold hover:bg-blue-50 px-3 py-2 rounded-lg transition-colors">
           <i class="ph ph-plus-circle text-lg"></i> Adicionar componente
         </button>
@@ -296,6 +296,11 @@ const COMPONENT_CODES = JSON.parse(document.getElementById('component-codes-data
 
 // Event delegation para mudanças na tabela de componentes
 const container = document.getElementById('components-container');
+// Guarde um molde independente antes que o usuário altere ou remova as linhas.
+// Assim "Adicionar componente" continua funcionando mesmo quando todas as
+// linhas tiverem sido retiradas do DOM.
+const firstComponentRow = container ? container.querySelector('.component-row') : null;
+const componentRowPrototype = firstComponentRow ? firstComponentRow.cloneNode(true) : null;
 if (container) {
   container.addEventListener('change', function(e) {
     // 1. Mudança na disciplina -> preenche código e ch padrão, calcula créditos/ch semanal
@@ -395,7 +400,7 @@ if (duplicarSelect) {
 }
 
 function verificarMatrizExistente() {
-  const cursoId = cursoSelect?.value;
+  const cursoId = cursoSelect ? cursoSelect.value : '';
   if (!cursoId) return;
 
   fetch(`/courses/matrices/buscar-existente/?curso_id=${cursoId}`)
@@ -502,12 +507,37 @@ function preencherFormsetComCopia(componentes) {
 // MatrixComponentForm quando a matriz for salva.
 function adicionarComponentesImportados(componentes) {
   const container = document.getElementById('components-container');
+  const linhasVazias = Array.from(container.querySelectorAll('.component-row'))
+    .filter(linhaComponenteVazia);
 
   componentes.forEach(comp => {
-    addComponent();
-    const rows = container.querySelectorAll('.component-row');
-    preencherLinhaComponente(rows[rows.length - 1], comp);
+    let row = linhasVazias.shift();
+    if (!row) {
+      addComponent();
+      const rows = container.querySelectorAll('.component-row');
+      row = rows[rows.length - 1];
+    }
+    preencherLinhaComponente(row, comp);
   });
+}
+
+// Na criação, o formset renderiza uma linha inicial para preenchimento manual.
+// A importação deve aproveitá-la; acrescentar todas as linhas depois dela
+// deixava o primeiro formulário obrigatório vazio e impedia salvar o rascunho.
+function linhaComponenteVazia(row) {
+  const valor = selector => {
+    const campo = row.querySelector(selector);
+    return campo ? (campo.value || '').trim() : '';
+  };
+  const campoDelete = row.querySelector('input[name$="-DELETE"]');
+  const excluida = campoDelete && campoDelete.checked;
+  if (excluida || valor('input[name$="-id"]')) return false;
+  return !valor('select[name$="-componente_curricular"]')
+    && !valor('input[name$="-nome_temporario"]')
+    && !valor('.cc-search-input')
+    && !valor('select[name$="-periodo"]')
+    && !valor('input[name$="-codigo"]')
+    && !valor('input[name$="-carga_horaria"]');
 }
 
 (function() {
@@ -608,8 +638,12 @@ function confirmarRemocaoComponenteMatriz(btn) {
     if (result.isConfirmed) {
       const row = btn.closest('.component-row');
       if (row) {
-        const checkbox = row.querySelector('input[type="checkbox"]');
-        if (checkbox) checkbox.checked = true;
+        // A linha tem outros checkboxes (principalmente o modo "temporária").
+        // Marcar o primeiro deles ativava esse modo sem limpar a disciplina do
+        // catálogo e gerava o erro "Escolha apenas uma opção" ao salvar.
+        const checkbox = row.querySelector('input[name$="-DELETE"]');
+        if (!checkbox) return;
+        checkbox.checked = true;
         row.style.transition = 'opacity .2s, transform .2s';
         row.style.opacity = '0';
         row.style.transform = 'translateY(-6px)';
@@ -623,11 +657,9 @@ function confirmarRemocaoComponenteMatriz(btn) {
 function addComponent() {
   const container = document.getElementById('components-container');
   const totalForms = document.getElementById('id_componentes-TOTAL_FORMS');
+  if (!container || !totalForms || !componentRowPrototype) return;
   const currentTotal = parseInt(totalForms.value);
-  const firstRow = container.querySelector('.component-row');
-  if (!firstRow) return;
-
-  const newRow = firstRow.cloneNode(true);
+  const newRow = componentRowPrototype.cloneNode(true);
   
   // Reindexar campos
   newRow.innerHTML = newRow.innerHTML.replace(/componentes-\d+/g, `componentes-${currentTotal}`);
@@ -638,6 +670,21 @@ function addComponent() {
   newRow.querySelectorAll('input[type=checkbox]').forEach(c => c.checked = false);
   newRow.querySelectorAll('input[type=hidden][name*="id"]').forEach(h => h.value = '');
 
+  // Uma linha nova não pode herdar metadados da primeira linha quando ela já
+  // existe no banco (docente/status/observações pertencem ao componente antigo).
+  const docente = newRow.querySelector('input[name$="-docente"]');
+  const status = newRow.querySelector('input[name$="-status"]');
+  const observacoes = newRow.querySelector('input[name$="-observacoes"]');
+  if (docente) docente.value = '';
+  if (status) status.value = 'SEM_PROFESSOR';
+  if (observacoes) observacoes.value = '';
+
+  // Não carregar para a nova linha o estado visual nem mensagens de uma
+  // validação/remoção anterior da linha usada como molde.
+  newRow.removeAttribute('style');
+  newRow.classList.remove('opacity-40');
+  newRow.querySelectorAll('.text-red-500, .field-error').forEach(el => el.remove());
+
   // A linha clonada pode ter copiado o VISUAL de "disciplina temporária" da
   // linha de origem (se ela estava nesse modo) — o reset dos checkboxes acima
   // não desfaz sozinho as classes/disabled disso. Força o modo padrão (catálogo).
@@ -645,7 +692,36 @@ function addComponent() {
 
   container.appendChild(newRow);
   totalForms.value = currentTotal + 1;
+  document.dispatchEvent(new CustomEvent('matrix:component-added', {
+    detail: { row: newRow },
+  }));
 }
+
+const addComponentButton = document.getElementById('add-component');
+if (addComponentButton) {
+  addComponentButton.addEventListener('click', addComponent);
+}
+
+// Normaliza os campos ocultos imediatamente antes do POST. Assim, mesmo uma
+// aba aberta antes desta correção não envia catálogo e nome temporário juntos.
+const matrixForm = document.getElementById('form-matriz');
+if (matrixForm) matrixForm.addEventListener('submit', function() {
+  document.querySelectorAll('#components-container .component-row').forEach(row => {
+    const campoDelete = row.querySelector('input[name$="-DELETE"]');
+    if (campoDelete && campoDelete.checked) return;
+    const campoTemporaria = row.querySelector('input[name$="-usar_disciplina_temporaria"]');
+    const temporaria = campoTemporaria && campoTemporaria.checked;
+    const catalogo = row.querySelector('select[name$="-componente_curricular"]');
+    const busca = row.querySelector('.cc-search-input');
+    const nomeTemporario = row.querySelector('input[name$="-nome_temporario"]');
+    if (temporaria) {
+      if (catalogo) catalogo.value = '';
+      if (busca) busca.value = '';
+    } else if (nomeTemporario) {
+      nomeTemporario.value = '';
+    }
+  });
+});
 
 // Sem carregamento dinâmico de cursos — a lista é carregada diretamente pelo Django
 </script>
@@ -752,14 +828,19 @@ function addComponent() {
     document.querySelectorAll('.cc-search-input').forEach(initCCAutocomplete);
   }
 
-  document.addEventListener('DOMContentLoaded', inicializarTodos);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', inicializarTodos);
+  } else {
+    inicializarTodos();
+  }
 
-  // Reitera quando addComponent() clonar uma nova linha
-  const _addComponent = window.addComponent;
-  window.addComponent = function() {
-    if (_addComponent) _addComponent();
-    setTimeout(inicializarTodos, 100);
-  };
+  // addComponent() avisa exatamente qual linha foi inserida. Isso evita
+  // substituir window.addComponent e quebrar o onclick do botão em alguns
+  // navegadores/carregamentos parciais.
+  document.addEventListener('matrix:component-added', function(event) {
+    const row = event.detail && event.detail.row;
+    if (row) row.querySelectorAll('.cc-search-input').forEach(initCCAutocomplete);
+  });
 })();
 </script>
 {% endblock %}

@@ -1,6 +1,6 @@
 # pyrefly: ignore [missing-import]
 from django import forms
-from django.forms import inlineformset_factory
+from django.forms import BaseInlineFormSet, inlineformset_factory
 
 from .models import ClassGroup, Course, CourseUnit, CurriculumMatrix, MatrixComponent, CurricularComponent
 from apps.core.models import Unidade
@@ -160,12 +160,11 @@ class MatrixComponentForm(forms.ModelForm):
         nome_temp = (cleaned_data.get('nome_temporario') or '').strip()
 
         if usar_temporaria:
-            if cc is not None:
-                self.add_error(
-                    'componente_curricular',
-                    'Escolha apenas uma opção: disciplina do catálogo OU temporária, não as duas.'
-                )
-                return cleaned_data
+            # O checkbox é a fonte de verdade do modo da linha. Autocomplete,
+            # importação e abas antigas podem deixar um FK residual no <select>
+            # oculto; nesse caso, normalize para temporária em vez de rejeitar o
+            # rascunho como se o usuário tivesse escolhido conscientemente os dois.
+            cleaned_data['componente_curricular'] = None
             if not nome_temp:
                 self.add_error('nome_temporario', 'Informe o nome da disciplina temporária.')
                 return cleaned_data
@@ -218,10 +217,28 @@ class MatrixComponentForm(forms.ModelForm):
         return cleaned_data
 
 
+class MatrixComponentBaseFormSet(BaseInlineFormSet):
+    """Permite ignorar linhas extras totalmente vazias.
+
+    ``min_num=1`` é mantido para renderizar uma linha inicial e garantir que a
+    matriz tenha ao menos um componente. Por padrão, porém, o Django torna essa
+    primeira linha extra obrigatória. Isso quebrava a importação: as linhas da
+    planilha eram acrescentadas depois dela e a linha inicial vazia invalidava o
+    formset. O próprio ``validate_min`` continua recusando uma matriz realmente
+    vazia depois que as linhas extras passam a ser opcionais individualmente.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for form in self.extra_forms:
+            form.empty_permitted = True
+
+
 MatrixComponentFormSet = inlineformset_factory(
     CurriculumMatrix,
     MatrixComponent,
     form=MatrixComponentForm,
+    formset=MatrixComponentBaseFormSet,
     fields=MatrixComponentForm.Meta.fields,
     # Na criação, min_num garante uma linha inicial. Na edição, mostrar apenas
     # os componentes realmente salvos; novas linhas são adicionadas pelo botão

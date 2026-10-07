@@ -1341,6 +1341,23 @@ class FormsetMatrizE2ETests(BaseCoursesE2ETests):
         super().setUp()
         self.client.force_login(self.desup)
 
+    def test_remover_linha_marca_delete_e_nao_o_checkbox_temporario(self):
+        html = self.client.get(reverse('courses:matrix_create')).content.decode()
+        self.assertIn("row.querySelector('input[name$=\"-DELETE\"]')", html)
+        self.assertNotIn("row.querySelector('input[type=\"checkbox\"]')", html)
+
+    def test_adicionar_componente_usa_evento_direto_sem_sobrescrever_funcao(self):
+        html = self.client.get(reverse('courses:matrix_create')).content.decode()
+        self.assertIn("addComponentButton.addEventListener('click', addComponent)", html)
+        self.assertIn("document.addEventListener('matrix:component-added'", html)
+        self.assertNotIn('window.addComponent = function()', html)
+
+    def test_adicionar_componente_mantem_molde_quando_todas_as_linhas_sao_removidas(self):
+        html = self.client.get(reverse('courses:matrix_create')).content.decode()
+        self.assertIn('const componentRowPrototype = firstComponentRow', html)
+        self.assertIn('componentRowPrototype.cloneNode(true)', html)
+        self.assertNotIn("const firstRow = container.querySelector('.component-row')", html)
+
     def test_publicar_matriz_com_tres_componentes(self):
         resp = self.client.post(reverse('courses:matrix_create'), data=payload_matriz(
             curso=self.curso, unidades=[self.unidade_a, self.unidade_b], nome='MC-MULTI',
