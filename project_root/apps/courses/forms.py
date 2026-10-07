@@ -1,5 +1,6 @@
 # pyrefly: ignore [missing-import]
 from django import forms
+from django.db import connection
 from django.forms import BaseInlineFormSet, inlineformset_factory
 
 from .models import (
@@ -183,6 +184,14 @@ class MatrixComponentForm(forms.ModelForm):
         # (herdada do catálogo) quando a linha NÃO está em modo temporário.
         self.fields['carga_horaria'].disabled = not self.modo_temporario_ativo
 
+    def _get_validation_exclusions(self):
+        exclude = super()._get_validation_exclusions()
+        if self.fields['componente_curricular'].catalogo_cache is not None:
+            # O campo já foi validado contra o catálogo carregado; sem isto o
+            # model.full_clean() faria um EXISTS no banco para cada linha.
+            exclude.add('componente_curricular')
+        return exclude
+
     def _choices_disciplina_atual(self, catalogo_cache):
         choices = [('', '---------')]
         if self.is_bound:
@@ -300,6 +309,33 @@ class MatrixComponentBaseFormSet(BaseInlineFormSet):
         super().__init__(*args, **kwargs)
         for form in self.extra_forms:
             form.empty_permitted = True
+
+    def save_new_objects(self, commit=True):
+        """Grava as linhas novas num único INSERT (em vez de um por linha)."""
+        if not commit or not connection.features.can_return_rows_from_bulk_insert:
+            return super().save_new_objects(commit)
+
+        novos = []
+        for form in self.extra_forms:
+            if not form.has_changed():
+                continue
+            if self.can_delete and self._should_delete_form(form):
+                continue
+            obj = self.save_new(form, commit=False)
+            obj.preencher_antes_de_salvar()
+            novos.append(obj)
+
+        if novos:
+            MatrixComponent.objects.bulk_create(novos)
+            temporarios = []
+            for obj in novos:
+                if obj.componente_curricular_id is None and not obj.codigo:
+                    obj.codigo = f"TEMP-{obj.pk:05d}"
+                    temporarios.append(obj)
+            if temporarios:
+                MatrixComponent.objects.bulk_update(temporarios, ['codigo'])
+        self.new_objects = novos
+        return novos
 
 
 MatrixComponentFormSet = inlineformset_factory(

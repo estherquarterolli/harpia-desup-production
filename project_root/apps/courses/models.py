@@ -320,7 +320,12 @@ class MatrixComponent(models.Model):
                 'nome_temporario': 'Escolha apenas uma opção: disciplina do catálogo OU nome temporário, não os dois.'
             })
 
-    def save(self, *args, **kwargs):
+    def preencher_antes_de_salvar(self):
+        """Completa código/CH/créditos a partir da disciplina do catálogo.
+
+        Separado do save() para que o formset possa gravar várias linhas de uma
+        vez (bulk_create) aplicando exatamente a mesma regra.
+        """
         cc = self.componente_curricular
         if cc is not None:
             if not self.codigo and cc.codigo:
@@ -335,7 +340,11 @@ class MatrixComponent(models.Model):
             if self.creditos is None:
                 self.creditos = self.carga_horaria // 20
             if self.carga_horaria_semanal is None:
-                self.carga_horaria_semanal = calcular_carga_horaria_semanal(self.carga_horaria)
+                self.carga_horaria_semanal = round(self.carga_horaria / 20, 2)
+        return cc
+
+    def save(self, *args, **kwargs):
+        cc = self.preencher_antes_de_salvar()
         super().save(*args, **kwargs)
         # Disciplina temporária não tem código de catálogo: gera um a partir do id
         # (autoincremento do banco) só para o campo não ficar vazio.

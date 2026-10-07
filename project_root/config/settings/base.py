@@ -60,6 +60,11 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# Diagnóstico de lentidão: PROFILE_REQUESTS=1 mede tempo/queries por requisição
+# (log "PERF ..." + cabeçalho Server-Timing). Desligado por padrão.
+if config("PROFILE_REQUESTS", default=False, cast=bool):
+    MIDDLEWARE.insert(0, 'apps.core.profiling.RequestProfilingMiddleware')
+
 ROOT_URLCONF = 'config.urls'
 
 TEMPLATES = [

@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import transaction
 from django.db.models import Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -281,10 +282,13 @@ class CurriculumMatrixFormsetMixin:
             # as demais do mesmo curso — matrizes de turnos diferentes coexistem como vigentes.
             # O arquivamento passa a ser manual (CORR-012) ou em massa na virada de semestre.
 
-        self.object.save()
-        form.save_m2m()
-        component_formset.instance = self.object
-        component_formset.save()
+        # Uma transação só: sem ela cada INSERT/UPDATE comita separadamente no
+        # banco remoto, e uma falha no meio deixava a matriz pela metade.
+        with transaction.atomic():
+            self.object.save()
+            form.save_m2m()
+            component_formset.instance = self.object
+            component_formset.save()
 
         if editando_vigente:
             from apps.accounts.views import registrar_auditoria
