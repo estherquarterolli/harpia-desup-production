@@ -104,15 +104,24 @@ class SolicitacaoCadastroProfessorForm(forms.Form):
 
     nome = forms.CharField(
         label='Nome do professor', max_length=255,
-        widget=forms.TextInput(attrs={'class': _INPUT_CSS, 'placeholder': 'Nome completo'}),
+        widget=forms.TextInput(attrs={
+            'class': _INPUT_CSS,
+            'placeholder': 'Ex.: Maria da Silva',
+        }),
     )
     id_funcional = forms.CharField(
         label='ID Funcional', max_length=50, required=False,
-        widget=forms.TextInput(attrs={'class': _INPUT_CSS, 'placeholder': 'Se já souber'}),
+        widget=forms.TextInput(attrs={
+            'class': _INPUT_CSS,
+            'placeholder': 'Ex.: 12345678',
+        }),
     )
     rh_matricula = forms.CharField(
         label='Matrícula RH (opcional)', max_length=50, required=False,
-        widget=forms.TextInput(attrs={'class': _INPUT_CSS, 'placeholder': 'Se houver'}),
+        widget=forms.TextInput(attrs={
+            'class': _INPUT_CSS,
+            'placeholder': 'Ex.: 00/123456',
+        }),
     )
     tipo_contrato = forms.ModelChoiceField(
         label='Tipo de contrato', queryset=ContractType.objects.none(), required=False,
@@ -123,7 +132,9 @@ class SolicitacaoCadastroProfessorForm(forms.Form):
         label='Observações', required=False,
         widget=forms.Textarea(attrs={
             'class': _INPUT_CSS, 'rows': 4,
-            'placeholder': 'Cursos, disciplinas, motivo da solicitação...',
+            'placeholder': (
+                'Ex.: Atua no curso de Administração, na disciplina de Gestão de Pessoas.'
+            ),
         }),
     )
 

@@ -917,6 +917,19 @@ class CalculosCargaHorariaProfessorE2ETests(ProfessorE2EBase):
 class SolicitacaoCadastroEMatriculaOpcionalTests(ProfessorE2EBase):
     """Matrícula opcional, solicitação de cadastro à DESUP e busca "contém" tolerante."""
 
+    def test_formulario_de_solicitacao_mostra_exemplos_nos_campos(self):
+        self.client.force_login(self.coord_a)
+
+        resposta = self.client.get(reverse('professors:professor_solicitar_cadastro'))
+
+        self.assertContains(resposta, 'placeholder="Ex.: Maria da Silva"')
+        self.assertContains(resposta, 'placeholder="Ex.: 12345678"')
+        self.assertContains(resposta, 'placeholder="Ex.: 00/123456"')
+        self.assertContains(
+            resposta,
+            'placeholder="Ex.: Atua no curso de Administração, na disciplina de Gestão de Pessoas."',
+        )
+
     def test_professor_sem_matricula_e_cadastrado(self):
         self.client.force_login(self.desup)
 
