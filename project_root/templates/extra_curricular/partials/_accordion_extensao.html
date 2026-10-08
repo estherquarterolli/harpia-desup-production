@@ -121,10 +121,11 @@
                 <form method="POST" action="{% if object %}{% url 'extra_curricular:deletar_item' pk=object.pk tipo='ext' item_pk=item.pk %}{% else %}{% url 'extra_curricular:deletar_item_lote' tipo='ext' item_pk=item.pk %}{% endif %}" class="m-0 inline" onsubmit="this.querySelector('button[type=submit], input[type=submit]').disabled=true; return true;">
                   {% csrf_token %}
                   {% if not object %}<input type="hidden" name="ids" value="{{ query_string }}">{% endif %}
-                  {# `type="submit"` (e não `type=button` + `form.submit()`): o
-                     `HTMLFormElement.submit()` NÃO dispara o evento `submit`, então o
-                     interceptador global do base.html nunca abria o modal "Janela
-                     fechada" — a exclusão saía silenciosa fora do prazo. #}
+                  {% comment %}
+                  `type="submit"` (e não `type=button` + `form.submit()`): o
+                  `HTMLFormElement.submit()` não dispara o evento `submit`; por isso
+                  o interceptador global depende do submit nativo deste botão.
+                  {% endcomment %}
                   <button type="submit"
                     onclick="return confirm('Remover este item?')"
                     class="flex items-center justify-center w-8 h-8 rounded-full text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors">

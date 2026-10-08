@@ -238,6 +238,12 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
         if pendencia:
             ch_justificada = pendencia.ch_total_justificada
             ch_faltante = max(ch_pendente - ch_justificada, 0)
+            # Enquanto a pendência não for enviada, o estado exibido e
+            # filtrado é RASCUNHO. Os itens nascem com parecer PENDENTE, mas
+            # esse parecer só representa o trâmite depois do envio à DESUP.
+            status_rascunho = (
+                pendencia.status == PendenciaExtra.StatusChoices.RASCUNHO
+            )
             # Só conta como CH Justificada (coluna da lista) quando a pendência está
             # de fato APROVADA. Após uma reabertura (status volta a ENVIADO) a CH
             # aprovada anteriormente deixa de contar até ser aprovada novamente.
@@ -261,7 +267,10 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                         "ch_faltante": ch_faltante,
                         "pendencia": pendencia,
                         "justificativa_detalhe": f"Orientação de TCC ({item.num_orientandos} orientando{'s' if item.num_orientandos > 1 else ''})",
-                        "status_item": item.parecer_desup,
+                        "status_item": (
+                            PendenciaExtra.StatusChoices.RASCUNHO
+                            if status_rascunho else item.parecer_desup
+                        ),
                         "justificativa_ch": item.ch_aprovada,
                         "justificativa_tipo": "TCC",
                         "sei_numero": pendencia.sei_numero,
@@ -279,7 +288,10 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                         "ch_faltante": ch_faltante,
                         "pendencia": pendencia,
                         "justificativa_detalhe": f"Atividade Extensionista ({item.num_estudantes} estudante{'s' if item.num_estudantes > 1 else ''})",
-                        "status_item": item.parecer_desup,
+                        "status_item": (
+                            PendenciaExtra.StatusChoices.RASCUNHO
+                            if status_rascunho else item.parecer_desup
+                        ),
                         "justificativa_ch": item.ch_aprovada,
                         "justificativa_tipo": "Extensão",
                         "sei_numero": pendencia.sei_numero,
@@ -297,7 +309,10 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                         "ch_faltante": ch_faltante,
                         "pendencia": pendencia,
                         "justificativa_detalhe": f"Redução de CH ({item.horas_reduzidas}h) - Motivo: {item.motivo_reducao}",
-                        "status_item": item.parecer_desup,
+                        "status_item": (
+                            PendenciaExtra.StatusChoices.RASCUNHO
+                            if status_rascunho else item.parecer_desup
+                        ),
                         "justificativa_ch": item.ch_aprovada,
                         "justificativa_tipo": "Redução",
                         "sei_numero": pendencia.sei_numero,

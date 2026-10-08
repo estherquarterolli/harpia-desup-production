@@ -564,6 +564,54 @@ class FluxoLoteUnidadeTests(_BaseFluxoE2E):
         self.assertNotContains(resp, "Mesa de Trabalho Lote")
         self.assertNotContains(resp, "Mesa de Justificativas em Lote")
 
+    def test_rascunhos_aparecem_em_aba_e_abrem_todos_em_lote(self):
+        self._criar_pendencia_pela_rota([self.prof_a, self.prof_a2])
+        ids = self._ids(self.prof_a, self.prof_a2)
+
+        # Mesmo depois de receber um item (cujo parecer nasce PENDENTE), o
+        # registro continua sendo rascunho até o envio definitivo.
+        pend_a = PendenciaExtra.objects.get(
+            professor=self.prof_a, semestre=self.semestre
+        )
+        self.client.post(
+            reverse("extra_curricular:salvar_tcc_lote"),
+            {"ids": ids, "pendencia_id": str(pend_a.pk), "num_orientandos": "2"},
+        )
+
+        resp = self.client.get(reverse("extra_curricular:pendencia_list"))
+        url_lote = f'{reverse("extra_curricular:pendencia_lote")}?ids={ids}'
+
+        self.assertEqual(resp.context["rascunhos_count"], 2)
+        self.assertEqual(resp.context["rascunho_professor_ids"], ids)
+        self.assertContains(resp, "Rascunhos")
+        self.assertContains(resp, url_lote, count=3)
+        linhas_rascunho = [
+            linha for linha in resp.context["pendencias_data"]
+            if linha.get("pendencia")
+            and linha["pendencia"].status == PendenciaExtra.StatusChoices.RASCUNHO
+        ]
+        self.assertEqual({linha["status_token"] for linha in linhas_rascunho}, {"rascunho"})
+
+        mesa = self.client.get(url_lote)
+        self.assertEqual(
+            {professor.pk for professor in mesa.context["professores"]},
+            {self.prof_a.pk, self.prof_a2.pk},
+        )
+
+    def test_comentario_tecnico_nao_aparece_na_tela_e_texto_usa_apenas_sei(self):
+        self._criar_pendencia_pela_rota([self.prof_a])
+        ids = self._ids(self.prof_a)
+        pendencia = PendenciaExtra.objects.get(
+            professor=self.prof_a, semestre=self.semestre
+        )
+        OrientacaoTCC.objects.create(pendencia=pendencia, num_orientandos=2)
+
+        resp = self.client.get(reverse("extra_curricular:pendencia_lote"), {"ids": ids})
+
+        self.assertNotContains(resp, "HTMLFormElement.submit()")
+        self.assertNotContains(resp, "SEIs individualizados")
+        self.assertContains(resp, "Casos não enquadrados exigem SEI.")
+
     def test_jornada_em_lote_dois_docentes(self):
         resp = self._criar_pendencia_pela_rota([self.prof_a, self.prof_a2])
         ids = self._ids(self.prof_a, self.prof_a2)

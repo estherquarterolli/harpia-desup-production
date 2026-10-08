@@ -125,6 +125,28 @@ class PendenciaListView(LoginRequiredMixin, PerfilRequiredMixin, View):
         # Semestres para o filtro
         semestres = _gerar_semestres()
 
+        # O rascunho nasce em lote e deve continuar sendo editado em lote. A
+        # listagem antes oferecia somente o link de cada docente, obrigando o
+        # coordenador a reabrir uma pendência por vez. Mantemos um único atalho
+        # com todos os docentes que ainda estão em rascunho no semestre atual.
+        rascunho_professor_ids = ""
+        rascunhos_count = 0
+        if perfil == "COORDENADOR_UNIDADE" and semestre == _semestre_atual():
+            rascunhos_qs = (
+                PendenciaExtra.objects
+                .filter(
+                    unidade=unidade,
+                    semestre=semestre,
+                    status=PendenciaExtra.StatusChoices.RASCUNHO,
+                )
+                .order_by("professor__rh_nome", "pk")
+            )
+            rascunho_professor_ids = ",".join(
+                str(professor_id)
+                for professor_id in rascunhos_qs.values_list("professor_id", flat=True)
+            )
+            rascunhos_count = rascunhos_qs.count()
+
         ctx = {
             "unidades": unidades,
             "unidade_selecionada": unidade,
@@ -140,6 +162,8 @@ class PendenciaListView(LoginRequiredMixin, PerfilRequiredMixin, View):
             "is_desup": (perfil == "DESUP" or user.is_superuser),
             "status_filtro": status_filtro,
             "justificativa_filtro": justificativa_filtro,
+            "rascunho_professor_ids": rascunho_professor_ids,
+            "rascunhos_count": rascunhos_count,
         }
         try:
             ctx.update(build_window_lock_context(
