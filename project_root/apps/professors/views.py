@@ -1,7 +1,9 @@
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
-from django.db.models import ProtectedError, Q
+from django.db.models import (
+    Case, Exists, IntegerField, OuterRef, ProtectedError, Q, Value, When,
+)
 from django.shortcuts import redirect, get_object_or_404, render
 from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView, View
@@ -145,6 +147,30 @@ class ProfessorListView(LoginRequiredMixin, ListView):
             qs = qs.filter(
                 Q(unidades__id=unidade_id) | Q(unidade_principal_id=unidade_id)
             ).distinct()
+
+        # A base de professores continua compartilhada entre as unidades, mas,
+        # na visao de uma unidade, os docentes vinculados a ela precisam aparecer
+        # primeiro. O Exists evita duplicar professores que possuem mais de um
+        # vinculo no ManyToMany e garante que a prioridade seja aplicada antes
+        # da paginacao.
+        if user.perfil == 'COORDENADOR_UNIDADE' and user.unidade_id:
+            vinculo_com_unidade_atual = Professor.unidades.through.objects.filter(
+                professor_id=OuterRef('pk'),
+                unidade_id=user.unidade_id,
+            )
+            qs = qs.annotate(
+                _vinculado_unidade_atual=Exists(vinculo_com_unidade_atual),
+            ).annotate(
+                _prioridade_unidade=Case(
+                    When(
+                        Q(unidade_principal_id=user.unidade_id)
+                        | Q(_vinculado_unidade_atual=True),
+                        then=Value(0),
+                    ),
+                    default=Value(1),
+                    output_field=IntegerField(),
+                ),
+            ).order_by('_prioridade_unidade', 'rh_nome', 'pk')
         return qs
 
     def get_context_data(self, **kwargs):

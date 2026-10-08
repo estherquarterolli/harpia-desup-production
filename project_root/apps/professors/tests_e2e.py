@@ -556,6 +556,26 @@ class IsolamentoUnidadeProfessorE2ETests(ProfessorE2EBase):
         self.assertFalse(resposta.context['is_desup'])
         self.assertEqual(resposta.context['unidade_atual'], self.unidade_a)
 
+    def test_coordenador_ve_primeiro_todos_os_professores_da_sua_unidade(self):
+        professor_local = self._professor('Zuleica Local', 'A2', self.unidade_a)
+        professor_compartilhado = self._professor(
+            'Zenaide Compartilhada', 'B2', self.unidade_b,
+        )
+        professor_compartilhado.unidades.add(self.unidade_a)
+        professor_externo = self._professor('Aline Externa', 'B3', self.unidade_b)
+        self.client.force_login(self.coord_a)
+
+        resposta = self.client.get(self.url_lista)
+
+        ids_ordenados = [p.pk for p in resposta.context['professores']]
+        ids_da_unidade = {
+            self.prof_a1.pk,
+            professor_local.pk,
+            professor_compartilhado.pk,
+        }
+        self.assertEqual(set(ids_ordenados[:3]), ids_da_unidade)
+        self.assertGreater(ids_ordenados.index(professor_externo.pk), 2)
+
     def test_desup_ve_todas_as_unidades_e_filtra_por_unidade(self):
         self.client.force_login(self.desup)
 
