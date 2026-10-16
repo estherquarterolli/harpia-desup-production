@@ -134,7 +134,7 @@ class ProfessorListView(LoginRequiredMixin, ListView):
         q = self.request.GET.get('q', '')
         if q:
             qs = filtrar_contem(
-                qs, q, ['rh_nome', 'desup_nome', 'id_funcional', 'rh_matricula'],
+                qs, q, ['rh_nome', 'desup_nome', 'id_funcional', 'rh_matricula', 'area_atuacao'],
             )
         carga = self.request.GET.get('ch', '')
         if carga.isdigit():

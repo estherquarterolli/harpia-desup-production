@@ -21,6 +21,7 @@ class ProfessorForm(forms.ModelForm):
             'cursos',
             'status',
             'nivel_ensino_origem',
+            'area_atuacao',
         ]
         widgets = {
             'id_funcional': forms.TextInput(attrs={'class': _INPUT_CSS, 'placeholder': 'Ex: 1234567'}),
@@ -37,6 +38,7 @@ class ProfessorForm(forms.ModelForm):
             'cursos': forms.CheckboxSelectMultiple(),
             'status': forms.Select(attrs={'class': _SELECT_CSS}),
             'nivel_ensino_origem': forms.Select(attrs={'class': _SELECT_CSS}),
+            'area_atuacao': forms.TextInput(attrs={'class': _INPUT_CSS, 'placeholder': 'Ex: Matemática', 'maxlength': 150}),
             'carga_diferenciada': forms.CheckboxInput(attrs={'class': 'w-4 h-4'}),
             'carga_horaria_personalizada': forms.NumberInput(attrs={'class': _INPUT_CSS, 'min': 1, 'max': 60, 'placeholder': 'Ex: 30'}),
         }
@@ -49,6 +51,7 @@ class ProfessorForm(forms.ModelForm):
             'cursos': 'Cursos (Checklist)',
             'status': 'Status',
             'nivel_ensino_origem': 'Nível de ensino de origem',
+            'area_atuacao': 'Área de atuação',
         }
 
     def __init__(self, *args, **kwargs):

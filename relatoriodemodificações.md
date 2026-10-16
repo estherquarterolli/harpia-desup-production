@@ -262,3 +262,24 @@
 
 ### Banco de dados
 - Nenhuma alteração de estrutura (`makemigrations --check`: "No changes detected"). Nenhum SQL novo para o Supabase.
+
+## 16/10/2026 — Área de atuação do professor
+
+### `project_root/apps/professors/models.py` e `migrations/0012_professor_area_atuacao.py`
+- Tipo: alterado / criado.
+- Alteração: novo campo `area_atuacao` (texto livre, até 150 caracteres, opcional, padrão vazio).
+- Banco de dados: `ALTER TABLE harpiadb_professores_professor ADD COLUMN area_atuacao varchar(150) NOT NULL` (registros existentes ficam vazios).
+
+### `project_root/sql/supabase_professor_area_atuacao.sql`
+- Tipo: criado.
+- Alteração: script idempotente equivalente à migration 0012 para o SQL Editor do Supabase.
+
+### `project_root/apps/professors/forms.py`, `views.py`
+- Alteração: campo no formulário de professor; área incluída na busca da listagem.
+
+### `project_root/templates/professors/professor_form.html`
+- Alteração: nova aba "Área", após "Contrato".
+
+### `project_root/templates/professors/professor_list.html`, `dashboard/partials/_professor_table.html`, `professors/partials/_professor_detail.html`
+- Alteração: coluna "Área" nas listagens de professores e no detalhe do professor.
+- Verificação: `manage.py test apps.professors apps.core` — 214 de 217 aprovados; as 3 falhas (`test_unidade_coord_can_only_see_their_unit`, `test_limite_manual_da_desup_prevalece_sobre_o_calculo`, `test_listagem_mostra_colunas_por_matriz_e_soma_de_horas`) não envolvem a área e já existiam no código commitado.

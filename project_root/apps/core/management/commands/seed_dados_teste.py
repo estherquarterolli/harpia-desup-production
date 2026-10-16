@@ -86,6 +86,9 @@ EQUIPES = {
                   ("COORDENACAO_DE_ESTAGIO", 2, "6")),
 }
 
+# Senha dos usuários de teste criados por este comando (somente ambiente local).
+SENHA_TESTE = "Teste@2026"
+
 LIMITES = {"TST-ISTCC": "160", "TST-ISERJ": "220", "TST-ISTRIO": "40"}
 
 
@@ -200,7 +203,24 @@ class Command(BaseCommand):
                 justificativa_administrativa="Readaptação funcional de teste.", criado_por=desup,
             )
 
-        solicitante = User.objects.filter(perfil=User.Perfil.COORDENADOR_UNIDADE).first() or desup
+        # Um coordenador por unidade de teste. A senha só é definida na criação,
+        # para não sobrescrever uma troca feita depois.
+        coordenadores = 0
+        for sigla, unidade in unidades.items():
+            email = f"coord.{sigla.removeprefix('TST-').lower()}@teste.harpia.local"
+            if not User.objects.filter(email=email).exists():
+                User.objects.create_user(
+                    email=email,
+                    password=SENHA_TESTE,
+                    perfil=User.Perfil.COORDENADOR_UNIDADE,
+                    unidade=unidade,
+                    forcar_troca_senha=False,
+                )
+                coordenadores += 1
+
+        solicitante = User.objects.filter(
+            perfil=User.Perfil.COORDENADOR_UNIDADE, unidade=unidades["TST-ISTRIO"],
+        ).first() or desup
         if solicitante and not ExcecaoCargaUnidade.objects.filter(unidade=unidades["TST-ISTRIO"]).exists():
             ExcecaoCargaUnidade.objects.create(
                 unidade=unidades["TST-ISTRIO"], horas_adicionais=Decimal("12"),
@@ -214,4 +234,5 @@ class Command(BaseCommand):
             "cursos": len(cursos),
             "professores": len(NOMES),
             "ocupações novas": ocupacoes,
+            "coordenadores novos": coordenadores,
         }

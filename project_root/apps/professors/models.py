@@ -174,6 +174,14 @@ class Professor(models.Model):
         help_text="Informação institucional usada para alertar atuações no Ensino Superior.",
     )
 
+    area_atuacao = models.CharField(
+        max_length=150,
+        blank=True,
+        default="",
+        verbose_name="Área de atuação",
+        help_text="Área de conhecimento em que o professor atua (ex.: Matemática, Computação).",
+    )
+
     class Meta:
         db_table = "harpiadb_professores_professor"
         verbose_name = "Professor"
