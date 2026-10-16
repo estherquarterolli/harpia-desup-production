@@ -195,4 +195,6 @@ def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, t
         "excecoes_pendentes": excecoes_pendentes.count(),
         "unidades_no_limite": unidades_no_limite,
         "unidades_no_limite_count": len(unidades_no_limite),
+        "cargas_por_unidade": dict(cargas_unidade),
+        "adicionais_por_unidade": dict(adicionais),
     }

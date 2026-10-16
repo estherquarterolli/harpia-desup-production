@@ -194,3 +194,71 @@
 - Tipo: alterado.
 - Alteração: inclusão do registro do script SQL fornecido para a implantação da Prioridade 1 no Supabase.
 - Motivo: manter a rastreabilidade por arquivo e registrar explicitamente as alterações previstas no banco de dados.
+
+## 16/10/2026 — Equipe diretiva por unidade e reorganização da supervisão de carga (Esther, DESUP)
+
+### `project_root/templates/core/prioridade1/equipe_diretiva.html`
+- Tipo: alterado.
+- Alteração: tela reorganizada em torno da unidade selecionada. Mostra a composição da equipe diretiva (um cartão por cargo, com ocupantes vigentes ou "Vago"), a redução de carga por ocupante e a redução total da unidade. Preenchimento de cargo, ajuste de redução e gestão dos tipos de cargo (novo/editar, com ícones) passam a ocorrer em modais; o histórico de ocupações fica recolhido.
+- Motivo: permitir que a DESUP preencha os cargos de cada unidade e registre a redução de carga sem sair da tela.
+
+### `project_root/templates/core/prioridade1/alertas_carga.html`
+- Tipo: alterado.
+- Alteração: tela dividida em abas (Visão geral, Teto por unidade, Readaptações, Exceções), com textos explicativos, barra de uso do teto por unidade, filtros com envio automático e todos os formulários (teto, readaptação, encerramento e decisão de exceção) em modais.
+- Motivo: a tela anterior apresentava todos os blocos ao mesmo tempo e não explicava o significado de limite e readaptação.
+
+### `project_root/templates/core/prioridade1/_modal_form.html` e `_campos_form.html`
+- Tipo: criados.
+- Alteração: modal genérico com formulário e renderização padronizada de campos, reutilizados pelas telas acima.
+
+### `project_root/templates/core/prioridade1/form.html`, `solicitacoes_professor.html`
+- Tipo: alterados.
+- Alteração: remoção do rótulo "Prioridade 1" das telas; o formulário de página inteira preserva o parâmetro `next` quando há erro de validação.
+
+### `project_root/apps/core/views.py`
+- Tipo: alterado.
+- Alteração: nova `OcupacaoEquipeDiretivaCreateView` (preencher cargo de uma unidade), mixin `RetornoOrigemMixin` (redireciona para a origem validada após salvar em modal), composição por cargo e redução total no contexto da equipe diretiva, carga atual × teto por unidade e formulários dos modais no contexto de alertas.
+
+### `project_root/apps/core/forms.py`
+- Tipo: alterado.
+- Alteração: `OcupacaoEquipeDiretivaForm` (servidores e cursos restritos à unidade), `ReadaptacaoProfessorEdicaoForm` (edição sem troca de professor), rótulos e textos de ajuda de teto e readaptação.
+
+### `project_root/apps/core/priority1.py`
+- Tipo: alterado.
+- Alteração: o resumo passa a retornar a carga alocada e as horas adicionais aprovadas por unidade.
+
+### `project_root/apps/core/urls.py`
+- Tipo: alterado.
+- Alteração: rota `ocupacao_diretiva_create`.
+
+### `project_root/apps/core/tests_prioridade1_desup.py`
+- Tipo: alterado.
+- Alteração: testes de preenchimento de cargo, bloqueio de servidor de outra unidade, renderização dos modais de alertas e edição de readaptação com retorno à origem.
+- Verificação: `python manage.py test apps.core.tests_prioridade1_desup --settings=config.settings._tmp_test` (com `DATABASE_URL` SQLite): aprovado, 11 testes.
+
+### `project_root/static/css/tailwind.min.css`
+- Tipo: alterado.
+- Alteração: recompilado com `npm run build:css` para incluir as classes novas.
+
+### `project_root/apps/core/management/commands/seed_dados_teste.py`
+- Tipo: criado.
+- Alteração: comando `python manage.py seed_dados_teste`, idempotente e restrito a `DEBUG=True`, que cria 5 unidades, 7 cursos vinculados às unidades, 36 professores distribuídos entre as unidades e os tipos de contrato, equipe diretiva parcial em duas unidades, tetos de carga, uma readaptação e uma exceção pendente. Todos os registros usam o prefixo/sufixo "TESTE".
+- Motivo: permitir testar localmente as telas de equipe diretiva, alertas de carga e consulta de professores.
+- Verificação: executado duas vezes no `local.sqlite3` sem gerar duplicidades; telas renderizadas com os dados.
+
+## 16/10/2026 — Ajustes de layout: equipe diretiva, alertas, dashboard e selects
+
+### `project_root/templates/core/prioridade1/equipe_diretiva.html` e `apps/core/views.py`
+- Alteração: layout em lista ("Cargos da equipe") com avatar, situação e seta; barra com unidade e redução total; detalhe do cargo, preenchimento, redução, edição de cargo e histórico em modais; botão "Adicionar cargo". Filtros de cargo/situação removidos da view.
+
+### `project_root/templates/core/prioridade1/alertas_carga.html` e `apps/core/views.py`
+- Alteração: removida a aba "Teto por unidade" e o ponto de atenção correspondente; "Pontos de atenção" passa a ficar recolhido, exibindo em negrito a quantidade de pontos com ocorrências.
+
+### `project_root/templates/dashboard/desup.html`
+- Alteração: removido o cartão "Unidades no limite"; a lista de unidades com pendências passa a abrir para baixo do cartão.
+
+### `project_root/static/css/tailwind-input.css` e `tailwind.min.css`
+- Alteração: seta padronizada dos selects, afastada da borda direita.
+
+### Banco de dados
+- Nenhuma alteração de estrutura (`makemigrations --check`: "No changes detected"). Nenhum SQL novo para o Supabase.

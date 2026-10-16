@@ -12,6 +12,7 @@
     </div>
     <form method="post" class="space-y-5 p-4 sm:p-6" novalidate>
       {% csrf_token %}
+      {% if retorno %}<input type="hidden" name="next" value="{{ retorno }}">{% endif %}
       {% if form.non_field_errors %}
       <div class="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">
         {{ form.non_field_errors }}

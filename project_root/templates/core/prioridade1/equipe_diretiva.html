@@ -4,70 +4,192 @@
 {% block header_title %}Equipe diretiva{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-  <section class="rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-white p-4 sm:p-6">
-    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-      <div>
-        <p class="text-xs font-black uppercase tracking-widest text-blue-600">Prioridade 1</p>
-        <h1 class="mt-1 text-xl font-black text-slate-900 sm:text-2xl">Governança da equipe diretiva</h1>
-        <p class="mt-2 max-w-3xl text-sm text-slate-600">Cadastre cargos institucionais, acompanhe ocupações por unidade e preserve o histórico de vigência.</p>
-      </div>
-      <div class="flex flex-col gap-2 sm:flex-row">
-        <a href="{% url 'core:cargo_diretivo_create' %}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-sm font-black text-[#025c9f] hover:bg-blue-50"><i class="ph ph-plus-circle"></i>Novo cargo</a>
-      </div>
-    </div>
-  </section>
+{% with retorno=request.get_full_path %}
+<div class="mx-auto w-full max-w-5xl space-y-6">
+  <p class="-mt-2 text-sm text-slate-500">Escolha a unidade, preencha os cargos e informe a redução de carga horária de cada ocupante.</p>
 
-  <section class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-xs font-black uppercase tracking-wider text-slate-400">Cargos cadastrados</p><p class="mt-2 text-3xl font-black text-slate-800">{{ cargos|length }}</p></div>
-    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-xs font-black uppercase tracking-wider text-slate-400">Ocupações vigentes</p><p class="mt-2 text-3xl font-black text-slate-800">{{ total_vigentes }}</p></div>
-    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-xs font-black uppercase tracking-wider text-slate-400">Escopo</p><p class="mt-2 text-lg font-black text-[#025c9f]">Todas as unidades</p></div>
-  </section>
-
-  <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
-    <div class="border-b border-slate-100 p-4 sm:p-5">
-      <h2 class="font-black text-slate-800">Tipos de cargo</h2>
-    </div>
-    <div class="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
-      {% for cargo in cargos %}
-      <a href="{% url 'core:cargo_diretivo_update' cargo.pk %}" class="rounded-xl border border-slate-200 p-4 transition hover:border-blue-300 hover:bg-blue-50/50">
-        <div class="flex items-start justify-between gap-3"><span class="font-black text-slate-800">{{ cargo.nome }}</span><span class="rounded-full px-2 py-1 text-[10px] font-black {% if cargo.ativo %}bg-emerald-100 text-emerald-700{% else %}bg-slate-100 text-slate-500{% endif %}">{% if cargo.ativo %}Ativo{% else %}Inativo{% endif %}</span></div>
-        <p class="mt-2 text-xs text-slate-500">{% if cargo.exige_curso %}Vinculado a curso{% else %}Sem vínculo obrigatório com curso{% endif %}</p>
-      </a>
-      {% empty %}<p class="text-sm text-slate-500">Nenhum cargo cadastrado.</p>{% endfor %}
-    </div>
-  </section>
-
-  <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
-    <form method="get" class="grid grid-cols-1 gap-3 border-b border-slate-100 p-4 sm:grid-cols-3 lg:grid-cols-4">
-      <label for="equipe-unidade" class="sr-only">Filtrar por unidade</label>
-      <select id="equipe-unidade" name="unidade_id" class="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">
-        <option value="">Todas as unidades</option>
+  {# ── Barra: unidade + redução total ── #}
+  <section class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-2 shadow-sm sm:flex-row sm:items-center">
+    <form method="get" class="relative min-w-0 flex-1">
+      <i class="ph ph-buildings pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-[#025c9f]"></i>
+      <label for="equipe-unidade" class="sr-only">Unidade</label>
+      <select id="equipe-unidade" name="unidade_id" onchange="this.form.submit()" class="min-h-14 w-full cursor-pointer appearance-none rounded-xl border-0 bg-white pl-14 pr-10 text-base font-bold text-slate-800 outline-none hover:bg-slate-50 focus:ring-2 focus:ring-blue-200">
+        <option value="">Selecione uma unidade…</option>
         {% for unidade in unidades %}<option value="{{ unidade.pk }}" {% if filtro_unidade == unidade.pk|stringformat:'s' %}selected{% endif %}>{{ unidade.sigla }} - {{ unidade.nome }}</option>{% endfor %}
       </select>
-      <label for="equipe-cargo" class="sr-only">Filtrar por cargo</label>
-      <select id="equipe-cargo" name="cargo_id" class="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">
-        <option value="">Todos os cargos</option>
-        {% for cargo in cargos %}<option value="{{ cargo.pk }}" {% if filtro_cargo == cargo.pk|stringformat:'s' %}selected{% endif %}>{{ cargo.nome }}</option>{% endfor %}
-      </select>
-      <label for="equipe-situacao" class="sr-only">Filtrar pela situação da ocupação</label>
-      <select id="equipe-situacao" name="situacao" class="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">
-        <option value="vigentes" {% if filtro_situacao == 'vigentes' %}selected{% endif %}>Vigentes</option>
-        <option value="encerradas" {% if filtro_situacao == 'encerradas' %}selected{% endif %}>Encerradas</option>
-        <option value="todas" {% if filtro_situacao == 'todas' %}selected{% endif %}>Todas</option>
-      </select>
-      <button class="min-h-11 rounded-xl bg-slate-800 px-4 text-sm font-black text-white hover:bg-slate-700">Aplicar filtros</button>
+      <i class="ph ph-caret-down pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
+      <noscript><button class="sr-only">Selecionar</button></noscript>
     </form>
-    <div class="overflow-x-auto">
-      <table class="w-full min-w-[920px] text-left text-sm stack-table">
-        <thead class="bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-500"><tr><th class="px-5 py-4">Unidade</th><th class="px-5 py-4">Cargo</th><th class="px-5 py-4">Servidor</th><th class="px-5 py-4">Curso</th><th class="px-5 py-4">Vigência</th><th class="px-5 py-4">Redução</th><th class="px-5 py-4 text-right">Ações</th></tr></thead>
-        <tbody class="divide-y divide-slate-100">
-          {% for ocupacao in ocupacoes %}
-          <tr class="hover:bg-slate-50/70"><td class="px-5 py-4 font-bold" data-label="Unidade">{{ ocupacao.unidade.sigla }}</td><td class="px-5 py-4" data-label="Cargo">{{ ocupacao.cargo.nome }}</td><td class="px-5 py-4" data-label="Servidor">{{ ocupacao.professor.nome }}</td><td class="px-5 py-4" data-label="Curso">{{ ocupacao.curso.sigla|default:'—' }}</td><td class="px-5 py-4" data-label="Vigência">{{ ocupacao.data_inicio|date:'d/m/Y' }} a {{ ocupacao.data_fim|date:'d/m/Y'|default:'atual' }}</td><td class="px-5 py-4" data-label="Redução">{{ ocupacao.carga_reducao_horas }} h</td><td class="px-5 py-4" data-label="Ações"><div class="flex justify-end"><a href="{% url 'core:ocupacao_diretiva_update' ocupacao.pk %}" class="rounded-lg border border-slate-200 px-3 py-2 font-bold text-slate-600 hover:bg-slate-100">Ajustar redução</a></div></td></tr>
-          {% empty %}<tr><td colspan="7" class="px-5 py-10 text-center text-slate-500">Nenhuma ocupação encontrada.</td></tr>{% endfor %}
-        </tbody>
-      </table>
+    {% if unidade_selecionada %}
+    <div class="hidden h-10 w-px bg-slate-200 sm:block"></div>
+    <div class="flex items-center gap-3 rounded-xl bg-emerald-50 px-5 py-3 text-emerald-700" title="Redução total de carga horária da unidade">
+      <i class="ph ph-clock text-3xl"></i>
+      <p><span class="text-2xl font-black text-emerald-900">{{ reducao_total|floatformat:"-2" }} h</span><span class="text-sm font-semibold">/semana</span></p>
     </div>
+    {% endif %}
   </section>
+
+  {% if unidade_selecionada %}
+  <section class="space-y-3">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-black text-slate-900">Cargos da equipe</h2>
+      {% if historico %}<button type="button" onclick="abrirModal('modalHistorico')" class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-bold text-slate-500 hover:bg-slate-100 hover:text-[#025c9f]"><i class="ph ph-clock-counter-clockwise text-lg"></i>Histórico</button>{% endif %}
+    </div>
+
+    {% for item in composicao %}
+    {% cycle 'bg-blue-50 text-blue-600' 'bg-violet-50 text-violet-600' 'bg-pink-50 text-pink-600' 'bg-amber-50 text-amber-600' 'bg-emerald-50 text-emerald-600' 'bg-cyan-50 text-cyan-600' as cor silent %}
+    <button type="button" onclick="abrirModal('modalDetalhe{{ item.cargo.pk }}')" class="flex w-full items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-200 {% if not item.cargo.ativo %}opacity-60{% endif %}">
+      <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full {{ cor }}"><i class="ph{% if not item.ocupantes %}-fill{% endif %} ph-user text-2xl"></i></span>
+      <span class="min-w-0 flex-1">
+        <span class="block font-black text-slate-900">{{ item.cargo.nome }}</span>
+        {% if item.ocupantes %}
+        <span class="block truncate text-sm text-slate-500">{% for ocupacao in item.ocupantes %}{{ ocupacao.professor.nome }}{% if ocupacao.curso %} ({{ ocupacao.curso.sigla }}){% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+        {% endif %}
+      </span>
+      {% if not item.cargo.ativo %}<span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500">Inativo</span>
+      {% elif item.ocupantes %}<span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700">Preenchido</span>
+      {% else %}<span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700">Vago</span>{% endif %}
+      <i class="ph ph-caret-right text-xl text-slate-700"></i>
+    </button>
+    {% endfor %}
+
+    <button type="button" onclick="abrirModal('modalNovoCargo')" class="flex min-h-20 w-full items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-blue-200 text-base font-black text-[#025c9f] transition hover:border-blue-400 hover:bg-blue-50/50">
+      <i class="ph-fill ph-plus-circle text-4xl text-blue-500"></i>Adicionar cargo
+    </button>
+  </section>
+  {% else %}
+  <section class="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 bg-white px-6 py-16 text-center">
+    <i class="ph ph-buildings text-5xl text-slate-300"></i>
+    <p class="font-black text-slate-700">Selecione uma unidade</p>
+    <p class="max-w-sm text-sm text-slate-500">Os cargos da equipe diretiva e a redução de carga da unidade aparecem aqui.</p>
+  </section>
+  {% endif %}
 </div>
+
+{# ═══════════════ Modais ═══════════════ #}
+
+{% url 'core:cargo_diretivo_create' as cargo_create_url %}
+{% include 'core/prioridade1/_modal_form.html' with modal_id='modalNovoCargo' modal_key='' titulo='Novo cargo' subtitulo='Fica disponível para todas as unidades.' voltar='' voltar_key='' action_url=cargo_create_url form=form_novo_cargo %}
+
+{% for cargo, form_cargo in cargos_forms %}
+{% url 'core:cargo_diretivo_update' cargo.pk as url_cargo %}
+{% include 'core/prioridade1/_modal_form.html' with modal_id='modalCargo' modal_key=cargo.pk titulo='Editar cargo' subtitulo='A alteração vale para todas as unidades.' voltar=unidade_selecionada|yesno:'modalDetalhe,' voltar_key=cargo.pk action_url=url_cargo form=form_cargo %}
+{% endfor %}
+
+{% for item in composicao %}
+{# Detalhe do cargo: ocupantes, redução e ações #}
+<div id="modalDetalhe{{ item.cargo.pk }}" class="modal-equipe hidden fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="tituloDetalhe{{ item.cargo.pk }}">
+  <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div class="flex items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
+      <div class="min-w-0">
+        <h3 id="tituloDetalhe{{ item.cargo.pk }}" class="truncate text-base font-black text-slate-900">{{ item.cargo.nome }}</h3>
+        <p class="text-xs text-slate-500">{{ unidade_selecionada.sigla }}{% if item.cargo.exige_curso %} · um ocupante por curso{% endif %}</p>
+      </div>
+      <div class="flex shrink-0 items-center gap-1">
+        <button type="button" onclick="trocarModal('modalDetalhe{{ item.cargo.pk }}','modalCargo{{ item.cargo.pk }}')" title="Editar cargo" aria-label="Editar cargo {{ item.cargo.nome }}" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-[#025c9f]"><i class="ph ph-gear-six text-lg"></i></button>
+        <button type="button" onclick="fecharModal('modalDetalhe{{ item.cargo.pk }}')" aria-label="Fechar" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:text-slate-600"><i class="ph ph-x text-xl"></i></button>
+      </div>
+    </div>
+    <ul class="max-h-[55vh] divide-y divide-slate-100 overflow-y-auto">
+      {% for ocupacao in item.ocupantes %}
+      <li class="flex items-center gap-3 px-6 py-4">
+        <div class="min-w-0 flex-1">
+          <p class="truncate font-bold text-slate-800">{{ ocupacao.professor.nome }}</p>
+          <p class="text-xs text-slate-500">{% if ocupacao.curso %}{{ ocupacao.curso.sigla }} · {% endif %}desde {{ ocupacao.data_inicio|date:'d/m/Y' }}{% if ocupacao.data_fim %} até {{ ocupacao.data_fim|date:'d/m/Y' }}{% endif %}</p>
+        </div>
+        <span class="flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-sm font-black text-emerald-700"><i class="ph ph-clock"></i>{{ ocupacao.carga_reducao_horas|floatformat:"-2" }} h</span>
+        <button type="button" onclick="trocarModal('modalDetalhe{{ item.cargo.pk }}','modalReducao{{ ocupacao.pk }}')" title="Ajustar redução" aria-label="Ajustar redução de {{ ocupacao.professor.nome }}" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-blue-50 hover:text-[#025c9f]"><i class="ph ph-pencil-simple text-lg"></i></button>
+      </li>
+      {% empty %}
+      <li class="flex flex-col items-center gap-1 px-6 py-8 text-center">
+        <i class="ph-fill ph-user text-3xl text-slate-200"></i>
+        <p class="text-sm text-slate-500">{% if item.cargo.ativo %}Cargo vago nesta unidade.{% else %}Cargo inativo. Reative-o pela engrenagem para preenchê-lo.{% endif %}</p>
+      </li>
+      {% endfor %}
+    </ul>
+    {% if item.pode_adicionar %}
+    <div class="border-t border-slate-100 bg-slate-50/50 px-6 py-4">
+      <button type="button" onclick="trocarModal('modalDetalhe{{ item.cargo.pk }}','modalPreencher{{ item.cargo.pk }}')" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#025c9f] text-sm font-black text-white hover:bg-[#153e70]">
+        <i class="ph ph-user-plus text-lg"></i>{% if item.ocupantes %}Adicionar ocupante{% else %}Preencher cargo{% endif %}
+      </button>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if item.form %}
+{% url 'core:ocupacao_diretiva_create' unidade_selecionada.pk item.cargo.pk as url_preencher %}
+{% include 'core/prioridade1/_modal_form.html' with modal_id='modalPreencher' modal_key=item.cargo.pk titulo=item.cargo.nome subtitulo=unidade_selecionada.sigla voltar='modalDetalhe' voltar_key=item.cargo.pk action_url=url_preencher form=item.form %}
+{% endif %}
+
+{% for ocupacao in item.ocupantes %}
+<div id="modalReducao{{ ocupacao.pk }}" class="modal-equipe hidden fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+  <div class="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="trocarModal('modalReducao{{ ocupacao.pk }}','modalDetalhe{{ item.cargo.pk }}')" aria-label="Voltar" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"><i class="ph ph-arrow-left text-lg"></i></button>
+        <div><h3 class="text-base font-black text-[#025c9f]">Redução de carga</h3><p class="text-xs text-slate-500">{{ ocupacao.professor.nome }} · {{ item.cargo.nome }}</p></div>
+      </div>
+      <button type="button" onclick="fecharModal('modalReducao{{ ocupacao.pk }}')" aria-label="Fechar" class="text-slate-400 hover:text-slate-600"><i class="ph ph-x text-xl"></i></button>
+    </div>
+    <form method="post" action="{% url 'core:ocupacao_diretiva_update' ocupacao.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ retorno }}">
+      <div class="space-y-4 px-6 py-4">
+        <div>
+          <label for="reducao{{ ocupacao.pk }}" class="mb-1.5 block text-sm font-bold text-slate-700">Horas semanais de redução</label>
+          <input id="reducao{{ ocupacao.pk }}" type="number" name="carga_reducao_horas" min="0" max="168" step="0.25" value="{{ ocupacao.carga_reducao_horas|stringformat:'s' }}" required class="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#025c9f] focus:ring-2 focus:ring-blue-100">
+        </div>
+        <div>
+          <label for="obs{{ ocupacao.pk }}" class="mb-1.5 block text-sm font-bold text-slate-700">Observações</label>
+          <textarea id="obs{{ ocupacao.pk }}" name="observacoes" rows="2" class="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#025c9f] focus:ring-2 focus:ring-blue-100">{{ ocupacao.observacoes }}</textarea>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-6 py-4">
+        <button type="button" onclick="fecharModal('modalReducao{{ ocupacao.pk }}')" class="rounded-lg px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-100">Cancelar</button>
+        <button type="submit" class="rounded-lg bg-[#025c9f] px-5 py-2.5 text-sm font-black text-white shadow-sm hover:bg-[#153e70]">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% endfor %}
+
+{% if historico %}
+<div id="modalHistorico" class="modal-equipe hidden fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="tituloHistorico">
+  <div class="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+      <div><h3 id="tituloHistorico" class="text-base font-black text-[#025c9f]">Histórico de ocupações</h3><p class="text-xs text-slate-500">{{ unidade_selecionada.sigla }}</p></div>
+      <button type="button" onclick="fecharModal('modalHistorico')" aria-label="Fechar" class="text-slate-400 hover:text-slate-600"><i class="ph ph-x text-xl"></i></button>
+    </div>
+    <ul class="max-h-[65vh] divide-y divide-slate-100 overflow-y-auto">
+      {% for ocupacao in historico %}
+      <li class="flex items-center justify-between gap-3 px-6 py-3">
+        <div class="min-w-0">
+          <p class="truncate text-sm font-bold text-slate-800">{{ ocupacao.cargo.nome }}{% if ocupacao.curso %} · {{ ocupacao.curso.sigla }}{% endif %}</p>
+          <p class="truncate text-xs text-slate-500">{{ ocupacao.professor.nome }} · {{ ocupacao.data_inicio|date:'d/m/Y' }} – {{ ocupacao.data_fim|date:'d/m/Y'|default:'atual' }}</p>
+        </div>
+        <div class="flex shrink-0 items-center gap-2">
+          <span class="text-xs font-bold text-slate-500">{{ ocupacao.carga_reducao_horas|floatformat:"-2" }} h</span>
+          {% if ocupacao.vigente %}<span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">Vigente</span>{% else %}<span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500">Encerrada</span>{% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endif %}
+{% endwith %}
+
+<script>
+  function abrirModal(id) { var m = document.getElementById(id); if (m) m.classList.remove('hidden'); }
+  function fecharModal(id) { var m = document.getElementById(id); if (m) m.classList.add('hidden'); }
+  function trocarModal(de, para) { fecharModal(de); abrirModal(para); }
+  document.querySelectorAll('.modal-equipe').forEach(function (m) {
+    m.addEventListener('click', function (e) { if (e.target === m) m.classList.add('hidden'); });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') document.querySelectorAll('.modal-equipe').forEach(function (m) { m.classList.add('hidden'); });
+  });
+</script>
 {% endblock %}

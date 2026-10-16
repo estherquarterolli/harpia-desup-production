@@ -136,12 +136,28 @@ class ProfessorListView(LoginRequiredMixin, ListView):
             qs = filtrar_contem(
                 qs, q, ['rh_nome', 'desup_nome', 'id_funcional', 'rh_matricula'],
             )
-        regime = self.request.GET.get('regime')
-        if regime:
-            qs = qs.filter(tipo_contrato__regime_trabalho__iexact=regime)
-        tipo = self.request.GET.get('tipo')
-        if tipo and tipo.isdigit():
-            qs = qs.filter(tipo_contrato_id=tipo)
+        carga = self.request.GET.get('ch', '')
+        if carga.isdigit():
+            carga = int(carga)
+            qs = qs.filter(
+                Q(
+                    carga_diferenciada=True,
+                    carga_horaria_personalizada=carga,
+                )
+                | Q(
+                    carga_diferenciada=False,
+                    tipo_contrato__max_total_hours=carga,
+                )
+            )
+        elif self.request.GET.get('regime'):
+            # Compatibilidade com links/favoritos criados antes da troca de
+            # "Regime" por "Carga horária (CH)" na consulta.
+            qs = qs.filter(
+                tipo_contrato__regime_trabalho__iexact=self.request.GET['regime']
+            )
+        cargo = self.request.GET.get('cargo') or self.request.GET.get('tipo')
+        if cargo and cargo.isdigit():
+            qs = qs.filter(tipo_contrato_id=cargo)
         unidade_id = self.request.GET.get('unidade_id')
         if unidade_id:
             qs = qs.filter(
@@ -178,20 +194,31 @@ class ProfessorListView(LoginRequiredMixin, ListView):
         user = self.request.user
         ctx['unidades'] = Unidade.objects.filter(status=True).order_by('nome')
         ctx['is_desup'] = user.is_superuser or user.perfil == 'DESUP'
-        ctx['regimes'] = sorted(
-            set(ContractType.objects.permitidos().exclude(regime_trabalho='').values_list('regime_trabalho', flat=True))
+        cargas_contratos = ContractType.objects.permitidos().values_list(
+            'max_total_hours', flat=True,
         )
-        ctx['tipos'] = [(str(pk), nome) for pk, nome in ContractType.objects.permitidos().order_by('nome').values_list('pk', 'nome')]
+        cargas_personalizadas = Professor.objects.filter(
+            carga_diferenciada=True,
+            carga_horaria_personalizada__isnull=False,
+        ).values_list('carga_horaria_personalizada', flat=True)
+        ctx['cargas_horarias'] = sorted(set(cargas_contratos) | set(cargas_personalizadas))
+        cargos = [
+            (str(pk), nome)
+            for pk, nome in ContractType.objects.permitidos().order_by('nome').values_list('pk', 'nome')
+        ]
+        ctx['cargos'] = cargos
+        ctx['tipos'] = cargos  # compatibilidade com integrações e testes existentes
         ctx['total_professores'] = Professor.objects.count()
         ctx['total_filtrados'] = ctx['paginator'].count if ctx.get('paginator') else len(ctx['professores'])
         params = self.request.GET.copy()
         params.pop('page', None)
         ctx['querystring'] = params.urlencode()
         ctx['filtros_ativos'] = any(
-            self.request.GET.get(k) for k in ('q', 'regime', 'tipo', 'unidade_id')
+            self.request.GET.get(k)
+            for k in ('q', 'ch', 'cargo', 'regime', 'tipo', 'unidade_id')
         )
-        ctx['regime_atual'] = self.request.GET.get('regime', '')
-        ctx['tipo_atual'] = self.request.GET.get('tipo', '')
+        ctx['ch_atual'] = self.request.GET.get('ch', '')
+        ctx['cargo_atual'] = self.request.GET.get('cargo') or self.request.GET.get('tipo', '')
 
         # Coordenador não pode mais CRIAR (CRUD parcial) mas pode visualizar e editar
         ctx['pode_crud'] = (

@@ -137,6 +137,43 @@ class TipoCargoDiretivoForm(forms.ModelForm):
         }
 
 
+class OcupacaoEquipeDiretivaForm(forms.ModelForm):
+    """Preenche um cargo da equipe diretiva de uma unidade já escolhida na tela."""
+
+    class Meta:
+        model = OcupacaoEquipeDiretiva
+        fields = ["professor", "curso", "data_inicio", "data_fim", "carga_reducao_horas", "observacoes"]
+        widgets = {
+            "professor": forms.Select(attrs={"class": _SELECT_CSS}),
+            "curso": forms.Select(attrs={"class": _SELECT_CSS}),
+            "data_inicio": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
+            "data_fim": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
+            "carga_reducao_horas": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": "0", "max": "168", "step": "0.25"}),
+            "observacoes": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 3}),
+        }
+
+    def __init__(self, *args, unidade, cargo, **kwargs):
+        super().__init__(*args, **kwargs)
+        from django.db.models import Q
+        from apps.courses.models import CourseUnit
+        from apps.professors.models import Professor
+
+        # Atribuídos antes do full_clean para que o clean() do modelo valide
+        # vínculo do servidor, curso da unidade e conflitos de vigência.
+        self.instance.unidade = unidade
+        self.instance.cargo = cargo
+        self.fields["professor"].queryset = Professor.objects.filter(
+            Q(unidade_principal=unidade) | Q(unidades=unidade)
+        ).distinct().order_by("rh_nome")
+        if cargo.exige_curso:
+            self.fields["curso"].required = True
+            self.fields["curso"].queryset = CourseUnit.objects.filter(
+                unidade=unidade, ativo=True,
+            ).select_related("curso", "unidade").order_by("curso__nome")
+        else:
+            del self.fields["curso"]
+
+
 class ReducaoOcupacaoEquipeDiretivaForm(forms.ModelForm):
     class Meta:
         model = OcupacaoEquipeDiretiva
@@ -158,6 +195,17 @@ class LimiteCargaUnidadeForm(forms.ModelForm):
             "data_fim": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
             "observacoes": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 3}),
         }
+        labels = {"limite_horas_semanais": "Teto semanal (horas-aula)"}
+        help_texts = {
+            "limite_horas_semanais": (
+                "Soma máxima de horas-aula semanais que a unidade pode alocar, "
+                "considerando todos os professores."
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["unidade"].queryset = self.fields["unidade"].queryset.filter(status=True).order_by("nome")
 
 
 class ReadaptacaoProfessorForm(forms.ModelForm):
@@ -170,12 +218,22 @@ class ReadaptacaoProfessorForm(forms.ModelForm):
             "data_fim": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
             "justificativa_administrativa": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 4}),
         }
+        help_texts = {
+            "professor": "Durante a vigência o professor não pode ser alocado em sala; a carga vai para o extracurricular.",
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         from apps.professors.models import Professor
 
         self.fields["professor"].queryset = Professor.objects.order_by("rh_nome")
+
+
+class ReadaptacaoProfessorEdicaoForm(forms.ModelForm):
+    """Edição da vigência/justificativa sem trocar o professor da readaptação."""
+
+    class Meta(ReadaptacaoProfessorForm.Meta):
+        fields = ["data_inicio", "data_fim", "justificativa_administrativa"]
 
 
 class DecisaoSolicitacaoProfessorForm(forms.Form):

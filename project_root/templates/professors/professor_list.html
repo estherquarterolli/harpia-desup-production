@@ -64,23 +64,23 @@
       {% endif %}
 
       <div>
-        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Regime</label>
-        <select name="regime" onchange="this.form.submit()"
+        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Carga horária (CH)</label>
+        <select name="ch" onchange="this.form.submit()"
           class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition">
-          <option value="">Todos</option>
-          {% for r in regimes %}
-          <option value="{{ r }}" {% if regime_atual|lower == r|lower %}selected{% endif %}>{{ r }}</option>
+          <option value="">Todas</option>
+          {% for carga in cargas_horarias %}
+          <option value="{{ carga }}" {% if ch_atual == carga|stringformat:'s' %}selected{% endif %}>{{ carga }}h</option>
           {% endfor %}
         </select>
       </div>
 
       <div>
-        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tipo de contrato</label>
-        <select name="tipo" onchange="this.form.submit()"
+        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Cargo</label>
+        <select name="cargo" onchange="this.form.submit()"
           class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition">
           <option value="">Todos</option>
-          {% for valor, rotulo in tipos %}
-          <option value="{{ valor }}" {% if tipo_atual == valor %}selected{% endif %}>{{ rotulo }}</option>
+          {% for valor, rotulo in cargos %}
+          <option value="{{ valor }}" {% if cargo_atual == valor %}selected{% endif %}>{{ rotulo }}</option>
           {% endfor %}
         </select>
       </div>
@@ -112,11 +112,12 @@
         <tr>
           <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider w-24">ID</th>
           <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nome Professor</th>
-          <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Regime</th>
-          <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tipo</th>
+          <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">CH</th>
+          <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Cargo</th>
+          <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Vínculo empregatício</th>
           <th class="px-5 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Unidades</th>
 
-          {# Coordenador de unidade vê só ID, Nome, Regime, Tipo e Unidades. #}
+          {# Coordenador de unidade vê os dados institucionais do docente. #}
           {% if is_desup %}
           {% if colunas_cursos %}
             {% for col in colunas_cursos %}
@@ -160,13 +161,14 @@
               </div>
             </div>
           </td>
-          <td class="px-5 py-4 text-sm text-slate-600" data-label="Regime">
-            {% if prof.tipo_contrato %}
-              <span class="font-semibold">{{ prof.tipo_contrato.regime_trabalho }}</span>
-            {% else %}<span class="text-slate-300">—</span>{% endif %}
+          <td class="px-5 py-4 text-sm text-slate-600" data-label="CH">
+            <span class="font-semibold">{{ prof.carga_total_efetiva }}h</span>
           </td>
-          <td class="px-5 py-4" data-label="Tipo">
+          <td class="px-5 py-4" data-label="Cargo">
             <span class="inline-block max-w-[14rem] truncate align-middle whitespace-nowrap px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-bold" title="{{ prof.tipo_contrato.nome }}">{{ prof.tipo_contrato.nome|default:"—" }}</span>
+          </td>
+          <td class="px-5 py-4 text-sm text-slate-600" data-label="Vínculo empregatício">
+            {{ prof.tipo_contrato.get_categoria_display|default:"—" }}
           </td>
           <td class="px-5 py-4 text-sm text-slate-600" data-label="Unidades">
             <div class="flex flex-wrap gap-1">
@@ -213,7 +215,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="{% if is_desup %}9{% else %}5{% endif %}" class="px-6 py-16 text-center text-slate-400">
+          <td colspan="{% if is_desup %}10{% else %}6{% endif %}" class="px-6 py-16 text-center text-slate-400">
             <i class="ph ph-chalkboard-teacher text-5xl opacity-20 mb-3 block"></i>
             Nenhum professor encontrado.
           </td>

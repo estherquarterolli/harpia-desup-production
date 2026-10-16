@@ -44,7 +44,7 @@ class ProfessorForm(forms.ModelForm):
             'id_funcional': 'ID',
             'rh_matricula': 'Matrícula RH (opcional)',
             'rh_nome': 'Nome',
-            'tipo_contrato': 'Regime / Tipo de Contrato',
+            'tipo_contrato': 'Cargo',
             'unidades': 'Unidades',
             'cursos': 'Cursos (Checklist)',
             'status': 'Status',

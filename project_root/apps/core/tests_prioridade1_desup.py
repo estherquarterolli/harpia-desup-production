@@ -12,9 +12,11 @@ from apps.professors.models import ContractType, Professor
 
 from .models import (
     AuditoriaGlobal,
+    ExcecaoCargaUnidade,
     LimiteCargaUnidade,
     Notificacao,
     OcupacaoEquipeDiretiva,
+    ReadaptacaoProfessor,
     SolicitacaoProfessorExterno,
     TipoCargoDiretivo,
     Unidade,
@@ -130,6 +132,89 @@ class Prioridade1DesupTests(TestCase):
         self.assertEqual(ocupacao.carga_reducao_horas, Decimal("8.00"))
         self.assertEqual(ocupacao.unidade_id, self.origem.pk)
         self.assertEqual(ocupacao.professor_id, self.professor.pk)
+
+    def test_desup_preenche_cargo_da_unidade_e_ve_reducao_total(self):
+        cargo = TipoCargoDiretivo.objects.create(nome="Direção", codigo="DIRECAO", ordem=10)
+        self.client.force_login(self.desup)
+        retorno = f"{reverse('core:equipe_diretiva_desup')}?unidade_id={self.origem.pk}"
+
+        resposta = self.client.post(
+            reverse("core:ocupacao_diretiva_create", args=[self.origem.pk, cargo.pk]),
+            {
+                "professor": self.professor.pk,
+                "data_inicio": self.hoje.isoformat(),
+                "carga_reducao_horas": "12.00",
+                "observacoes": "",
+                "next": retorno,
+            },
+        )
+
+        self.assertRedirects(resposta, retorno)
+        ocupacao = OcupacaoEquipeDiretiva.objects.get()
+        self.assertEqual(ocupacao.unidade_id, self.origem.pk)
+        self.assertEqual(ocupacao.cargo_id, cargo.pk)
+        self.assertEqual(ocupacao.criado_por, self.desup)
+
+        pagina = self.client.get(retorno)
+        self.assertEqual(pagina.status_code, 200)
+        self.assertEqual(pagina.context["reducao_total"], Decimal("12.00"))
+        self.assertFalse(pagina.context["composicao"][0]["pode_adicionar"])
+        self.assertNotContains(pagina, "Prioridade 1")
+
+    def test_preencher_cargo_rejeita_servidor_de_outra_unidade(self):
+        cargo = TipoCargoDiretivo.objects.create(nome="Direção", codigo="DIRECAO", ordem=10)
+        self.client.force_login(self.desup)
+
+        resposta = self.client.post(
+            reverse("core:ocupacao_diretiva_create", args=[self.destino.pk, cargo.pk]),
+            {"professor": self.professor.pk, "data_inicio": self.hoje.isoformat(), "carga_reducao_horas": "4"},
+        )
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertFalse(OcupacaoEquipeDiretiva.objects.exists())
+
+    def test_tela_de_alertas_mostra_readaptacao_e_excecao_em_modais(self):
+        readaptacao = ReadaptacaoProfessor.objects.create(
+            professor=self.professor, data_inicio=self.hoje,
+            justificativa_administrativa="Restrição funcional.", criado_por=self.desup,
+        )
+        excecao = ExcecaoCargaUnidade.objects.create(
+            unidade=self.origem, horas_adicionais=Decimal("10.00"), data_inicio=self.hoje,
+            data_fim=self.hoje + timedelta(days=30), justificativa="Turma extra.",
+            solicitado_por=self.coordenador,
+        )
+        self.client.force_login(self.desup)
+
+        pagina = self.client.get(reverse("core:alertas_carga_desup"))
+
+        self.assertEqual(pagina.status_code, 200)
+        self.assertNotContains(pagina, 'data-aba="tetos"')
+        self.assertContains(pagina, f'id="modalEncerrar{readaptacao.pk}"')
+        self.assertContains(pagina, f'id="modalExcecao{excecao.pk}"')
+        self.assertNotContains(pagina, "Prioridade 1")
+
+    def test_editar_readaptacao_volta_para_origem_sem_trocar_professor(self):
+        readaptacao = ReadaptacaoProfessor.objects.create(
+            professor=self.professor, data_inicio=self.hoje,
+            justificativa_administrativa="Restrição funcional.", criado_por=self.desup,
+        )
+        self.client.force_login(self.desup)
+        retorno = f"{reverse('core:alertas_carga_desup')}?unidade_id={self.origem.pk}"
+
+        resposta = self.client.post(
+            reverse("core:readaptacao_update", args=[readaptacao.pk]),
+            {
+                "data_inicio": self.hoje.isoformat(),
+                "data_fim": (self.hoje + timedelta(days=90)).isoformat(),
+                "justificativa_administrativa": "Atualizada.",
+                "next": retorno,
+            },
+        )
+
+        self.assertRedirects(resposta, retorno)
+        readaptacao.refresh_from_db()
+        self.assertEqual(readaptacao.professor_id, self.professor.pk)
+        self.assertEqual(readaptacao.justificativa_administrativa, "Atualizada.")
 
     def test_limite_da_unidade_impede_periodos_sobrepostos(self):
         LimiteCargaUnidade.objects.create(
