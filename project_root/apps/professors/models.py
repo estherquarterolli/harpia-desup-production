@@ -67,6 +67,12 @@ class Professor(models.Model):
         ATIVO = 'Ativo', 'Ativo'
         AFASTADO = 'Afastado', 'Ausente/Afastado'
 
+    class NivelEnsinoOrigemChoices(models.TextChoices):
+        NAO_INFORMADO = 'NAO_INFORMADO', 'Não informado'
+        MEDIO = 'MEDIO', 'Ensino Médio'
+        SUPERIOR = 'SUPERIOR', 'Ensino Superior'
+        AMBOS = 'AMBOS', 'Ensino Médio e Superior'
+
     # --- Campos Originais RH (Read-only por Regra de Negócio) ---
     id_funcional = models.CharField(
         max_length=50,
@@ -157,6 +163,15 @@ class Professor(models.Model):
         choices=StatusChoices.choices,
         default=StatusChoices.ATIVO,
         verbose_name="Status"
+    )
+
+    nivel_ensino_origem = models.CharField(
+        max_length=20,
+        choices=NivelEnsinoOrigemChoices.choices,
+        default=NivelEnsinoOrigemChoices.NAO_INFORMADO,
+        db_index=True,
+        verbose_name="Nível de ensino de origem",
+        help_text="Informação institucional usada para alertar atuações no Ensino Superior.",
     )
 
     class Meta:

@@ -1,4 +1,10 @@
+from decimal import Decimal
+
+from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
+from django.utils import timezone
+from django.utils.text import slugify
 
 class Unidade(models.Model):
     """
@@ -28,6 +34,556 @@ class Unidade(models.Model):
 
     def __str__(self):
         return f"{self.sigla} - {self.nome}"
+
+
+class TipoCargoDiretivo(models.Model):
+    """Cargo configurável que pode compor a equipe diretiva de uma unidade."""
+
+    nome = models.CharField(max_length=120, unique=True, verbose_name="Nome do cargo")
+    codigo = models.CharField(
+        max_length=50,
+        unique=True,
+        editable=False,
+        verbose_name="Código interno",
+    )
+    exige_curso = models.BooleanField(
+        default=False,
+        verbose_name="Exige curso",
+        help_text="Use para cargos como Coordenação de Curso.",
+    )
+    permite_multiplos = models.BooleanField(
+        default=False,
+        verbose_name="Permite ocupantes simultâneos",
+        help_text=(
+            "Quando desmarcado, o sistema impede duas ocupações vigentes do mesmo "
+            "cargo na mesma unidade e, quando aplicável, no mesmo curso."
+        ),
+    )
+    ativo = models.BooleanField(
+        default=True,
+        db_index=True,
+        verbose_name="Disponível para novas ocupações",
+    )
+    ordem = models.PositiveSmallIntegerField(default=100, verbose_name="Ordem de exibição")
+    criado_em = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
+    atualizado_em = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
+
+    class Meta:
+        db_table = "harpiadb_nucleo_tipo_cargo_diretivo"
+        verbose_name = "Tipo de cargo diretivo"
+        verbose_name_plural = "Tipos de cargo diretivo"
+        ordering = ["ordem", "nome"]
+        constraints = [
+            models.UniqueConstraint(
+                models.functions.Lower("nome"),
+                name="harpia_cargo_nome_ci_uniq",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.codigo:
+            base = slugify(self.nome).replace("-", "_").upper() or "CARGO"
+            base = base[:50]
+            codigo = base
+            contador = 2
+            while type(self).objects.exclude(pk=self.pk).filter(codigo=codigo).exists():
+                sufixo = f"_{contador}"
+                codigo = f"{base[:50 - len(sufixo)]}{sufixo}"
+                contador += 1
+            self.codigo = codigo
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.nome
+
+
+class OcupacaoEquipeDiretiva(models.Model):
+    """Ocupação histórica de um cargo diretivo por um professor/servidor."""
+
+    unidade = models.ForeignKey(
+        Unidade,
+        on_delete=models.PROTECT,
+        related_name="ocupacoes_equipe_diretiva",
+        verbose_name="Unidade",
+    )
+    cargo = models.ForeignKey(
+        TipoCargoDiretivo,
+        on_delete=models.PROTECT,
+        related_name="ocupacoes",
+        verbose_name="Cargo",
+    )
+    professor = models.ForeignKey(
+        "professors.Professor",
+        on_delete=models.PROTECT,
+        related_name="ocupacoes_diretivas",
+        verbose_name="Servidor",
+        help_text="Selecione o servidor no cadastro institucional de professores.",
+    )
+    curso = models.ForeignKey(
+        "courses.CourseUnit",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="ocupacoes_diretivas",
+        verbose_name="Curso na unidade",
+    )
+    data_inicio = models.DateField(verbose_name="Início da vigência")
+    data_fim = models.DateField(null=True, blank=True, verbose_name="Fim da vigência")
+    carga_reducao_horas = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0.00")), MaxValueValidator(Decimal("168.00"))],
+        verbose_name="Carga horária de redução semanal",
+        help_text="Informe o total de horas semanais de redução associado à ocupação.",
+    )
+    observacoes = models.TextField(blank=True, verbose_name="Observações")
+    criado_por = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ocupacoes_diretivas_criadas",
+        verbose_name="Criado por",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
+    atualizado_em = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
+
+    class Meta:
+        db_table = "harpiadb_nucleo_ocupacao_diretiva"
+        verbose_name = "Ocupação da equipe diretiva"
+        verbose_name_plural = "Ocupações da equipe diretiva"
+        ordering = ["unidade__nome", "cargo__ordem", "cargo__nome", "-data_inicio"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(data_fim__isnull=True) | models.Q(data_fim__gte=models.F("data_inicio")),
+                name="harpia_ocup_data_valida",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(carga_reducao_horas__gte=0),
+                name="harpia_ocup_carga_nao_neg",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["unidade", "data_inicio", "data_fim"], name="harpia_ocup_unid_vig_idx"),
+            models.Index(fields=["cargo", "data_inicio", "data_fim"], name="harpia_ocup_cargo_vig_idx"),
+        ]
+
+    @property
+    def vigente(self):
+        hoje = timezone.localdate()
+        return self.data_inicio <= hoje and (self.data_fim is None or self.data_fim >= hoje)
+
+    def conflitos_de_vigencia(self):
+        if not self.unidade_id or not self.cargo_id or not self.data_inicio:
+            return type(self).objects.none()
+
+        conflitos = type(self).objects.filter(
+            unidade_id=self.unidade_id,
+            cargo_id=self.cargo_id,
+        ).exclude(pk=self.pk)
+
+        if self.cargo.exige_curso:
+            conflitos = conflitos.filter(curso_id=self.curso_id)
+        else:
+            conflitos = conflitos.filter(curso__isnull=True)
+
+        if self.cargo.permite_multiplos:
+            conflitos = conflitos.filter(professor_id=self.professor_id)
+
+        if self.data_fim:
+            conflitos = conflitos.filter(data_inicio__lte=self.data_fim)
+        return conflitos.filter(
+            models.Q(data_fim__isnull=True) | models.Q(data_fim__gte=self.data_inicio)
+        )
+
+    def clean(self):
+        super().clean()
+        erros = {}
+
+        if self.data_inicio and self.data_fim and self.data_fim < self.data_inicio:
+            erros["data_fim"] = "O fim da vigência não pode ser anterior ao início."
+
+        if self.cargo_id:
+            if self.cargo.exige_curso and not self.curso_id:
+                erros["curso"] = "Este cargo exige a seleção de um curso da unidade."
+            if not self.cargo.exige_curso and self.curso_id:
+                erros["curso"] = "Este cargo não deve ser vinculado a um curso."
+
+        if self.curso_id and self.unidade_id and self.curso.unidade_id != self.unidade_id:
+            erros["curso"] = "O curso selecionado não pertence à unidade informada."
+
+        if self.professor_id and self.unidade_id:
+            vinculado = (
+                self.professor.unidade_principal_id == self.unidade_id
+                or self.professor.unidades.filter(pk=self.unidade_id).exists()
+            )
+            if not vinculado:
+                erros["professor"] = "O servidor não está vinculado à unidade informada."
+
+        if not erros and self.conflitos_de_vigencia().exists():
+            erros["data_inicio"] = (
+                "Já existe uma ocupação conflitante para este cargo, unidade e período."
+            )
+
+        if erros:
+            raise ValidationError(erros)
+
+    def __str__(self):
+        complemento = f" - {self.curso.sigla}" if self.curso_id else ""
+        return f"{self.unidade.sigla} - {self.cargo.nome}{complemento}: {self.professor.nome}"
+
+
+class SolicitacaoProfessorExterno(models.Model):
+    """Solicitação formal para vincular um professor a outra unidade."""
+
+    class StatusChoices(models.TextChoices):
+        PENDENTE = "PENDENTE", "Pendente"
+        APROVADA = "APROVADA", "Aprovada"
+        RECUSADA = "RECUSADA", "Recusada"
+        CANCELADA = "CANCELADA", "Cancelada"
+
+    unidade_solicitante = models.ForeignKey(
+        Unidade,
+        on_delete=models.PROTECT,
+        related_name="solicitacoes_professor_enviadas",
+        verbose_name="Unidade solicitante",
+    )
+    unidade_origem = models.ForeignKey(
+        Unidade,
+        on_delete=models.PROTECT,
+        related_name="solicitacoes_professor_recebidas",
+        verbose_name="Unidade de origem",
+    )
+    professor = models.ForeignKey(
+        "professors.Professor",
+        on_delete=models.PROTECT,
+        related_name="solicitacoes_externas",
+        verbose_name="Professor",
+    )
+    semestre = models.CharField(
+        max_length=6,
+        validators=[
+            RegexValidator(
+                regex=r"^\d{4}\.[12]$",
+                message="Informe o semestre no formato AAAA.1 ou AAAA.2.",
+            )
+        ],
+        verbose_name="Semestre",
+    )
+    justificativa = models.TextField(verbose_name="Justificativa")
+    status = models.CharField(
+        max_length=12,
+        choices=StatusChoices.choices,
+        default=StatusChoices.PENDENTE,
+        db_index=True,
+        verbose_name="Situação",
+    )
+    solicitado_por = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.PROTECT,
+        related_name="solicitacoes_professor_criadas",
+        verbose_name="Solicitado por",
+    )
+    decidido_por = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="solicitacoes_professor_decididas",
+        verbose_name="Decidido por",
+    )
+    motivo_decisao = models.TextField(blank=True, verbose_name="Motivo da decisão")
+    criado_em = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
+    decidido_em = models.DateTimeField(null=True, blank=True, verbose_name="Decidido em")
+
+    class Meta:
+        db_table = "harpiadb_nucleo_solicitacao_professor_externo"
+        verbose_name = "Solicitação de professor externo"
+        verbose_name_plural = "Solicitações de professor externo"
+        ordering = ["-criado_em"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(unidade_solicitante=models.F("unidade_origem")),
+                name="harpia_sol_prof_unidades_distintas",
+            ),
+            models.UniqueConstraint(
+                fields=["unidade_solicitante", "professor", "semestre"],
+                condition=models.Q(status="PENDENTE"),
+                name="harpia_sol_prof_pendente_uniq",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["status", "semestre"], name="harpia_sol_prof_status_idx"),
+            models.Index(fields=["unidade_solicitante", "status"], name="harpia_sol_prof_unid_idx"),
+        ]
+
+    def clean(self):
+        super().clean()
+        erros = {}
+        if (
+            self.unidade_solicitante_id
+            and self.unidade_origem_id
+            and self.unidade_solicitante_id == self.unidade_origem_id
+        ):
+            erros["unidade_solicitante"] = "A unidade solicitante deve ser diferente da unidade de origem."
+
+        if self.professor_id and self.unidade_origem_id:
+            vinculado = (
+                self.professor.unidade_principal_id == self.unidade_origem_id
+                or self.professor.unidades.filter(pk=self.unidade_origem_id).exists()
+            )
+            if not vinculado:
+                erros["unidade_origem"] = "O professor não está vinculado à unidade de origem informada."
+
+        if erros:
+            raise ValidationError(erros)
+
+    def __str__(self):
+        return f"{self.professor.nome}: {self.unidade_origem.sigla} -> {self.unidade_solicitante.sigla}"
+
+
+class LimiteCargaUnidade(models.Model):
+    """Limite agregado de carga semanal definido pela DESUP para uma unidade."""
+
+    unidade = models.ForeignKey(
+        Unidade,
+        on_delete=models.PROTECT,
+        related_name="limites_carga",
+        verbose_name="Unidade",
+    )
+    limite_horas_semanais = models.DecimalField(
+        max_digits=9,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+        verbose_name="Limite semanal da unidade",
+    )
+    data_inicio = models.DateField(verbose_name="Início da vigência")
+    data_fim = models.DateField(null=True, blank=True, verbose_name="Fim da vigência")
+    observacoes = models.TextField(blank=True, verbose_name="Observações")
+    criado_por = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="limites_carga_criados",
+        verbose_name="Criado por",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
+    atualizado_em = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
+
+    class Meta:
+        db_table = "harpiadb_nucleo_limite_carga_unidade"
+        verbose_name = "Limite de carga da unidade"
+        verbose_name_plural = "Limites de carga das unidades"
+        ordering = ["unidade__nome", "-data_inicio"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(data_fim__isnull=True) | models.Q(data_fim__gte=models.F("data_inicio")),
+                name="harpia_limite_data_valida",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(limite_horas_semanais__gt=0),
+                name="harpia_limite_carga_positiva",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["unidade", "data_inicio", "data_fim"], name="harpia_limite_vig_idx"),
+        ]
+
+    @property
+    def vigente(self):
+        hoje = timezone.localdate()
+        return self.data_inicio <= hoje and (self.data_fim is None or self.data_fim >= hoje)
+
+    def conflitos_de_vigencia(self):
+        if not self.unidade_id or not self.data_inicio:
+            return type(self).objects.none()
+        conflitos = type(self).objects.filter(unidade_id=self.unidade_id).exclude(pk=self.pk)
+        if self.data_fim:
+            conflitos = conflitos.filter(data_inicio__lte=self.data_fim)
+        return conflitos.filter(
+            models.Q(data_fim__isnull=True) | models.Q(data_fim__gte=self.data_inicio)
+        )
+
+    def clean(self):
+        super().clean()
+        erros = {}
+        if self.data_inicio and self.data_fim and self.data_fim < self.data_inicio:
+            erros["data_fim"] = "O fim da vigência não pode ser anterior ao início."
+        if not erros and self.conflitos_de_vigencia().exists():
+            erros["data_inicio"] = "Já existe um limite para esta unidade no período informado."
+        if erros:
+            raise ValidationError(erros)
+
+    def __str__(self):
+        return f"{self.unidade.sigla}: {self.limite_horas_semanais} h semanais"
+
+
+class ExcecaoCargaUnidade(models.Model):
+    """Exceção temporária de carga submetida à decisão da DESUP."""
+
+    class StatusChoices(models.TextChoices):
+        PENDENTE = "PENDENTE", "Pendente"
+        APROVADA = "APROVADA", "Aprovada"
+        RECUSADA = "RECUSADA", "Recusada"
+        CANCELADA = "CANCELADA", "Cancelada"
+
+    unidade = models.ForeignKey(
+        Unidade,
+        on_delete=models.PROTECT,
+        related_name="excecoes_carga",
+        verbose_name="Unidade",
+    )
+    professor = models.ForeignKey(
+        "professors.Professor",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="excecoes_carga",
+        verbose_name="Professor",
+        help_text="Deixe vazio quando a exceção se aplicar somente ao limite agregado da unidade.",
+    )
+    horas_adicionais = models.DecimalField(
+        max_digits=7,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+        verbose_name="Horas adicionais autorizadas",
+    )
+    data_inicio = models.DateField(verbose_name="Início da vigência")
+    data_fim = models.DateField(verbose_name="Fim da vigência")
+    justificativa = models.TextField(verbose_name="Justificativa")
+    status = models.CharField(
+        max_length=12,
+        choices=StatusChoices.choices,
+        default=StatusChoices.PENDENTE,
+        db_index=True,
+        verbose_name="Situação",
+    )
+    solicitado_por = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.PROTECT,
+        related_name="excecoes_carga_solicitadas",
+        verbose_name="Solicitado por",
+    )
+    decidido_por = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="excecoes_carga_decididas",
+        verbose_name="Decidido por",
+    )
+    motivo_decisao = models.TextField(blank=True, verbose_name="Motivo da decisão")
+    criado_em = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
+    decidido_em = models.DateTimeField(null=True, blank=True, verbose_name="Decidido em")
+
+    class Meta:
+        db_table = "harpiadb_nucleo_excecao_carga_unidade"
+        verbose_name = "Exceção de carga"
+        verbose_name_plural = "Exceções de carga"
+        ordering = ["-criado_em"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(data_fim__gte=models.F("data_inicio")),
+                name="harpia_excecao_data_valida",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(horas_adicionais__gt=0),
+                name="harpia_excecao_horas_positivas",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        erros = {}
+        if self.data_inicio and self.data_fim and self.data_fim < self.data_inicio:
+            erros["data_fim"] = "O fim da vigência não pode ser anterior ao início."
+        if self.professor_id and self.unidade_id:
+            vinculado = (
+                self.professor.unidade_principal_id == self.unidade_id
+                or self.professor.unidades.filter(pk=self.unidade_id).exists()
+            )
+            if not vinculado:
+                erros["professor"] = "O professor não está vinculado à unidade informada."
+        if erros:
+            raise ValidationError(erros)
+
+    def __str__(self):
+        alvo = self.professor.nome if self.professor_id else self.unidade.sigla
+        return f"{alvo}: +{self.horas_adicionais} h ({self.get_status_display()})"
+
+
+class ReadaptacaoProfessor(models.Model):
+    """Período formal de readaptação administrado pela DESUP."""
+
+    professor = models.ForeignKey(
+        "professors.Professor",
+        on_delete=models.PROTECT,
+        related_name="readaptacoes",
+        verbose_name="Professor",
+    )
+    data_inicio = models.DateField(verbose_name="Início da vigência")
+    data_fim = models.DateField(null=True, blank=True, verbose_name="Fim da vigência")
+    justificativa_administrativa = models.TextField(
+        verbose_name="Justificativa administrativa",
+        help_text="Não informe diagnóstico ou dados médicos desnecessários.",
+    )
+    criado_por = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="readaptacoes_criadas",
+        verbose_name="Criado por",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
+    atualizado_em = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
+
+    class Meta:
+        db_table = "harpiadb_nucleo_readaptacao_professor"
+        verbose_name = "Readaptação de professor"
+        verbose_name_plural = "Readaptações de professores"
+        ordering = ["-data_inicio", "professor__rh_nome"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(data_fim__isnull=True) | models.Q(data_fim__gte=models.F("data_inicio")),
+                name="harpia_readapt_data_valida",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["professor", "data_inicio", "data_fim"], name="harpia_readapt_vig_idx"),
+        ]
+
+    @property
+    def vigente(self):
+        hoje = timezone.localdate()
+        return self.data_inicio <= hoje and (self.data_fim is None or self.data_fim >= hoje)
+
+    def conflitos_de_vigencia(self):
+        if not self.professor_id or not self.data_inicio:
+            return type(self).objects.none()
+        conflitos = type(self).objects.filter(professor_id=self.professor_id).exclude(pk=self.pk)
+        if self.data_fim:
+            conflitos = conflitos.filter(data_inicio__lte=self.data_fim)
+        return conflitos.filter(
+            models.Q(data_fim__isnull=True) | models.Q(data_fim__gte=self.data_inicio)
+        )
+
+    def clean(self):
+        super().clean()
+        erros = {}
+        if self.data_inicio and self.data_fim and self.data_fim < self.data_inicio:
+            erros["data_fim"] = "O fim da vigência não pode ser anterior ao início."
+        if not (self.justificativa_administrativa or "").strip():
+            erros["justificativa_administrativa"] = "Informe uma justificativa administrativa."
+        if not erros and self.conflitos_de_vigencia().exists():
+            erros["data_inicio"] = "Já existe uma readaptação para este professor no período informado."
+        if erros:
+            raise ValidationError(erros)
+
+    def __str__(self):
+        return f"Readaptação de {self.professor.nome} desde {self.data_inicio:%d/%m/%Y}"
 
 class JanelaEntrega(models.Model):
     """

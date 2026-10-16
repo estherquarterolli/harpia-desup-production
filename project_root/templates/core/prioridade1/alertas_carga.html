@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block title %}Alertas e limites - DESUP{% endblock %}
+{% block header_title %}Alertas e limites de carga{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <section class="rounded-2xl border border-amber-100 bg-amber-50 p-4 sm:p-6">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div><p class="text-xs font-black uppercase tracking-widest text-amber-700">Prioridade 1</p><h1 class="mt-1 text-xl font-black text-slate-900 sm:text-2xl">Supervisão de carga e alertas administrativos</h1><p class="mt-2 max-w-3xl text-sm text-slate-600">Acompanhe limites, exceções, readaptações e situações que exigem análise da DESUP.</p></div>
+      <div class="flex flex-col gap-2 sm:flex-row"><a href="{% url 'core:limite_carga_create' %}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-amber-200 bg-white px-4 py-2.5 text-sm font-black text-amber-800 hover:bg-amber-100"><i class="ph ph-gauge"></i>Novo limite</a><a href="{% url 'core:readaptacao_create' %}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#025c9f] px-4 py-2.5 text-sm font-black text-white hover:bg-[#153e70]"><i class="ph ph-user-focus"></i>Registrar readaptação</a></div>
+    </div>
+  </section>
+
+  <form method="get" class="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+    <label for="alerta-unidade" class="sr-only">Filtrar por unidade</label>
+    <select id="alerta-unidade" name="unidade_id" class="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="">Todas as unidades</option>{% for unidade in unidades %}<option value="{{ unidade.pk }}" {% if filtro_unidade == unidade.pk|stringformat:'s' %}selected{% endif %}>{{ unidade.sigla }} - {{ unidade.nome }}</option>{% endfor %}</select>
+    <label for="alerta-semestre" class="sr-only">Filtrar por semestre</label>
+    <input id="alerta-semestre" type="text" name="semestre" value="{{ request.GET.semestre|default:resumo_p1.semestre }}" placeholder="Semestre: 2026.1" class="min-h-11 rounded-xl border border-slate-200 px-3 text-sm">
+    <label for="alerta-turno" class="sr-only">Filtrar por turno</label>
+    <select id="alerta-turno" name="turno" class="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="">Todos os turnos</option><option value="M" {% if request.GET.turno == 'M' %}selected{% endif %}>Manhã</option><option value="T" {% if request.GET.turno == 'T' %}selected{% endif %}>Tarde</option><option value="N" {% if request.GET.turno == 'N' %}selected{% endif %}>Noite</option></select>
+    <button class="min-h-11 rounded-xl bg-slate-800 px-4 text-sm font-black text-white hover:bg-slate-700">Atualizar indicadores</button>
+  </form>
+
+  <section class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-[10px] font-black uppercase text-slate-400">Sem professor</p><p class="mt-2 text-2xl font-black text-red-600">{{ resumo_p1.componentes_sem_professor }}</p></div>
+    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-[10px] font-black uppercase text-slate-400">Com sobra</p><p class="mt-2 text-2xl font-black text-blue-600">{{ resumo_p1.professores_com_sobra }}</p></div>
+    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-[10px] font-black uppercase text-slate-400">No limite</p><p class="mt-2 text-2xl font-black text-amber-600">{{ resumo_p1.professores_no_limite }}</p></div>
+    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-[10px] font-black uppercase text-slate-400">Excedidos</p><p class="mt-2 text-2xl font-black text-red-700">{{ resumo_p1.professores_excedidos }}</p></div>
+    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-[10px] font-black uppercase text-slate-400">Diretivos em sala</p><p class="mt-2 text-2xl font-black text-violet-700">{{ resumo_p1.diretivos_em_sala }}</p></div>
+    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-[10px] font-black uppercase text-slate-400">Readaptados em sala</p><p class="mt-2 text-2xl font-black text-red-700">{{ resumo_p1.readaptados_em_sala }}</p></div>
+  </section>
+
+  {% if resumo_p1.ensino_medio_superior or resumo_p1.unidades_no_limite_count %}
+  <section class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4"><h2 class="font-black text-amber-900"><i class="ph ph-warning-circle mr-1"></i>Ensino Médio no Ensino Superior</h2><p class="mt-2 text-sm text-amber-800">{{ resumo_p1.ensino_medio_superior }} professor(es) identificado(s) nesta situação.</p></div>
+    <div class="rounded-2xl border border-red-200 bg-red-50 p-4"><h2 class="font-black text-red-900"><i class="ph ph-gauge mr-1"></i>Unidades no limite ou acima</h2><ul class="mt-2 space-y-1 text-sm text-red-800">{% for item in resumo_p1.unidades_no_limite %}<li><strong>{{ item.sigla }}</strong>: {{ item.carga }} h de {{ item.limite }} h {% if item.excedida %}(excedida){% else %}(no limite){% endif %}</li>{% empty %}<li>Nenhuma unidade.</li>{% endfor %}</ul></div>
+  </section>
+  {% endif %}
+
+  <section class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+    <div class="rounded-2xl border border-slate-200 bg-white shadow-sm"><div class="border-b border-slate-100 p-4"><h2 class="font-black text-slate-800">Limites por unidade</h2></div><div class="divide-y divide-slate-100">{% for limite in limites %}<div class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p class="font-black text-slate-800">{{ limite.unidade.sigla }} - {{ limite.limite_horas_semanais }} h</p><p class="text-xs text-slate-500">{{ limite.data_inicio|date:'d/m/Y' }} a {{ limite.data_fim|date:'d/m/Y'|default:'sem data final' }}</p></div><a href="{% url 'core:limite_carga_update' limite.pk %}" class="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-600 hover:bg-slate-50">Editar</a></div>{% empty %}<p class="p-6 text-center text-sm text-slate-500">Nenhum limite cadastrado.</p>{% endfor %}</div></div>
+    <div class="rounded-2xl border border-slate-200 bg-white shadow-sm"><div class="border-b border-slate-100 p-4"><h2 class="font-black text-slate-800">Readaptações</h2></div><div class="divide-y divide-slate-100">{% for item in readaptacoes %}<div class="p-4"><div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p class="font-black text-slate-800">{{ item.professor.nome }}</p><p class="text-xs text-slate-500">{{ item.data_inicio|date:'d/m/Y' }} a {{ item.data_fim|date:'d/m/Y'|default:'atual' }}</p></div><div class="flex gap-2"><a href="{% url 'core:readaptacao_update' item.pk %}" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold">Editar</a>{% if item.vigente %}<form method="post" action="{% url 'core:readaptacao_encerrar' item.pk %}">{% csrf_token %}<button class="rounded-lg bg-amber-100 px-3 py-2 text-sm font-bold text-amber-800">Encerrar</button></form>{% endif %}</div></div><p class="mt-2 text-sm text-slate-600">{{ item.justificativa_administrativa }}</p></div>{% empty %}<p class="p-6 text-center text-sm text-slate-500">Nenhuma readaptação cadastrada.</p>{% endfor %}</div></div>
+  </section>
+
+  <section class="rounded-2xl border border-slate-200 bg-white shadow-sm"><div class="border-b border-slate-100 p-4"><h2 class="font-black text-slate-800">Exceções pendentes</h2></div><div class="space-y-4 p-4">{% for excecao in excecoes_pendentes %}<article class="rounded-xl border border-slate-200 bg-slate-50 p-4"><div class="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_24rem]"><div><p class="font-black text-slate-800">{{ excecao.unidade.sigla }} · +{{ excecao.horas_adicionais }} h {% if excecao.professor %}para {{ excecao.professor.nome }}{% endif %}</p><p class="mt-2 text-sm text-slate-600">{{ excecao.justificativa }}</p><p class="mt-2 text-xs text-slate-400">Vigência: {{ excecao.data_inicio|date:'d/m/Y' }} a {{ excecao.data_fim|date:'d/m/Y' }}</p></div><form method="post" action="{% url 'core:excecao_carga_decidir' excecao.pk %}">{% csrf_token %}<select name="decisao" class="min-h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value="APROVADA">Aprovar</option><option value="RECUSADA">Recusar</option></select><textarea name="motivo_decisao" rows="2" class="mt-2 w-full rounded-lg border border-slate-200 p-2 text-sm" placeholder="Motivo obrigatório na recusa"></textarea><button class="mt-2 min-h-10 w-full rounded-lg bg-[#025c9f] px-4 text-sm font-black text-white">Registrar decisão</button></form></div></article>{% empty %}<p class="py-5 text-center text-sm text-slate-500">Não há exceções pendentes.</p>{% endfor %}</div></section>
+</div>
+{% endblock %}

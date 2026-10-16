@@ -87,8 +87,9 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
         ctx = super().get_context_data(**kwargs)
         from apps.professors.models import Professor
         from apps.professors.views import _bulk_ch_alocada, _bulk_ch_justificada
-        from apps.courses.models import MatrixComponent
+        from apps.courses.models import Course, MatrixComponent
         from apps.core.models import Unidade
+        from apps.core.priority1 import obter_resumo_prioridade1
 
         ctx['total_professores'] = Professor.objects.count()
         unidades_ativas = list(Unidade.objects.filter(status=True).order_by('nome'))
@@ -150,6 +151,23 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
             ),
         ).order_by('rh_nome')
         ctx['unidades'] = unidades_ativas
+        filtros_p1 = {
+            'unidade_id': self.request.GET.get('unidade_id', ''),
+            'semestre': self.request.GET.get('semestre', ''),
+            'curso_id': self.request.GET.get('curso_id', ''),
+            'turno': self.request.GET.get('turno', ''),
+            'status': self.request.GET.get('status', ''),
+        }
+        ctx['resumo_p1'] = obter_resumo_prioridade1(
+            unidade_id=filtros_p1['unidade_id'] if filtros_p1['unidade_id'].isdigit() else None,
+            semestre=filtros_p1['semestre'] or None,
+            curso_id=filtros_p1['curso_id'] or None,
+            turno=filtros_p1['turno'] or None,
+            status=filtros_p1['status'] or None,
+        )
+        ctx['filtros_p1'] = filtros_p1
+        ctx['cursos_dashboard'] = Course.objects.order_by('nome')
+        ctx['status_componentes'] = MatrixComponent.StatusChoices.choices
 
         # Estrutura esperada pelo partial _professor_table.html
         from django.core.paginator import Paginator
@@ -767,4 +785,366 @@ class ExportarLogsView(LoginRequiredMixin, PerfilRequiredMixin, View):
             ])
         
         return response
+
+
+# ---------------------------------------------------------------------------
+# Prioridade 1 - governança exclusiva da DESUP
+# ---------------------------------------------------------------------------
+
+class DesupPrioridade1Mixin(LoginRequiredMixin, PerfilRequiredMixin):
+    allowed_profiles = ['DESUP']
+
+
+class EquipeDiretivaDesupView(DesupPrioridade1Mixin, TemplateView):
+    template_name = 'core/prioridade1/equipe_diretiva.html'
+
+    def get_context_data(self, **kwargs):
+        from django.utils import timezone
+        from .models import OcupacaoEquipeDiretiva, TipoCargoDiretivo, Unidade
+
+        ctx = super().get_context_data(**kwargs)
+        unidade_id = self.request.GET.get('unidade_id', '')
+        cargo_id = self.request.GET.get('cargo_id', '')
+        situacao = self.request.GET.get('situacao', 'vigentes')
+        hoje = timezone.localdate()
+        ocupacoes = OcupacaoEquipeDiretiva.objects.select_related(
+            'unidade', 'cargo', 'professor', 'curso', 'curso__curso'
+        )
+        if unidade_id.isdigit():
+            ocupacoes = ocupacoes.filter(unidade_id=unidade_id)
+        if cargo_id.isdigit():
+            ocupacoes = ocupacoes.filter(cargo_id=cargo_id)
+        if situacao == 'vigentes':
+            ocupacoes = ocupacoes.filter(data_inicio__lte=hoje).filter(
+                Q(data_fim__isnull=True) | Q(data_fim__gte=hoje)
+            )
+        elif situacao == 'encerradas':
+            ocupacoes = ocupacoes.filter(data_fim__lt=hoje)
+
+        ctx.update({
+            'ocupacoes': ocupacoes[:300],
+            'cargos': TipoCargoDiretivo.objects.order_by('ordem', 'nome'),
+            'unidades': Unidade.objects.filter(status=True).order_by('nome'),
+            'filtro_unidade': unidade_id,
+            'filtro_cargo': cargo_id,
+            'filtro_situacao': situacao,
+            'total_vigentes': OcupacaoEquipeDiretiva.objects.filter(
+                data_inicio__lte=hoje,
+            ).filter(Q(data_fim__isnull=True) | Q(data_fim__gte=hoje)).count(),
+        })
+        return ctx
+
+
+class TipoCargoDiretivoCreateView(DesupPrioridade1Mixin, CreateView):
+    from .forms import TipoCargoDiretivoForm
+    from .models import TipoCargoDiretivo
+
+    model = TipoCargoDiretivo
+    form_class = TipoCargoDiretivoForm
+    template_name = 'core/prioridade1/form.html'
+    success_url = reverse_lazy('core:equipe_diretiva_desup')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update({'titulo': 'Novo tipo de cargo', 'cancel_url': self.success_url})
+        return ctx
+
+    def form_valid(self, form):
+        from .services import registrar_evento_prioridade1
+        response = super().form_valid(form)
+        registrar_evento_prioridade1(
+            self.request, 'CARGO_DIRETIVO_CRIADO', f'Cargo {self.object.pk}: {self.object.nome}.',
+        )
+        messages.success(self.request, 'Tipo de cargo criado com sucesso.')
+        return response
+
+
+class TipoCargoDiretivoUpdateView(DesupPrioridade1Mixin, UpdateView):
+    from .forms import TipoCargoDiretivoForm
+    from .models import TipoCargoDiretivo
+
+    model = TipoCargoDiretivo
+    form_class = TipoCargoDiretivoForm
+    template_name = 'core/prioridade1/form.html'
+    success_url = reverse_lazy('core:equipe_diretiva_desup')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update({'titulo': 'Editar tipo de cargo', 'cancel_url': self.success_url})
+        return ctx
+
+    def form_valid(self, form):
+        from .services import registrar_evento_prioridade1
+        response = super().form_valid(form)
+        registrar_evento_prioridade1(
+            self.request, 'CARGO_DIRETIVO_ATUALIZADO', f'Cargo {self.object.pk}: {self.object.nome}.',
+        )
+        messages.success(self.request, 'Tipo de cargo atualizado com sucesso.')
+        return response
+
+
+class OcupacaoEquipeDiretivaUpdateView(DesupPrioridade1Mixin, UpdateView):
+    from .forms import ReducaoOcupacaoEquipeDiretivaForm
+    from .models import OcupacaoEquipeDiretiva
+
+    model = OcupacaoEquipeDiretiva
+    form_class = ReducaoOcupacaoEquipeDiretivaForm
+    template_name = 'core/prioridade1/form.html'
+    success_url = reverse_lazy('core:equipe_diretiva_desup')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update({'titulo': 'Ajustar redução da ocupação', 'cancel_url': self.success_url})
+        return ctx
+
+    def form_valid(self, form):
+        from .services import registrar_evento_prioridade1
+        response = super().form_valid(form)
+        registrar_evento_prioridade1(
+            self.request,
+            'REDUCAO_OCUPACAO_DIRETIVA_ATUALIZADA',
+            f'Ocupação {self.object.pk}; redução semanal {self.object.carga_reducao_horas} h.',
+        )
+        messages.success(self.request, 'Carga horária de redução atualizada com sucesso.')
+        return response
+
+
+class SolicitacaoProfessorExternoDesupView(DesupPrioridade1Mixin, TemplateView):
+    template_name = 'core/prioridade1/solicitacoes_professor.html'
+
+    def get_context_data(self, **kwargs):
+        from django.core.paginator import Paginator
+        from .models import SolicitacaoProfessorExterno, Unidade
+
+        ctx = super().get_context_data(**kwargs)
+        status = self.request.GET.get('status', SolicitacaoProfessorExterno.StatusChoices.PENDENTE)
+        unidade_id = self.request.GET.get('unidade_id', '')
+        qs = SolicitacaoProfessorExterno.objects.select_related(
+            'professor', 'unidade_solicitante', 'unidade_origem', 'solicitado_por', 'decidido_por'
+        )
+        if status in SolicitacaoProfessorExterno.StatusChoices.values:
+            qs = qs.filter(status=status)
+        if unidade_id.isdigit():
+            qs = qs.filter(unidade_solicitante_id=unidade_id)
+        ctx.update({
+            'solicitacoes': Paginator(qs, 25).get_page(self.request.GET.get('page')),
+            'unidades': Unidade.objects.filter(status=True).order_by('nome'),
+            'status_choices': SolicitacaoProfessorExterno.StatusChoices.choices,
+            'filtro_status': status,
+            'filtro_unidade': unidade_id,
+        })
+        return ctx
+
+
+class SolicitacaoProfessorExternoDecidirView(DesupPrioridade1Mixin, View):
+    def post(self, request, pk):
+        from django.core.exceptions import ValidationError
+        from .forms import DecisaoSolicitacaoProfessorForm
+        from .services import decidir_solicitacao_professor_externo
+
+        form = DecisaoSolicitacaoProfessorForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, 'Revise a decisão e informe o motivo quando necessário.')
+            return redirect('core:solicitacao_professor_list')
+        try:
+            solicitacao = decidir_solicitacao_professor_externo(
+                request=request,
+                solicitacao_id=pk,
+                decisao=form.cleaned_data['decisao'],
+                motivo=form.cleaned_data['motivo_decisao'],
+            )
+        except ValidationError as exc:
+            messages.error(request, ' '.join(exc.messages))
+        else:
+            messages.success(
+                request, f'Solicitação {solicitacao.get_status_display().lower()} com sucesso.',
+            )
+        return redirect('core:solicitacao_professor_list')
+
+
+class AlertasCargaDesupView(DesupPrioridade1Mixin, TemplateView):
+    template_name = 'core/prioridade1/alertas_carga.html'
+
+    def get_context_data(self, **kwargs):
+        from django.utils import timezone
+        from .models import ExcecaoCargaUnidade, LimiteCargaUnidade, ReadaptacaoProfessor, Unidade
+        from .priority1 import obter_resumo_prioridade1
+
+        ctx = super().get_context_data(**kwargs)
+        hoje = timezone.localdate()
+        unidade_id = self.request.GET.get('unidade_id', '')
+        resumo = obter_resumo_prioridade1(
+            unidade_id=unidade_id if unidade_id.isdigit() else None,
+            semestre=self.request.GET.get('semestre') or None,
+            curso_id=self.request.GET.get('curso_id') or None,
+            turno=self.request.GET.get('turno') or None,
+            status=self.request.GET.get('status') or None,
+        )
+        limites = LimiteCargaUnidade.objects.select_related('unidade').order_by('unidade__nome', '-data_inicio')
+        readaptacoes = ReadaptacaoProfessor.objects.select_related('professor').order_by('-data_inicio')
+        excecoes = ExcecaoCargaUnidade.objects.filter(
+            status=ExcecaoCargaUnidade.StatusChoices.PENDENTE
+        ).select_related('unidade', 'professor', 'solicitado_por')
+        if unidade_id.isdigit():
+            limites = limites.filter(unidade_id=unidade_id)
+            readaptacoes = readaptacoes.filter(
+                Q(professor__unidades__id=unidade_id) | Q(professor__unidade_principal_id=unidade_id)
+            ).distinct()
+            excecoes = excecoes.filter(unidade_id=unidade_id)
+        ctx.update({
+            'resumo_p1': resumo,
+            'limites': limites[:100],
+            'readaptacoes': readaptacoes[:100],
+            'excecoes_pendentes': excecoes[:100],
+            'unidades': Unidade.objects.filter(status=True).order_by('nome'),
+            'filtro_unidade': unidade_id,
+            'hoje': hoje,
+        })
+        return ctx
+
+
+class LimiteCargaUnidadeCreateView(DesupPrioridade1Mixin, CreateView):
+    from .forms import LimiteCargaUnidadeForm
+    from .models import LimiteCargaUnidade
+
+    model = LimiteCargaUnidade
+    form_class = LimiteCargaUnidadeForm
+    template_name = 'core/prioridade1/form.html'
+    success_url = reverse_lazy('core:alertas_carga_desup')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update({'titulo': 'Novo limite de carga da unidade', 'cancel_url': self.success_url})
+        return ctx
+
+    def form_valid(self, form):
+        from .services import registrar_evento_prioridade1
+        self.object = form.save(commit=False)
+        self.object.criado_por = self.request.user
+        self.object.save()
+        registrar_evento_prioridade1(
+            self.request, 'LIMITE_CARGA_CRIADO', f'Limite {self.object.pk}; unidade {self.object.unidade_id}.',
+        )
+        messages.success(self.request, 'Limite de carga criado com sucesso.')
+        return redirect(self.success_url)
+
+
+class LimiteCargaUnidadeUpdateView(DesupPrioridade1Mixin, UpdateView):
+    from .forms import LimiteCargaUnidadeForm
+    from .models import LimiteCargaUnidade
+
+    model = LimiteCargaUnidade
+    form_class = LimiteCargaUnidadeForm
+    template_name = 'core/prioridade1/form.html'
+    success_url = reverse_lazy('core:alertas_carga_desup')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update({'titulo': 'Editar limite de carga da unidade', 'cancel_url': self.success_url})
+        return ctx
+
+    def form_valid(self, form):
+        from .services import registrar_evento_prioridade1
+        response = super().form_valid(form)
+        registrar_evento_prioridade1(
+            self.request, 'LIMITE_CARGA_ATUALIZADO', f'Limite {self.object.pk}; unidade {self.object.unidade_id}.',
+        )
+        messages.success(self.request, 'Limite de carga atualizado com sucesso.')
+        return response
+
+
+class ReadaptacaoProfessorCreateView(DesupPrioridade1Mixin, CreateView):
+    from .forms import ReadaptacaoProfessorForm
+    from .models import ReadaptacaoProfessor
+
+    model = ReadaptacaoProfessor
+    form_class = ReadaptacaoProfessorForm
+    template_name = 'core/prioridade1/form.html'
+    success_url = reverse_lazy('core:alertas_carga_desup')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update({'titulo': 'Registrar readaptação', 'cancel_url': self.success_url})
+        return ctx
+
+    def form_valid(self, form):
+        from .services import registrar_evento_prioridade1
+        self.object = form.save(commit=False)
+        self.object.criado_por = self.request.user
+        self.object.save()
+        registrar_evento_prioridade1(
+            self.request, 'READAPTACAO_CRIADA', f'Readaptação {self.object.pk}; professor {self.object.professor_id}.',
+        )
+        messages.success(self.request, 'Readaptação registrada com sucesso.')
+        return redirect(self.success_url)
+
+
+class ReadaptacaoProfessorUpdateView(DesupPrioridade1Mixin, UpdateView):
+    from .forms import ReadaptacaoProfessorForm
+    from .models import ReadaptacaoProfessor
+
+    model = ReadaptacaoProfessor
+    form_class = ReadaptacaoProfessorForm
+    template_name = 'core/prioridade1/form.html'
+    success_url = reverse_lazy('core:alertas_carga_desup')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update({'titulo': 'Editar readaptação', 'cancel_url': self.success_url})
+        return ctx
+
+    def form_valid(self, form):
+        from .services import registrar_evento_prioridade1
+        response = super().form_valid(form)
+        registrar_evento_prioridade1(
+            self.request, 'READAPTACAO_ATUALIZADA', f'Readaptação {self.object.pk}; professor {self.object.professor_id}.',
+        )
+        messages.success(self.request, 'Readaptação atualizada com sucesso.')
+        return response
+
+
+class ReadaptacaoProfessorEncerrarView(DesupPrioridade1Mixin, View):
+    def post(self, request, pk):
+        from django.db import transaction
+        from django.utils import timezone
+        from .models import ReadaptacaoProfessor
+        from .services import registrar_evento_prioridade1
+
+        with transaction.atomic():
+            readaptacao = get_object_or_404(ReadaptacaoProfessor.objects.select_for_update(), pk=pk)
+            hoje = timezone.localdate()
+            if readaptacao.data_fim and readaptacao.data_fim < hoje:
+                messages.info(request, 'Esta readaptação já estava encerrada.')
+                return redirect('core:alertas_carga_desup')
+            readaptacao.data_fim = max(hoje, readaptacao.data_inicio)
+            readaptacao.save(update_fields=['data_fim', 'atualizado_em'])
+            registrar_evento_prioridade1(
+                request, 'READAPTACAO_ENCERRADA', f'Readaptação {readaptacao.pk}.',
+            )
+        messages.success(request, 'Readaptação encerrada com sucesso.')
+        return redirect('core:alertas_carga_desup')
+
+
+class ExcecaoCargaDecidirView(DesupPrioridade1Mixin, View):
+    def post(self, request, pk):
+        from django.core.exceptions import ValidationError
+        from .forms import DecisaoExcecaoCargaForm
+        from .services import decidir_excecao_carga
+
+        form = DecisaoExcecaoCargaForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, 'Revise a decisão e informe o motivo quando necessário.')
+            return redirect('core:alertas_carga_desup')
+        try:
+            excecao = decidir_excecao_carga(
+                request=request,
+                excecao_id=pk,
+                decisao=form.cleaned_data['decisao'],
+                motivo=form.cleaned_data['motivo_decisao'],
+            )
+        except ValidationError as exc:
+            messages.error(request, ' '.join(exc.messages))
+        else:
+            messages.success(request, f'Exceção {excecao.get_status_display().lower()} com sucesso.')
+        return redirect('core:alertas_carga_desup')
 

@@ -124,6 +124,13 @@
             {% if form.status.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.status.errors.0 }}</p>{% endif %}
           </div>
 
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nível de ensino de origem</label>
+            {{ form.nivel_ensino_origem }}
+            <p class="mt-1 text-xs text-slate-500">Informação institucional usada nos alertas da DESUP.</p>
+            {% if form.nivel_ensino_origem.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.nivel_ensino_origem.errors.0 }}</p>{% endif %}
+          </div>
+
         </div>
       </div>
 

@@ -1,11 +1,19 @@
 import logging
 
 from django.conf import settings
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Q
 from django.urls import reverse
+from django.utils import timezone
 
-from .models import JanelaEntrega, Notificacao
+from .models import (
+    AuditoriaGlobal,
+    ExcecaoCargaUnidade,
+    JanelaEntrega,
+    Notificacao,
+    SolicitacaoProfessorExterno,
+)
 from .tasks import send_email_task
 
 logger = logging.getLogger(__name__)
@@ -228,3 +236,166 @@ def create_window_ticket(*, request, area_label, action_label, target_label="", 
         },
     )
     return email_sent
+
+
+def registrar_evento_prioridade1(request, acao, detalhes):
+    """Registra eventos administrativos sem incluir segredos ou conteúdo médico."""
+    user = request.user
+    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    ip = forwarded.split(",", 1)[0].strip() if forwarded else request.META.get("REMOTE_ADDR")
+    return AuditoriaGlobal.objects.create(
+        usuario=user if user.is_authenticated else None,
+        email=user.email if user.is_authenticated else "",
+        acao=acao,
+        detalhes=detalhes,
+        ip=ip or None,
+        user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:1000],
+    )
+
+
+def _exigir_desup(user):
+    autorizado = bool(
+        user.is_authenticated
+        and (
+            user.is_superuser
+            or user.perfil == "DESUP"
+            or user.groups.filter(name="Admin DESUP").exists()
+        )
+    )
+    if not autorizado:
+        raise PermissionDenied("A decisão é restrita à DESUP.")
+
+
+def _enviar_email_unidade_apos_commit(unidade, assunto, mensagem):
+    from apps.accounts.models import User
+
+    destinatarios = list(
+        User.objects.filter(unidade=unidade, is_active=True)
+        .exclude(email="")
+        .values_list("email", flat=True)
+        .distinct()
+    )
+    if not destinatarios:
+        return
+
+    def _enviar():
+        try:
+            send_email_task.delay(
+                subject=assunto,
+                message=mensagem,
+                recipient_list=destinatarios,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                fail_silently=False,
+            )
+        except Exception:
+            logger.exception("Falha ao enfileirar e-mail para a unidade %s", unidade.pk)
+
+    transaction.on_commit(_enviar)
+
+
+@transaction.atomic
+def decidir_solicitacao_professor_externo(*, request, solicitacao_id, decisao, motivo=""):
+    """Decide uma solicitação uma única vez e efetiva o vínculo sob bloqueio."""
+    _exigir_desup(request.user)
+    permitidas = {
+        SolicitacaoProfessorExterno.StatusChoices.APROVADA,
+        SolicitacaoProfessorExterno.StatusChoices.RECUSADA,
+    }
+    if decisao not in permitidas:
+        raise ValidationError("Decisão inválida.")
+
+    solicitacao = (
+        SolicitacaoProfessorExterno.objects.select_for_update()
+        .select_related("professor", "unidade_solicitante", "unidade_origem")
+        .get(pk=solicitacao_id)
+    )
+    if solicitacao.status != SolicitacaoProfessorExterno.StatusChoices.PENDENTE:
+        raise ValidationError("Esta solicitação já foi decidida ou cancelada.")
+    if decisao == SolicitacaoProfessorExterno.StatusChoices.RECUSADA and not motivo.strip():
+        raise ValidationError("Informe o motivo da recusa.")
+
+    solicitacao.status = decisao
+    solicitacao.motivo_decisao = motivo.strip()
+    solicitacao.decidido_por = request.user
+    solicitacao.decidido_em = timezone.now()
+    solicitacao.save(update_fields=["status", "motivo_decisao", "decidido_por", "decidido_em"])
+
+    if decisao == SolicitacaoProfessorExterno.StatusChoices.APROVADA:
+        solicitacao.professor.unidades.add(solicitacao.unidade_solicitante)
+
+    estado = solicitacao.get_status_display().lower()
+    mensagem = (
+        f"A solicitação do professor {solicitacao.professor.nome} para a unidade "
+        f"{solicitacao.unidade_solicitante.sigla} foi {estado} pela DESUP."
+    )
+    if motivo.strip():
+        mensagem = f"{mensagem} Motivo: {motivo.strip()}"
+    Notificacao.objects.create(
+        unidade_destino=solicitacao.unidade_solicitante,
+        titulo=f"Solicitação de professor {solicitacao.get_status_display().lower()}",
+        mensagem=mensagem,
+        url_acao=reverse("dashboard_unidade"),
+    )
+    _enviar_email_unidade_apos_commit(
+        solicitacao.unidade_solicitante,
+        f"[Harpia] Solicitação de professor {solicitacao.get_status_display().lower()}",
+        f"{mensagem}\n\nNotificação automática do sistema Harpia.",
+    )
+    registrar_evento_prioridade1(
+        request,
+        "SOLICITACAO_PROFESSOR_DECIDIDA",
+        f"Solicitação {solicitacao.pk}; decisão {decisao}; unidade {solicitacao.unidade_solicitante_id}.",
+    )
+    return solicitacao
+
+
+@transaction.atomic
+def decidir_excecao_carga(*, request, excecao_id, decisao, motivo=""):
+    """Aprova ou recusa exceção de carga, impedindo decisões concorrentes."""
+    _exigir_desup(request.user)
+    permitidas = {
+        ExcecaoCargaUnidade.StatusChoices.APROVADA,
+        ExcecaoCargaUnidade.StatusChoices.RECUSADA,
+    }
+    if decisao not in permitidas:
+        raise ValidationError("Decisão inválida.")
+
+    excecao = (
+        ExcecaoCargaUnidade.objects.select_for_update()
+        .select_related("unidade", "professor")
+        .get(pk=excecao_id)
+    )
+    if excecao.status != ExcecaoCargaUnidade.StatusChoices.PENDENTE:
+        raise ValidationError("Esta exceção já foi decidida ou cancelada.")
+    if decisao == ExcecaoCargaUnidade.StatusChoices.RECUSADA and not motivo.strip():
+        raise ValidationError("Informe o motivo da recusa.")
+
+    excecao.status = decisao
+    excecao.motivo_decisao = motivo.strip()
+    excecao.decidido_por = request.user
+    excecao.decidido_em = timezone.now()
+    excecao.save(update_fields=["status", "motivo_decisao", "decidido_por", "decidido_em"])
+
+    alvo = excecao.professor.nome if excecao.professor_id else excecao.unidade.sigla
+    mensagem = (
+        f"A exceção de carga para {alvo} foi {excecao.get_status_display().lower()} pela DESUP."
+    )
+    if motivo.strip():
+        mensagem = f"{mensagem} Motivo: {motivo.strip()}"
+    Notificacao.objects.create(
+        unidade_destino=excecao.unidade,
+        titulo=f"Exceção de carga {excecao.get_status_display().lower()}",
+        mensagem=mensagem,
+        url_acao=reverse("dashboard_unidade"),
+    )
+    _enviar_email_unidade_apos_commit(
+        excecao.unidade,
+        f"[Harpia] Exceção de carga {excecao.get_status_display().lower()}",
+        f"{mensagem}\n\nNotificação automática do sistema Harpia.",
+    )
+    registrar_evento_prioridade1(
+        request,
+        "EXCECAO_CARGA_DECIDIDA",
+        f"Exceção {excecao.pk}; decisão {decisao}; unidade {excecao.unidade_id}.",
+    )
+    return excecao

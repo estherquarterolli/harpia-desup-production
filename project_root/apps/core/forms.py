@@ -1,11 +1,22 @@
 import re
 
 from django import forms
-from .models import JanelaEntrega
+from .models import (
+    ExcecaoCargaUnidade,
+    JanelaEntrega,
+    LimiteCargaUnidade,
+    OcupacaoEquipeDiretiva,
+    ReadaptacaoProfessor,
+    SolicitacaoProfessorExterno,
+    TipoCargoDiretivo,
+)
 
 # Classe de input consistente com os demais campos das telas de janela.
 _DATE_CSS = ('w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm '
              'bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition')
+_INPUT_CSS = ('w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm '
+              'bg-white focus:border-[#025c9f] focus:ring-2 focus:ring-blue-100 outline-none transition')
+_SELECT_CSS = _INPUT_CSS
 
 # O semestre é usado como chave lógica em alocações/matrizes e aparece cru na tela;
 # sem formato fixo entrava qualquer string ("banana!!") e a janela virava órfã.
@@ -111,3 +122,107 @@ class JanelaEntregaForm(JanelaEntregaValidacaoMixin, forms.ModelForm):
         if commit:
             instance.save()
         return instance
+
+
+class TipoCargoDiretivoForm(forms.ModelForm):
+    class Meta:
+        model = TipoCargoDiretivo
+        fields = ["nome", "exige_curso", "permite_multiplos", "ativo", "ordem"]
+        widgets = {
+            "nome": forms.TextInput(attrs={"class": _INPUT_CSS}),
+            "exige_curso": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
+            "permite_multiplos": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
+            "ativo": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
+            "ordem": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": 0}),
+        }
+
+
+class ReducaoOcupacaoEquipeDiretivaForm(forms.ModelForm):
+    class Meta:
+        model = OcupacaoEquipeDiretiva
+        fields = ["carga_reducao_horas", "observacoes"]
+        widgets = {
+            "carga_reducao_horas": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": "0", "max": "168", "step": "0.25"}),
+            "observacoes": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 3}),
+        }
+
+
+class LimiteCargaUnidadeForm(forms.ModelForm):
+    class Meta:
+        model = LimiteCargaUnidade
+        fields = ["unidade", "limite_horas_semanais", "data_inicio", "data_fim", "observacoes"]
+        widgets = {
+            "unidade": forms.Select(attrs={"class": _SELECT_CSS}),
+            "limite_horas_semanais": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": "0.01", "step": "0.25"}),
+            "data_inicio": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
+            "data_fim": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
+            "observacoes": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 3}),
+        }
+
+
+class ReadaptacaoProfessorForm(forms.ModelForm):
+    class Meta:
+        model = ReadaptacaoProfessor
+        fields = ["professor", "data_inicio", "data_fim", "justificativa_administrativa"]
+        widgets = {
+            "professor": forms.Select(attrs={"class": _SELECT_CSS}),
+            "data_inicio": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
+            "data_fim": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
+            "justificativa_administrativa": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 4}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from apps.professors.models import Professor
+
+        self.fields["professor"].queryset = Professor.objects.order_by("rh_nome")
+
+
+class DecisaoSolicitacaoProfessorForm(forms.Form):
+    decisao = forms.ChoiceField(
+        label="Decisão",
+        choices=(
+            (SolicitacaoProfessorExterno.StatusChoices.APROVADA, "Aprovar"),
+            (SolicitacaoProfessorExterno.StatusChoices.RECUSADA, "Recusar"),
+        ),
+        widget=forms.Select(attrs={"class": _SELECT_CSS}),
+    )
+    motivo_decisao = forms.CharField(
+        label="Motivo da decisão",
+        widget=forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 3}),
+        required=False,
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        if (
+            cleaned.get("decisao") == SolicitacaoProfessorExterno.StatusChoices.RECUSADA
+            and not (cleaned.get("motivo_decisao") or "").strip()
+        ):
+            self.add_error("motivo_decisao", "Informe o motivo da recusa.")
+        return cleaned
+
+
+class DecisaoExcecaoCargaForm(forms.Form):
+    decisao = forms.ChoiceField(
+        label="Decisão",
+        choices=(
+            (ExcecaoCargaUnidade.StatusChoices.APROVADA, "Aprovar"),
+            (ExcecaoCargaUnidade.StatusChoices.RECUSADA, "Recusar"),
+        ),
+        widget=forms.Select(attrs={"class": _SELECT_CSS}),
+    )
+    motivo_decisao = forms.CharField(
+        label="Motivo da decisão",
+        widget=forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 3}),
+        required=False,
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        if (
+            cleaned.get("decisao") == ExcecaoCargaUnidade.StatusChoices.RECUSADA
+            and not (cleaned.get("motivo_decisao") or "").strip()
+        ):
+            self.add_error("motivo_decisao", "Informe o motivo da recusa.")
+        return cleaned

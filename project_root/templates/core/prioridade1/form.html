@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ titulo }} - Harpia{% endblock %}
+{% block header_title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto w-full max-w-3xl">
+  <div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div class="border-b border-slate-100 px-4 py-4 sm:px-6">
+      <h1 class="text-lg font-black text-[#025c9f] sm:text-xl">{{ titulo }}</h1>
+      <p class="mt-1 text-sm text-slate-500">Área de governança restrita à DESUP.</p>
+    </div>
+    <form method="post" class="space-y-5 p-4 sm:p-6" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+      <div class="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">
+        {{ form.non_field_errors }}
+      </div>
+      {% endif %}
+      <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+        {% for field in form %}
+        <div class="min-w-0 {% if field.name == 'observacoes' or field.name == 'justificativa_administrativa' %}md:col-span-2{% endif %}">
+          {% if field.field.widget.input_type == 'checkbox' %}
+          <label class="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <span class="mt-0.5">{{ field }}</span>
+            <span>
+              <span class="block text-sm font-bold text-slate-700">{{ field.label }}</span>
+              {% if field.help_text %}<span class="mt-1 block text-xs text-slate-500">{{ field.help_text }}</span>{% endif %}
+            </span>
+          </label>
+          {% else %}
+          <label for="{{ field.id_for_label }}" class="mb-1.5 block text-sm font-bold text-slate-700">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<p class="mt-1 text-xs text-slate-500">{{ field.help_text }}</p>{% endif %}
+          {% endif %}
+          {% for error in field.errors %}<p class="mt-1 text-xs font-semibold text-red-600" role="alert">{{ error }}</p>{% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+      <div class="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+        <a href="{{ cancel_url }}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50">Cancelar</a>
+        <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#025c9f] px-5 py-2.5 text-sm font-black text-white hover:bg-[#153e70] focus:outline-none focus:ring-2 focus:ring-blue-300">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

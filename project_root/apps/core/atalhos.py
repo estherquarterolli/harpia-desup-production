@@ -31,6 +31,9 @@ ATALHOS_CATALOGO = {
     'adicionar_curso':  {'label': 'Adicionar Curso',            'url_name': 'core:unidade_list',               'icon': 'ph-graduation-cap',       'profiles': (DESUP,)},
     'exportar_logs':    {'label': 'Exportar Logs',              'url_name': 'core:exportar_logs',              'icon': 'ph-download-simple',      'profiles': (DESUP,)},
     'dashboard_desup':  {'label': 'Dashboard DESUP',            'url_name': 'dashboard_desup',                 'icon': 'ph-gauge',                'profiles': (DESUP,)},
+    'equipe_diretiva':  {'label': 'Equipe Diretiva',            'url_name': 'core:equipe_diretiva_desup',     'icon': 'ph-identification-card',  'profiles': (DESUP,)},
+    'solicitacoes_ext': {'label': 'Solicitações Externas',      'url_name': 'core:solicitacao_professor_list','icon': 'ph-arrows-left-right',    'profiles': (DESUP,)},
+    'alertas_carga':    {'label': 'Alertas de Carga',            'url_name': 'core:alertas_carga_desup',       'icon': 'ph-warning-circle',       'profiles': (DESUP,)},
     'dashboard_unidade':{'label': 'Dashboard da Unidade',       'url_name': 'dashboard_unidade',               'icon': 'ph-gauge',                'profiles': (UNIDADE,)},
 }
 

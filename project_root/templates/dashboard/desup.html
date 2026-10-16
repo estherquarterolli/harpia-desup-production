@@ -8,6 +8,36 @@
 {% block content %}
 <div class="space-y-8">
 
+    <section class="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 sm:p-5">
+        <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-blue-600">Visão institucional</p>
+                <h2 class="text-lg font-black text-slate-900">Filtros da alocação geral</h2>
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs font-bold">
+                <a href="{% url 'core:equipe_diretiva_desup' %}" class="rounded-lg border border-blue-200 bg-white px-3 py-2 text-[#025c9f] hover:bg-blue-100">Equipe diretiva</a>
+                <a href="{% url 'core:solicitacao_professor_list' %}" class="rounded-lg border border-blue-200 bg-white px-3 py-2 text-[#025c9f] hover:bg-blue-100">Solicitações externas</a>
+                <a href="{% url 'core:alertas_carga_desup' %}" class="rounded-lg border border-blue-200 bg-white px-3 py-2 text-[#025c9f] hover:bg-blue-100">Alertas de carga</a>
+            </div>
+        </div>
+        <form method="get" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+            <label for="filtro-p1-unidade" class="sr-only">Filtrar por unidade</label>
+            <select id="filtro-p1-unidade" name="unidade_id" class="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">
+                <option value="">Todas as unidades</option>
+                {% for u in unidades %}<option value="{{ u.pk }}" {% if filtros_p1.unidade_id == u.pk|stringformat:'s' %}selected{% endif %}>{{ u.sigla }}</option>{% endfor %}
+            </select>
+            <label for="filtro-p1-semestre" class="sr-only">Filtrar por semestre</label>
+            <input id="filtro-p1-semestre" name="semestre" value="{{ filtros_p1.semestre|default:resumo_p1.semestre }}" placeholder="Semestre: 2026.1" class="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">
+            <label for="filtro-p1-curso" class="sr-only">Filtrar por curso</label>
+            <select id="filtro-p1-curso" name="curso_id" class="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="">Todos os cursos</option>{% for curso in cursos_dashboard %}<option value="{{ curso.pk }}" {% if filtros_p1.curso_id == curso.pk|stringformat:'s' %}selected{% endif %}>{{ curso.sigla }}</option>{% endfor %}</select>
+            <label for="filtro-p1-turno" class="sr-only">Filtrar por turno</label>
+            <select id="filtro-p1-turno" name="turno" class="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="">Todos os turnos</option><option value="M" {% if filtros_p1.turno == 'M' %}selected{% endif %}>Manhã</option><option value="T" {% if filtros_p1.turno == 'T' %}selected{% endif %}>Tarde</option><option value="N" {% if filtros_p1.turno == 'N' %}selected{% endif %}>Noite</option></select>
+            <label for="filtro-p1-status" class="sr-only">Filtrar pela situação do componente</label>
+            <select id="filtro-p1-status" name="status" class="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="">Todas as situações</option>{% for value,label in status_componentes %}<option value="{{ value }}" {% if filtros_p1.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+            <button class="min-h-11 rounded-xl bg-[#025c9f] px-4 text-sm font-black text-white hover:bg-[#153e70]">Aplicar filtros</button>
+        </form>
+    </section>
+
     <!-- Cards de Visão Geral -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 border-b-4 border-b-blue-500">
@@ -38,6 +68,15 @@
             {% endif %}
         </div>
     </div>
+
+    <section aria-label="Alertas consolidados" class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        <a href="{% url 'core:solicitacao_professor_list' %}" class="rounded-2xl border border-amber-200 bg-amber-50 p-4 transition hover:bg-amber-100"><p class="text-[10px] font-black uppercase text-amber-700">Solicitações</p><p class="mt-2 text-2xl font-black text-amber-900">{{ resumo_p1.solicitacoes_pendentes }}</p><p class="mt-1 text-xs text-amber-700">pendentes</p></a>
+        <a href="{% url 'core:alertas_carga_desup' %}" class="rounded-2xl border border-red-200 bg-red-50 p-4 transition hover:bg-red-100"><p class="text-[10px] font-black uppercase text-red-700">Sem professor</p><p class="mt-2 text-2xl font-black text-red-900">{{ resumo_p1.componentes_sem_professor }}</p><p class="mt-1 text-xs text-red-700">componentes</p></a>
+        <a href="{% url 'core:alertas_carga_desup' %}" class="rounded-2xl border border-blue-200 bg-blue-50 p-4 transition hover:bg-blue-100"><p class="text-[10px] font-black uppercase text-blue-700">Com sobra</p><p class="mt-2 text-2xl font-black text-blue-900">{{ resumo_p1.professores_com_sobra }}</p><p class="mt-1 text-xs text-blue-700">professores</p></a>
+        <a href="{% url 'core:alertas_carga_desup' %}" class="rounded-2xl border border-violet-200 bg-violet-50 p-4 transition hover:bg-violet-100"><p class="text-[10px] font-black uppercase text-violet-700">Diretivos em sala</p><p class="mt-2 text-2xl font-black text-violet-900">{{ resumo_p1.diretivos_em_sala }}</p><p class="mt-1 text-xs text-violet-700">alertas</p></a>
+        <a href="{% url 'core:alertas_carga_desup' %}" class="rounded-2xl border border-red-200 bg-red-50 p-4 transition hover:bg-red-100"><p class="text-[10px] font-black uppercase text-red-700">Readaptados em sala</p><p class="mt-2 text-2xl font-black text-red-900">{{ resumo_p1.readaptados_em_sala }}</p><p class="mt-1 text-xs text-red-700">bloqueios</p></a>
+        <a href="{% url 'core:alertas_carga_desup' %}" class="rounded-2xl border border-slate-200 bg-white p-4 transition hover:bg-slate-50"><p class="text-[10px] font-black uppercase text-slate-500">Unidades no limite</p><p class="mt-2 text-2xl font-black text-slate-900">{{ resumo_p1.unidades_no_limite_count }}</p><p class="mt-1 text-xs text-slate-500">unidades</p></a>
+    </section>
 
     <!-- Atalhos do dashboard -->
     <div class="flex flex-wrap items-center gap-3">
