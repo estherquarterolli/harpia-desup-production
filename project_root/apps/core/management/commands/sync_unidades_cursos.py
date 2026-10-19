@@ -34,7 +34,8 @@ from django.db import models, transaction
 from django.db.models import ProtectedError
 
 from apps.core.models import Unidade
-from apps.courses.models import Course, CourseUnit, MatrixComponent
+from apps.allocations.models import AlocacaoTurmaDocente
+from apps.courses.models import Course, CourseUnit
 
 # (nome_unidade, sigla_unidade, nome_curso)
 DADOS_CORRETOS = [
@@ -103,7 +104,9 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("-- Limpando Cursos placeholder (nome == sigla, sem uso real) --"))
             for curso in list(Course.objects.filter(nome=models.F('sigla'))):
                 tem_courseunit = curso.course_units.exists()
-                tem_docente = MatrixComponent.objects.filter(matriz__curso=curso).exclude(docente=None).exists()
+                tem_docente = AlocacaoTurmaDocente.objects.filter(
+                    componente_matriz__matriz__curso=curso, docente__isnull=False
+                ).exists()
                 if tem_courseunit or tem_docente:
                     self.stdout.write(self.style.ERROR(
                         f"  PULADO (tem uso real, nao e placeholder): {curso.sigla} - {curso.nome}"

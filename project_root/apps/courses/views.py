@@ -156,6 +156,28 @@ class CurriculumMatrixListView(MatrixBaseView, ListView):
         ctx['cursos'] = cursos_qs.distinct().order_by('nome')
         ctx['unidade_selecionada_id'] = unidade_id
 
+        # Resumo: mesmo escopo de perfil da lista, sem os filtros de tela.
+        from django.db.models import Count, Q
+
+        user = self.request.user
+        base = CurriculumMatrix.objects.all()
+        if not (user.perfil == 'DESUP' or user.is_superuser):
+            base = base.filter(unidades=user.unidade).exclude(is_rascunho=True) if user.unidade else base.none()
+        totais = base.distinct().aggregate(
+            total=Count('pk', distinct=True),
+            vigentes=Count('pk', filter=Q(is_vigente=True, is_rascunho=False), distinct=True),
+            rascunhos=Count('pk', filter=Q(is_rascunho=True), distinct=True),
+            historico=Count('pk', filter=Q(is_vigente=False, is_rascunho=False), distinct=True),
+        )
+        kpis = [
+            {'rotulo': 'Matrizes', 'valor': totais['total'], 'tom': 'azul', 'icone': 'ph-file-text'},
+            {'rotulo': 'Vigentes', 'valor': totais['vigentes'], 'tom': 'verde', 'icone': 'ph-check-circle'},
+        ]
+        if user.perfil == 'DESUP' or user.is_superuser:
+            kpis.append({'rotulo': 'Rascunhos', 'valor': totais['rascunhos'], 'tom': 'ambar', 'icone': 'ph-pencil-simple'})
+        kpis.append({'rotulo': 'Histórico', 'valor': totais['historico'], 'tom': 'cinza', 'icone': 'ph-archive'})
+        ctx['kpis'] = kpis
+
         params = self.request.GET.copy()
         params.pop('page', None)
         ctx['querystring'] = params.urlencode()

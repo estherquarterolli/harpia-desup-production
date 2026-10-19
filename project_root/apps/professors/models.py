@@ -282,7 +282,13 @@ class Professor(models.Model):
         try:
             vistos = set()
             total = 0
-            for comp in self.componentes_matriz.filter(matriz__is_vigente=True).select_related('componente_curricular'):
+            from apps.allocations.services import alocacoes_vigentes
+
+            linhas = alocacoes_vigentes().filter(docente=self).select_related(
+                'componente_matriz', 'componente_matriz__componente_curricular'
+            )
+            for linha in linhas:
+                comp = linha.componente_matriz
                 chave = (
                     comp.componente_curricular_id
                     if comp.compartilhado
@@ -345,12 +351,11 @@ class Professor(models.Model):
         sem registro em CurricularComponent) — por isso usa `nome_disciplina`
         (property) em vez de filtrar direto no banco por `componente_curricular__nome`.
         """
-        from apps.courses.models import MatrixComponent
-        componentes = MatrixComponent.objects.filter(
-            docente=self,
-            matriz__is_vigente=True,
-        ).select_related('componente_curricular')
-        nomes = {c.nome_disciplina for c in componentes if c.nome_disciplina}
+        from apps.allocations.services import alocacoes_vigentes
+        linhas = alocacoes_vigentes().filter(docente=self).select_related(
+            'componente_matriz', 'componente_matriz__componente_curricular'
+        )
+        nomes = {l.componente_matriz.nome_disciplina for l in linhas if l.componente_matriz.nome_disciplina}
         return sorted(nomes)
 
 class Availability(models.Model):

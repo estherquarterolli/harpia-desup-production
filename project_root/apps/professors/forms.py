@@ -115,6 +115,30 @@ class ProfessorForm(forms.ModelForm):
         return professor
 
 
+class SolicitacaoCessaoProfessorForm(forms.Form):
+    """Pedido do coordenador à DESUP para usar um professor de outra unidade."""
+
+    professor = forms.ModelChoiceField(
+        label='Professor de outra unidade', queryset=Professor.objects.none(),
+        widget=forms.Select(attrs={'class': _SELECT_CSS}),
+    )
+    justificativa = forms.CharField(
+        label='Justificativa',
+        widget=forms.Textarea(attrs={
+            'class': _INPUT_CSS, 'rows': 4,
+            'placeholder': 'Ex.: Professor necessário para a disciplina X no semestre.',
+        }),
+    )
+
+    def __init__(self, *args, unidade=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        qs = Professor.objects.filter(status=Professor.StatusChoices.ATIVO)
+        if unidade is not None:
+            qs = qs.exclude(unidades=unidade).exclude(unidade_principal=unidade)
+        self.fields['professor'].queryset = qs.distinct().order_by('desup_nome', 'rh_nome')
+        self.fields['professor'].label_from_instance = lambda p: p.nome
+
+
 class SolicitacaoCadastroProfessorForm(forms.Form):
     """Pedido do coordenador de unidade à DESUP para cadastrar um professor."""
 

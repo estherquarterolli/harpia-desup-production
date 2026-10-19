@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
-{% block title %}Solicitar Cadastro de Professor | Harpia{% endblock %}
-{% block header_title %}Solicitar Cadastro de Professor{% endblock %}
+{% block title %}{{ titulo }} | Harpia{% endblock %}
+{% block header_title %}{{ titulo }}{% endblock %}
 
 {% block content %}
 <div class="max-w-2xl mx-auto space-y-6">
@@ -9,12 +9,12 @@
   <nav class="breadcrumb-container mb-6" aria-label="Breadcrumb">
     <a href="{% url 'professors:professor_list' %}" class="breadcrumb-item-link">Professores</a>
     <i class="ph ph-caret-right breadcrumb-separator"></i>
-    <span class="breadcrumb-item-active">Solicitar cadastro</span>
+    <span class="breadcrumb-item-active">{{ breadcrumb }}</span>
   </nav>
 
   <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
     <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/70">
-      <h2 class="text-sm font-black text-[#025c9f] uppercase tracking-widest">Solicitar cadastro à DESUP</h2>
+      <h2 class="text-sm font-black text-[#025c9f] uppercase tracking-widest">{{ subtitulo }}</h2>
       <p class="text-xs text-slate-500 mt-1">Os administradores da DESUP serão avisados por notificação e por e-mail.</p>
     </div>
 

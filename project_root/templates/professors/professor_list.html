@@ -7,26 +7,21 @@
 {% block content %}
 <div class="space-y-6">
 
-  <!-- Barra superior: contagem + ações -->
-  <div class="flex flex-wrap items-center justify-between gap-3">
-    <div class="flex flex-wrap items-center gap-2">
-      <div class="flex items-center gap-2 bg-[#e8f0fb] text-[#025c9f] rounded-xl px-4 py-2 text-sm font-black" title="Professores cadastrados no sistema">
-        <i class="ph ph-chalkboard-teacher text-base"></i>
-        {{ total_professores }} no sistema
-      </div>
-      {% if filtros_ativos %}
-      <div class="flex items-center gap-2 bg-amber-50 text-amber-700 rounded-xl px-4 py-2 text-sm font-bold">
-        <i class="ph ph-funnel text-base"></i>
-        {{ total_filtrados }} encontrado{{ total_filtrados|pluralize }}
-      </div>
-      {% endif %}
-    </div>
+  {% include 'partials/_kpi_cards.html' %}
 
+  <!-- Ações -->
+  <div class="flex flex-wrap items-center justify-end gap-3">
     <div class="flex flex-wrap items-center gap-2">
       {% if pode_solicitar_cadastro %}
       <a href="{% url 'professors:professor_solicitar_cadastro' %}"
         class="flex items-center justify-center gap-2 bg-[#ffb800] hover:bg-yellow-400 text-[#025c9f] px-4 py-2.5 rounded-xl text-sm font-black transition-colors shadow-md">
         <i class="ph ph-paper-plane-tilt"></i> Solicitar Cadastro de Professor
+      </a>
+      {% endif %}
+      {% if pode_solicitar_cadastro %}
+      <a href="{% url 'professors:professor_solicitar_cessao' %}"
+        class="flex items-center justify-center gap-2 bg-[#ffb800] hover:bg-yellow-400 text-[#025c9f] px-4 py-2.5 rounded-xl text-sm font-black transition-colors shadow-md">
+        <i class="ph ph-paper-plane-tilt"></i> Solicitar Professor de Outra Unidade
       </a>
       {% endif %}
       {% if pode_criar %}

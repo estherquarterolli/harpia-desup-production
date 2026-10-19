@@ -1,8 +1,11 @@
 import logging
 from decimal import Decimal
 from django import forms
-from django.db.models import Prefetch, Q
+from django.db.models import Count, Prefetch, Q
+from django.db.models import Exists, OuterRef
+from django.db.models.deletion import ProtectedError
 from django.http import Http404
+from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
@@ -88,7 +91,7 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
         ctx = super().get_context_data(**kwargs)
         from apps.professors.models import Professor
         from apps.professors.views import _bulk_ch_alocada, _bulk_ch_justificada
-        from apps.courses.models import MatrixComponent
+        from apps.allocations.services import alocacoes_vigentes
         from apps.core.models import Unidade
         from apps.core.priority1 import obter_resumo_prioridade1
 
@@ -138,17 +141,17 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
             ctx['conformidade'] = '0%'
 
         # Professores para a tabela de consulta
-        componentes_vigentes = MatrixComponent.objects.filter(
-            matriz__is_vigente=True,
-        ).select_related('componente_curricular')
+        componentes_vigentes = alocacoes_vigentes().select_related(
+            'componente_matriz', 'componente_matriz__componente_curricular'
+        )
         professores_qs = Professor.objects.select_related(
             'tipo_contrato', 'unidade_principal'
         ).prefetch_related(
             'unidades',
             Prefetch(
-                'componentes_matriz',
+                'alocacoes_turma_docente',
                 queryset=componentes_vigentes,
-                to_attr='componentes_vigentes',
+                to_attr='alocacoes_vigentes',
             ),
         ).order_by('rh_nome')
         ctx['unidades'] = unidades_ativas
@@ -162,9 +165,9 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
                 'prof': prof,
                 'units': prof.unidades_exibicao,
                 'subjects': sorted({
-                    componente.nome_disciplina
-                    for componente in prof.componentes_vigentes
-                    if componente.nome_disciplina
+                    linha.componente_matriz.nome_disciplina
+                    for linha in prof.alocacoes_vigentes
+                    if linha.componente_matriz.nome_disciplina
                 }),
                 'ch': prof.carga_total_efetiva,
             }
@@ -199,11 +202,21 @@ class AtalhoRemoveView(LoginRequiredMixin, PerfilRequiredMixin, View):
     """Remove um atalho do próprio usuário."""
     allowed_profiles = ['DESUP', 'COORDENADOR_UNIDADE']
 
+    def get(self, request, pk):
+        # A remoção só acontece por POST; abrir o endereço direto volta ao painel
+        # em vez de mostrar erro.
+        return redirect(_dashboard_atalhos_url_name(request.user))
+
     def post(self, request, pk):
         from apps.core.models import AtalhoDashboard
-        atalho = get_object_or_404(AtalhoDashboard, pk=pk, user=request.user)
-        atalho.delete()
-        messages.success(request, 'Atalho(s) removido(s).')
+        # Escopo no servidor: só apaga atalho do próprio usuário. Se ele não existe
+        # mais (outra aba, duplo clique) ou é de outro usuário, a resposta é a mesma,
+        # sem 404 e sem revelar se o id existe.
+        removidos, _ = AtalhoDashboard.objects.filter(pk=pk, user=request.user).delete()
+        if removidos:
+            messages.success(request, 'Atalho(s) removido(s).')
+        else:
+            messages.info(request, 'Este atalho já havia sido removido.')
         return redirect(_dashboard_atalhos_url_name(request.user))
 
 
@@ -221,20 +234,20 @@ class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, T
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         from apps.professors.models import Professor
-        from apps.courses.models import MatrixComponent
+        from apps.allocations.services import alocacoes_vigentes
 
-        componentes_vigentes = MatrixComponent.objects.filter(
-            matriz__is_vigente=True,
-        ).select_related('componente_curricular')
+        componentes_vigentes = alocacoes_vigentes().select_related(
+            'componente_matriz', 'componente_matriz__componente_curricular'
+        )
 
         qs = Professor.objects.select_related(
             'tipo_contrato', 'unidade_principal'
         ).prefetch_related(
             'unidades',
             Prefetch(
-                'componentes_matriz',
+                'alocacoes_turma_docente',
                 queryset=componentes_vigentes,
-                to_attr='componentes_vigentes',
+                to_attr='alocacoes_vigentes',
             ),
         ).order_by('rh_nome')
 
@@ -258,9 +271,9 @@ class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, T
                 'prof': prof,
                 'units': prof.unidades_exibicao,
                 'subjects': sorted({
-                    componente.nome_disciplina
-                    for componente in prof.componentes_vigentes
-                    if componente.nome_disciplina
+                    linha.componente_matriz.nome_disciplina
+                    for linha in prof.alocacoes_vigentes
+                    if linha.componente_matriz.nome_disciplina
                 }),
                 'ch': prof.carga_total_efetiva,
             }
@@ -293,6 +306,41 @@ class UnidadeListView(UnidadeBaseView, ListView):
     template_name = 'core/unidade_list.html'
     context_object_name = 'unidades'
     paginate_by = 18
+
+    def get_queryset(self):
+        from apps.core.busca import filtrar_contem
+
+        qs = Unidade.objects.annotate(
+            qtd_cursos=Count('course_units', filter=Q(course_units__ativo=True), distinct=True)
+        ).order_by('nome')
+        status = self.request.GET.get('status', '')
+        if status == 'ativa':
+            qs = qs.filter(status=True)
+        elif status == 'inativa':
+            qs = qs.filter(status=False)
+        return filtrar_contem(qs, self.request.GET.get('q', '').strip(), ['nome', 'sigla'])
+
+    def get_context_data(self, **kwargs):
+        from apps.courses.models import CourseUnit
+
+        ctx = super().get_context_data(**kwargs)
+        total = Unidade.objects.aggregate(
+            total=Count('pk'),
+            ativas=Count('pk', filter=Q(status=True)),
+            inativas=Count('pk', filter=Q(status=False)),
+        )
+        ctx['kpis'] = [
+            {'rotulo': 'Unidades', 'valor': total['total'], 'tom': 'azul', 'icone': 'ph-buildings'},
+            {'rotulo': 'Ativas', 'valor': total['ativas'], 'tom': 'verde', 'icone': 'ph-check-circle'},
+            {'rotulo': 'Inativas', 'valor': total['inativas'], 'tom': 'ambar', 'icone': 'ph-prohibit'},
+            {'rotulo': 'Cursos ativos', 'valor': CourseUnit.objects.filter(ativo=True).count(), 'tom': 'cinza', 'icone': 'ph-graduation-cap'},
+        ]
+        ctx['filtro_q'] = self.request.GET.get('q', '').strip()
+        ctx['filtro_status'] = self.request.GET.get('status', '')
+        params = self.request.GET.copy()
+        params.pop('page', None)
+        ctx['querystring'] = params.urlencode()
+        return ctx
 
 class UnidadeCreateView(UnidadeBaseView, CreateView):
     model = Unidade
@@ -813,7 +861,13 @@ class EquipeDiretivaDesupView(DesupPrioridade1Mixin, TemplateView):
         ctx = super().get_context_data(**kwargs)
         unidade_id = self.request.GET.get('unidade_id', '')
         hoje = timezone.localdate()
-        cargos = list(TipoCargoDiretivo.objects.order_by('ordem', 'nome'))
+        cargos = list(
+            TipoCargoDiretivo.objects.annotate(
+                tem_ocupacoes=Exists(
+                    OcupacaoEquipeDiretiva.objects.filter(cargo_id=OuterRef('pk'))
+                )
+            ).order_by('ordem', 'nome')
+        )
         unidade_selecionada = None
         if unidade_id.isdigit():
             unidade_selecionada = Unidade.objects.filter(pk=unidade_id, status=True).first()
@@ -837,10 +891,8 @@ class EquipeDiretivaDesupView(DesupPrioridade1Mixin, TemplateView):
                 item = {
                     'cargo': cargo,
                     'ocupantes': ocupantes,
-                    # Cargos por curso ou com múltiplos ocupantes aceitam novas
-                    # ocupações mesmo já preenchidos.
                     'pode_adicionar': cargo.ativo and (
-                        not ocupantes or cargo.exige_curso or cargo.permite_multiplos
+                        not ocupantes or cargo.permite_multiplos
                     ),
                 }
                 if item['pode_adicionar']:
@@ -866,6 +918,11 @@ class EquipeDiretivaDesupView(DesupPrioridade1Mixin, TemplateView):
             'reducao_total': reducao_total,
             'unidades': Unidade.objects.filter(status=True).order_by('nome'),
             'filtro_unidade': unidade_id,
+            'retorno': (
+                f"{reverse_lazy('core:equipe_diretiva_desup')}?unidade_id={unidade_selecionada.pk}"
+                if unidade_selecionada
+                else reverse_lazy('core:equipe_diretiva_desup')
+            ),
         })
         return ctx
 
@@ -916,6 +973,41 @@ class TipoCargoDiretivoUpdateView(DesupPrioridade1Mixin, RetornoOrigemMixin, Upd
         )
         messages.success(self.request, 'Tipo de cargo atualizado com sucesso.')
         return response
+
+
+class TipoCargoDiretivoDeleteView(DesupPrioridade1Mixin, View):
+    http_method_names = ['post', 'head', 'options']
+
+    def post(self, request, *args, **kwargs):
+        from django.db import transaction
+        from .models import TipoCargoDiretivo
+        from .services import registrar_evento_prioridade1
+
+        cargo = get_object_or_404(TipoCargoDiretivo, pk=kwargs['pk'])
+        cargo_id = cargo.pk
+        nome_cargo = cargo.nome
+        # O cargo pode ser excluído mesmo com ocupantes: as ocupações dele (vigentes e
+        # históricas) são removidas junto, na mesma transação, e a quantidade fica na auditoria.
+        with transaction.atomic():
+            ocupacoes_removidas, _ = cargo.ocupacoes.all().delete()
+            cargo.delete()
+        detalhe = f'Cargo {cargo_id}: {nome_cargo}.'
+        if ocupacoes_removidas:
+            detalhe += f' {ocupacoes_removidas} ocupação(ões) removida(s) junto com o cargo.'
+        registrar_evento_prioridade1(request, 'CARGO_DIRETIVO_EXCLUIDO', detalhe)
+        messages.success(
+            request,
+            'Cargo excluído com sucesso.' if not ocupacoes_removidas
+            else f'Cargo excluído com sucesso, junto com {ocupacoes_removidas} ocupação(ões).',
+        )
+        destino = request.POST.get('next', '')
+        if destino and url_has_allowed_host_and_scheme(
+            destino,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            return HttpResponseRedirect(destino)
+        return HttpResponseRedirect(reverse_lazy('core:equipe_diretiva_desup'))
 
 
 class OcupacaoEquipeDiretivaCreateView(DesupPrioridade1Mixin, CreateView):
@@ -1002,18 +1094,32 @@ class SolicitacaoProfessorExternoDesupView(DesupPrioridade1Mixin, TemplateView):
         ctx = super().get_context_data(**kwargs)
         status = self.request.GET.get('status', SolicitacaoProfessorExterno.StatusChoices.PENDENTE)
         unidade_id = self.request.GET.get('unidade_id', '')
+        tipo = self.request.GET.get('tipo', '')
         qs = SolicitacaoProfessorExterno.objects.select_related(
             'professor', 'unidade_solicitante', 'unidade_origem', 'solicitado_por', 'decidido_por'
         )
         if status in SolicitacaoProfessorExterno.StatusChoices.values:
             qs = qs.filter(status=status)
+        if tipo in SolicitacaoProfessorExterno.TipoChoices.values:
+            qs = qs.filter(tipo=tipo)
         if unidade_id.isdigit():
             qs = qs.filter(unidade_solicitante_id=unidade_id)
+        totais = dict(
+            SolicitacaoProfessorExterno.objects.values_list('status').annotate(n=Count('pk'))
+        )
+        Status = SolicitacaoProfessorExterno.StatusChoices
         ctx.update({
+            'kpis': [
+                {'rotulo': 'Pendentes', 'valor': totais.get(Status.PENDENTE, 0), 'tom': 'ambar', 'icone': 'ph-clock'},
+                {'rotulo': 'Aprovadas', 'valor': totais.get(Status.APROVADA, 0), 'tom': 'verde', 'icone': 'ph-check-circle'},
+                {'rotulo': 'Recusadas', 'valor': totais.get(Status.RECUSADA, 0), 'tom': 'vermelho', 'icone': 'ph-x-circle'},
+            ],
             'solicitacoes': Paginator(qs, 25).get_page(self.request.GET.get('page')),
             'unidades': Unidade.objects.filter(status=True).order_by('nome'),
             'status_choices': SolicitacaoProfessorExterno.StatusChoices.choices,
+            'tipo_choices': SolicitacaoProfessorExterno.TipoChoices.choices,
             'filtro_status': status,
+            'filtro_tipo': tipo,
             'filtro_unidade': unidade_id,
         })
         return ctx
@@ -1057,10 +1163,16 @@ class AlertasCargaDesupView(DesupPrioridade1Mixin, TemplateView):
         ctx = super().get_context_data(**kwargs)
         hoje = timezone.localdate()
         unidade_id = self.request.GET.get('unidade_id', '')
+        curso_id = self.request.GET.get('curso_id', '')
+        curso_id = curso_id if curso_id.isdigit() else ''
+        from apps.courses.models import Course
+        cursos_filtro = Course.objects.order_by('sigla')
+        if unidade_id.isdigit():
+            cursos_filtro = cursos_filtro.filter(course_units__unidade_id=unidade_id).distinct()
         resumo = obter_resumo_prioridade1(
             unidade_id=unidade_id if unidade_id.isdigit() else None,
             semestre=self.request.GET.get('semestre') or None,
-            curso_id=self.request.GET.get('curso_id') or None,
+            curso_id=curso_id or None,
             turno=self.request.GET.get('turno') or None,
             status=self.request.GET.get('status') or None,
         )
@@ -1089,7 +1201,9 @@ class AlertasCargaDesupView(DesupPrioridade1Mixin, TemplateView):
             'readaptacoes': readaptacoes,
             'excecoes_pendentes': excecoes[:100],
             'unidades': Unidade.objects.filter(status=True).order_by('nome'),
+            'cursos': cursos_filtro,
             'filtro_unidade': unidade_id,
+            'filtro_curso': curso_id,
             'hoje': hoje,
         })
         return ctx
@@ -1239,4 +1353,3 @@ class ExcecaoCargaDecidirView(DesupPrioridade1Mixin, View):
         else:
             messages.success(request, f'Exceção {excecao.get_status_display().lower()} com sucesso.')
         return redirect('core:alertas_carga_desup')
-

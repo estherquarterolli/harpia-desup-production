@@ -87,6 +87,12 @@ class BaseE2ETestCase(TestCase):
 
 
 class AlocacaoFixtureMixin:
+    @staticmethod
+    def _docente_do_componente(componente):
+        from apps.allocations.models import AlocacaoTurmaDocente
+        linha = AlocacaoTurmaDocente.objects.filter(componente_matriz=componente).order_by('pk').first()
+        return linha.docente if linha else None
+
     """
     Monta o mínimo necessário para exercitar a rota real que o coordenador usa
     e que é protegida pela janela de entrega: alocar um docente num componente
@@ -472,7 +478,7 @@ class JornadaCicloDeVidaJanelaTests(AlocacaoFixtureMixin, BaseE2ETestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp['HX-Refresh'], 'true')
         self.fixture['matrix_component'].refresh_from_db()
-        self.assertEqual(self.fixture['matrix_component'].docente, self.fixture['professor'])
+        self.assertEqual(self._docente_do_componente(self.fixture['matrix_component']), self.fixture['professor'])
         self.assertFalse(Notificacao.objects.filter(titulo__icontains='Tentativa bloqueada').exists())
 
         # ── DESUP fecha a janela pela tela de edição ─────────────────────────
@@ -735,7 +741,7 @@ class JornadaBloqueioNotificaDesupTests(AlocacaoFixtureMixin, BaseE2ETestCase):
         # 1) A ação foi barrada.
         self.assertEqual(resp.status_code, 302)
         self.fixture['matrix_component'].refresh_from_db()
-        self.assertIsNone(self.fixture['matrix_component'].docente)
+        self.assertIsNone(self._docente_do_componente(self.fixture['matrix_component']))
 
         # 2) O coordenador vê a mensagem de bloqueio.
         self.assertIn(
@@ -773,7 +779,7 @@ class JornadaBloqueioNotificaDesupTests(AlocacaoFixtureMixin, BaseE2ETestCase):
 
         self.assertEqual(resp.status_code, 200)
         self.fixture['matrix_component'].refresh_from_db()
-        self.assertEqual(self.fixture['matrix_component'].docente, self.fixture['professor'])
+        self.assertEqual(self._docente_do_componente(self.fixture['matrix_component']), self.fixture['professor'])
         self.assertFalse(Notificacao.objects.filter(titulo__startswith='Tentativa bloqueada').exists())
 
     def test_cada_tentativa_bloqueada_gera_um_novo_registro(self):
@@ -1140,6 +1146,28 @@ class JornadaAtalhosDashboardTests(BaseE2ETestCase):
 
         self.assertEqual(resp.context['atalhos_user'], [])
         self.assertIn('unidade_list', {op['chave'] for op in resp.context['atalhos_disponiveis']})
+
+
+    def test_remover_atalho_inexistente_ou_de_outro_usuario_nao_da_404(self):
+        outro = self.criar_desup('e2e_atalho_desup3@teste.com')
+        alheio = AtalhoDashboard.objects.create(user=outro, chave='unidade_list', ordem=0)
+        self.client.force_login(self.desup)
+
+        resp_inexistente = self.client.post(reverse('core:atalho_remove', kwargs={'pk': 999999}))
+        resp_alheio = self.client.post(reverse('core:atalho_remove', kwargs={'pk': alheio.pk}))
+
+        self.assertRedirects(resp_inexistente, self.url_dashboard)
+        self.assertRedirects(resp_alheio, self.url_dashboard)
+        self.assertTrue(AtalhoDashboard.objects.filter(pk=alheio.pk).exists())
+
+    def test_abrir_endereco_de_remocao_por_get_volta_ao_painel(self):
+        atalho = AtalhoDashboard.objects.create(user=self.desup, chave='janela_list', ordem=0)
+        self.client.force_login(self.desup)
+
+        resp = self.client.get(reverse('core:atalho_remove', kwargs={'pk': atalho.pk}))
+
+        self.assertRedirects(resp, self.url_dashboard)
+        self.assertTrue(AtalhoDashboard.objects.filter(pk=atalho.pk).exists())
 
 
 # ══════════════════════════════════════════════════════════════════════════════

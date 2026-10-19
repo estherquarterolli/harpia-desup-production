@@ -48,21 +48,19 @@ class TipoCargoDiretivo(models.Model):
     )
     exige_curso = models.BooleanField(
         default=False,
-        verbose_name="Exige curso",
-        help_text="Use para cargos como Coordenação de Curso.",
+        verbose_name="Cargo por curso",
+        help_text="Ao preencher o cargo, será necessário escolher um curso da unidade.",
     )
     permite_multiplos = models.BooleanField(
         default=False,
-        verbose_name="Permite ocupantes simultâneos",
-        help_text=(
-            "Quando desmarcado, o sistema impede duas ocupações vigentes do mesmo "
-            "cargo na mesma unidade e, quando aplicável, no mesmo curso."
-        ),
+        verbose_name="Permite mais de um ocupante",
+        help_text="Marque para permitir mais de um ocupante vigente ao mesmo tempo.",
     )
     ativo = models.BooleanField(
         default=True,
         db_index=True,
-        verbose_name="Disponível para novas ocupações",
+        verbose_name="Ativo",
+        help_text="Cargos inativos permanecem no histórico, mas não recebem novos ocupantes.",
     )
     ordem = models.PositiveSmallIntegerField(default=100, verbose_name="Ordem de exibição")
     criado_em = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
@@ -125,7 +123,7 @@ class OcupacaoEquipeDiretiva(models.Model):
         null=True,
         blank=True,
         related_name="ocupacoes_diretivas",
-        verbose_name="Curso na unidade",
+        verbose_name="Curso",
     )
     data_inicio = models.DateField(verbose_name="Início da vigência")
     data_fim = models.DateField(null=True, blank=True, verbose_name="Fim da vigência")
@@ -183,12 +181,11 @@ class OcupacaoEquipeDiretiva(models.Model):
             cargo_id=self.cargo_id,
         ).exclude(pk=self.pk)
 
-        if self.cargo.exige_curso:
-            conflitos = conflitos.filter(curso_id=self.curso_id)
-        else:
-            conflitos = conflitos.filter(curso__isnull=True)
-
         if self.cargo.permite_multiplos:
+            if self.cargo.exige_curso:
+                conflitos = conflitos.filter(curso_id=self.curso_id)
+            else:
+                conflitos = conflitos.filter(curso__isnull=True)
             conflitos = conflitos.filter(professor_id=self.professor_id)
 
         if self.data_fim:
@@ -235,7 +232,7 @@ class OcupacaoEquipeDiretiva(models.Model):
 
 
 class SolicitacaoProfessorExterno(models.Model):
-    """Solicitação formal para vincular um professor a outra unidade."""
+    """Solicitação à DESUP: cessão de professor de outra unidade ou cadastro de professor novo."""
 
     class StatusChoices(models.TextChoices):
         PENDENTE = "PENDENTE", "Pendente"
@@ -243,23 +240,45 @@ class SolicitacaoProfessorExterno(models.Model):
         RECUSADA = "RECUSADA", "Recusada"
         CANCELADA = "CANCELADA", "Cancelada"
 
+    class TipoChoices(models.TextChoices):
+        CESSAO = "CESSAO", "Cessão de professor"
+        CADASTRO = "CADASTRO", "Cadastro de professor"
+
+    tipo = models.CharField(
+        max_length=10,
+        choices=TipoChoices.choices,
+        default=TipoChoices.CESSAO,
+        db_index=True,
+        verbose_name="Tipo",
+    )
     unidade_solicitante = models.ForeignKey(
         Unidade,
         on_delete=models.PROTECT,
         related_name="solicitacoes_professor_enviadas",
         verbose_name="Unidade solicitante",
     )
+    # Nulos nas solicitações de cadastro: o professor ainda não existe no sistema.
     unidade_origem = models.ForeignKey(
         Unidade,
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name="solicitacoes_professor_recebidas",
         verbose_name="Unidade de origem",
     )
     professor = models.ForeignKey(
         "professors.Professor",
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name="solicitacoes_externas",
         verbose_name="Professor",
+    )
+    professor_nome = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Nome do professor informado",
+        help_text="Usado nas solicitações de cadastro.",
     )
     semestre = models.CharField(
         max_length=6,
@@ -299,8 +318,8 @@ class SolicitacaoProfessorExterno(models.Model):
 
     class Meta:
         db_table = "harpiadb_nucleo_solicitacao_professor_externo"
-        verbose_name = "Solicitação de professor externo"
-        verbose_name_plural = "Solicitações de professor externo"
+        verbose_name = "Solicitação"
+        verbose_name_plural = "Solicitações"
         ordering = ["-criado_em"]
         constraints = [
             models.CheckConstraint(
@@ -328,6 +347,11 @@ class SolicitacaoProfessorExterno(models.Model):
         ):
             erros["unidade_solicitante"] = "A unidade solicitante deve ser diferente da unidade de origem."
 
+        if self.tipo == self.TipoChoices.CESSAO and not (self.professor_id and self.unidade_origem_id):
+            erros["professor"] = "Informe o professor e a unidade de origem da cessão."
+        if self.tipo == self.TipoChoices.CADASTRO and not self.professor_nome.strip():
+            erros["professor_nome"] = "Informe o nome do professor a cadastrar."
+
         if self.professor_id and self.unidade_origem_id:
             vinculado = (
                 self.professor.unidade_principal_id == self.unidade_origem_id
@@ -339,8 +363,14 @@ class SolicitacaoProfessorExterno(models.Model):
         if erros:
             raise ValidationError(erros)
 
+    @property
+    def nome_professor(self):
+        return self.professor.nome if self.professor_id else self.professor_nome
+
     def __str__(self):
-        return f"{self.professor.nome}: {self.unidade_origem.sigla} -> {self.unidade_solicitante.sigla}"
+        if self.unidade_origem_id:
+            return f"{self.nome_professor}: {self.unidade_origem.sigla} -> {self.unidade_solicitante.sigla}"
+        return f"{self.nome_professor}: cadastro para {self.unidade_solicitante.sigla}"
 
 
 class LimiteCargaUnidade(models.Model):
@@ -795,4 +825,3 @@ class AtalhoDashboard(models.Model):
 
     def __str__(self):
         return f"{self.user_id}:{self.chave}"
-

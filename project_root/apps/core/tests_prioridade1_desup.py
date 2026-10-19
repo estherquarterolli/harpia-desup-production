@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.courses.models import Course, CourseUnit
 from apps.professors.models import ContractType, Professor
 
 from .models import (
@@ -62,21 +63,140 @@ class Prioridade1DesupTests(TestCase):
         self.professor.unidades.add(self.origem)
 
     def test_paginas_da_prioridade_um_sao_exclusivas_da_desup(self):
+        cargo = TipoCargoDiretivo.objects.create(nome="Cargo para teste", codigo="CARGO_TESTE")
         urls = (
             reverse("core:equipe_diretiva_desup"),
             reverse("core:solicitacao_professor_list"),
             reverse("core:alertas_carga_desup"),
         )
+        url_excluir_cargo = reverse("core:cargo_diretivo_delete", args=[cargo.pk])
 
         self.client.force_login(self.coordenador)
         for url in urls:
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 403)
+        self.assertEqual(self.client.post(url_excluir_cargo).status_code, 403)
 
         self.client.force_login(self.desup)
         for url in urls:
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_formulario_de_cargo_por_curso_lista_cursos_ativos_da_unidade(self):
+        from .forms import OcupacaoEquipeDiretivaForm
+
+        curso = Course.objects.create(nome="Curso de Teste", sigla="CT")
+        curso_unidade = CourseUnit.objects.create(curso=curso, unidade=self.origem)
+        cargo = TipoCargoDiretivo.objects.create(
+            nome="Coordenação por Curso",
+            codigo="COORDENACAO_POR_CURSO",
+            exige_curso=True,
+        )
+
+        form = OcupacaoEquipeDiretivaForm(unidade=self.origem, cargo=cargo)
+
+        self.assertTrue(form.fields["curso"].required)
+        self.assertEqual(list(form.fields["curso"].queryset), [curso_unidade])
+        self.assertEqual(form.fields["curso"].label, "Curso")
+        self.assertIn("curso ativo desta unidade", form.fields["curso"].help_text)
+
+    def test_formulario_informa_quando_unidade_nao_tem_curso_ativo(self):
+        from .forms import OcupacaoEquipeDiretivaForm
+
+        cargo = TipoCargoDiretivo.objects.create(
+            nome="Coordenação sem Curso Ativo",
+            codigo="COORDENACAO_SEM_CURSO_ATIVO",
+            exige_curso=True,
+        )
+
+        form = OcupacaoEquipeDiretivaForm(unidade=self.origem, cargo=cargo)
+
+        self.assertEqual(form.fields["curso"].queryset.count(), 0)
+        self.assertIn("Nenhum curso ativo cadastrado", form.fields["curso"].help_text)
+
+    def test_configuracao_de_cargo_nao_exibe_ordem_ou_catalogo_de_cursos(self):
+        curso = Course.objects.create(nome="Curso Oculto", sigla="CO")
+        CourseUnit.objects.create(curso=curso, unidade=self.origem)
+        cargo = TipoCargoDiretivo.objects.create(
+            nome="Coordenação de Curso sem Catálogo",
+            codigo="COORDENACAO_SEM_CATALOGO",
+            exige_curso=True,
+        )
+        self.client.force_login(self.desup)
+
+        resposta = self.client.get(
+            f"{reverse('core:equipe_diretiva_desup')}?unidade_id={self.origem.pk}"
+        )
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertNotContains(resposta, "Ordem de exibição")
+        self.assertNotContains(resposta, "Cursos ativos por unidade")
+
+    def test_desup_exclui_cargo_sem_ocupacoes(self):
+        cargo = TipoCargoDiretivo.objects.create(nome="Cargo Excluível", codigo="EXCLUIVEL")
+        self.client.force_login(self.desup)
+
+        resposta = self.client.post(
+            reverse("core:cargo_diretivo_delete", args=[cargo.pk]),
+            {"next": f"{reverse('core:equipe_diretiva_desup')}?unidade_id={self.origem.pk}"},
+        )
+
+        self.assertRedirects(
+            resposta,
+            f"{reverse('core:equipe_diretiva_desup')}?unidade_id={self.origem.pk}",
+        )
+        self.assertFalse(TipoCargoDiretivo.objects.filter(pk=cargo.pk).exists())
+
+    def test_cargo_com_ocupantes_pode_ser_excluido_junto_com_as_ocupacoes(self):
+        cargo = TipoCargoDiretivo.objects.create(nome="Cargo com Histórico", codigo="COM_HISTORICO")
+        OcupacaoEquipeDiretiva.objects.create(
+            unidade=self.origem,
+            cargo=cargo,
+            professor=self.professor,
+            data_inicio=self.hoje,
+            criado_por=self.desup,
+        )
+        self.client.force_login(self.desup)
+
+        resposta = self.client.post(
+            reverse("core:cargo_diretivo_delete", args=[cargo.pk]),
+        )
+
+        self.assertRedirects(resposta, reverse("core:equipe_diretiva_desup"))
+        self.assertFalse(TipoCargoDiretivo.objects.filter(pk=cargo.pk).exists())
+        self.assertFalse(OcupacaoEquipeDiretiva.objects.filter(cargo_id=cargo.pk).exists())
+        # A pessoa e a unidade continuam cadastradas: só a ocupação do cargo some.
+        self.assertTrue(Professor.objects.filter(pk=self.professor.pk).exists())
+
+    def test_modal_de_edicao_oferece_excluir_mesmo_com_ocupantes(self):
+        cargo = TipoCargoDiretivo.objects.create(nome="Cargo Preenchido", codigo="PREENCHIDO")
+        OcupacaoEquipeDiretiva.objects.create(
+            unidade=self.origem, cargo=cargo, professor=self.professor,
+            data_inicio=self.hoje, criado_por=self.desup,
+        )
+        self.client.force_login(self.desup)
+
+        resposta = self.client.get(
+            f"{reverse('core:equipe_diretiva_desup')}?unidade_id={self.origem.pk}"
+        )
+
+        self.assertContains(resposta, reverse("core:cargo_diretivo_delete", args=[cargo.pk]))
+        self.assertContains(resposta, "Excluir cargo")
+        self.assertNotContains(resposta, "não pode ser excluído")
+
+    def test_ocupacoes_de_outro_cargo_nao_sao_afetadas_pela_exclusao(self):
+        excluido = TipoCargoDiretivo.objects.create(nome="Cargo A", codigo="CARGO_A")
+        mantido = TipoCargoDiretivo.objects.create(nome="Cargo B", codigo="CARGO_B")
+        for cargo in (excluido, mantido):
+            OcupacaoEquipeDiretiva.objects.create(
+                unidade=self.origem, cargo=cargo, professor=self.professor,
+                data_inicio=self.hoje, criado_por=self.desup,
+            )
+        self.client.force_login(self.desup)
+
+        self.client.post(reverse("core:cargo_diretivo_delete", args=[excluido.pk]))
+
+        self.assertEqual(OcupacaoEquipeDiretiva.objects.filter(cargo=mantido).count(), 1)
 
     def test_ocupacao_diretiva_impede_sobreposicao(self):
         cargo = TipoCargoDiretivo.objects.create(
@@ -101,6 +221,55 @@ class Prioridade1DesupTests(TestCase):
 
         with self.assertRaises(ValidationError):
             conflitante.full_clean()
+
+    def test_cargo_sem_multiplos_bloqueia_outra_ocupacao_em_outro_curso(self):
+        curso_a = Course.objects.create(nome="Curso A", sigla="CA")
+        curso_b = Course.objects.create(nome="Curso B", sigla="CB")
+        course_unit_a = CourseUnit.objects.create(curso=curso_a, unidade=self.origem)
+        course_unit_b = CourseUnit.objects.create(curso=curso_b, unidade=self.origem)
+        cargo = TipoCargoDiretivo.objects.create(
+            nome="Coordenação exclusiva por curso",
+            codigo="COORDENACAO_EXCLUSIVA",
+            exige_curso=True,
+            permite_multiplos=False,
+        )
+        OcupacaoEquipeDiretiva.objects.create(
+            unidade=self.origem,
+            cargo=cargo,
+            professor=self.professor,
+            curso=course_unit_a,
+            data_inicio=self.hoje,
+            criado_por=self.desup,
+        )
+        self.client.force_login(self.desup)
+        resposta = self.client.get(
+            f"{reverse('core:equipe_diretiva_desup')}?unidade_id={self.origem.pk}"
+        )
+        item_cargo = next(
+            item for item in resposta.context["composicao"]
+            if item["cargo"].pk == cargo.pk
+        )
+        self.assertFalse(item_cargo["pode_adicionar"])
+        self.assertNotIn("form", item_cargo)
+
+        segunda_ocupacao = OcupacaoEquipeDiretiva(
+            unidade=self.origem,
+            cargo=cargo,
+            professor=self.professor,
+            curso=course_unit_b,
+            data_inicio=self.hoje,
+            criado_por=self.desup,
+        )
+
+        with self.assertRaises(ValidationError):
+            segunda_ocupacao.full_clean()
+
+    def test_formulario_de_cargo_oculta_ordem_de_exibicao(self):
+        from .forms import TipoCargoDiretivoForm
+
+        form = TipoCargoDiretivoForm()
+
+        self.assertNotIn("ordem", form.fields)
 
     def test_desup_ajusta_reducao_sem_alterar_ocupante_ou_unidade(self):
         cargo = TipoCargoDiretivo.objects.create(
@@ -300,3 +469,21 @@ class Prioridade1DesupTests(TestCase):
         solicitacao.refresh_from_db()
         self.assertEqual(solicitacao.status, SolicitacaoProfessorExterno.StatusChoices.PENDENTE)
 
+    def test_barra_de_reducao_aparece_ao_preencher_e_ao_ajustar_o_cargo(self):
+        cargo = TipoCargoDiretivo.objects.create(nome="Cargo Barra", codigo="CARGO_BARRA")
+        ocupacao = OcupacaoEquipeDiretiva.objects.create(
+            unidade=self.origem, cargo=cargo, professor=self.professor,
+            data_inicio=self.hoje, carga_reducao_horas=9.5, criado_por=self.desup,
+        )
+        TipoCargoDiretivo.objects.create(nome="Cargo Vago", codigo="CARGO_VAGO_BARRA")
+        self.client.force_login(self.desup)
+
+        html = self.client.get(
+            f"{reverse('core:equipe_diretiva_desup')}?unidade_id={self.origem.pk}"
+        ).content.decode()
+
+        # Uma barra no modal de preenchimento e outra no de ajuste de redução da ocupação.
+        self.assertGreaterEqual(html.count('class="reducao-ctl'), 2)
+        self.assertIn(f'id="{ocupacao.pk}-reducao"', html)
+        self.assertIn('Redução total (20 h)', html)
+        self.assertNotIn('max="168"', html.split('modalPreencher')[1].split('</form>')[0])

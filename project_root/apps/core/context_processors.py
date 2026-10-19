@@ -95,3 +95,19 @@ def delivery_window_context(request):
         logger.exception("Erro ao carregar contexto da janela de entrega")
 
     return {}
+
+
+def ajuda_pagina(request):
+    """Conteúdo do tutorial ("?") da página atual, somente para o perfil DESUP."""
+    user = getattr(request, 'user', None)
+    match = getattr(request, 'resolver_match', None)
+    if not (user and user.is_authenticated and match):
+        return {}
+    if getattr(user, 'perfil', None) != 'DESUP':
+        return {}
+    from apps.core.ajuda import AJUDA_PAGINAS, passos_resolvidos
+
+    conteudo = AJUDA_PAGINAS.get(match.view_name)
+    if not conteudo:
+        return {}
+    return {'ajuda_pagina': {**conteudo, 'passos': passos_resolvidos(conteudo)}}

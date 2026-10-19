@@ -127,13 +127,12 @@ class JanelaEntregaForm(JanelaEntregaValidacaoMixin, forms.ModelForm):
 class TipoCargoDiretivoForm(forms.ModelForm):
     class Meta:
         model = TipoCargoDiretivo
-        fields = ["nome", "exige_curso", "permite_multiplos", "ativo", "ordem"]
+        fields = ["nome", "exige_curso", "permite_multiplos", "ativo"]
         widgets = {
             "nome": forms.TextInput(attrs={"class": _INPUT_CSS}),
             "exige_curso": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
             "permite_multiplos": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
             "ativo": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
-            "ordem": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": 0}),
         }
 
 
@@ -148,7 +147,7 @@ class OcupacaoEquipeDiretivaForm(forms.ModelForm):
             "curso": forms.Select(attrs={"class": _SELECT_CSS}),
             "data_inicio": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
             "data_fim": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
-            "carga_reducao_horas": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": "0", "max": "168", "step": "0.25"}),
+            "carga_reducao_horas": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": "0", "max": "20", "step": "0.25"}),
             "observacoes": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 3}),
         }
 
@@ -167,9 +166,16 @@ class OcupacaoEquipeDiretivaForm(forms.ModelForm):
         ).distinct().order_by("rh_nome")
         if cargo.exige_curso:
             self.fields["curso"].required = True
-            self.fields["curso"].queryset = CourseUnit.objects.filter(
+            cursos_unidade = CourseUnit.objects.filter(
                 unidade=unidade, ativo=True,
             ).select_related("curso", "unidade").order_by("curso__nome")
+            self.fields["curso"].queryset = cursos_unidade
+            self.fields["curso"].label = "Curso"
+            self.fields["curso"].help_text = (
+                "Selecione um curso ativo desta unidade."
+                if cursos_unidade.exists()
+                else "Nenhum curso ativo cadastrado nesta unidade. Cadastre ou ative um curso antes de preencher este cargo."
+            )
         else:
             del self.fields["curso"]
 
@@ -179,7 +185,7 @@ class ReducaoOcupacaoEquipeDiretivaForm(forms.ModelForm):
         model = OcupacaoEquipeDiretiva
         fields = ["carga_reducao_horas", "observacoes"]
         widgets = {
-            "carga_reducao_horas": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": "0", "max": "168", "step": "0.25"}),
+            "carga_reducao_horas": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": "0", "max": "20", "step": "0.25"}),
             "observacoes": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 3}),
         }
 

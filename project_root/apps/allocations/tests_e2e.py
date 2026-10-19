@@ -29,7 +29,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.models import User
-from apps.allocations.models import AlocacaoCurricular
+from apps.allocations.models import AlocacaoCurricular, AlocacaoTurmaDocente, Carencia
+from apps.allocations.services import atribuir_docente
 from apps.core.models import JanelaEntrega, Notificacao, Unidade
 from apps.courses.models import (
     Course,
@@ -163,6 +164,21 @@ class AlocacaoE2EBase(TestCase):
     def _url_alocar(self, componente):
         return reverse('alocar_docente_componente', kwargs={'pk': componente.pk})
 
+    def _url_turmas(self, componente):
+        return reverse('quantidade_turmas_componente', kwargs={'pk': componente.pk})
+
+    def _atribuir(self, componente, professor):
+        """Fixture: aloca o professor no componente (equivale a `componente.docente = ...`)."""
+        atribuir_docente(componente, professor)
+        componente.refresh_from_db()
+
+    def _docente(self, componente):
+        """Docente da primeira linha de alocação do componente (ou None)."""
+        linha = AlocacaoTurmaDocente.objects.filter(
+            componente_matriz=componente
+        ).order_by('pk').first()
+        return linha.docente if linha else None
+
     def _mensagens(self, response):
         return [str(m) for m in get_messages(response.wsgi_request)]
 
@@ -214,7 +230,7 @@ class JornadaAlocacaoCurricularE2ETests(AlocacaoE2EBase):
         self.assertEqual(resposta['HX-Refresh'], 'true')
 
         self.comp_algoritmos.refresh_from_db()
-        self.assertEqual(self.comp_algoritmos.docente, self.prof_a1)
+        self.assertEqual(self._docente(self.comp_algoritmos), self.prof_a1)
         self.assertEqual(self.comp_algoritmos.status, MatrixComponent.StatusChoices.COMPLETO)
 
         # A CH alocada do docente sobe (80h semestrais / 20 semanas = 4 HA/sem).
@@ -229,7 +245,7 @@ class JornadaAlocacaoCurricularE2ETests(AlocacaoE2EBase):
         )
         self.assertEqual(resposta.status_code, 200)
         self.comp_banco.refresh_from_db()
-        self.assertIsNone(self.comp_banco.docente)
+        self.assertIsNone(self._docente(self.comp_banco))
         self.assertEqual(self.comp_banco.status, MatrixComponent.StatusChoices.SEM_PROFESSOR)
 
         # 4) Marca o terceiro como NÃO OFERECIDA.
@@ -239,7 +255,7 @@ class JornadaAlocacaoCurricularE2ETests(AlocacaoE2EBase):
         )
         self.assertEqual(resposta.status_code, 200)
         self.comp_redes.refresh_from_db()
-        self.assertIsNone(self.comp_redes.docente)
+        self.assertIsNone(self._docente(self.comp_redes))
         self.assertEqual(self.comp_redes.status, MatrixComponent.StatusChoices.NAO_OFERECIDA)
 
         # 5) Confere os estados na tela: só o SEM_PROFESSOR conta como pendência
@@ -263,15 +279,13 @@ class JornadaAlocacaoCurricularE2ETests(AlocacaoE2EBase):
     def test_post_sem_docente_id_cai_no_estado_sem_professor(self):
         """`docente_id` vazio equivale a marcar o componente como Sem professor."""
         self.client.force_login(self.coord_a)
-        self.comp_algoritmos.docente = self.prof_a1
-        self.comp_algoritmos.status = MatrixComponent.StatusChoices.COMPLETO
-        self.comp_algoritmos.save()
+        self._atribuir(self.comp_algoritmos, self.prof_a1)
 
         resposta = self.client.post(self._url_alocar(self.comp_algoritmos), {})
 
         self.assertEqual(resposta.status_code, 200)
         self.comp_algoritmos.refresh_from_db()
-        self.assertIsNone(self.comp_algoritmos.docente)
+        self.assertIsNone(self._docente(self.comp_algoritmos))
         self.assertEqual(self.comp_algoritmos.status, MatrixComponent.StatusChoices.SEM_PROFESSOR)
         self.prof_a1.refresh_from_db()
         self.assertEqual(self.prof_a1.ch_alocada, 0)
@@ -353,19 +367,17 @@ class LiberarAlocacaoE2ETests(AlocacaoE2EBase):
         )
         self.assertEqual(resposta.status_code, 200)
         self.comp_algoritmos.refresh_from_db()
-        self.assertEqual(self.comp_algoritmos.docente, self.prof_a1)
+        self.assertEqual(self._docente(self.comp_algoritmos), self.prof_a1)
 
     def test_liberar_nao_altera_os_componentes_ja_alocados(self):
         """Liberar mexe apenas no consolidado; os componentes seguem como estavam."""
-        self.comp_algoritmos.docente = self.prof_a1
-        self.comp_algoritmos.status = MatrixComponent.StatusChoices.COMPLETO
-        self.comp_algoritmos.save()
+        self._atribuir(self.comp_algoritmos, self.prof_a1)
         self.client.force_login(self.desup)
 
         self.client.post(self.url_liberar)
 
         self.comp_algoritmos.refresh_from_db()
-        self.assertEqual(self.comp_algoritmos.docente, self.prof_a1)
+        self.assertEqual(self._docente(self.comp_algoritmos), self.prof_a1)
         self.assertEqual(self.comp_algoritmos.status, MatrixComponent.StatusChoices.COMPLETO)
 
     def test_coordenador_de_unidade_nao_pode_liberar(self):
@@ -398,9 +410,7 @@ class AprovarAlocacaoUnidadeE2ETests(AlocacaoE2EBase):
             (self.comp_algoritmos, self.prof_a1),
             (self.comp_banco, self.prof_a2),
         ):
-            componente.docente = docente
-            componente.status = MatrixComponent.StatusChoices.COMPLETO
-            componente.save()
+            self._atribuir(componente, docente)
         self.comp_redes.status = MatrixComponent.StatusChoices.NAO_OFERECIDA
         self.comp_redes.save()
 
@@ -426,15 +436,15 @@ class AprovarAlocacaoUnidadeE2ETests(AlocacaoE2EBase):
         self.assertFalse(AlocacaoCurricular.objects.filter(unidade=self.unidade_b).exists())
 
     def test_desup_nao_aprova_com_componente_sem_docente(self):
-        self.comp_algoritmos.docente = self.prof_a1
-        self.comp_algoritmos.status = MatrixComponent.StatusChoices.COMPLETO
-        self.comp_algoritmos.save()
+        self._atribuir(self.comp_algoritmos, self.prof_a1)
         self.client.force_login(self.desup)
 
         resposta = self.client.post(self.url_aprovar)
 
         self.assertEqual(resposta.status_code, 302)
-        self.assertFalse(AlocacaoCurricular.objects.exists())
+        self.assertFalse(
+            AlocacaoCurricular.objects.filter(status=AlocacaoCurricular.StatusChoices.APROVADO).exists()
+        )
         mensagens = self._mensagens(resposta)
         self.assertTrue(any('sem docente' in m for m in mensagens), mensagens)
         # 2 pendências: Banco de Dados e Redes (nenhum marcado como não oferecido).
@@ -458,7 +468,9 @@ class AprovarAlocacaoUnidadeE2ETests(AlocacaoE2EBase):
         resposta = self.client.post(self.url_aprovar)
 
         self.assertEqual(resposta.status_code, 403)
-        self.assertFalse(AlocacaoCurricular.objects.exists())
+        self.assertFalse(
+            AlocacaoCurricular.objects.filter(status=AlocacaoCurricular.StatusChoices.APROVADO).exists()
+        )
 
     def test_botao_aprovar_so_aparece_para_desup_com_unidade_selecionada(self):
         self._completar_alocacao_da_unidade_a()
@@ -618,7 +630,7 @@ class JanelaEntregaAlocacaoE2ETests(AlocacaoE2EBase):
         self.assertEqual(resposta['Location'], self.url_tela)
 
         self.comp_algoritmos.refresh_from_db()
-        self.assertIsNone(self.comp_algoritmos.docente)
+        self.assertIsNone(self._docente(self.comp_algoritmos))
         self.assertEqual(self.comp_algoritmos.status, MatrixComponent.StatusChoices.SEM_PROFESSOR)
 
         # A tentativa vira notificação para a DESUP.
@@ -646,7 +658,7 @@ class JanelaEntregaAlocacaoE2ETests(AlocacaoE2EBase):
 
         self.assertEqual(resposta.status_code, 302)
         self.comp_algoritmos.refresh_from_db()
-        self.assertIsNone(self.comp_algoritmos.docente)
+        self.assertIsNone(self._docente(self.comp_algoritmos))
 
     def test_desup_faz_bypass_da_janela_fechada(self):
         self.client.force_login(self.desup)
@@ -659,7 +671,7 @@ class JanelaEntregaAlocacaoE2ETests(AlocacaoE2EBase):
         self.assertEqual(resposta.status_code, 200)
         self.assertEqual(resposta['HX-Refresh'], 'true')
         self.comp_algoritmos.refresh_from_db()
-        self.assertEqual(self.comp_algoritmos.docente, self.prof_a1)
+        self.assertEqual(self._docente(self.comp_algoritmos), self.prof_a1)
         self.assertFalse(
             Notificacao.objects.filter(titulo__icontains='Tentativa bloqueada').exists()
         )
@@ -689,7 +701,7 @@ class IsolamentoUnidadeAlocacaoE2ETests(AlocacaoE2EBase):
         self.assertEqual(resposta.status_code, 403)
         self.assertIn('outra unidade', resposta.content.decode())
         self.comp_anatomia.refresh_from_db()
-        self.assertIsNone(self.comp_anatomia.docente)
+        self.assertIsNone(self._docente(self.comp_anatomia))
 
     def test_coordenador_a_aloca_docente_de_outra_unidade_no_proprio_componente(self):
         self.client.force_login(self.coord_a)
@@ -701,7 +713,7 @@ class IsolamentoUnidadeAlocacaoE2ETests(AlocacaoE2EBase):
 
         self.assertEqual(resposta.status_code, 200)
         self.comp_algoritmos.refresh_from_db()
-        self.assertEqual(self.comp_algoritmos.docente, self.prof_b1)
+        self.assertEqual(self._docente(self.comp_algoritmos), self.prof_b1)
 
     def test_coordenador_sem_unidade_nao_ve_nem_altera_nada(self):
         self.coord_a.unidade = None
@@ -728,7 +740,7 @@ class IsolamentoUnidadeAlocacaoE2ETests(AlocacaoE2EBase):
 
         self.assertEqual(resposta.status_code, 200)
         self.comp_anatomia.refresh_from_db()
-        self.assertEqual(self.comp_anatomia.docente, self.prof_b1)
+        self.assertEqual(self._docente(self.comp_anatomia), self.prof_b1)
 
 
 class PerfisAcessoAlocacaoE2ETests(AlocacaoE2EBase):
@@ -761,7 +773,7 @@ class PerfisAcessoAlocacaoE2ETests(AlocacaoE2EBase):
         self.assertEqual(resposta.status_code, 302)
         self.assertEqual(resposta['Location'], '/admin/')
         self.comp_algoritmos.refresh_from_db()
-        self.assertIsNone(self.comp_algoritmos.docente)
+        self.assertIsNone(self._docente(self.comp_algoritmos))
 
     def test_perfil_admin_ti_via_htmx_recebe_hx_redirect(self):
         self.client.force_login(self.admin_ti)
@@ -850,9 +862,7 @@ class MultiplasMatrizesVigentesE2ETests(AlocacaoE2EBase):
             (self.comp_banco, self.prof_a2),
             (self.comp_algoritmos_noite, self.prof_a1),
         ):
-            componente.docente = docente
-            componente.status = MatrixComponent.StatusChoices.COMPLETO
-            componente.save()
+            self._atribuir(componente, docente)
         self.comp_redes.status = MatrixComponent.StatusChoices.NAO_OFERECIDA
         self.comp_redes.save()
 
@@ -866,3 +876,297 @@ class MultiplasMatrizesVigentesE2ETests(AlocacaoE2EBase):
             AlocacaoCurricular.objects.filter(unidade=self.unidade_a).values_list('turno', flat=True)
         )
         self.assertEqual(turnos, {'M', 'N'})
+
+
+class LinhasDeDocenteETurmasE2ETests(AlocacaoE2EBase):
+    """Prioridade 2: várias linhas de docente/carência por componente e quantidade de turmas."""
+
+    AJAX = {'HTTP_X_REQUESTED_WITH': 'XMLHttpRequest'}
+
+    def _post(self, componente, dados, usuario=None):
+        self.client.force_login(usuario or self.coord_a)
+        return self.client.post(self._url_alocar(componente), dados, **self.AJAX)
+
+    def _linhas(self, componente):
+        return AlocacaoTurmaDocente.objects.filter(componente_matriz=componente).order_by('pk')
+
+    # --- alocação básica -------------------------------------------------
+    def test_alocar_docente_cria_linha_com_carga_e_vinculo_ao_consolidado(self):
+        resposta = self._post(self.comp_algoritmos, {'docente_id': self.prof_a1.pk})
+
+        self.assertEqual(resposta.status_code, 200)
+        linha = self._linhas(self.comp_algoritmos).get()
+        self.assertEqual(linha.docente, self.prof_a1)
+        self.assertEqual(linha.alocacao_curricular.unidade, self.unidade_a)
+        self.assertEqual(linha.alocacao_curricular.semestre, self.semestre_atual)
+        self.assertEqual(linha.carga_horaria_contabilizada, 4)  # 80h / 20 semanas
+        self.assertFalse(linha.compartilhado)
+        self.comp_algoritmos.refresh_from_db()
+        self.assertEqual(self.comp_algoritmos.status, MatrixComponent.StatusChoices.COMPLETO)
+
+    def test_trocar_docente_reaproveita_a_mesma_linha(self):
+        self._post(self.comp_algoritmos, {'docente_id': self.prof_a1.pk})
+        self._post(self.comp_algoritmos, {'docente_id': self.prof_a2.pk})
+
+        linha = self._linhas(self.comp_algoritmos).get()
+        self.assertEqual(linha.docente, self.prof_a2)
+
+    def test_sem_professor_declara_carencia_e_alocar_resolve(self):
+        self._post(self.comp_banco, {'docente_id': MatrixComponent.StatusChoices.SEM_PROFESSOR})
+        linha = self._linhas(self.comp_banco).get()
+        self.assertIsNone(linha.docente)
+        self.assertEqual(linha.carencia.status, Carencia.StatusChoices.DECLARADA)
+
+        self._post(self.comp_banco, {'docente_id': self.prof_a1.pk})
+        linha.carencia.refresh_from_db()
+        self.assertEqual(linha.carencia.status, Carencia.StatusChoices.RESOLVIDA)
+
+        self._post(self.comp_banco, {'docente_id': MatrixComponent.StatusChoices.SEM_PROFESSOR})
+        linha.carencia.refresh_from_db()
+        self.assertEqual(linha.carencia.status, Carencia.StatusChoices.DECLARADA)
+
+    # --- botão "+" (linhas adicionais) ------------------------------------
+    def test_linha_adicional_aceita_outro_docente_ou_carencia(self):
+        self._post(self.comp_algoritmos, {'docente_id': self.prof_a1.pk})
+        r2 = self._post(self.comp_algoritmos, {'docente_id': self.prof_a2.pk, 'linha_id': 'novo'})
+        r3 = self._post(
+            self.comp_algoritmos,
+            {'docente_id': MatrixComponent.StatusChoices.SEM_PROFESSOR, 'linha_id': 'novo'},
+        )
+
+        self.assertEqual(r2.status_code, 200)
+        self.assertEqual(r3.status_code, 200)
+        self.assertEqual(self._linhas(self.comp_algoritmos).count(), 3)
+        self.assertEqual(Carencia.objects.count(), 1)
+        self.assertNotEqual(r2.json()['linha_id'], r3.json()['linha_id'])
+
+    def test_mesmo_docente_nao_pode_repetir_no_componente(self):
+        self._post(self.comp_algoritmos, {'docente_id': self.prof_a1.pk})
+        resposta = self._post(self.comp_algoritmos, {'docente_id': self.prof_a1.pk, 'linha_id': 'novo'})
+
+        self.assertEqual(resposta.status_code, 409)
+        self.assertEqual(self._linhas(self.comp_algoritmos).count(), 1)
+
+    def test_remover_linha_adicional(self):
+        self._post(self.comp_algoritmos, {'docente_id': self.prof_a1.pk})
+        extra = self._post(self.comp_algoritmos, {'docente_id': self.prof_a2.pk, 'linha_id': 'novo'}).json()
+
+        resposta = self._post(self.comp_algoritmos, {'acao': 'remover', 'linha_id': extra['linha_id']})
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(self._linhas(self.comp_algoritmos).count(), 1)
+
+    def test_nao_oferecida_remove_as_linhas_do_componente(self):
+        self._post(self.comp_algoritmos, {'docente_id': self.prof_a1.pk})
+        self._post(self.comp_algoritmos, {'docente_id': self.prof_a2.pk, 'linha_id': 'novo'})
+
+        resposta = self._post(self.comp_algoritmos, {'docente_id': MatrixComponent.StatusChoices.NAO_OFERECIDA})
+
+        self.assertTrue(resposta.json()['reload'])
+        self.assertEqual(self._linhas(self.comp_algoritmos).count(), 0)
+        self.comp_algoritmos.refresh_from_db()
+        self.assertEqual(self.comp_algoritmos.status, MatrixComponent.StatusChoices.NAO_OFERECIDA)
+
+    def test_linha_de_outro_componente_nao_pode_ser_alterada(self):
+        """Evita IDOR: a linha precisa pertencer ao componente da URL."""
+        self._post(self.comp_banco, {'docente_id': self.prof_a1.pk})
+        linha_banco = self._linhas(self.comp_banco).get()
+
+        resposta = self._post(
+            self.comp_algoritmos, {'docente_id': self.prof_a2.pk, 'linha_id': linha_banco.pk}
+        )
+
+        self.assertEqual(resposta.status_code, 404)
+        linha_banco.refresh_from_db()
+        self.assertEqual(linha_banco.docente, self.prof_a1)
+
+    # --- quantidade de turmas ----------------------------------------------
+    def test_quantidade_padrao_e_um(self):
+        self.assertEqual(self.comp_algoritmos.quantidade_turmas, 1)
+
+    def test_definir_quantidade_de_turmas(self):
+        self.client.force_login(self.coord_a)
+        resposta = self.client.post(self._url_turmas(self.comp_algoritmos), {'quantidade_turmas': '3'}, **self.AJAX)
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(resposta.json()['quantidade_turmas'], 3)
+        self.comp_algoritmos.refresh_from_db()
+        self.assertEqual(self.comp_algoritmos.quantidade_turmas, 3)
+
+    def test_quantidade_rejeita_valores_que_nao_sao_numeros_validos(self):
+        self.client.force_login(self.coord_a)
+        for invalido in ('', 'abc', '0', '-1', '21', '1.5', ' ', '٣'):
+            with self.subTest(valor=invalido):
+                resposta = self.client.post(
+                    self._url_turmas(self.comp_algoritmos), {'quantidade_turmas': invalido}, **self.AJAX
+                )
+                self.assertEqual(resposta.status_code, 400)
+        self.comp_algoritmos.refresh_from_db()
+        self.assertEqual(self.comp_algoritmos.quantidade_turmas, 1)
+
+    def test_varias_turmas_com_um_docente_nao_deixa_o_componente_pendente(self):
+        """O mesmo docente pode dar todas as turmas: a quantidade não exige um docente por turma."""
+        self._post(self.comp_algoritmos, {'docente_id': self.prof_a1.pk})
+        self.client.force_login(self.coord_a)
+        self.assertEqual(self.client.get(self.url_tela).context['componentes_sem_docente'], 3 - 1)
+
+        self.client.post(self._url_turmas(self.comp_algoritmos), {'quantidade_turmas': '3'}, **self.AJAX)
+
+        self.comp_algoritmos.refresh_from_db()
+        self.assertEqual(self.comp_algoritmos.status, MatrixComponent.StatusChoices.COMPLETO)
+        self.assertEqual(self.client.get(self.url_tela).context['componentes_sem_docente'], 3 - 1)
+
+    def test_carencia_em_uma_das_turmas_mantem_o_componente_pendente(self):
+        self._post(self.comp_algoritmos, {'docente_id': self.prof_a1.pk})
+        self.client.post(self._url_turmas(self.comp_algoritmos), {'quantidade_turmas': '2'}, **self.AJAX)
+        self._post(
+            self.comp_algoritmos,
+            {'docente_id': MatrixComponent.StatusChoices.SEM_PROFESSOR, 'linha_id': 'novo'},
+        )
+
+        self.comp_algoritmos.refresh_from_db()
+        self.assertEqual(self.comp_algoritmos.status, MatrixComponent.StatusChoices.SEM_PROFESSOR)
+        self.client.force_login(self.coord_a)
+        self.assertEqual(self.client.get(self.url_tela).context['componentes_sem_docente'], 3)
+
+    def test_aprovacao_liberada_com_tudo_alocado_mesmo_com_varias_turmas(self):
+        self._completar_alocacao_da_unidade_a()
+        self.client.post(self._url_turmas(self.comp_algoritmos), {'quantidade_turmas': '2'}, **self.AJAX)
+        self.client.force_login(self.desup)
+
+        resposta = self.client.get(f'{self.url_tela}?unidade_id={self.unidade_a.pk}')
+
+        self.assertEqual(resposta.context['componentes_sem_docente'], 0)
+        self.assertTrue(resposta.context['alocacao_curricular_preenchida'])
+
+    def test_tela_exibe_coluna_turmas_botao_mais_e_valor_salvo(self):
+        self.comp_banco.quantidade_turmas = 4
+        self.comp_banco.save(update_fields=['quantidade_turmas'])
+        self.client.force_login(self.coord_a)
+
+        resposta = self.client.get(self.url_tela)
+
+        self.assertContains(resposta, 'Turmas</th>')
+        self.assertContains(resposta, 'class="ac-turmas-input')
+        self.assertContains(resposta, 'value="4"')
+        self.assertContains(resposta, 'ac-add')
+        self.assertContains(resposta, 'id="acSlotTemplate"')
+
+    # --- segurança e escopo --------------------------------------------------
+    def test_coordenador_de_outra_unidade_nao_altera_turmas_nem_linhas(self):
+        self.client.force_login(self.coord_b)
+        r1 = self.client.post(self._url_turmas(self.comp_algoritmos), {'quantidade_turmas': '5'}, **self.AJAX)
+        r2 = self.client.post(
+            self._url_alocar(self.comp_algoritmos), {'docente_id': self.prof_b1.pk}, **self.AJAX
+        )
+
+        self.assertEqual(r1.status_code, 403)
+        self.assertEqual(r2.status_code, 403)
+        self.comp_algoritmos.refresh_from_db()
+        self.assertEqual(self.comp_algoritmos.quantidade_turmas, 1)
+        self.assertEqual(self._linhas(self.comp_algoritmos).count(), 0)
+
+    def test_turmas_exige_post_e_login(self):
+        self.assertEqual(self.client.post(self._url_turmas(self.comp_algoritmos), {'quantidade_turmas': '2'}).status_code, 302)
+        self.client.force_login(self.coord_a)
+        self.assertEqual(self.client.get(self._url_turmas(self.comp_algoritmos)).status_code, 405)
+
+    def test_janela_fechada_bloqueia_quantidade_de_turmas_da_unidade(self):
+        self._fechar_janela_da_unidade(self.unidade_a)
+        self.client.force_login(self.coord_a)
+
+        resposta = self.client.post(
+            self._url_turmas(self.comp_algoritmos), {'quantidade_turmas': '3'}, **self.AJAX
+        )
+
+        self.assertEqual(resposta.status_code, 403)
+        self.comp_algoritmos.refresh_from_db()
+        self.assertEqual(self.comp_algoritmos.quantidade_turmas, 1)
+
+    def test_desup_escolhe_a_unidade_pelo_parametro_validado(self):
+        self.client.force_login(self.desup)
+        # unidade_id de uma unidade que não possui a matriz cai na primeira unidade da matriz.
+        resposta = self.client.post(
+            self._url_alocar(self.comp_algoritmos),
+            {'docente_id': self.prof_a1.pk, 'unidade_id': self.unidade_b.pk},
+            **self.AJAX,
+        )
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(self._linhas(self.comp_algoritmos).get().alocacao_curricular.unidade, self.unidade_a)
+
+    def test_componente_sem_vinculo_curso_unidade_retorna_erro_claro(self):
+        AlocacaoCurricular.objects.all().delete()
+        CourseUnit.objects.filter(pk=self.course_unit_a.pk).delete()
+        resposta = self._post(self.comp_algoritmos, {'docente_id': self.prof_a1.pk})
+
+        self.assertEqual(resposta.status_code, 400)
+        self.assertIn('Cursos na Unidade', resposta.json()['message'])
+        self.assertEqual(self._linhas(self.comp_algoritmos).count(), 0)
+
+
+class AlocacaoTurmaDocenteModeloTests(AlocacaoE2EBase):
+    """Restrições de banco dos novos modelos."""
+
+    def _alocacao(self):
+        return AlocacaoCurricular.objects.create(
+            unidade=self.unidade_a, curso=self.course_unit_a, semestre=self.semestre_atual, turno='M'
+        )
+
+    def test_unicidade_com_turma_informada(self):
+        from django.db import IntegrityError, transaction
+
+        from apps.courses.models import ClassGroup
+
+        turma = ClassGroup.objects.create(
+            matriz_curricular=self.matriz_a, matriz_componente=self.comp_algoritmos,
+            ano_semestre=self.semestre_atual, identificador='T01',
+        )
+        dados = dict(
+            alocacao_curricular=self._alocacao(), componente_matriz=self.comp_algoritmos,
+            turma=turma, docente=self.prof_a1,
+        )
+        AlocacaoTurmaDocente.objects.create(**dados)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            AlocacaoTurmaDocente.objects.create(**dados)
+
+    def test_unicidade_sem_turma(self):
+        from django.db import IntegrityError, transaction
+
+        dados = dict(
+            alocacao_curricular=self._alocacao(), componente_matriz=self.comp_algoritmos,
+            turma=None, docente=self.prof_a1,
+        )
+        AlocacaoTurmaDocente.objects.create(**dados)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            AlocacaoTurmaDocente.objects.create(**dados)
+
+    def test_carencia_e_um_para_um_e_rat_referencia_carencia(self):
+        from django.db import IntegrityError, transaction
+
+        from apps.allocations.models import SolicitacaoRAT
+
+        linha = AlocacaoTurmaDocente.objects.create(
+            alocacao_curricular=self._alocacao(), componente_matriz=self.comp_algoritmos
+        )
+        carencia = Carencia.objects.create(alocacao_turma_docente=linha)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Carencia.objects.create(alocacao_turma_docente=linha)
+
+        rat = SolicitacaoRAT.objects.create(
+            carencia=carencia, professor=self.prof_a1, solicitado_por=self.coord_a,
+            carga_horaria_solicitada='4.00',
+        )
+        self.assertEqual(rat.status, SolicitacaoRAT.StatusChoices.RASCUNHO)
+        self.assertIsNone(rat.avaliado_por)
+
+    def test_docente_alocado_nao_pode_ser_excluido(self):
+        from django.db.models import ProtectedError
+
+        linha = AlocacaoTurmaDocente.objects.create(
+            alocacao_curricular=self._alocacao(), componente_matriz=self.comp_algoritmos,
+            docente=self.prof_a1,
+        )
+        with self.assertRaises(ProtectedError):
+            self.prof_a1.delete()
+        self.assertTrue(AlocacaoTurmaDocente.objects.filter(pk=linha.pk).exists())

@@ -7,6 +7,8 @@
 {% block content %}
 <div class="space-y-6">
 
+  {% include 'partials/_kpi_cards.html' %}
+
   <form method="get" class="space-y-3" id="matrix-filter-form">
     <details id="matrix-secondary-filters" class="group overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
       <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-[#025c9f] sm:px-5">

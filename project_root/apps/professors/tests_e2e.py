@@ -28,6 +28,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from apps.accounts.models import User
+from apps.allocations.services import atribuir_docente
 from apps.core.models import Unidade
 from apps.courses.models import (
     Course,
@@ -127,21 +128,20 @@ class ProfessorE2EBase(TestCase):
             carga_horaria_padrao=carga_horaria,
             creditos=carga_horaria // 20,
         )
-        return MatrixComponent.objects.create(
+        matrix_component = MatrixComponent.objects.create(
             matriz=matriz,
             componente_curricular=componente,
             periodo='1o periodo',
             carga_horaria=carga_horaria,
             creditos=carga_horaria // 20,
             carga_horaria_semanal=carga_horaria / 20,
-            docente=docente,
-            status=(
-                MatrixComponent.StatusChoices.COMPLETO
-                if docente
-                else MatrixComponent.StatusChoices.SEM_PROFESSOR
-            ),
+            status=MatrixComponent.StatusChoices.SEM_PROFESSOR,
             **kwargs,
         )
+        if docente:
+            atribuir_docente(matrix_component, docente)
+            matrix_component.refresh_from_db()
+        return matrix_component
 
     def _dados_professor(self, **overrides):
         dados = {
@@ -442,7 +442,7 @@ class CrudProfessorE2ETests(ProfessorE2EBase):
         CORRIGIDO: excluir professor alocado em matriz vigente avisa em vez de
         estourar 500.
 
-        `MatrixComponent.docente` usa `on_delete=PROTECT`
+        `AlocacaoTurmaDocente.docente` usa `on_delete=PROTECT`
         (apps/courses/models.py:197-204) e `ProfessorDeleteView` não tratava o
         `ProtectedError`. Agora `form_valid` captura a exceção, mostra
         "libere as alocações antes de excluir" e redireciona para a listagem.
@@ -810,18 +810,18 @@ class CalculosCargaHorariaProfessorE2ETests(ProfessorE2EBase):
             nome='Ingles Instrumental', codigo='GER001', carga_horaria_padrao=40, creditos=2
         )
         for matriz in (self.matriz_manha, self.matriz_noite):
-            MatrixComponent.objects.create(
+            compartilhado = MatrixComponent.objects.create(
                 matriz=matriz,
                 componente_curricular=componente_base,
                 periodo='1o periodo',
                 carga_horaria=40,
                 creditos=2,
                 carga_horaria_semanal=2,
-                docente=self.prof_a1,
                 compartilhado=True,
                 curso_compartilhado=self.course_unit_enf_b,
                 status=MatrixComponent.StatusChoices.COMPLETO,
             )
+            atribuir_docente(compartilhado, self.prof_a1)
 
         # 4 + 3 + 2 (o compartilhado entra uma vez só, não duas)
         self.assertEqual(self.prof_a1.ch_alocada, 9)
@@ -1015,7 +1015,10 @@ class SolicitacaoCadastroEMatriculaOpcionalTests(ProfessorE2EBase):
         self.client.force_login(self.desup)
         resposta = self.client.get(self.url_lista)
         self.assertEqual(resposta.context['total_professores'], 2)
-        self.assertContains(resposta, '2 no sistema')
+        # O total agora é o primeiro cartão de resumo ("No sistema").
+        self.assertEqual(resposta.context['kpis'][0]['valor'], 2)
+        self.assertEqual(resposta.context['kpis'][0]['rotulo'], 'No sistema')
+        self.assertContains(resposta, 'No sistema')
 
     def test_listagem_exibe_cargo_vinculo_e_filtra_por_ch(self):
         contrato_20h = ContractType.objects.create(

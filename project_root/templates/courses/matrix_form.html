@@ -782,11 +782,9 @@ function addComponent() {
   newRow.querySelectorAll('input[type=hidden][name*="id"]').forEach(h => h.value = '');
 
   // Uma linha nova não pode herdar metadados da primeira linha quando ela já
-  // existe no banco (docente/status/observações pertencem ao componente antigo).
-  const docente = newRow.querySelector('input[name$="-docente"]');
+  // existe no banco (status/observações pertencem ao componente antigo).
   const status = newRow.querySelector('input[name$="-status"]');
   const observacoes = newRow.querySelector('input[name$="-observacoes"]');
-  if (docente) docente.value = '';
   if (status) status.value = 'SEM_PROFESSOR';
   if (observacoes) observacoes.value = '';
 

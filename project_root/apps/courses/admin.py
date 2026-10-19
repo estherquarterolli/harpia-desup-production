@@ -20,7 +20,7 @@ class CurricularComponentAdmin(HarpiaModelAdmin):
 class MatrixComponentInline(TabularInline):
     model = MatrixComponent
     extra = 1
-    autocomplete_fields = ('componente_curricular', 'docente', 'curso_compartilhado')
+    autocomplete_fields = ('componente_curricular', 'curso_compartilhado')
     filter_horizontal = ('pre_requisitos',)
     fields = (
         'componente_curricular',
@@ -29,7 +29,6 @@ class MatrixComponentInline(TabularInline):
         'carga_horaria',
         'creditos',
         'pre_requisitos',
-        'docente',
         'compartilhado',
         'curso_compartilhado',
         'carga_horaria_semanal',
@@ -51,7 +50,7 @@ class MatrixComponentAdmin(HarpiaModelAdmin):
         'periodo',
         'carga_horaria',
         'creditos',
-        'docente',
+        'quantidade_turmas',
         'compartilhado',
         'status',
     )
@@ -62,7 +61,7 @@ class MatrixComponentAdmin(HarpiaModelAdmin):
         'matriz__curso__nome',
         'matriz__curso__sigla',
     )
-    autocomplete_fields = ('matriz', 'componente_curricular', 'docente', 'curso_compartilhado')
+    autocomplete_fields = ('matriz', 'componente_curricular', 'curso_compartilhado')
     filter_horizontal = ('pre_requisitos',)
 
 class ClassGroupAdmin(HarpiaModelAdmin):

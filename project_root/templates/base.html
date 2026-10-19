@@ -73,7 +73,7 @@
             <a href="{% url 'core:solicitacao_professor_list' %}"
                 class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if '/core/desup/solicitacoes-professor' in request.path %}bg-white/10{% endif %}">
                 <i class="ph ph-arrows-left-right text-2xl flex-shrink-0"></i>
-                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Solicitações externas</span>
+                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Solicitações</span>
             </a>
 
             <a href="{% url 'core:alertas_carga_desup' %}"
@@ -141,10 +141,10 @@
         </div>
     </aside>
 
-    <main class="main-content flex-grow p-4 md:p-8">
+    <main class="main-content flex-grow px-4 pb-4 pt-0 lg:px-8 lg:pb-8">
 
         {% if superadmin_visualizando %}
-        <div class="mb-5 flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 shadow-sm sm:flex-row sm:items-center">
+        <div class="mb-5 mt-4 flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 shadow-sm sm:flex-row sm:items-center lg:mt-6">
             <div class="flex min-w-0 items-center gap-3">
                 <i class="ph ph-eye text-2xl text-amber-600"></i>
                 <div class="min-w-0">
@@ -162,15 +162,17 @@
         </div>
         {% endif %}
 
-        <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
-            <div class="flex items-center gap-4">
-                <button type="button" id="mobileMenuButton" onclick="toggleMobileSidebar()" class="lg:hidden text-3xl text-[#025c9f]"><i class="ph ph-list"></i></button>
-                <h1 class="text-2xl md:text-4xl font-black text-[#025c9f] uppercase tracking-tighter">
+        {# Cabeçalho fixo: título e ajuda à esquerda; notificações e conta à direita. #}
+        <header id="topbar" class="sticky top-0 z-30 -mx-4 mb-6 flex items-center justify-between gap-3 border-b border-slate-200/70 bg-slate-50/90 px-4 py-3 shadow-sm backdrop-blur-md lg:-mx-8 lg:px-8">
+            <div class="flex min-w-0 items-center gap-3">
+                <button type="button" id="mobileMenuButton" onclick="toggleMobileSidebar()" aria-label="Abrir menu" class="lg:hidden text-3xl text-[#025c9f]"><i class="ph ph-list" aria-hidden="true"></i></button>
+                {% block header_titulo %}<h1 class="truncate text-lg md:text-2xl font-black text-[#025c9f] uppercase tracking-tight">
                     {% block header_title %}HARPIA{% endblock %}
-                </h1>
+                </h1>{% endblock %}
+                {% block header_ajuda %}{% include 'partials/_ajuda_botao.html' %}{% endblock %}
             </div>
 
-            <div class="flex items-center gap-4 self-end md:self-auto">
+            <div class="flex shrink-0 items-center gap-3 md:gap-4">
                 <div class="relative">
                     <button onclick="toggleElement('notificationMenu')" class="relative text-[#025c9f] p-1">
                         <i class="ph ph-bell text-3xl"></i>
@@ -754,6 +756,7 @@
             });
         });
     </script>
+    {% include 'partials/_ajuda_modal.html' %}
     {% block extra_js %}{% endblock %}
 </body>
 </html>

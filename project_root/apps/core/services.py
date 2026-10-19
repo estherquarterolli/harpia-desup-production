@@ -320,25 +320,29 @@ def decidir_solicitacao_professor_externo(*, request, solicitacao_id, decisao, m
     solicitacao.decidido_em = timezone.now()
     solicitacao.save(update_fields=["status", "motivo_decisao", "decidido_por", "decidido_em"])
 
-    if decisao == SolicitacaoProfessorExterno.StatusChoices.APROVADA:
+    # Só a cessão vincula o professor à unidade; o cadastro novo é feito pela DESUP depois.
+    if (
+        decisao == SolicitacaoProfessorExterno.StatusChoices.APROVADA
+        and solicitacao.tipo == SolicitacaoProfessorExterno.TipoChoices.CESSAO
+    ):
         solicitacao.professor.unidades.add(solicitacao.unidade_solicitante)
 
     estado = solicitacao.get_status_display().lower()
     mensagem = (
-        f"A solicitação do professor {solicitacao.professor.nome} para a unidade "
+        f"A solicitação ({solicitacao.get_tipo_display().lower()}) do professor {solicitacao.nome_professor} para a unidade "
         f"{solicitacao.unidade_solicitante.sigla} foi {estado} pela DESUP."
     )
     if motivo.strip():
         mensagem = f"{mensagem} Motivo: {motivo.strip()}"
     Notificacao.objects.create(
         unidade_destino=solicitacao.unidade_solicitante,
-        titulo=f"Solicitação de professor {solicitacao.get_status_display().lower()}",
+        titulo=f"Solicitação {solicitacao.get_status_display().lower()}",
         mensagem=mensagem,
         url_acao=reverse("dashboard_unidade"),
     )
     _enviar_email_unidade_apos_commit(
         solicitacao.unidade_solicitante,
-        f"[Harpia] Solicitação de professor {solicitacao.get_status_display().lower()}",
+        f"[Harpia] Solicitação {solicitacao.get_status_display().lower()}",
         f"{mensagem}\n\nNotificação automática do sistema Harpia.",
     )
     registrar_evento_prioridade1(

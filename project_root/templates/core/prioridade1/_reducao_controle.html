@@ -1,0 +1,67 @@
+{# Controle de redução de carga: campo numérico + barra (0 a 20 h) + botão "Redução total". #}
+{# Contexto: ctl_id, ctl_name, ctl_valor, ctl_label. #}
+<div class="reducao-ctl rounded-xl border border-slate-200 bg-slate-50/70 p-4" data-max="20">
+  <label for="{{ ctl_id }}" class="mb-1.5 block text-sm font-bold text-slate-700">{{ ctl_label }}</label>
+  <div class="flex items-center gap-2">
+    <input id="{{ ctl_id }}" type="number" name="{{ ctl_name }}" min="0" max="20" step="0.25" value="{{ ctl_valor|default_if_none:''|stringformat:'s' }}"{% if ctl_required %} required{% endif %}
+           class="reducao-num w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-[#025c9f] focus:ring-2 focus:ring-blue-100">
+    <span class="shrink-0 text-sm font-bold text-slate-500" aria-hidden="true">h/semana</span>
+  </div>
+  <div class="mt-4">
+    <input type="range" min="0" max="20" step="0.25" value="{{ ctl_valor|default_if_none:''|stringformat:'s' }}"
+           class="reducao-range h-2 w-full cursor-pointer accent-[#025c9f]"
+           aria-label="{{ ctl_label }}, de 0 a 20 horas" aria-describedby="{{ ctl_id }}-escala">
+    <div id="{{ ctl_id }}-escala" class="mt-1 flex justify-between text-[11px] font-semibold text-slate-400" aria-hidden="true"><span>0 h</span><span>10 h</span><span>20 h</span></div>
+  </div>
+  <button type="button" class="reducao-total mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50" aria-pressed="false">
+    <i class="ph ph-check-circle text-base" aria-hidden="true"></i>
+    <span class="reducao-total-texto">Redução total (20 h)</span>
+  </button>
+</div>
+<script>
+(function () {
+  // Os controles de redução ficam sincronizados: campo numérico, barra e botão "Redução total".
+  if (window.__reducaoCarga) return;
+  window.__reducaoCarga = true;
+  function ajustar(ctl) {
+    var max = parseFloat(ctl.dataset.max) || 20;
+    var num = ctl.querySelector('.reducao-num');
+    var range = ctl.querySelector('.reducao-range');
+    var btn = ctl.querySelector('.reducao-total');
+    var v = parseFloat(String(num.value).replace(',', '.'));
+    if (isNaN(v)) v = 0;
+    v = Math.min(Math.max(v, 0), max);
+    range.value = v;
+    var total = v === max;
+    btn.setAttribute('aria-pressed', total ? 'true' : 'false');
+    ['bg-[#025c9f]', 'text-white', 'border-[#025c9f]'].forEach(function (c) { btn.classList.toggle(c, total); });
+    ['bg-white', 'text-slate-600'].forEach(function (c) { btn.classList.toggle(c, !total); });
+    btn.querySelector('.reducao-total-texto').textContent = total ? 'Redução total selecionada' : 'Redução total (' + max + ' h)';
+  }
+  document.addEventListener('input', function (e) {
+    var ctl = e.target.closest && e.target.closest('.reducao-ctl');
+    if (!ctl) return;
+    if (e.target.classList.contains('reducao-range')) ctl.querySelector('.reducao-num').value = e.target.value;
+    ajustar(ctl);
+  });
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('.reducao-total');
+    if (!btn) return;
+    var ctl = btn.closest('.reducao-ctl');
+    var num = ctl.querySelector('.reducao-num');
+    var max = parseFloat(ctl.dataset.max) || 20;
+    if (btn.getAttribute('aria-pressed') === 'true') {
+      // Desmarcar devolve o valor anterior (ou zero, se o anterior já era o total).
+      var anterior = parseFloat(ctl.dataset.anterior || '0');
+      num.value = anterior >= max ? 0 : anterior;
+    } else {
+      ctl.dataset.anterior = String(parseFloat(num.value) || 0);
+      num.value = max;
+    }
+    ajustar(ctl);
+  });
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.reducao-ctl').forEach(ajustar);
+  });
+})();
+</script>

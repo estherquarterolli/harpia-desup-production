@@ -744,10 +744,12 @@ class AtalhoDashboardTests(TestCase):
     def test_remove_apenas_do_proprio_usuario(self):
         from apps.core.models import AtalhoDashboard
         atalho = AtalhoDashboard.objects.create(user=self.desup, chave='matrix_list')
-        # desup2 (outro DESUP) não consegue remover atalho alheio → 404
+        # desup2 (outro DESUP) não consegue remover atalho alheio: nada é apagado e a
+        # resposta é a mesma de um atalho inexistente (volta ao painel, sem 404 e sem
+        # revelar se o id existe).
         self.client.force_login(self.desup2)
         resp = self.client.post(self.reverse('core:atalho_remove', kwargs={'pk': atalho.pk}))
-        self.assertEqual(resp.status_code, 404)
+        self.assertRedirects(resp, self.reverse('dashboard_desup'))
         self.assertTrue(AtalhoDashboard.objects.filter(pk=atalho.pk).exists())
         # dono remove com sucesso
         self.client.force_login(self.desup)

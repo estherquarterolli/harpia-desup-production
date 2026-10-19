@@ -283,3 +283,264 @@
 ### `project_root/templates/professors/professor_list.html`, `dashboard/partials/_professor_table.html`, `professors/partials/_professor_detail.html`
 - Alteração: coluna "Área" nas listagens de professores e no detalhe do professor.
 - Verificação: `manage.py test apps.professors apps.core` — 214 de 217 aprovados; as 3 falhas (`test_unidade_coord_can_only_see_their_unit`, `test_limite_manual_da_desup_prevalece_sobre_o_calculo`, `test_listagem_mostra_colunas_por_matriz_e_soma_de_horas`) não envolvem a área e já existiam no código commitado.
+
+
+## 19/10/2026 — Prioridade 2, Fase 1: alocação de docente por turma, carência e RAT
+
+Resumo: o docente deixou de ser um campo de `MatrixComponent` e passou a ser registrado em `AlocacaoTurmaDocente` (uma ou mais linhas por componente, cada uma com docente ou carência). Foram criados os modelos `Carencia` e `SolicitacaoRAT`, a quantidade de turmas por componente e, na tela de Alocação Curricular, o botão "+" (outro docente ou carência) e a coluna "Turmas" (somente números, com número por extenso e confirmação). Os dados existentes foram preservados por migração de dados reversível.
+
+### `project_root/apps/allocations/models.py`
+- Tipo: alterado.
+- Alteração: novos modelos `AlocacaoTurmaDocente` (restrições `harpia_alocturmadocente_unica` e `harpia_alocturmadocente_unica_sem_turma`), `Carencia` (OneToOne com a alocação; status DECLARADA, EM_ANALISE, HOMOLOGADA, RESOLVIDA) e `SolicitacaoRAT` (status RASCUNHO, AGUARDANDO_DESUP, APROVADO, REJEITADO).
+- Motivo: requisito da Prioridade 2 (múltiplas turmas, carências e RAT).
+
+### `project_root/apps/allocations/migrations/0004_alocacao_turma_docente_carencia_rat.py`
+- Tipo: criado.
+- Alteração: cria os três modelos e as restrições.
+- Motivo: passo 2.1 (somente schema).
+
+### `project_root/apps/allocations/migrations/0005_migrar_docente_componente_para_alocacao_turma.py`
+- Tipo: criado.
+- Alteração: `RunPython` que copia cada `MatrixComponent.docente` para `AlocacaoTurmaDocente` (sem turma). Unidade: a principal do docente, se pertencer à matriz; senão, a de menor id. Consolidado: semestre corrente, turno da matriz (padrão M). É idempotente, reversível e aborta com erro, sem perder dados, quando não há vínculo em "Cursos na Unidade".
+- Motivo: passo 2.2 / Regra 5 (sem perda de histórico).
+
+### `project_root/apps/courses/models.py`
+- Tipo: alterado.
+- Alteração: removido `MatrixComponent.docente`; adicionado `quantidade_turmas` (padrão 1).
+- Motivo: passo 2.3 e coluna "Turmas".
+
+### `project_root/apps/courses/migrations/0010_matrixcomponent_quantidade_turmas.py` e `0011_remove_matrixcomponent_docente.py`
+- Tipo: criados.
+- Alteração: 0010 adiciona `quantidade_turmas`; 0011 remove `docente`, dependendo de `allocations.0005` (a cópia roda antes). Na reversão o campo volta nulo e é repreenchido pela reversa da 0005.
+- Motivo: passo 2.3 com ordem segura.
+
+### `project_root/apps/allocations/services.py`
+- Tipo: criado.
+- Alteração: regras de negócio (escolha de docente, "Sem professor" com carência, "Não oferecido", linhas adicionais, quantidade de turmas de 1 a 20 só com dígitos, status do componente, `alocacoes_vigentes`, `atribuir_docente` para fixtures). Operações em transação com bloqueio de linha.
+- Motivo: centralizar a regra e evitar duplicação entre views.
+
+### `project_root/apps/allocations/views.py` e `project_root/config/urls.py`
+- Tipo: alterado.
+- Alteração: `AlocarDocenteComponenteView` passa a operar em linhas (`linha_id`, `acao=remover`); nova `QuantidadeTurmasComponenteView` (`quantidade_turmas_componente`, POST); pendências e aprovação calculadas por turma. Perfil, escopo por unidade, janela de entrega e CSRF mantidos no servidor; o `linha_id` precisa pertencer ao componente da URL (evita IDOR); a unidade do pedido do DESUP é validada contra as unidades da matriz.
+- Motivo: Prioridade 2 e Regra 2 (segurança).
+
+### `project_root/templates/allocations/alloc_curricular.html` e `templates/allocations/partials/_slot_docente.html`
+- Tipo: alterado / criado.
+- Alteração: botão "+", linhas adicionais com remoção, coluna "Turmas" com input numérico, número por extenso e confirmação; modelo `<template>` da nova linha; contagem de pendências por componente. Rótulos acessíveis (`aria-label`, `sr-only`), foco por teclado e confirmação com Enter/Esc; tabela já responsiva (`stack-table`).
+- Motivo: requisito da diretoria.
+
+### `project_root/static/css/tailwind.min.css`
+- Tipo: alterado (gerado por `npm run build:css`).
+- Motivo: novas classes Tailwind.
+
+### `project_root/apps/core/priority1.py`, `apps/core/views.py`, `apps/professors/models.py`, `apps/professors/views.py`, `apps/extra_curricular/services.py`, `apps/core/management/commands/sync_unidades_cursos.py`
+- Tipo: alterado.
+- Alteração: cargas e listagens passam a ler `AlocacaoTurmaDocente` do semestre corrente em matrizes vigentes, mantendo a deduplicação de componentes compartilhados.
+- Motivo: o campo `docente` foi removido.
+
+### `project_root/apps/courses/admin.py`, `apps/courses/forms.py`, `templates/courses/matrix/partials/_formset_row.html`, `templates/courses/matrix_form.html`
+- Tipo: alterado.
+- Alteração: removidas as referências ao campo `docente`; `quantidade_turmas` exibida no admin.
+- Motivo: o campo foi removido.
+
+### `project_root/apps/allocations/admin.py`
+- Tipo: alterado.
+- Alteração: `AlocacaoTurmaDocente`, `Carencia` e `SolicitacaoRAT` registrados no Django Admin.
+- Motivo: operação técnica (perfil ADMIN).
+
+### `project_root/apps/allocations/tests_e2e.py`, `apps/core/tests_e2e.py`, `apps/professors/tests_e2e.py`
+- Tipo: alterado.
+- Alteração: fixtures adaptadas ao novo modelo; 28 testes novos (linhas, carência, "+", turmas, entradas inválidas, isolamento entre unidades, janela fechada, IDOR, restrições de banco). Nenhum teste foi enfraquecido; duas asserções "não existe nenhum consolidado" passaram a "não existe consolidado aprovado", pois a fixture agora cria o consolidado em rascunho.
+
+### `project_root/sql/supabase_alocacao_turma_docente.sql`
+- Tipo: criado.
+- Alteração: script idempotente equivalente às migrations 0004, 0010, 0005 e 0011 para o SQL Editor do Supabase (usar este script OU `migrate`). Aborta, sem alterar nada, se algum componente com docente não puder ser mapeado.
+- Motivo: Regra 8. **Não foi executado em PostgreSQL neste ambiente** — revisar e testar antes (de preferência com backup).
+
+### Banco de dados (Supabase)
+- Novas tabelas `harpiadb_alocacoes_alocacao_turma_docente`, `harpiadb_alocacoes_carencia` e `harpiadb_alocacoes_solicitacao_rat`; nova coluna `harpiadb_cursos_componente_matriz.quantidade_turmas`; remoção de `harpiadb_cursos_componente_matriz.docente_id` após a cópia.
+
+### Verificações
+- `python manage.py check`: nenhum problema.
+- `python manage.py makemigrations --check --dry-run`: "No changes detected".
+- Migração de dados 0005 (ida, repetição, reversão e caso de erro) validada com script sobre o estado histórico dos modelos em SQLite; a cadeia completa de `migrate` não roda em SQLite (migrações antigas usam SQL de PostgreSQL) e não foi testada em PostgreSQL.
+- `python manage.py test --settings=config.settings._tmp_test`: 667 testes executados; 12 falhas (9 falhas e 3 erros), todas já existentes: as mesmas 12 falham no commit original (HEAD), verificado em worktree limpo (`test_estouro_de_limite_gera_mensagem_e_nao_500`, `test_soma_de_itens_respeita_o_limite`, `test_formset_da_unidade_barra_limite_manual_de_horas_extras`, `test_reset_exige_tela_e_checkbox_de_confirmacao`, `test_unidade_coord_can_only_see_their_unit`, `test_hr_total_dois_decimais`, `test_opcoes_de_duplicacao_para_a_desup`, `test_lista_desup_sem_form_de_status`, `test_limite_manual_da_desup_prevalece_sobre_o_calculo`, `test_listagem_mostra_colunas_por_matriz_e_soma_de_horas` e os 2 de iconografia). Nenhuma falha nova; os testes de alocação, inclusive os 28 novos, passam.
+- `npm run build:css`: executado com sucesso.
+- Pendências reais: `turma` fica vazia (não há criação de `ClassGroup` por componente); uma carência declarada continua impedindo a aprovação da alocação (comportamento anterior); fluxo de homologação de carência e de RAT ainda sem telas (Fases seguintes).
+
+### `project_root/templates/core/prioridade1/equipe_diretiva.html`
+- Tipo: alterado.
+- Alteração: no modal "Redução de carga", barra de 0 a 20 h sincronizada com o campo numérico (máximo 20 h no campo) e botão selecionável "Redução total (20 h)" (marca 20 h; ao desmarcar, volta ao valor anterior). Validação do servidor inalterada (aceita até 168 h).
+- Verificação: `manage.py test apps.core.tests_prioridade1_desup` — 18 aprovados; `npm run build:css` executado.
+
+## 19/10/2026 — Remoção de atalho do painel sem erro 404
+
+### `project_root/apps/core/views.py`
+- Tipo: alterado.
+- Alteração: `AtalhoRemoveView` — o POST remove somente atalhos do próprio usuário e, se o atalho não existe mais ou é de outro usuário, redireciona ao painel com aviso (antes: 404). O GET no endereço de remoção redireciona ao painel (antes: 405).
+- Motivo: tela "Página não encontrada" em `/core/atalhos/3/remover/`. Escopo por usuário mantido no servidor, sem revelar a existência do id.
+
+### `project_root/apps/core/tests_e2e.py`
+- Tipo: alterado.
+- Alteração: 2 testes novos (atalho inexistente/de outro usuário; GET volta ao painel).
+
+### Verificações
+- `manage.py test apps.core.tests_e2e.JornadaAtalhosDashboardTests`: 4 aprovados.
+- Sem alteração de banco de dados.
+
+## 19/10/2026 — Redesenho da página de Alertas e Limites de Carga e remoção de banner
+
+### `project_root/templates/core/prioridade1/alertas_carga.html`
+- Tipo: alterado.
+- Alteração: layout conforme o modelo da diretoria — cabeçalho com ícone e descrição; filtros em cartão (Unidade, Curso, Ano, Turno, com ícones); quatro cartões (Disciplinas, Professores, Exatamente no limite, Acima do limite) com cores azul, verde, âmbar e vermelho; faixa "Pontos de atenção" com botão "Ver todos" (expande/oculta a lista, com `aria-expanded`). As abas Readaptações e Exceções, os modais e todos os dados foram mantidos. Cores não são o único indicador (texto e ícones presentes); filtros empilham em telas pequenas.
+
+### `project_root/apps/core/views.py`
+- Tipo: alterado.
+- Alteração: `AlertasCargaDesupView` passa `cursos` (limitados à unidade, quando filtrada) e `filtro_curso` (somente dígitos); o filtro por curso já era aceito por `obter_resumo_prioridade1`.
+
+### `project_root/templates/core/prioridade1/solicitacoes_professor.html`
+- Tipo: alterado.
+- Alteração: removido o bloco "Análise institucional de solicitações" (título e texto explicativo).
+
+### `project_root/static/css/tailwind.min.css`
+- Tipo: alterado (gerado por `npm run build:css`).
+
+### Verificações
+- `manage.py test apps.core.tests_prioridade1_desup`: 18 aprovados. Teste temporário (removido) confirmou render da página com filtros de unidade/curso e valor inválido de curso.
+- `apps.core.tests_iconography`: 2 falhas já existentes, causadas por `extra_curricular/pendencia_list.html` (`ph-list-bullets`), sem relação com estas telas.
+- Sem alteração de banco de dados.
+
+## 19/10/2026 — Janelas de detalhe nos cartões de Alertas e Limites de Carga
+
+### `project_root/apps/core/priority1.py`
+- Tipo: alterado.
+- Alteração: `obter_resumo_prioridade1` passa a devolver também `detalhe_disciplinas`, `detalhe_sobra`, `detalhe_limite`, `detalhe_acima` e `limite_detalhe` (cada lista com no máximo 100 itens, ordenados pelos maiores desvios; os totais continuam nos cartões). Chaves existentes inalteradas.
+- Motivo: explicar os números com os itens que os compõem.
+
+### `project_root/templates/core/prioridade1/alertas_carga.html`
+- Tipo: alterado.
+- Alteração: cada cartão ganhou seta (botão acessível) que abre uma janela com "O que significa", "Como é calculado" e a lista detalhada (tabelas com rolagem horizontal em telas pequenas; aviso quando a lista é truncada).
+
+### `project_root/apps/core/tests_alertas_detalhes.py`
+- Tipo: criado.
+- Alteração: 2 testes (conteúdo dos detalhes e acesso restrito à DESUP).
+
+### Verificações
+- `manage.py test apps.core.tests_alertas_detalhes apps.core.tests_prioridade1_desup`: aprovados (2 + 18). `npm run build:css`: executado. Sem alteração de banco de dados.
+
+## 19/10/2026 — Ajuda ("?") com tutorial nas abas da DESUP e ajustes em Alertas e Limites de Carga
+
+### `project_root/apps/core/ajuda.py`
+- Tipo: criado.
+- Alteração: conteúdo do tutorial (resumo, "O que você pode fazer aqui" e "Passo a passo") das 12 abas do menu da DESUP: Dashboard, Unidades, Usuários, Equipe diretiva, Solicitações externas, Alertas, Professores, Alocação, Extracurriculares, Matrizes, Componentes e Entrega.
+
+### `project_root/apps/core/context_processors.py` e `project_root/config/settings/base.py`
+- Tipo: alterado.
+- Alteração: novo context processor `ajuda_pagina`, ativo somente para o perfil DESUP e para as rotas cadastradas.
+
+### `project_root/templates/base.html`, `templates/partials/_ajuda_botao.html`, `templates/partials/_ajuda_modal.html`
+- Tipo: alterado / criados.
+- Alteração: botão "?" ao lado do título da página e modal de tutorial (foco no botão de fechar, Esc e clique fora fecham; foco retorna ao botão; passos numerados com texto para leitor de tela). Novos blocos `header_titulo` e `header_ajuda` permitem a uma página assumir o próprio título.
+
+### `project_root/templates/core/prioridade1/alertas_carga.html`
+- Tipo: alterado.
+- Alteração: título exibido uma única vez (o do topo foi removido nesta página) com o "?" ao lado; removido o texto "Acompanhe a supervisão…"; removidas as seções "O que significa" e "Como é calculado" das janelas dos cartões; os números de "Pontos de atenção" viraram botões que abrem a lista de professores de cada ponto.
+
+### `project_root/apps/core/priority1.py`
+- Tipo: alterado.
+- Alteração: `obter_resumo_prioridade1` devolve também `detalhe_diretivos`, `detalhe_readaptados` e `detalhe_medio` (professor, unidade, situação; até 100 itens). Contagens inalteradas.
+
+### `project_root/apps/core/tests_ajuda.py`, `apps/core/tests_alertas_detalhes.py`, `apps/core/tests.py`
+- Tipo: criado / alterado.
+- Alteração: testes da ajuda (12 rotas válidas e com conteúdo, botão e modal em cada página para DESUP, ausência para coordenador, título único em Alertas) e dos pontos de atenção. Em `tests.py`, `test_remove_apenas_do_proprio_usuario` passou a esperar redirecionamento (e não 404) ao tentar remover atalho alheio, consequência da alteração de `AtalhoRemoveView` registrada acima; o atalho continua sem ser apagado.
+
+### Verificações
+- `manage.py test apps.core apps.allocations`: 249 executados; 3 falhas já existentes (`test_unidade_coord_can_only_see_their_unit` e as 2 de iconografia, de `extra_curricular/pendencia_list.html`) e 1 ajustada (descrita acima). `npm run build:css` executado. Sem alteração de banco.
+- Pendência real: os textos dos tutoriais foram escritos a partir do código das telas e devem ser revisados por quem conhece o fluxo real da DESUP.
+
+## 19/10/2026 — Tutorial guiado, cabeçalho fixo e padrão "resumo + filtro + dados" (Unidades, Solicitações, Professores, Matrizes)
+
+### `project_root/templates/partials/_ajuda_modal.html`, `_ajuda_botao.html`, `apps/core/ajuda.py`, `apps/core/context_processors.py`
+- Tipo: alterado.
+- Alteração: o "?" agora inicia um tutorial guiado — popups em sequência (boas-vindas, passos com "Anterior/Próximo/Concluir", indicador de progresso, "Pular tutorial", setas do teclado e Esc). Cada passo destaca o elemento da ação e o popup aparece ao lado dele (direita, depois esquerda; se não couber, embaixo ou em cima; no celular, como folha na base). Os alvos usam seletores ou "rota:<nome>", resolvidos para o link correspondente; passo sem alvo aparece centralizado.
+- Motivo: pedido de tutorial sequencial e junto dos botões (ex.: "Novo Professor").
+
+### `project_root/templates/base.html`, `static/css/dashboard.css`
+- Tipo: alterado.
+- Alteração: cabeçalho fixo e colado no topo (o `<main>` não tem mais padding superior; o aviso de modo de visualização ganhou margem própria). Título, "?", notificações e conta no mesmo cabeçalho.
+
+### `project_root/templates/partials/_kpi_cards.html`
+- Tipo: criado.
+- Alteração: cartões de resumo reutilizáveis (ícone, número e rótulo; sem texto extra).
+
+### `project_root/apps/core/views.py`, `templates/core/unidade_list.html`
+- Tipo: alterado.
+- Alteração: Unidades — resumo (unidades, ativas, inativas, cursos ativos), busca por nome/sigla, filtro de situação e tabela com cursos ativos, status e ações, com paginação preservando os filtros. Os rótulos "Ativo/Inativo" foram mantidos.
+
+### `project_root/templates/core/prioridade1/solicitacoes_professor.html`, `apps/core/views.py`
+- Tipo: alterado.
+- Alteração: Solicitações externas — resumo (pendentes, aprovadas, recusadas), filtros e tabela enxuta; a justificativa e o formulário de decisão (aprovar/recusar com motivo) passaram para uma janela aberta por "Decidir"/"Ver". Regras e endpoint de decisão inalterados.
+
+### `project_root/apps/professors/views.py`, `templates/professors/professor_list.html`
+- Tipo: alterado.
+- Alteração: Professores — resumo (no sistema, ativos, afastados e, com filtro, encontrados) no lugar das etiquetas de contagem; botões de ação alinhados à direita; filtros e tabela mantidos.
+
+### `project_root/apps/courses/views.py`, `templates/courses/matrix_list.html`
+- Tipo: alterado.
+- Alteração: Matrizes — resumo (total, vigentes, rascunhos só para a DESUP, histórico) no escopo do perfil; filtros e tabela mantidos.
+
+### `project_root/apps/core/tests_resumos_telas.py`, `tests_ajuda.py`, `apps/professors/tests_e2e.py`
+- Tipo: criado / alterado.
+- Alteração: testes dos resumos, filtros, escopo por perfil, cabeçalho colado e alvos do tutorial. Em `professors/tests_e2e.py`, `test_listagem_mostra_total_de_professores` passou a verificar o cartão "No sistema" (antes procurava o texto "2 no sistema").
+
+### Verificações
+- `manage.py test apps.core apps.professors apps.courses`: apenas falhas já existentes (`test_unidade_coord_can_only_see_their_unit`, `test_limite_manual_da_desup_prevalece_sobre_o_calculo`, `test_listagem_mostra_colunas_por_matriz_e_soma_de_horas`, `test_hr_total_dois_decimais`, `test_opcoes_de_duplicacao_para_a_desup` e as 2 de iconografia); os testes novos e os ajustados passam. `npm run build:css` executado. Sem alteração de banco.
+- Não validado visualmente em navegador (posição do popup, cabeçalho em telas reais).
+
+## 19/10/2026 — Exclusão de cargo da equipe diretiva mesmo com ocupantes
+
+### `project_root/apps/core/views.py`
+- Tipo: alterado.
+- Alteração: `TipoCargoDiretivoDeleteView` passa a excluir o cargo mesmo com ocupantes: as ocupações dele (vigentes e históricas) são removidas junto, na mesma transação. A auditoria (`CARGO_DIRETIVO_EXCLUIDO`) registra a quantidade de ocupações removidas e a mensagem ao usuário informa o mesmo. Continuam restritos à DESUP, POST e CSRF. Professores e unidades não são afetados.
+- Motivo: pedido da DESUP. Observação: é uma exclusão definitiva do histórico daquele cargo (decisão explícita do solicitante, em exceção à diretriz de evitar exclusões destrutivas).
+
+### `project_root/templates/core/prioridade1/_modal_form.html`
+- Tipo: alterado.
+- Alteração: a confirmação passou a avisar que ocupantes e histórico do cargo também serão excluídos.
+
+### `project_root/apps/core/tests_prioridade1_desup.py`
+- Tipo: alterado.
+- Alteração: `test_cargo_com_historico_nao_pode_ser_excluido` foi substituído por `test_cargo_com_ocupantes_pode_ser_excluido_junto_com_as_ocupacoes` (a regra anterior foi alterada a pedido); novo teste garante que ocupações de outros cargos e o cadastro do professor ficam intactos.
+
+### Verificações
+- `manage.py test apps.core.tests_prioridade1_desup`: 19 aprovados. Sem alteração de banco (sem migração).
+
+### Correção — botão "Excluir cargo" ausente em cargos preenchidos
+- `project_root/templates/core/prioridade1/_modal_form.html`: removido o bloqueio da tela que escondia "Excluir cargo" e exibia "Este cargo tem ocupações no histórico e não pode ser excluído" quando o cargo tinha ocupações (o servidor já permitia a exclusão). Agora o botão aparece sempre, com a confirmação que avisa que ocupantes e histórico também serão excluídos.
+- `project_root/apps/core/tests_prioridade1_desup.py`: novo teste `test_modal_de_edicao_oferece_excluir_mesmo_com_ocupantes`. Verificação: `manage.py test apps.core.tests_prioridade1_desup` aprovado.
+
+### Tutorial guiado ligado às funções reais da tela
+- `project_root/apps/core/ajuda.py`: cada passo agora tem `alvo` (elementos reais da tela, com alternativas), `abrir` (o que o tutorial clica para abrir o popup, aba ou filtro), `fechar` (o que desfazer ao sair do passo) e `requisito` (aviso quando o elemento ainda não existe, ex.: escolher uma unidade). Passos novos/ajustados para abrir os popups de verdade: Equipe diretiva (cargo, preenchimento, redução, novo cargo/exclusão, histórico), Alertas (lista dos cartões, pontos de atenção, readaptação, exceção), Professores (detalhe e edição), Solicitações (pedido e decisão), Dashboard (atalhos) e Alocação (campo de docente e opções de carência/não oferecido).
+- `project_root/templates/partials/_ajuda_modal.html`: o tutorial executa o `abrir`, destaca o elemento real, mostra o aviso de requisito quando necessário e desfaz (fecha popups, volta a aba, recolhe filtros) ao avançar, voltar, pular ou concluir.
+- `project_root/apps/core/context_processors.py`, `templates/dashboard/desup.html`, `templates/core/unidade_list.html`: resolução dos alvos por rota e marcadores `data-tour`.
+- `project_root/apps/core/tests_ajuda.py`: testes atualizados (todo passo tem alvo; passos de popup têm abrir e fechar).
+- Verificação: `manage.py test apps.core.tests_ajuda apps.core.tests_resumos_telas` aprovados; checagem estática dos seletores contra o HTML de cada página (nenhum passo ficou sem alvo). Não validado em navegador: o comportamento de abrir/fechar popups durante o tutorial deve ser conferido na tela.
+
+## 19/10/2026 — Barra de redução no preenchimento do cargo, tutorial sem "dança", alinhamento e responsividade
+
+### `project_root/templates/core/prioridade1/_reducao_controle.html`, `_campos_form.html`, `equipe_diretiva.html`, `apps/core/forms.py`
+- Tipo: criado / alterado.
+- Alteração: o controle de redução (campo numérico + barra de 0 a 20 h + botão "Redução total") virou um parcial único, usado tanto no modal "Preencher cargo" quanto no "Redução de carga" (script compartilhado, sem duplicação). No preenchimento, professor, curso e redução ocupam a largura toda e as datas ficam lado a lado. O campo numérico dos dois formulários passou a aceitar no máximo 20 (o servidor continua validando só pelo modelo).
+- Testes: `test_barra_de_reducao_aparece_ao_preencher_e_ao_ajustar_o_cargo`.
+
+### `project_root/templates/partials/_ajuda_modal.html`, `apps/core/ajuda.py`, `templates/core/prioridade1/equipe_diretiva.html`
+- Tipo: alterado.
+- Alteração: o tutorial deixa de "pular": o popup fica invisível enquanto o passo é preparado e só aparece depois de abrir o popup da tela, rolar e posicionar (uma conferência final após o layout assentar); reposicionamento por quadro de animação ao rolar/redimensionar; se faltar algo para abrir o popup (ex.: não há cargo vago), o que foi aberto é desfeito e o item mais próximo é destacado com o aviso; o popup procura o lado com espaço livre e, se nenhum couber, encosta na borda com mais espaço em vez de cobrir o elemento. Alternativas de clique (`a || b`) e marcadores `data-tour-vago/ocupado` escolhem o cargo certo para cada passo.
+
+### `project_root/templates/core/prioridade1/alertas_carga.html`, `templates/base.html`
+- Tipo: alterado.
+- Alteração: filtros de Alertas ocupam a largura toda, alinhados com as abas e os cartões (4 colunas no desktop/tablet largo, 2 no tablet, 1 no celular); abas com rolagem horizontal sem quebra de texto. No `base.html`, as margens do cabeçalho fixo passaram a acompanhar o padding do `<main>` (quebra em 1024 px), corrigindo estouro lateral de 16 px em tablets (768–1023 px).
+
+### Verificações
+- `manage.py test apps.core.tests_ajuda apps.core.tests_resumos_telas apps.core.tests_alertas_detalhes apps.core.tests_prioridade1_desup`: 39 aprovados; `npm run build:css` executado.
+- Tentei validar o tutorial no navegador (Chrome), mas o controle remoto não conseguiu anexar à aba ("Cannot attach to this target"); o comportamento visual do tutorial e a responsividade (360/768/1024/1440 px) NÃO foram verificados em tela e precisam de conferência manual.

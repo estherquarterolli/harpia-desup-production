@@ -38,7 +38,7 @@
 
     {% for item in composicao %}
     {% cycle 'bg-blue-50 text-blue-600' 'bg-violet-50 text-violet-600' 'bg-pink-50 text-pink-600' 'bg-amber-50 text-amber-600' 'bg-emerald-50 text-emerald-600' 'bg-cyan-50 text-cyan-600' as cor silent %}
-    <button type="button" onclick="abrirModal('modalDetalhe{{ item.cargo.pk }}')" class="flex w-full items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-200 {% if not item.cargo.ativo %}opacity-60{% endif %}">
+    <button type="button" onclick="abrirModal('modalDetalhe{{ item.cargo.pk }}')"{% if item.pode_adicionar and not item.ocupantes %} data-tour-vago{% endif %}{% if item.ocupantes %} data-tour-ocupado{% endif %} class="flex w-full items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-200 {% if not item.cargo.ativo %}opacity-60{% endif %}">
       <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full {{ cor }}"><i class="ph{% if not item.ocupantes %}-fill{% endif %} ph-user text-2xl"></i></span>
       <span class="min-w-0 flex-1">
         <span class="block font-black text-slate-900">{{ item.cargo.nome }}</span>
@@ -73,7 +73,8 @@
 
 {% for cargo, form_cargo in cargos_forms %}
 {% url 'core:cargo_diretivo_update' cargo.pk as url_cargo %}
-{% include 'core/prioridade1/_modal_form.html' with modal_id='modalCargo' modal_key=cargo.pk titulo='Editar cargo' subtitulo='A alteração vale para todas as unidades.' voltar=unidade_selecionada|yesno:'modalDetalhe,' voltar_key=cargo.pk action_url=url_cargo form=form_cargo %}
+{% url 'core:cargo_diretivo_delete' cargo.pk as url_excluir_cargo %}
+{% include 'core/prioridade1/_modal_form.html' with modal_id='modalCargo' modal_key=cargo.pk titulo='Editar cargo' subtitulo='A alteração vale para todas as unidades.' voltar=unidade_selecionada|yesno:'modalDetalhe,' voltar_key=cargo.pk action_url=url_cargo form=form_cargo delete_url=url_excluir_cargo tem_ocupacoes=cargo.tem_ocupacoes %}
 {% endfor %}
 
 {% for item in composicao %}
@@ -136,10 +137,7 @@
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ retorno }}">
       <div class="space-y-4 px-6 py-4">
-        <div>
-          <label for="reducao{{ ocupacao.pk }}" class="mb-1.5 block text-sm font-bold text-slate-700">Horas semanais de redução</label>
-          <input id="reducao{{ ocupacao.pk }}" type="number" name="carga_reducao_horas" min="0" max="168" step="0.25" value="{{ ocupacao.carga_reducao_horas|stringformat:'s' }}" required class="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#025c9f] focus:ring-2 focus:ring-blue-100">
-        </div>
+        {% include 'core/prioridade1/_reducao_controle.html' with ctl_id=ocupacao.pk|stringformat:'s'|add:'-reducao' ctl_name='carga_reducao_horas' ctl_valor=ocupacao.carga_reducao_horas ctl_label='Horas semanais de redução' ctl_required=True %}
         <div>
           <label for="obs{{ ocupacao.pk }}" class="mb-1.5 block text-sm font-bold text-slate-700">Observações</label>
           <textarea id="obs{{ ocupacao.pk }}" name="observacoes" rows="2" class="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#025c9f] focus:ring-2 focus:ring-blue-100">{{ ocupacao.observacoes }}</textarea>

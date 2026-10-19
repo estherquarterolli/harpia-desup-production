@@ -48,7 +48,10 @@
         Alocação aprovada
       </button>
       <form method="POST" action="{% url 'desfazer_aprovacao_unidade' unidade_id=unidade_selecionada_id %}" class="m-0"
-            onsubmit="return confirm('Desfazer a aprovação desta unidade? A alocação voltará a ser editável.');">
+            data-confirm-title="Desfazer aprovação"
+            data-confirm-message="Desfazer a aprovação desta unidade? A alocação voltará a ser editável."
+            data-confirm-label="Desfazer"
+            data-confirm-tone="warn">
         {% csrf_token %}
         <button type="submit" class="flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-bold text-sm px-4 py-2.5 rounded-xl transition-all">
           <i class="ph ph-arrow-counter-clockwise text-lg"></i>
@@ -57,11 +60,14 @@
       </form>
     </div>
     {% else %}
-    <form method="POST" action="{% url 'aprovar_alocacao_unidade' unidade_id=unidade_selecionada_id %}" class="w-full sm:w-auto sm:ml-auto m-0">
+    <form method="POST" action="{% url 'aprovar_alocacao_unidade' unidade_id=unidade_selecionada_id %}" class="w-full sm:w-auto sm:ml-auto m-0"
+          data-confirm-title="Aprovar alocação"
+          data-confirm-message="Deseja aprovar a alocação curricular desta unidade para este semestre?"
+          data-confirm-label="Aprovar"
+          data-confirm-tone="ok">
       {% csrf_token %}
       <button type="submit" id="approveAllocBtn"
         {% if not alocacao_curricular_preenchida %}disabled title="Ainda existem componentes sem docente"{% endif %}
-        onclick="if(!confirm('Deseja aprovar a alocação curricular desta unidade para este semestre?')) return false;"
         class="w-full sm:w-auto flex items-center justify-center gap-2 text-white font-black text-sm px-5 py-2.5 rounded-xl shadow-md transition-all {% if alocacao_curricular_preenchida %}bg-emerald-600 hover:bg-emerald-700 hover:scale-105{% else %}bg-slate-300 cursor-not-allowed{% endif %}">
         <i class="ph ph-check-circle text-lg"></i>
         Aprovar Alocação
@@ -103,6 +109,7 @@
             <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider w-24">Código</th>
             <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider min-w-[200px]">Nome Disciplina</th>
             <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider min-w-[300px]">Docente</th>
+            <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider text-center min-w-[170px]">Turmas</th>
             <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider text-center w-20">Crédito</th>
             <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider text-center w-16">HA/sem</th>
             <th class="px-4 py-4 text-[10px] font-bold uppercase tracking-wider text-center w-16">HR/sem</th>
@@ -110,65 +117,56 @@
         </thead>
         <tbody class="divide-y divide-slate-100">
           {% for comp in item.componentes %}
-          <tr class="hover:bg-slate-50 transition-colors" id="row-comp-{{ comp.id }}">
+          <tr class="hover:bg-slate-50 transition-colors" id="row-comp-{{ comp.id }}" data-qtd="{{ comp.quantidade_turmas }}">
             <td class="px-4 py-3 text-center font-bold text-slate-700" data-label="Período">{{ comp.periodo|default:"-" }}</td>
             <td class="px-4 py-3 font-mono text-xs text-slate-500" data-label="Código">{{ comp.codigo|default:"-" }}</td>
             <td class="px-4 py-3 font-bold text-slate-800">
               {{ comp.nome_disciplina }}
             </td>
             <td class="px-4 py-2" data-label="Docente">
-              <!-- Autocomplete Docente -->
-              <div class="ac-docente relative"
+              <div class="ac-slots space-y-1.5"
                    data-comp-id="{{ comp.id }}"
-                   data-alocar-url="{% url 'alocar_docente_componente' pk=comp.id %}"
-                   data-current-id="{% if comp.docente %}{{ comp.docente.id }}{% elif comp.status == 'NAO_OFERECIDA' %}NAO_OFERECIDA{% else %}SEM_PROFESSOR{% endif %}"
-                   data-current-nome="{% if comp.docente %}{{ comp.docente.rh_nome }}{% elif comp.status == 'NAO_OFERECIDA' %}Não oferecido{% else %}{% endif %}"
-                   {% if window_fechada and user.perfil != 'DESUP' %}data-window-lock="true" data-window-area="{{ window_area_label }}" data-window-action="{{ window_action_label }}" data-window-target="{{ comp.nome_disciplina }}" data-window-message="{{ window_message }}"{% endif %}
-              >
-                <div class="ac-input-wrap flex items-center gap-1.5 w-full px-3 py-1.5 border rounded text-sm transition cursor-pointer
-                  {% if comp.docente %}border-emerald-300 bg-emerald-50{% elif comp.status == 'NAO_OFERECIDA' %}border-slate-300 bg-slate-100{% elif comp.status == 'SEM_PROFESSOR' %}border-slate-300 bg-slate-50{% else %}border-slate-200 bg-slate-50{% endif %}"
-                >
-                  {% if not comp.docente and comp.status == 'SEM_PROFESSOR' %}
-                  <i class="ph ph-chalkboard-teacher text-base text-slate-400 flex-shrink-0"></i>
-                  {% endif %}
-                  <input type="text"
-                         class="ac-input flex-1 bg-transparent outline-none
-                           {% if comp.docente %}text-emerald-800 font-semibold{% elif comp.status == 'NAO_OFERECIDA' %}text-slate-500 font-semibold{% else %}text-slate-400{% endif %}"
-                         placeholder="{% if comp.status == 'NAO_OFERECIDA' %}Não oferecido{% else %}Sem professor{% endif %}"
-                         value="{% if comp.docente %}{{ comp.docente.rh_nome }}{% elif comp.status == 'NAO_OFERECIDA' %}Não oferecido{% endif %}"
-                         autocomplete="off"
-                         {% if user.perfil != 'DESUP' and user.perfil != 'COORDENADOR_UNIDADE' %}disabled{% endif %}
-                  >
-                  {% if comp.docente %}
-                  <button type="button" class="ac-clear text-emerald-400 hover:text-red-500 transition-colors flex-shrink-0" title="Remover docente">
-                    <i class="ph ph-trash text-base"></i>
-                  </button>
-                  {% endif %}
-                  <i class="ph ph-caret-down text-xs text-slate-400 flex-shrink-0 ac-caret transition-transform"></i>
+                   data-comp-nome="{{ comp.nome_disciplina }}"
+                   data-alocar-url="{% url 'alocar_docente_componente' pk=comp.id %}">
+                {% for linha in comp.linhas_carregadas %}
+                  {% include 'allocations/partials/_slot_docente.html' with extra=forloop.counter0 %}
+                {% empty %}
+                  {% include 'allocations/partials/_slot_docente.html' with linha=None extra=False %}
+                {% endfor %}
+              </div>
+              {% if user.perfil == 'DESUP' or user.perfil == 'COORDENADOR_UNIDADE' %}
+              <button type="button"
+                      class="ac-add mt-1.5 inline-flex items-center gap-1 rounded border border-dashed border-slate-300 px-2.5 py-1 text-xs font-bold text-[#025c9f] hover:border-[#025c9f] hover:bg-blue-50 transition-colors"
+                      title="Adicionar outro docente ou carência"
+                      aria-label="Adicionar outro docente ou carência para {{ comp.nome_disciplina }}"
+                      {% if window_fechada and user.perfil != 'DESUP' %}data-window-lock="true" data-window-area="{{ window_area_label }}" data-window-action="{{ window_action_label }}" data-window-target="{{ comp.nome_disciplina }}" data-window-message="{{ window_message }}"{% endif %}>
+                <i class="ph ph-plus-circle text-sm" aria-hidden="true"></i>
+                <span class="sr-only sm:not-sr-only">Adicionar</span>
+              </button>
+              {% endif %}
+            </td>
+            <td class="px-4 py-2 text-center" data-label="Turmas">
+              <div class="ac-turmas inline-block text-left"
+                   data-turmas-url="{% url 'quantidade_turmas_componente' pk=comp.id %}"
+                   data-saved="{{ comp.quantidade_turmas }}"
+                   data-comp-nome="{{ comp.nome_disciplina }}"
+                   {% if window_fechada and user.perfil != 'DESUP' %}data-window-lock="true" data-window-area="{{ window_area_label }}" data-window-action="{{ window_action_label }}" data-window-target="{{ comp.nome_disciplina }}" data-window-message="{{ window_message }}"{% endif %}>
+                <label class="sr-only" for="turmas-{{ comp.id }}">Quantidade de turmas de {{ comp.nome_disciplina }}</label>
+                <div class="flex items-center gap-2">
+                  <input id="turmas-{{ comp.id }}" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="off"
+                         value="{{ comp.quantidade_turmas }}"
+                         class="ac-turmas-input w-14 rounded border border-slate-300 bg-white px-2 py-1.5 text-center text-sm font-bold text-slate-700 outline-none focus:border-[#025c9f] focus:ring-1 focus:ring-[#025c9f]"
+                         {% if user.perfil != 'DESUP' and user.perfil != 'COORDENADOR_UNIDADE' %}disabled{% endif %}>
+                  <span class="ac-turmas-extenso text-xs font-semibold text-slate-500" aria-live="polite"></span>
                 </div>
-
-                <!-- Dropdown -->
-                <div class="ac-dropdown hidden absolute z-50 bg-white border border-slate-200 rounded-lg shadow-xl mt-1 overflow-hidden"
-                     style="max-height: 320px; min-width: 280px;">
-                  <!-- Opções fixas -->
-                  <div class="ac-fixed-options border-b border-slate-100">
-                    <div class="ac-option px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 flex items-center gap-2 text-slate-500 transition-colors"
-                         data-value="SEM_PROFESSOR">
-                      <i class="ph ph-chalkboard-teacher text-base"></i> Sem professor
-                    </div>
-                    <div class="ac-option px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 flex items-center gap-2 text-slate-400 transition-colors"
-                         data-value="NAO_OFERECIDA">
-                      <i class="ph ph-prohibit text-base"></i> Não oferecido
-                    </div>
-                  </div>
-                  <!-- Resultados dinâmicos -->
-                  <div class="ac-results overflow-y-auto" style="max-height: 200px;">
-                    <div class="ac-placeholder px-3 py-4 text-xs text-center text-slate-400">
-                      <i class="ph ph-magnifying-glass text-lg block mb-1"></i>
-                      Digite para buscar professores...
-                    </div>
+                <div class="ac-turmas-confirm hidden mt-1.5 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900" role="group" aria-label="Confirmar quantidade de turmas">
+                  <p class="ac-turmas-confirm-text font-semibold"></p>
+                  <div class="mt-1.5 flex gap-1.5">
+                    <button type="button" class="ac-turmas-ok rounded bg-[#025c9f] px-2.5 py-1 font-bold text-white hover:bg-[#153e70]">Confirmar</button>
+                    <button type="button" class="ac-turmas-cancel rounded border border-slate-300 bg-white px-2.5 py-1 font-bold text-slate-600 hover:bg-slate-50">Cancelar</button>
                   </div>
                 </div>
+                <p class="ac-turmas-erro hidden mt-1 text-xs font-semibold text-red-600" role="alert"></p>
               </div>
             </td>
             <td class="px-4 py-3 text-center text-slate-600" data-label="Crédito">{{ comp.creditos }}</td>
@@ -177,7 +175,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="7" class="px-6 py-12 text-center text-slate-400 bg-white">
+            <td colspan="8" class="px-6 py-12 text-center text-slate-400 bg-white">
               Nenhuma disciplina cadastrada nesta matriz.
             </td>
           </tr>
@@ -206,8 +204,26 @@
 
 </div>
 
+{# Modelo da linha adicional criada pelo botão "+" #}
+<template id="acSlotTemplate">{% include 'allocations/partials/_slot_docente.html' with comp=None linha=None extra=True nova=True %}</template>
+
 {# Aviso discreto do salvamento automático #}
 <div id="allocToast" class="pointer-events-none fixed bottom-5 right-5 z-[150] hidden items-center gap-2 rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white shadow-lg" role="status" aria-live="polite"></div>
+
+{# Popup de confirmação genérico (substitui o confirm() do navegador) #}
+<div id="allocConfirmModal" class="hidden fixed inset-0 z-[160] flex items-center justify-center bg-slate-900/50 px-4" role="alertdialog" aria-modal="true" aria-labelledby="allocConfirmTitle" aria-describedby="allocConfirmMsg">
+  <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl text-center">
+    <div id="allocConfirmIcon" class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-green-600">
+      <i class="ph ph-question text-3xl"></i>
+    </div>
+    <h2 id="allocConfirmTitle" class="text-lg font-black text-slate-800"></h2>
+    <p id="allocConfirmMsg" class="mt-2 text-sm text-slate-600"></p>
+    <div class="mt-5 flex justify-center gap-3">
+      <button type="button" id="allocConfirmCancel" class="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50">Cancelar</button>
+      <button type="button" id="allocConfirmOk" class="rounded-lg bg-[#025c9f] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#153e70]">Confirmar</button>
+    </div>
+  </div>
+</div>
 
 {# Popup de confirmação do botão "Salvar Alocações" #}
 <div id="allocSavedModal" class="hidden fixed inset-0 z-[140] flex items-center justify-center bg-slate-900/50 px-4" role="dialog" aria-modal="true" aria-labelledby="allocSavedTitle">
@@ -258,22 +274,38 @@
 
   // ─── Aviso discreto (toast) ──────────────────────────────
   let toastTimer;
-  function showAllocToast(text, isError) {
+  // kind: true/'error' = vermelho, 'warn' = amarelo (aviso), demais = neutro.
+  function showAllocToast(text, kind) {
     const el = document.getElementById('allocToast');
     if (!el) return;
+    const isError = kind === true || kind === 'error';
+    const isWarn = kind === 'warn';
     el.textContent = text;
-    el.classList.toggle('bg-red-600', !!isError);
-    el.classList.toggle('bg-slate-800', !isError);
+    el.classList.toggle('bg-red-600', isError);
+    el.classList.toggle('alloc-toast-warn', isWarn);
+    el.classList.toggle('bg-slate-800', !isError && !isWarn);
     el.classList.remove('hidden');
     el.classList.add('flex');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { el.classList.add('hidden'); el.classList.remove('flex'); }, 2500);
+    toastTimer = setTimeout(() => { el.classList.add('hidden'); el.classList.remove('flex'); }, isWarn ? 6000 : 2500);
   }
 
   // ─── Resumo / botões ─────────────────────────────────────
+  // Uma disciplina está pendente quando é oferecida e alguma turma ainda não tem
+  // docente: há linha "Sem professor" ou menos docentes que a quantidade de turmas.
+  function rowPending(tr) {
+    const slots = Array.from(tr.querySelectorAll('.ac-docente'));
+    if (!slots.length) return false;
+    if (slots[0].dataset.currentId === 'NAO_OFERECIDA') return false;
+    // Pendente: alguma linha "Sem professor" ou nenhum docente definido. A quantidade de turmas
+    // não exige um docente por turma (o mesmo docente pode dar todas).
+    const preenchidas = slots.filter(el => el.dataset.currentId !== 'SEM_PROFESSOR').length;
+    return preenchidas < slots.length || preenchidas === 0;
+  }
+
   function countPending() {
     let n = 0;
-    document.querySelectorAll('.ac-docente').forEach(el => { if (el.dataset.currentId === 'SEM_PROFESSOR') n++; });
+    document.querySelectorAll('tr[data-qtd]').forEach(tr => { if (rowPending(tr)) n++; });
     return n;
   }
 
@@ -282,7 +314,7 @@
     const btn = document.getElementById('approveAllocBtn');
     if (!btn || btn.type !== 'submit') return;
     const pend = countPending();
-    const ready = pend === 0 && document.querySelectorAll('.ac-docente').length > 0;
+    const ready = pend === 0 && document.querySelectorAll('tr[data-qtd]').length > 0;
     btn.disabled = !ready;
     btn.title = ready ? '' : 'Ainda existem componentes sem docente';
     btn.classList.toggle('bg-emerald-600', ready);
@@ -313,10 +345,11 @@
       this.results   = root.querySelector('.ac-results');
       this.clearBtn  = root.querySelector('.ac-clear');
       this.caret     = root.querySelector('.ac-caret');
-      this.compId    = root.dataset.compId;
-      this.alocarUrl = root.dataset.alocarUrl;
+      this.slots     = root.closest('.ac-slots');
+      this.alocarUrl = this.slots.dataset.alocarUrl;
       this.currentId = root.dataset.currentId;
       this.currentNome = root.dataset.currentNome;
+      this.currentCargo = root.dataset.currentCargo || '';
       this.isLocked  = root.dataset.windowLock === 'true';
 
       if (this.input.disabled) return;
@@ -368,6 +401,16 @@
           this.input.focus();
         }
       });
+
+      // Botão "remover linha" (linhas adicionais)
+      const slotEl = this.root.closest('.ac-slot');
+      const removeBtn = slotEl ? slotEl.querySelector('.ac-remove') : null;
+      if (removeBtn) {
+        removeBtn.addEventListener('click', () => {
+          if (this.isLocked) { this._triggerWindowLock(); return; }
+          this._removeLine(slotEl);
+        });
+      }
 
       // Close on outside click (delegated at document level via init)
       // Escape to close
@@ -466,12 +509,14 @@
       }
 
       this.results.innerHTML = items.map(p => `
-        <div class="ac-option-result px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 flex items-center justify-between gap-2 transition-colors ${p.id == this.currentId ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-slate-700'}"
-             data-id="${p.id}" data-nome="${this._escapeAttr(p.nome)}">
+        <div class="ac-option-result px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 flex items-center justify-between gap-2 transition-colors ${p.cargo_diretivo ? 'ac-state-diretivo' : p.id == this.currentId ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-slate-700'}"
+             data-id="${p.id}" data-nome="${this._escapeAttr(p.nome)}" data-cargo="${this._escapeAttr(p.cargo_diretivo || '')}"
+             ${p.cargo_diretivo ? `title="${this._escapeAttr('Equipe diretiva: ' + p.cargo_diretivo)}"` : ''}>
           <span class="flex items-center gap-2 truncate">
-            <i class="ph ph-chalkboard-teacher text-base text-slate-400 flex-shrink-0"></i>
+            <i class="ph ${p.cargo_diretivo ? 'ph-warning-circle' : 'ph-chalkboard-teacher'} text-base ${p.cargo_diretivo ? 'ac-text-diretivo' : 'text-slate-400'} flex-shrink-0"></i>
             <span class="truncate">${this._escapeHtml(p.nome)}</span>
           </span>
+          ${p.cargo_diretivo ? '<span class="text-[10px] font-bold ac-text-diretivo bg-white/70 px-1.5 py-0.5 rounded flex-shrink-0">Diretivo</span>' : ''}
           ${p.unidade ? `<span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded flex-shrink-0">${this._escapeHtml(p.unidade)}</span>` : ''}
         </div>
       `).join('');
@@ -484,7 +529,7 @@
             this._triggerWindowLock();
             return;
           }
-          this._selectValue(el.dataset.id, el.dataset.nome);
+          this._selectValue(el.dataset.id, el.dataset.nome, el.dataset.cargo || '');
         });
       });
 
@@ -493,20 +538,21 @@
       this._position();
     }
 
-    async _selectValue(value, label) {
+    async _selectValue(value, label, cargo) {
       this._close();
 
       // Escolheu o que já está salvo: nada a enviar.
-      if (String(value) === String(this.currentId)) {
+      const linhaSalva = this.root.dataset.linhaId && this.root.dataset.linhaId !== 'novo';
+      if (String(value) === String(this.currentId) && linhaSalva) {
         this.input.value = this.currentNome;
         return;
       }
 
       // Salvamento automático: a linha é atualizada na hora e o envio roda em
       // segundo plano, sem recarregar a página nem travar o campo.
-      const prev = { id: this.currentId, nome: this.currentNome };
+      const prev = { id: this.currentId, nome: this.currentNome, cargo: this.currentCargo };
       const nome = value === 'SEM_PROFESSOR' ? '' : value === 'NAO_OFERECIDA' ? 'Não oferecido' : label;
-      this._applyState(value, nome);
+      this._applyState(value, nome, cargo || '');
       this.wrap.classList.add('opacity-60');
 
       try {
@@ -518,7 +564,7 @@
             'Accept': 'application/json',
             'Content-Type': 'application/x-www-form-urlencoded',
           },
-          body: `docente_id=${encodeURIComponent(value)}`,
+          body: this._body(value),
         });
 
         if (resp.status === 403 || resp.redirected) {
@@ -527,44 +573,113 @@
           return;
         }
         const data = await resp.json();
-        if (!resp.ok || !data.ok) throw new Error('save failed');
+        if (!resp.ok || !data.ok) {
+          const err = new Error(data.message || 'save failed');
+          err.fromServer = !!data.message;
+          throw err;
+        }
+        if (data.reload) { window.location.reload(); return; }
 
+        if (data.linha_id) {
+          this.root.dataset.linhaId = String(data.linha_id);
+        }
+        if (value === 'NAO_OFERECIDA') {
+          const proprio = this.root.closest('.ac-slot');
+          this.slots.querySelectorAll('.ac-slot').forEach(el => { if (el !== proprio) el.remove(); });
+        }
         this.wrap.classList.remove('opacity-60');
         markAllocationChanged();
-        showAllocToast(data.message || 'Alocação salva.', false);
+        const cargoDiretivo = data.cargo_diretivo || '';
+        if (cargoDiretivo !== this.currentCargo) this._applyState(value, nome, cargoDiretivo);
+        if (cargoDiretivo) {
+          showAllocToast(`Atenção: ${nome} integra a equipe diretiva (${cargoDiretivo}) e foi alocado em sala.`, 'warn');
+        } else if (value === 'SEM_PROFESSOR') {
+          showAllocToast('Carência declarada: a turma ficou sem professor.', 'error');
+        } else {
+          showAllocToast(data.message || 'Alocação salva.', false);
+        }
       } catch (err) {
         this.wrap.classList.remove('opacity-60');
-        this._applyState(prev.id, prev.nome);
+        this._applyState(prev.id, prev.nome, prev.cargo);
         refreshAllocSummary();
-        showAllocToast('Erro ao salvar a alocação. Tente novamente.', true);
+        showAllocToast(err.fromServer ? err.message : 'Erro ao salvar a alocação. Tente novamente.', true);
+      }
+    }
+
+    _body(value) {
+      const params = new URLSearchParams({ docente_id: value });
+      const linha = this.root.dataset.linhaId;
+      if (linha) params.set('linha_id', linha);
+      if (UNIDADE_ID) params.set('unidade_id', UNIDADE_ID);
+      return params.toString();
+    }
+
+    async _removeLine(slotEl) {
+      const linha = this.root.dataset.linhaId;
+      // Linha ainda não salva: basta descartá-la da tela.
+      if (!linha || linha === 'novo') {
+        slotEl.remove();
+        markAllocationChanged();
+        return;
+      }
+      const params = new URLSearchParams({ acao: 'remover', linha_id: linha });
+      if (UNIDADE_ID) params.set('unidade_id', UNIDADE_ID);
+      try {
+        const resp = await fetch(this.alocarUrl, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': getCSRFToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: params.toString(),
+        });
+        if (resp.status === 403 || resp.redirected) { window.location.reload(); return; }
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) throw new Error(data.message || 'remove failed');
+        slotEl.remove();
+        markAllocationChanged();
+        showAllocToast(data.message || 'Linha removida.', false);
+      } catch (err) {
+        showAllocToast(err.message && err.message !== 'remove failed' ? err.message : 'Erro ao remover a linha.', true);
       }
     }
 
     // Reflete na linha o estado (docente / sem professor / não oferecido),
     // espelhando as classes que o template renderiza no carregamento.
-    _applyState(id, nome) {
+    _applyState(id, nome, cargo) {
       const isNone = id === 'SEM_PROFESSOR';
       const isNao = id === 'NAO_OFERECIDA';
       const hasDoc = !isNone && !isNao;
+      const diretivo = hasDoc && !!cargo;
 
       this.currentId = String(id);
       this.currentNome = nome || '';
+      this.currentCargo = diretivo ? cargo : '';
       this.root.dataset.currentId = this.currentId;
       this.root.dataset.currentNome = this.currentNome;
+      this.root.dataset.currentCargo = this.currentCargo;
 
       this.input.value = this.currentNome;
       this.input.placeholder = isNao ? 'Não oferecido' : 'Sem professor';
-      this.input.className = 'ac-input flex-1 bg-transparent outline-none ' +
-        (hasDoc ? 'text-emerald-800 font-semibold' : isNao ? 'text-slate-500 font-semibold' : 'text-slate-400');
+      // Amarelo = equipe diretiva em sala; vermelho = carência; verde = docente.
+      this.input.className = 'ac-input flex-1 min-w-0 bg-transparent outline-none ' +
+        (diretivo ? 'ac-text-diretivo font-semibold' : hasDoc ? 'text-emerald-800 font-semibold'
+          : isNao ? 'text-slate-500 font-semibold' : 'ac-text-carencia font-semibold');
 
       this.wrap.className = 'ac-input-wrap flex items-center gap-1.5 w-full px-3 py-1.5 border rounded text-sm transition cursor-pointer ' +
-        (hasDoc ? 'border-emerald-300 bg-emerald-50' : isNao ? 'border-slate-300 bg-slate-100' : 'border-slate-300 bg-slate-50');
+        (diretivo ? 'ac-state-diretivo' : hasDoc ? 'border-emerald-300 bg-emerald-50'
+          : isNao ? 'border-slate-300 bg-slate-100' : 'ac-state-carencia');
+      if (diretivo) this.wrap.title = `Equipe diretiva: ${cargo}. Este docente está alocado em sala.`;
+      else if (isNone) this.wrap.title = 'Carência: esta turma está sem professor.';
+      else this.wrap.removeAttribute('title');
 
       // Ícone "sem professor" (antes do input)
       let userIcon = this.wrap.querySelector(':scope > i.ph-chalkboard-teacher');
       if (isNone && !userIcon) {
         userIcon = document.createElement('i');
-        userIcon.className = 'ph ph-chalkboard-teacher text-base text-slate-400 flex-shrink-0';
+        userIcon.className = 'ph ph-chalkboard-teacher text-base ac-carencia-icon flex-shrink-0';
         this.wrap.insertBefore(userIcon, this.input);
       } else if (!isNone && userIcon) {
         userIcon.remove();
@@ -602,11 +717,160 @@
     }
   }
 
+  // ─── Quantidade de turmas ────────────────────────────────
+  const MAX_TURMAS = 20;
+  const EXTENSO = ['zero', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove', 'dez',
+    'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove', 'vinte'];
+
+  function extenso(n) { return EXTENSO[n] || String(n); }
+  function turmasTexto(n) { return n === 1 ? 'turma' : 'turmas'; }
+
+  class QuantidadeTurmas {
+    constructor(root) {
+      this.root = root;
+      this.input = root.querySelector('.ac-turmas-input');
+      this.extensoEl = root.querySelector('.ac-turmas-extenso');
+      this.confirmEl = root.querySelector('.ac-turmas-confirm');
+      this.confirmText = root.querySelector('.ac-turmas-confirm-text');
+      this.erroEl = root.querySelector('.ac-turmas-erro');
+      this.tr = root.closest('tr');
+      this.isLocked = root.dataset.windowLock === 'true';
+      this.saved = parseInt(root.dataset.saved || '1', 10);
+      this._renderExtenso(this.saved);
+      if (this.input.disabled) return;
+
+      this.input.addEventListener('input', () => this._onInput());
+      this.input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); if (!this.confirmEl.classList.contains('hidden')) this._confirm(); }
+        if (e.key === 'Escape') this._cancel();
+      });
+      root.querySelector('.ac-turmas-ok').addEventListener('click', () => this._confirm());
+      root.querySelector('.ac-turmas-cancel').addEventListener('click', () => this._cancel());
+    }
+
+    _valor() {
+      const txt = this.input.value;
+      return /^\d{1,2}$/.test(txt) ? parseInt(txt, 10) : NaN;
+    }
+
+    _renderExtenso(n) {
+      this.extensoEl.textContent = (n >= 1 && n <= MAX_TURMAS) ? `(${extenso(n)})` : '';
+    }
+
+    _onInput() {
+      // Aceita somente números.
+      const limpo = this.input.value.replace(/\D/g, '');
+      if (limpo !== this.input.value) this.input.value = limpo;
+      this.erroEl.classList.add('hidden');
+      const n = this._valor();
+      this._renderExtenso(n);
+      if (Number.isNaN(n) || n < 1 || n > MAX_TURMAS) {
+        this.confirmEl.classList.add('hidden');
+        if (this.input.value !== '') this._erro(`Informe um número de 1 a ${MAX_TURMAS}.`);
+        return;
+      }
+      if (n === this.saved) { this.confirmEl.classList.add('hidden'); return; }
+      this.confirmText.textContent = `Confirmar ${n} (${extenso(n)}) ${turmasTexto(n)}?`;
+      this.confirmEl.classList.remove('hidden');
+    }
+
+    _erro(texto) {
+      this.erroEl.textContent = texto;
+      this.erroEl.classList.remove('hidden');
+    }
+
+    _cancel() {
+      this.input.value = String(this.saved);
+      this.confirmEl.classList.add('hidden');
+      this.erroEl.classList.add('hidden');
+      this._renderExtenso(this.saved);
+    }
+
+    async _confirm() {
+      if (this.isLocked) { this._triggerWindowLock(); return; }
+      const n = this._valor();
+      if (Number.isNaN(n) || n < 1 || n > MAX_TURMAS) return;
+      const params = new URLSearchParams({ quantidade_turmas: String(n) });
+      if (UNIDADE_ID) params.set('unidade_id', UNIDADE_ID);
+      this.root.classList.add('opacity-60');
+      try {
+        const resp = await fetch(this.root.dataset.turmasUrl, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': getCSRFToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: params.toString(),
+        });
+        if (resp.status === 403 || resp.redirected) { window.location.reload(); return; }
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) throw new Error(data.message || 'turmas failed');
+        this.saved = data.quantidade_turmas;
+        this.root.dataset.saved = String(this.saved);
+        this.tr.dataset.qtd = String(this.saved);
+        this.input.value = String(this.saved);
+        this._renderExtenso(this.saved);
+        this.confirmEl.classList.add('hidden');
+        markAllocationChanged();
+        showAllocToast(data.message || 'Quantidade de turmas salva.', false);
+      } catch (err) {
+        this._cancel();
+        showAllocToast(err.message && err.message !== 'turmas failed' ? err.message : 'Erro ao salvar a quantidade de turmas.', true);
+      } finally {
+        this.root.classList.remove('opacity-60');
+      }
+    }
+
+    _triggerWindowLock() {
+      if (typeof openWindowLockModal === 'function' && typeof getWindowLockPayload === 'function') {
+        openWindowLockModal(getWindowLockPayload(this.root));
+      }
+    }
+  }
+
   // ─── Initialization ──────────────────────────────────────
   document.addEventListener('DOMContentLoaded', () => {
     const instances = [];
     document.querySelectorAll('.ac-docente').forEach(el => {
       instances.push(new AutocompleteDocente(el));
+    });
+    document.querySelectorAll('.ac-turmas').forEach(el => new QuantidadeTurmas(el));
+
+    // Botão "+": acrescenta uma linha para escolher outro docente (ou carência).
+    document.querySelectorAll('.ac-add').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tr = btn.closest('tr');
+        const slots = tr.querySelector('.ac-slots');
+        const first = slots.querySelector('.ac-docente');
+        if (btn.dataset.windowLock === 'true') {
+          if (typeof openWindowLockModal === 'function' && typeof getWindowLockPayload === 'function') {
+            openWindowLockModal(getWindowLockPayload(btn));
+          }
+          return;
+        }
+        if (first && first.dataset.currentId === 'NAO_OFERECIDA') {
+          showAllocToast('Escolha um docente no primeiro campo antes de adicionar outra linha.', true);
+          return;
+        }
+        const pendente = slots.querySelector('.ac-docente[data-linha-id="novo"]');
+        if (pendente) { pendente.querySelector('.ac-input').focus(); return; }
+
+        const modelo = document.getElementById('acSlotTemplate').content.firstElementChild.cloneNode(true);
+        const raiz = modelo.querySelector('.ac-docente');
+        const nome = slots.dataset.compNome || '';
+        raiz.querySelector('.ac-input').setAttribute('aria-label', `Docente de ${nome} (linha adicional)`);
+        if (first) {
+          ['windowLock', 'windowArea', 'windowAction', 'windowTarget', 'windowMessage'].forEach(k => {
+            if (first.dataset[k] !== undefined) raiz.dataset[k] = first.dataset[k];
+          });
+        }
+        slots.appendChild(modelo);
+        instances.push(new AutocompleteDocente(raiz));
+        markAllocationChanged();
+        raiz.querySelector('.ac-input').focus();
+      });
     });
 
     // Global: close all dropdowns on outside click
@@ -624,9 +888,15 @@
 <script>
 (function () {
   window.openAllocSavedModal = function () {
-    var all = document.querySelectorAll('.ac-docente');
+    var rows = document.querySelectorAll('tr[data-qtd]');
     var pend = 0;
-    all.forEach(function (el) { if (el.dataset.currentId === 'SEM_PROFESSOR') pend++; });
+    rows.forEach(function (tr) {
+      var slots = Array.prototype.slice.call(tr.querySelectorAll('.ac-docente'));
+      if (!slots.length || slots[0].dataset.currentId === 'NAO_OFERECIDA') return;
+      var ok = slots.filter(function (el) { return el.dataset.currentId !== 'SEM_PROFESSOR'; }).length;
+      if (ok < slots.length || ok === 0) pend++;
+    });
+    var all = rows;
     var txt = all.length ? (all.length - pend) + ' de ' + all.length + ' disciplinas com docente definido.' : '';
     if (pend) txt += ' ' + pend + ' ainda sem docente.';
     document.getElementById('allocSavedSummary').textContent = txt;
@@ -657,7 +927,54 @@
 })();
 </script>
 
+<script>
+// Popup de confirmação: formulários com data-confirm-message só são enviados após "Confirmar".
+(function () {
+  var modal = document.getElementById('allocConfirmModal');
+  if (!modal) return;
+  var pendingForm = null;
+  function close() { modal.classList.add('hidden'); pendingForm = null; }
+  function open(form) {
+    pendingForm = form;
+    document.getElementById('allocConfirmTitle').textContent = form.dataset.confirmTitle || 'Confirmar';
+    document.getElementById('allocConfirmMsg').textContent = form.dataset.confirmMessage;
+    var ok = document.getElementById('allocConfirmOk');
+    ok.textContent = form.dataset.confirmLabel || 'Confirmar';
+    var warn = form.dataset.confirmTone === 'warn';
+    document.getElementById('allocConfirmIcon').className = 'mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full ' +
+      (warn ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600');
+    ok.className = 'rounded-lg px-5 py-2.5 text-sm font-bold text-white ' + (warn ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700');
+    modal.classList.remove('hidden');
+    ok.focus();
+  }
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!form.dataset || !form.dataset.confirmMessage || form.dataset.confirmed === 'true') return;
+    e.preventDefault();
+    open(form);
+  });
+  document.getElementById('allocConfirmOk').addEventListener('click', function () {
+    var form = pendingForm;
+    if (!form) return;
+    form.dataset.confirmed = 'true';
+    modal.classList.add('hidden');
+    form.submit();
+  });
+  document.getElementById('allocConfirmCancel').addEventListener('click', close);
+  modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.classList.contains('hidden')) close(); });
+})();
+</script>
+
 <style>
+  /* Estados da alocação: amarelo = equipe diretiva em sala, vermelho = carência.
+     Classes próprias porque o tailwind.min.css é pré-compilado e não traz todas as cores. */
+  .ac-state-diretivo { background-color: #fef3c7; border-color: #f59e0b; }
+  .ac-state-carencia { background-color: #fee2e2; border-color: #f87171; }
+  .ac-text-diretivo { color: #92400e; }
+  .ac-text-carencia, .ac-carencia-icon { color: #b91c1c; }
+  .ac-text-carencia::placeholder { color: #b91c1c; opacity: 1; }
+  .alloc-toast-warn { background-color: #d97706; }
   /* Autocomplete transition animations */
   .ac-dropdown {
     animation: acSlideDown 0.15s ease-out;

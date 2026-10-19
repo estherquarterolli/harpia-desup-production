@@ -1,0 +1,6 @@
+{% if ajuda_pagina %}
+<button type="button" data-ajuda-abrir aria-haspopup="dialog" aria-controls="tourRoot" title="Ajuda: {{ ajuda_pagina.titulo }}" aria-label="Abrir ajuda da página {{ ajuda_pagina.titulo }}"
+        class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#025c9f]/30 bg-white text-[#025c9f] shadow-sm transition hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#025c9f]">
+  <i class="ph ph-question text-xl" aria-hidden="true"></i>
+</button>
+{% endif %}

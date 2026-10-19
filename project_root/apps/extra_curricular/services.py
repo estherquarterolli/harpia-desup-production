@@ -180,25 +180,32 @@ def _bulk_ch_alocada(professor_ids):
     em lote — evita reabrir a query por professor, que é o que causava os
     timeouts nas telas de professores/extracurricular no Vercel.
     """
-    from apps.courses.models import MatrixComponent
+    from apps.allocations.services import alocacoes_vigentes
 
     # ha_semanal é @property (carga_horaria / 20.0), não dá pra pedir direto no
     # .values() — busca o campo real (carga_horaria) e calcula igual à property.
-    componentes = MatrixComponent.objects.filter(
-        docente_id__in=professor_ids,
-        matriz__is_vigente=True,
-    ).values("docente_id", "componente_curricular_id", "compartilhado", "carga_horaria", "pk")
+    componentes = alocacoes_vigentes().filter(docente_id__in=professor_ids).values(
+        "docente_id",
+        "componente_matriz__componente_curricular_id",
+        "componente_matriz__compartilhado",
+        "componente_matriz__carga_horaria",
+        "componente_matriz_id",
+    )
 
     mapa = {}
     vistos = {}
     for comp in componentes:
         pid = comp["docente_id"]
         vistos.setdefault(pid, set())
-        chave = comp["componente_curricular_id"] if comp["compartilhado"] else comp["pk"]
+        chave = (
+            comp["componente_matriz__componente_curricular_id"]
+            if comp["componente_matriz__compartilhado"]
+            else comp["componente_matriz_id"]
+        )
         if chave in vistos[pid]:
             continue
         vistos[pid].add(chave)
-        ha_semanal = (comp["carga_horaria"] or 0) / 20.0
+        ha_semanal = (comp["componente_matriz__carga_horaria"] or 0) / 20.0
         mapa[pid] = mapa.get(pid, 0) + ha_semanal
     return mapa
 

@@ -6,64 +6,64 @@
 {% block header_title %}Unidades de Ensino{% endblock %}
 
 {% block content %}
-<div class="p-6">
-    <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
-        <div>
-            <h1 class="text-2xl font-bold text-[#025c9f]">Unidades de Ensino</h1>
-            <p class="text-sm text-slate-500">Gestão de campus e centros administrativos da FAETEC.</p>
+<div class="space-y-6">
+  {% include 'partials/_kpi_cards.html' %}
+
+  <section class="overflow-hidden rounded-2xl border border-white bg-white/90 shadow-[0_8px_30px_rgba(2,92,159,0.08)]">
+    <div class="flex flex-col gap-3 border-b border-slate-100 p-4 lg:flex-row lg:items-center lg:justify-between">
+      <form method="get" class="flex flex-1 flex-col gap-3 sm:flex-row">
+        <div class="relative flex-1 sm:max-w-sm">
+          <label for="unidade-busca" class="sr-only">Buscar unidade</label>
+          <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true"></i>
+          <input id="unidade-busca" type="search" name="q" value="{{ filtro_q }}" placeholder="Buscar unidade..." class="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-9 pr-3 text-sm outline-none focus:border-[#025c9f] focus:bg-white">
         </div>
-        <div class="flex items-center gap-4">
-            <a href="{% url 'core:unidade_create' %}" class="w-full sm:w-auto justify-center bg-[#025c9f] hover:bg-[#153e70] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2">
-                <i class="ph ph-plus-circle text-base"></i>
-                Adicionar Unidade
-            </a>
-        </div>
+        <label for="unidade-status" class="sr-only">Situação</label>
+        <select id="unidade-status" name="status" onchange="this.form.submit()" class="min-h-11 rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm font-semibold text-slate-700 sm:w-44">
+          <option value="">Todas as situações</option>
+          <option value="ativa" {% if filtro_status == 'ativa' %}selected{% endif %}>Ativas</option>
+          <option value="inativa" {% if filtro_status == 'inativa' %}selected{% endif %}>Inativas</option>
+        </select>
+        <button type="submit" class="sr-only">Filtrar</button>
+        {% if filtro_q or filtro_status %}<a href="{% url 'core:unidade_list' %}" class="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-500 hover:bg-slate-50"><i class="ph ph-x" aria-hidden="true"></i>Limpar</a>{% endif %}
+      </form>
+      <a href="{% url 'core:unidade_create' %}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#025c9f] px-5 text-sm font-black text-white shadow-sm transition-colors hover:bg-[#153e70]">
+        <i class="ph ph-plus-circle text-lg" aria-hidden="true"></i>Adicionar Unidade
+      </a>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {% for unidade in unidades %}
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow relative overflow-hidden">
-            {% if unidade.status %}
-                <div class="absolute top-0 right-0 bg-green-100 text-green-600 text-[10px] font-bold px-3 py-1 rounded-bl-lg uppercase">Ativo</div>
-            {% else %}
-                <div class="absolute top-0 right-0 bg-red-100 text-red-600 text-[10px] font-bold px-3 py-1 rounded-bl-lg uppercase">Inativo</div>
-            {% endif %}
-            
-            <div class="flex items-center gap-4 mb-4">
-                <div class="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center text-[#025c9f] font-bold text-xl">
-                    {{ unidade.sigla|slice:":2" }}
-                </div>
-                <div>
-                    <h3 class="font-bold text-slate-800">{{ unidade.sigla }}</h3>
-                    <p class="text-xs text-slate-500">{{ unidade.nome }}</p>
-                </div>
-            </div>
-
-            <div class="flex flex-wrap justify-between items-center gap-2 pt-4 border-t border-slate-50">
-                <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Status: 
-                    <span class="{% if unidade.status %}text-green-500{% else %}text-red-400{% endif %}">
-                        {% if unidade.status %}Ativo{% else %}Inativo{% endif %}
-                    </span>
-                </span>
-                <div class="flex items-center gap-2">
-                    <a href="{% url 'core:curso_list' unidade_pk=unidade.pk %}" class="text-[#025c9f] hover:text-blue-800 text-xs font-bold flex items-center gap-1 px-2 py-1 bg-blue-50 rounded hover:bg-blue-100 transition-colors">
-                        <i class="ph ph-graduation-cap text-sm"></i>
-                        Cursos
-                    </a>
-                    <a href="{% url 'core:unidade_update' unidade.pk %}" class="text-slate-400 hover:text-[#025c9f] text-xs font-bold flex items-center gap-1">
-                        <i class="ph ph-pencil-simple text-xs"></i>
-                        Editar
-                    </a>
-                </div>
-            </div>
-        </div>
-        {% empty %}
-        <div class="col-span-full py-20 text-center text-slate-400">
-            <i class="ph ph-buildings block text-5xl mx-auto mb-4 opacity-10"></i>
-            Nenhuma unidade cadastrada.
-        </div>
-        {% endfor %}
+    <div class="overflow-x-auto">
+      <table class="w-full min-w-[640px] border-collapse text-left stack-table">
+        <thead class="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500">
+          <tr><th scope="col" class="px-5 py-3">Unidade</th><th scope="col" class="px-5 py-3 text-center">Cursos ativos</th><th scope="col" class="px-5 py-3">Status</th><th scope="col" class="px-5 py-3 text-right">Ações</th></tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 text-sm">
+          {% for unidade in unidades %}
+          <tr class="transition-colors hover:bg-slate-50/70">
+            <td class="px-5 py-3" data-label="Unidade">
+              <div class="flex items-center gap-3">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-sm font-black text-[#025c9f]" aria-hidden="true">{{ unidade.sigla|slice:":2" }}</span>
+                <div class="min-w-0"><p class="font-bold text-slate-800">{{ unidade.sigla }}</p><p class="truncate text-xs text-slate-500">{{ unidade.nome }}</p></div>
+              </div>
+            </td>
+            <td class="px-5 py-3 text-center font-semibold text-slate-700" data-label="Cursos ativos">{{ unidade.qtd_cursos }}</td>
+            <td class="px-5 py-3" data-label="Status">
+              {% if unidade.status %}<span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700"><i class="ph ph-check-circle" aria-hidden="true"></i>Ativo</span>
+              {% else %}<span class="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600"><i class="ph ph-prohibit" aria-hidden="true"></i>Inativo</span>{% endif %}
+            </td>
+            <td class="px-5 py-3 text-right" data-label="Ações">
+              <div class="inline-flex items-center gap-2">
+                <a href="{% url 'core:curso_list' unidade_pk=unidade.pk %}" data-tour="unidade-cursos" class="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-[#025c9f] hover:bg-blue-100"><i class="ph ph-graduation-cap text-sm" aria-hidden="true"></i>Cursos</a>
+                <a href="{% url 'core:unidade_update' unidade.pk %}" data-tour="unidade-editar" class="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50"><i class="ph ph-pencil-simple text-sm" aria-hidden="true"></i>Editar</a>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="px-6 py-14 text-center text-slate-400"><i class="ph ph-buildings mb-2 block text-4xl opacity-30" aria-hidden="true"></i>Nenhuma unidade encontrada.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
-    {% include 'partials/pagination.html' %}
+  </section>
+  {% include 'partials/pagination.html' %}
 </div>
 {% endblock %}

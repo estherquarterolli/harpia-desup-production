@@ -229,13 +229,12 @@ class MatrixComponent(models.Model):
         verbose_name="Pre-requisitos",
         db_table="harpiadb_cursos_matriz_pre_requisitos",
     )
-    docente = models.ForeignKey(
-        'professors.Professor',
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True,
-        related_name='componentes_matriz',
-        verbose_name="Docente"
+    # O professor deixou de ser um campo do componente: a alocação por turma vive em
+    # `allocations.AlocacaoTurmaDocente` (related_name `alocacoes_turma_docente`).
+    quantidade_turmas = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name="Quantidade de turmas",
+        help_text="Número de turmas ofertadas do componente (padrão: 1).",
     )
     compartilhado = models.BooleanField(default=False, verbose_name="Compartilhado com outro curso")
     curso_compartilhado = models.ForeignKey(

@@ -1,61 +1,109 @@
 {% extends 'base.html' %}
 
-{% block title %}Solicitações de professor - DESUP{% endblock %}
-{% block header_title %}Solicitações de professor externo{% endblock %}
+{% block title %}Solicitações - DESUP{% endblock %}
+{% block header_title %}Solicitações{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
-  <section class="rounded-2xl border border-blue-100 bg-blue-50 p-4 sm:p-6">
-    <h1 class="text-xl font-black text-slate-900 sm:text-2xl">Análise institucional de solicitações</h1>
-    <p class="mt-2 max-w-3xl text-sm text-slate-600">A aprovação cria o novo vínculo do professor sem remover os vínculos existentes. Cada decisão gera auditoria, notificação e e-mail para a unidade solicitante.</p>
+  {% include 'partials/_kpi_cards.html' %}
+
+  <section class="overflow-hidden rounded-2xl border border-white bg-white/90 shadow-[0_8px_30px_rgba(2,92,159,0.08)]">
+    <form method="get" class="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center">
+      <label for="solicitacao-status" class="sr-only">Situação da solicitação</label>
+      <select id="solicitacao-status" name="status" onchange="this.form.submit()" class="min-h-11 rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm font-semibold text-slate-700 sm:w-56">
+        <option value="">Todas as situações</option>
+        {% for value,label in status_choices %}<option value="{{ value }}" {% if filtro_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <label for="solicitacao-tipo" class="sr-only">Tipo de solicitação</label>
+      <select id="solicitacao-tipo" name="tipo" onchange="this.form.submit()" class="min-h-11 rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm font-semibold text-slate-700 sm:w-56">
+        <option value="">Todos os tipos</option>
+        {% for value,label in tipo_choices %}<option value="{{ value }}" {% if filtro_tipo == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <label for="solicitacao-unidade" class="sr-only">Unidade solicitante</label>
+      <select id="solicitacao-unidade" name="unidade_id" onchange="this.form.submit()" class="min-h-11 rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm font-semibold text-slate-700 sm:w-72">
+        <option value="">Todas as unidades</option>
+        {% for unidade in unidades %}<option value="{{ unidade.pk }}" {% if filtro_unidade == unidade.pk|stringformat:'s' %}selected{% endif %}>{{ unidade.sigla }} - {{ unidade.nome }}</option>{% endfor %}
+      </select>
+      <button type="submit" class="sr-only">Filtrar</button>
+    </form>
+
+    <div class="overflow-x-auto">
+      <table class="w-full min-w-[720px] border-collapse text-left stack-table">
+        <thead class="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500">
+          <tr><th scope="col" class="px-5 py-3">Professor</th><th scope="col" class="px-5 py-3">Tipo</th><th scope="col" class="px-5 py-3">Origem → Solicitante</th><th scope="col" class="px-5 py-3">Semestre</th><th scope="col" class="px-5 py-3">Situação</th><th scope="col" class="px-5 py-3">Data</th><th scope="col" class="px-5 py-3 text-right">Ação</th></tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 text-sm">
+          {% for solicitacao in solicitacoes %}
+          <tr class="transition-colors hover:bg-slate-50/70">
+            <td class="px-5 py-3 font-bold text-slate-800" data-label="Professor">{{ solicitacao.nome_professor }}</td>
+            <td class="px-5 py-3 text-slate-600" data-label="Tipo">{{ solicitacao.get_tipo_display }}</td>
+            <td class="px-5 py-3 text-slate-600" data-label="Origem → Solicitante">{% if solicitacao.unidade_origem %}<strong>{{ solicitacao.unidade_origem.sigla }}</strong> <span aria-hidden="true">→</span><span class="sr-only"> para </span> {% endif %}<strong>{{ solicitacao.unidade_solicitante.sigla }}</strong></td>
+            <td class="px-5 py-3 text-slate-600" data-label="Semestre">{{ solicitacao.semestre }}</td>
+            <td class="px-5 py-3" data-label="Situação">
+              <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold {% if solicitacao.status == 'PENDENTE' %}bg-amber-50 text-amber-700{% elif solicitacao.status == 'APROVADA' %}bg-emerald-50 text-emerald-700{% elif solicitacao.status == 'RECUSADA' %}bg-red-50 text-red-600{% else %}bg-slate-100 text-slate-500{% endif %}">{{ solicitacao.get_status_display }}</span>
+            </td>
+            <td class="px-5 py-3 text-slate-500" data-label="Data">{{ solicitacao.criado_em|date:'d/m/Y' }}</td>
+            <td class="px-5 py-3 text-right" data-label="Ação">
+              <button type="button" onclick="abrirModal('modalSolicitacao{{ solicitacao.pk }}')" aria-haspopup="dialog" class="inline-flex items-center gap-1 rounded-lg {% if solicitacao.status == 'PENDENTE' %}bg-[#025c9f] text-white hover:bg-[#153e70]{% else %}border border-slate-200 text-slate-600 hover:bg-slate-50{% endif %} px-3 py-1.5 text-xs font-bold"><i class="ph ph-eye text-sm" aria-hidden="true"></i>{% if solicitacao.status == 'PENDENTE' %}Decidir{% else %}Ver{% endif %}</button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" class="px-6 py-14 text-center text-slate-400"><i class="ph ph-tray mb-2 block text-4xl opacity-30" aria-hidden="true"></i>Nenhuma solicitação encontrada.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </section>
-
-  <form method="get" class="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-3">
-    <label for="solicitacao-status" class="sr-only">Filtrar pela situação da solicitação</label>
-    <select id="solicitacao-status" name="status" class="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">
-      <option value="">Todas as situações</option>
-      {% for value,label in status_choices %}<option value="{{ value }}" {% if filtro_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
-    </select>
-    <label for="solicitacao-unidade" class="sr-only">Filtrar pela unidade solicitante</label>
-    <select id="solicitacao-unidade" name="unidade_id" class="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">
-      <option value="">Todas as unidades solicitantes</option>
-      {% for unidade in unidades %}<option value="{{ unidade.pk }}" {% if filtro_unidade == unidade.pk|stringformat:'s' %}selected{% endif %}>{{ unidade.sigla }} - {{ unidade.nome }}</option>{% endfor %}
-    </select>
-    <button class="min-h-11 rounded-xl bg-slate-800 px-4 text-sm font-black text-white hover:bg-slate-700">Aplicar filtros</button>
-  </form>
-
-  <div class="space-y-4">
-    {% for solicitacao in solicitacoes %}
-    <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-      <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div class="min-w-0">
-          <div class="flex flex-wrap items-center gap-2"><h2 class="text-lg font-black text-slate-900">{{ solicitacao.professor.nome }}</h2><span class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase {% if solicitacao.status == 'PENDENTE' %}bg-amber-100 text-amber-800{% elif solicitacao.status == 'APROVADA' %}bg-emerald-100 text-emerald-800{% else %}bg-slate-100 text-slate-600{% endif %}">{{ solicitacao.get_status_display }}</span></div>
-          <p class="mt-2 text-sm text-slate-600"><strong>{{ solicitacao.unidade_origem.sigla }}</strong> <span aria-hidden="true">→</span> <strong>{{ solicitacao.unidade_solicitante.sigla }}</strong> · semestre {{ solicitacao.semestre }}</p>
-          <p class="mt-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-700"><strong>Justificativa:</strong> {{ solicitacao.justificativa }}</p>
-          <p class="mt-2 text-xs text-slate-400">Solicitada por {{ solicitacao.solicitado_por.email }} em {{ solicitacao.criado_em|date:'d/m/Y H:i' }}.</p>
-          {% if solicitacao.motivo_decisao %}<p class="mt-2 text-sm text-slate-600"><strong>Decisão:</strong> {{ solicitacao.motivo_decisao }}</p>{% endif %}
-        </div>
-        {% if solicitacao.status == 'PENDENTE' %}
-        <form method="post" action="{% url 'core:solicitacao_professor_decidir' solicitacao.pk %}" class="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 lg:max-w-md">
-          {% csrf_token %}
-          <label for="decisao-{{ solicitacao.pk }}" class="text-xs font-black uppercase text-slate-500">Decisão</label>
-          <select id="decisao-{{ solicitacao.pk }}" name="decisao" class="mt-1 min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value="APROVADA">Aprovar</option><option value="RECUSADA">Recusar</option></select>
-          <label for="motivo-{{ solicitacao.pk }}" class="mt-3 block text-xs font-black uppercase text-slate-500">Motivo ou observação</label>
-          <textarea id="motivo-{{ solicitacao.pk }}" name="motivo_decisao" rows="3" class="mt-1 w-full rounded-lg border border-slate-200 bg-white p-3 text-sm" placeholder="Obrigatório em caso de recusa"></textarea>
-          <button class="mt-3 min-h-11 w-full rounded-lg bg-[#025c9f] px-4 text-sm font-black text-white hover:bg-[#153e70]">Registrar decisão</button>
-        </form>
-        {% endif %}
-      </div>
-    </article>
-    {% empty %}<div class="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">Nenhuma solicitação encontrada.</div>{% endfor %}
-  </div>
 
   {% if solicitacoes.has_other_pages %}
   <nav class="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 text-sm" aria-label="Paginação">
-    {% if solicitacoes.has_previous %}<a href="?page={{ solicitacoes.previous_page_number }}&status={{ filtro_status }}&unidade_id={{ filtro_unidade }}" class="rounded-lg border px-4 py-2 font-bold">Anteriores</a>{% else %}<span></span>{% endif %}
+    {% if solicitacoes.has_previous %}<a href="?page={{ solicitacoes.previous_page_number }}&status={{ filtro_status }}&tipo={{ filtro_tipo }}&unidade_id={{ filtro_unidade }}" class="rounded-lg border px-4 py-2 font-bold">Anteriores</a>{% else %}<span></span>{% endif %}
     <span class="text-slate-500">Página {{ solicitacoes.number }} de {{ solicitacoes.paginator.num_pages }}</span>
-    {% if solicitacoes.has_next %}<a href="?page={{ solicitacoes.next_page_number }}&status={{ filtro_status }}&unidade_id={{ filtro_unidade }}" class="rounded-lg bg-[#025c9f] px-4 py-2 font-bold text-white">Próximas</a>{% endif %}
+    {% if solicitacoes.has_next %}<a href="?page={{ solicitacoes.next_page_number }}&status={{ filtro_status }}&tipo={{ filtro_tipo }}&unidade_id={{ filtro_unidade }}" class="rounded-lg bg-[#025c9f] px-4 py-2 font-bold text-white">Próximas</a>{% endif %}
   </nav>
   {% endif %}
 </div>
+
+{% for solicitacao in solicitacoes %}
+<div id="modalSolicitacao{{ solicitacao.pk }}" class="modal-solicitacao hidden fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="modalSolicitacao{{ solicitacao.pk }}Titulo">
+  <div class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div class="flex items-start justify-between gap-3 border-b border-slate-100 px-6 py-4">
+      <div><h2 id="modalSolicitacao{{ solicitacao.pk }}Titulo" class="text-base font-black text-[#0b2a5b]">{{ solicitacao.nome_professor }}</h2><p class="text-xs text-slate-500">{{ solicitacao.get_tipo_display }} · {% if solicitacao.unidade_origem %}{{ solicitacao.unidade_origem.sigla }} → {% endif %}{{ solicitacao.unidade_solicitante.sigla }} · semestre {{ solicitacao.semestre }}</p></div>
+      <button type="button" onclick="fecharModal('modalSolicitacao{{ solicitacao.pk }}')" aria-label="Fechar" class="text-slate-400 hover:text-slate-600"><i class="ph ph-x text-xl" aria-hidden="true"></i></button>
+    </div>
+    <div class="space-y-3 overflow-y-auto px-6 py-4 text-sm text-slate-600">
+      <p class="rounded-xl bg-slate-50 p-3"><strong class="text-slate-800">Justificativa:</strong> {{ solicitacao.justificativa }}</p>
+      <p class="text-xs text-slate-400">Solicitada por {{ solicitacao.solicitado_por.email }} em {{ solicitacao.criado_em|date:'d/m/Y H:i' }}.</p>
+      {% if solicitacao.motivo_decisao %}<p><strong class="text-slate-800">Decisão:</strong> {{ solicitacao.motivo_decisao }}</p>{% endif %}
+      {% if solicitacao.status == 'PENDENTE' %}
+      <form method="post" action="{% url 'core:solicitacao_professor_decidir' solicitacao.pk %}" class="space-y-3 border-t border-slate-100 pt-3">
+        {% csrf_token %}
+        <div>
+          <label for="decisao-{{ solicitacao.pk }}" class="text-xs font-black uppercase text-slate-500">Decisão</label>
+          <select id="decisao-{{ solicitacao.pk }}" name="decisao" class="mt-1 min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value="APROVADA">Aprovar</option><option value="RECUSADA">Recusar</option></select>
+        </div>
+        <div>
+          <label for="motivo-{{ solicitacao.pk }}" class="text-xs font-black uppercase text-slate-500">Motivo</label>
+          <textarea id="motivo-{{ solicitacao.pk }}" name="motivo_decisao" rows="3" class="mt-1 w-full rounded-lg border border-slate-200 bg-white p-3 text-sm" placeholder="Obrigatório em caso de recusa"></textarea>
+        </div>
+        <button class="min-h-11 w-full rounded-lg bg-[#025c9f] px-4 text-sm font-black text-white hover:bg-[#153e70]">Registrar decisão</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function abrirModal(id) { var m = document.getElementById(id); if (m) m.classList.remove('hidden'); }
+  function fecharModal(id) { var m = document.getElementById(id); if (m) m.classList.add('hidden'); }
+  document.querySelectorAll('.modal-solicitacao').forEach(function (m) {
+    m.addEventListener('click', function (e) { if (e.target === m) m.classList.add('hidden'); });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') document.querySelectorAll('.modal-solicitacao').forEach(function (m) { m.classList.add('hidden'); });
+  });
+</script>
 {% endblock %}

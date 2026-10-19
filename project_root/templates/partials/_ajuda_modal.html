@@ -1,0 +1,258 @@
+{# Tutorial guiado: vários popups em sequência, com "Pular tutorial". Conteúdo em apps/core/ajuda.py. #}
+{% if ajuda_pagina %}
+{{ ajuda_pagina|json_script:"ajuda-dados" }}
+<div id="tourRoot" class="hidden fixed inset-0 z-[170]" role="dialog" aria-modal="true" aria-labelledby="tourTitulo" aria-describedby="tourTexto">
+  <div id="tourSpot" class="pointer-events-none fixed hidden rounded-xl ring-2 ring-white" style="box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.6); transition: opacity .15s ease;"></div>
+  <div id="tourDim" class="absolute inset-0 bg-slate-900/60"></div>
+  <div id="tourCard" class="fixed w-[min(26rem,calc(100vw-2rem))] rounded-2xl bg-white p-5 shadow-2xl" style="left: 1rem; top: 1rem; transition: opacity .15s ease;">
+    <div class="flex items-start justify-between gap-3">
+      <div class="flex min-w-0 items-center gap-3">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[#025c9f]" aria-hidden="true"><i class="ph ph-question text-xl"></i></span>
+        <div class="min-w-0">
+          <p id="tourContexto" class="truncate text-[11px] font-black uppercase tracking-wide text-slate-400"></p>
+          <h2 id="tourTitulo" class="text-base font-black text-[#0b2a5b]"></h2>
+        </div>
+      </div>
+      <button type="button" data-tour="pular" aria-label="Pular tutorial" class="shrink-0 text-slate-400 hover:text-slate-600"><i class="ph ph-x text-xl" aria-hidden="true"></i></button>
+    </div>
+    <p id="tourTexto" class="mt-3 text-sm leading-relaxed text-slate-600" aria-live="polite"></p>
+    <ul id="tourLista" class="mt-3 hidden space-y-1.5 text-sm text-slate-600"></ul>
+    <p id="tourRequisito" class="mt-3 hidden rounded-lg bg-amber-50 p-2.5 text-xs font-semibold text-amber-800" role="note"></p>
+    <div id="tourPontos" class="mt-4 flex items-center justify-center gap-1.5" aria-hidden="true"></div>
+    <div class="mt-4 flex items-center justify-between gap-3">
+      <button type="button" data-tour="pular" class="rounded-lg px-3 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100">Pular tutorial</button>
+      <div class="flex items-center gap-2">
+        <button type="button" id="tourAnterior" data-tour="anterior" class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">Anterior</button>
+        <button type="button" id="tourProximo" data-tour="proximo" class="rounded-lg bg-[#025c9f] px-5 py-2 text-sm font-black text-white hover:bg-[#153e70]">Próximo</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var dadosEl = document.getElementById('ajuda-dados');
+  var root = document.getElementById('tourRoot');
+  if (!dadosEl || !root) return;
+  var dados = JSON.parse(dadosEl.textContent);
+  var passos = dados.passos || [];
+  var total = passos.length;
+  var spot = document.getElementById('tourSpot');
+  var dim = document.getElementById('tourDim');
+  var card = document.getElementById('tourCard');
+  var el = function (id) { return document.getElementById(id); };
+  var idx = -1;            // -1 = tela de boas-vindas
+  var ultimoFoco = null;
+  var ficha = 0;           // invalida renderizações antigas quando o usuário avança rápido
+  var pendentes = [];      // o que desfazer ao sair do passo atual
+  var usadoPrincipal = true;
+  var quadro = 0;
+
+  function pausa(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function visivel(e) {
+    if (!e) return false;
+    var r = e.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  }
+  function achar(seletor) {
+    var lista;
+    try { lista = document.querySelectorAll(seletor); } catch (e) { return null; }
+    for (var i = 0; i < lista.length; i++) { if (visivel(lista[i]) && !root.contains(lista[i])) return lista[i]; }
+    return null;
+  }
+  // "a || b" = alternativas: usa a primeira que existir.
+  function acharAlternativa(texto) {
+    var partes = texto.split(' || ');
+    for (var i = 0; i < partes.length; i++) { var e = achar(partes[i].trim()); if (e) return e; }
+    return null;
+  }
+
+  // Alvo do passo: o primeiro seletor que existe e está visível. `usadoPrincipal` indica se foi o primeiro.
+  function alvoDoPasso() {
+    if (idx < 0 || !passos[idx]) return null;
+    var lista = passos[idx].alvo || [];
+    for (var i = 0; i < lista.length; i++) {
+      var e = achar(lista[i]);
+      if (e) { usadoPrincipal = (i === 0); return e; }
+    }
+    usadoPrincipal = false;
+    return null;
+  }
+
+  // Executa os cliques do passo. Retorna false se algum elemento necessário não existe.
+  async function abrirDoPasso(passo) {
+    var abertos = passo.abrir || [];
+    for (var i = 0; i < abertos.length; i++) {
+      var e = acharAlternativa(abertos[i]);
+      if (!e) return false;
+      e.click();
+      await pausa(abertos[i].indexOf('abrirDetalhesProfessor') >= 0 ? 700 : 300);
+    }
+    return true;
+  }
+
+  function desfazerPasso() {
+    var itens = pendentes;
+    pendentes = [];
+    itens.forEach(function (sel) {
+      try {
+        if (sel.indexOf('clicar:') === 0) {
+          var c = document.querySelector(sel.slice(7)); if (c) c.click();
+        } else if (sel.indexOf('alternar:') === 0) {
+          var t = document.querySelector(sel.slice(9)); if (t && t.getAttribute('aria-expanded') === 'true') t.click();
+        } else {
+          document.querySelectorAll(sel).forEach(function (m) {
+            if (m.id === 'professorDetailModal' && typeof window.fecharDetalhesProfessor === 'function') window.fecharDetalhesProfessor();
+            else m.classList.add('hidden');
+          });
+        }
+      } catch (e) { /* seletor inválido: ignora */ }
+    });
+  }
+
+  // Escolhe o lado do elemento com espaço livre (direita, esquerda, embaixo, em cima); se nenhum
+  // couber, encosta o popup na borda com mais espaço livre em vez de cobrir o elemento.
+  function posicionar(rolar) {
+    if (root.classList.contains('hidden')) return;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var alvo = alvoDoPasso();
+    var nota = el('tourRequisito');
+    if (nota) {
+      var passo = idx >= 0 ? passos[idx] : null;
+      var mostrar = !!(passo && passo.requisito && (!alvo || !usadoPrincipal));
+      nota.classList.toggle('hidden', !mostrar);
+      nota.textContent = mostrar ? passo.requisito : '';
+    }
+    if (alvo && rolar) alvo.scrollIntoView({ block: 'center', inline: 'nearest' });
+    var cw = card.offsetWidth, ch = card.offsetHeight;
+    var margem = 16;
+    if (!alvo) {
+      spot.classList.add('hidden');
+      dim.classList.remove('hidden');
+      card.style.left = Math.max((vw - cw) / 2, margem) + 'px';
+      card.style.top = Math.max((vh - ch) / 2, margem) + 'px';
+      return;
+    }
+    var r = alvo.getBoundingClientRect();
+    dim.classList.add('hidden');
+    spot.classList.remove('hidden');
+    spot.style.left = (r.left - 6) + 'px';
+    spot.style.top = (r.top - 6) + 'px';
+    spot.style.width = (r.width + 12) + 'px';
+    spot.style.height = (r.height + 12) + 'px';
+    if (vw < 640) {
+      card.style.left = '1rem';
+      var abaixo = vh - r.bottom, acima = r.top;
+      card.style.top = (abaixo >= acima ? Math.max(vh - ch - margem, margem) : margem) + 'px';
+      return;
+    }
+    var left, top;
+    var meioY = r.top + r.height / 2 - ch / 2;
+    if (r.right + 18 + cw <= vw - margem) { left = r.right + 18; top = meioY; }
+    else if (r.left - 18 - cw >= margem) { left = r.left - 18 - cw; top = meioY; }
+    else if (r.bottom + ch + 18 <= vh - margem) { left = r.left; top = r.bottom + 16; }
+    else if (r.top - ch - 18 >= margem) { left = r.left; top = r.top - ch - 16; }
+    else {
+      // Sem espaço ao redor: usa a borda (de cima ou de baixo) com mais área livre.
+      left = (vw - cw) / 2;
+      top = (vh - r.bottom) >= r.top ? vh - ch - margem : margem;
+    }
+    card.style.left = Math.min(Math.max(left, margem), Math.max(vw - cw - margem, margem)) + 'px';
+    card.style.top = Math.min(Math.max(top, margem), Math.max(vh - ch - margem, margem)) + 'px';
+  }
+
+  function reposicionarSuave() {
+    if (quadro) return;
+    quadro = requestAnimationFrame(function () { quadro = 0; posicionar(false); });
+  }
+
+  async function render() {
+    var minha = ++ficha;
+    desfazerPasso();
+    var intro = idx < 0;
+    var ultimo = idx === total - 1;
+    // O cartão fica invisível enquanto o passo é preparado, para não "pular" na tela.
+    card.style.opacity = '0';
+    spot.style.opacity = '0';
+    el('tourContexto').textContent = intro ? 'Tutorial' : 'Passo ' + (idx + 1) + ' de ' + total + ' · ' + dados.titulo;
+    el('tourTitulo').textContent = intro ? dados.titulo : passos[idx].titulo;
+    el('tourTexto').textContent = intro ? dados.resumo : passos[idx].texto;
+    var lista = el('tourLista');
+    lista.innerHTML = '';
+    if (intro && dados.funcionalidades) {
+      dados.funcionalidades.forEach(function (f) {
+        var li = document.createElement('li');
+        li.className = 'flex gap-2';
+        li.innerHTML = '<i class="ph ph-check-circle mt-0.5 text-base text-emerald-600" aria-hidden="true"></i>';
+        var s = document.createElement('span');
+        s.textContent = f;
+        li.appendChild(s);
+        lista.appendChild(li);
+      });
+    }
+    lista.classList.toggle('hidden', !(intro && dados.funcionalidades && dados.funcionalidades.length));
+    var pontos = el('tourPontos');
+    pontos.innerHTML = '';
+    for (var i = 0; i < total; i++) {
+      var p = document.createElement('span');
+      p.className = 'h-1.5 rounded-full ' + (i === idx ? 'w-5 bg-[#025c9f]' : 'w-1.5 bg-slate-200');
+      pontos.appendChild(p);
+    }
+    el('tourAnterior').classList.toggle('hidden', intro);
+    el('tourProximo').textContent = intro ? 'Começar' : (ultimo ? 'Concluir' : 'Próximo');
+
+    if (!intro) {
+      var passo = passos[idx];
+      pendentes = (passo.fechar || []).slice();
+      var ok = await abrirDoPasso(passo);
+      if (minha !== ficha) return;
+      if (!ok) {
+        // Faltou algo para abrir o popup (ex.: não há cargo vago): desfaz o que abriu e
+        // destaca o item mais próximo, com o aviso de requisito.
+        desfazerPasso();
+        await pausa(80);
+        if (minha !== ficha) return;
+      }
+    }
+    posicionar(true);
+    card.style.opacity = '1';
+    spot.style.opacity = '1';
+    el('tourProximo').focus({ preventScroll: true });
+    // Confere uma única vez depois que o layout assentar (conteúdo carregado, rolagem concluída).
+    await pausa(160);
+    if (minha === ficha) posicionar(false);
+  }
+
+  function onKey(e) {
+    if (e.key === 'Escape') { encerrar(); }
+    else if (e.key === 'ArrowRight') { avancar(); }
+    else if (e.key === 'ArrowLeft') { voltar(); }
+  }
+  function avancar() { if (idx >= total - 1) encerrar(); else { idx++; render(); } }
+  function voltar() { if (idx >= 0) { idx--; render(); } }
+
+  function iniciar() {
+    ultimoFoco = document.activeElement;
+    idx = -1;
+    root.classList.remove('hidden');
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('resize', reposicionarSuave);
+    window.addEventListener('scroll', reposicionarSuave, true);
+    render();
+  }
+  function encerrar() {
+    ficha++;
+    desfazerPasso();
+    root.classList.add('hidden');
+    document.removeEventListener('keydown', onKey);
+    window.removeEventListener('resize', reposicionarSuave);
+    window.removeEventListener('scroll', reposicionarSuave, true);
+    if (ultimoFoco && ultimoFoco.focus) ultimoFoco.focus({ preventScroll: true });
+  }
+
+  document.querySelectorAll('[data-ajuda-abrir]').forEach(function (b) { b.addEventListener('click', iniciar); });
+  root.querySelectorAll('[data-tour="pular"]').forEach(function (b) { b.addEventListener('click', encerrar); });
+  el('tourAnterior').addEventListener('click', voltar);
+  el('tourProximo').addEventListener('click', avancar);
+})();
+</script>
+{% endif %}

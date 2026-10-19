@@ -79,7 +79,7 @@ h1, h2, h3, h4, h5, h6, .font-black {
         display: block !important;
     }
     .main-content {
-        padding: 1rem !important;
+        padding: 0 1rem 1rem !important;
     }
 }
 

@@ -5,7 +5,8 @@ from apps.accounts.mixins import PerfilRequiredMixin
 from django.shortcuts import redirect, get_object_or_404
 from django.contrib import messages
 from django.http import JsonResponse
-from apps.allocations.models import AlocacaoCurricular
+from apps.allocations import services
+from apps.allocations.models import AlocacaoCurricular, AlocacaoTurmaDocente
 from apps.core.services import build_window_lock_context, enforce_window_or_redirect
 
 # `AlocacaoCurricular.turno` é NOT NULL. O formulário agora exige o turno para novas
@@ -16,9 +17,26 @@ TURNO_PADRAO_ALOCACAO = 'M'
 
 
 def _semestre_atual():
+    return services.semestre_atual()
+
+
+def _cargos_diretivos_vigentes():
+    """{professor_id: 'Cargo (SIGLA)'} dos ocupantes vigentes da equipe diretiva.
+
+    Usado para avisar (amarelo) quando alguém da equipe diretiva é alocado em sala.
+    """
+    from django.db.models import Q
     from django.utils import timezone
-    hoje = timezone.now()
-    return f"{hoje.year}.{'1' if hoje.month <= 6 else '2'}"
+    from apps.core.models import OcupacaoEquipeDiretiva
+
+    hoje = timezone.localdate()
+    ocupacoes = OcupacaoEquipeDiretiva.objects.filter(
+        Q(data_fim__isnull=True) | Q(data_fim__gte=hoje), data_inicio__lte=hoje,
+    ).select_related('cargo', 'unidade')
+    cargos = {}
+    for o in ocupacoes:
+        cargos.setdefault(o.professor_id, []).append(f'{o.cargo.nome} ({o.unidade.sigla})')
+    return {pid: ', '.join(nomes) for pid, nomes in cargos.items()}
 
 class AllocCurricularView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
     template_name = "allocations/alloc_curricular.html"
@@ -74,8 +92,14 @@ class AllocCurricularView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView)
             ))
             return context
 
+        linhas_qs = AlocacaoTurmaDocente.objects.filter(
+            alocacao_curricular__unidade_id=unidade_id,
+            alocacao_curricular__semestre=_semestre_atual(),
+        ).select_related('docente').order_by('pk')
         componentes_qs = MatrixComponent.objects.select_related(
-            'componente_curricular', 'docente'
+            'componente_curricular'
+        ).prefetch_related(
+            Prefetch('alocacoes_turma_docente', queryset=linhas_qs, to_attr='linhas_carregadas')
         ).order_by('periodo', 'codigo')
         matrizes_vigentes = CurriculumMatrix.objects.filter(
             unidades__id=unidade_id,
@@ -92,17 +116,28 @@ class AllocCurricularView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView)
         ids_matrizes = matrizes_vigentes.order_by().values('pk')
         componentes_da_unidade = MatrixComponent.objects.filter(
             matriz_id__in=ids_matrizes,
+        ).prefetch_related(
+            Prefetch('alocacoes_turma_docente', queryset=linhas_qs, to_attr='linhas_carregadas')
         )
-        total_componentes = componentes_da_unidade.count()
-        componentes_sem_docente = componentes_da_unidade.filter(
-            docente__isnull=True,
-        ).exclude(status=MatrixComponent.StatusChoices.NAO_OFERECIDA).count()
+        total_componentes = 0
+        componentes_sem_docente = 0
+        for componente_unidade in componentes_da_unidade:
+            total_componentes += 1
+            if services.componente_pendente(componente_unidade, componente_unidade.linhas_carregadas):
+                componentes_sem_docente += 1
 
         paginator = Paginator(matrizes_vigentes, 3)
         page_obj = paginator.get_page(self.request.GET.get('page'))
 
+        cargos_diretivos = _cargos_diretivos_vigentes()
         matrizes_data = []
         for matriz in page_obj.object_list:
+            for componente in matriz.componentes_carregados:
+                componente.pendente_alocacao = services.componente_pendente(
+                    componente, componente.linhas_carregadas
+                )
+                for linha in componente.linhas_carregadas:
+                    linha.cargo_diretivo = cargos_diretivos.get(linha.docente_id, '')
             matrizes_data.append({
                 'matriz': matriz,
                 'componentes': matriz.componentes_carregados,
@@ -153,71 +188,140 @@ class AllocCurricularView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView)
 
         return context
 
+def _contexto_componente(request, pk):
+    """Carrega o componente e valida perfil/unidade/janela.
+
+    Retorna (componente, unidade, resposta_de_erro). Quando `resposta_de_erro`
+    não é None, a view deve devolvê-la sem processar a operação.
+    """
+    from apps.courses.models import MatrixComponent
+    from django.http import HttpResponseForbidden
+
+    comp = get_object_or_404(MatrixComponent.objects.select_related('matriz', 'matriz__curso'), pk=pk)
+    user = request.user
+
+    # Segurança: Coordenador só pode modificar componentes da sua unidade
+    if user.perfil == 'COORDENADOR_UNIDADE':
+        if not user.unidade_id or not comp.matriz.unidades.filter(id=user.unidade_id).exists():
+            return comp, None, HttpResponseForbidden('Sem permissão para modificar componentes de outra unidade.')
+        unidade = comp.matriz.unidades.filter(id=user.unidade_id).first()
+    else:
+        unidades = comp.matriz.unidades.order_by('pk')
+        unidade_id = request.POST.get('unidade_id', '')
+        unidade = unidades.filter(pk=unidade_id).first() if unidade_id.isdigit() else None
+        unidade = unidade or unidades.first()
+
+    blocked = enforce_window_or_redirect(
+        request,
+        area_label='Alocação',
+        action_label='alocar docente',
+        target_label=str(comp.nome_disciplina),
+        unidade=unidade,
+        fallback_url=request.META.get('HTTP_REFERER', '/alocacao-curricular/'),
+    )
+    if blocked:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            # A mensagem de janela fechada já foi enfileirada; o cliente recarrega para exibi-la.
+            return comp, unidade, JsonResponse({'ok': False, 'reload': True}, status=403)
+        return comp, unidade, blocked
+    return comp, unidade, None
+
+
+def _eh_ajax(request):
+    return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+
+def _resposta_erro(request, erro):
+    if _eh_ajax(request):
+        return JsonResponse({'ok': False, 'message': erro.message}, status=erro.status)
+    messages.error(request, erro.message)
+    return redirect(request.META.get('HTTP_REFERER', '/alocacao-curricular/'))
+
+
 class AlocarDocenteComponenteView(LoginRequiredMixin, PerfilRequiredMixin, View):
+    """Define o docente (ou carência / não oferecido) de uma linha do componente.
+
+    POST: `docente_id` (id do professor | SEM_PROFESSOR | NAO_OFERECIDA),
+    `linha_id` (opcional: pk da linha, ou `novo` para acrescentar uma linha) e
+    `acao=remover` (com `linha_id`) para excluir uma linha adicional.
+    """
     allowed_profiles = ['DESUP', 'COORDENADOR_UNIDADE']
-    
+
     def post(self, request, pk):
-        from apps.courses.models import MatrixComponent
-        from apps.professors.models import Professor
-        from django.http import HttpResponse, HttpResponseForbidden
-        
-        comp = get_object_or_404(MatrixComponent, pk=pk)
-        user = request.user
-        
-        # Segurança: Coordenador só pode modificar componentes da sua unidade
-        if user.perfil == 'COORDENADOR_UNIDADE':
-            if not user.unidade or not comp.matriz.unidades.filter(id=user.unidade.id).exists():
-                return HttpResponseForbidden('Sem permissão para modificar componentes de outra unidade.')
+        from django.http import HttpResponse
 
-        unidade_comp = comp.matriz.unidades.filter(id=user.unidade_id).first() if user.unidade_id else comp.matriz.unidades.first()
-        blocked = enforce_window_or_redirect(
-            request,
-            area_label='Alocação',
-            action_label='alocar docente',
-            target_label=str(comp.nome_disciplina),
-            unidade=unidade_comp,
-            fallback_url=request.META.get('HTTP_REFERER', '/alocacao-curricular/'),
-        )
-        if blocked:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                # A mensagem de janela fechada já foi enfileirada; o cliente recarrega para exibi-la.
-                return JsonResponse({'ok': False, 'reload': True}, status=403)
-            return blocked
-        
-        docente_id = request.POST.get('docente_id')
-        
-        if docente_id == MatrixComponent.StatusChoices.NAO_OFERECIDA:
-            comp.docente = None
-            comp.status = MatrixComponent.StatusChoices.NAO_OFERECIDA
-            comp.save()
-            msg = f'Componente {comp.nome_disciplina} marcado como Não oferecido.'
-        elif docente_id == MatrixComponent.StatusChoices.SEM_PROFESSOR or not docente_id:
-            comp.docente = None
-            comp.status = MatrixComponent.StatusChoices.SEM_PROFESSOR
-            comp.save()
-            msg = f'Componente {comp.nome_disciplina} marcado como Sem professor.'
-        else:
-            # Qualquer unidade pode utilizar um professor da base institucional.
-            comp.docente = get_object_or_404(Professor, pk=docente_id)
-            comp.status = MatrixComponent.StatusChoices.COMPLETO
-            comp.save()
-            msg = f'Docente alocado para {comp.nome_disciplina} com sucesso!'
+        comp, unidade, erro_resposta = _contexto_componente(request, pk)
+        if erro_resposta:
+            return erro_resposta
 
+        linha_id = request.POST.get('linha_id') or None
+        linha = None
+        reload = False
+        try:
+            if request.POST.get('acao') == 'remover':
+                msg = services.remover_linha(comp, unidade, linha_id)
+                reload = True
+            else:
+                msg, linha, reload = services.definir_escolha(
+                    comp, unidade, request.POST.get('docente_id'), linha_id
+                )
+        except services.AlocacaoError as erro:
+            return _resposta_erro(request, erro)
+
+        comp.refresh_from_db(fields=['status'])
         # Salvamento automático (fetch): responde JSON e a página não recarrega.
         # Sem `messages`, para o aviso não reaparecer numa navegação posterior.
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        if _eh_ajax(request):
             return JsonResponse({
                 'ok': True,
                 'message': msg,
                 'status': comp.status,
-                'docente_id': comp.docente_id,
-                'docente_nome': comp.docente.rh_nome if comp.docente_id else '',
+                'reload': reload,
+                'linha_id': linha.pk if linha else None,
+                'docente_id': linha.docente_id if linha else None,
+                'docente_nome': linha.docente.rh_nome if linha and linha.docente_id else '',
+                'cargo_diretivo': (
+                    _cargos_diretivos_vigentes().get(linha.docente_id, '')
+                    if linha and linha.docente_id else ''
+                ),
             })
 
         messages.success(request, msg)
         response = HttpResponse()
         response['HX-Refresh'] = 'true'
         return response
+
+
+class QuantidadeTurmasComponenteView(LoginRequiredMixin, PerfilRequiredMixin, View):
+    """Grava a quantidade de turmas ofertadas do componente (somente números)."""
+    allowed_profiles = ['DESUP', 'COORDENADOR_UNIDADE']
+
+    def post(self, request, pk):
+        from django.http import HttpResponse
+
+        comp, unidade, erro_resposta = _contexto_componente(request, pk)
+        if erro_resposta:
+            return erro_resposta
+        try:
+            msg, quantidade = services.definir_quantidade_turmas(
+                comp, unidade, request.POST.get('quantidade_turmas')
+            )
+        except services.AlocacaoError as erro:
+            return _resposta_erro(request, erro)
+
+        comp.refresh_from_db(fields=['status'])
+        if _eh_ajax(request):
+            return JsonResponse({
+                'ok': True,
+                'message': msg,
+                'status': comp.status,
+                'quantidade_turmas': quantidade,
+            })
+        messages.success(request, msg)
+        response = HttpResponse()
+        response['HX-Refresh'] = 'true'
+        return response
+
 
 class LiberarAlocacaoView(LoginRequiredMixin, PerfilRequiredMixin, View):
     allowed_profiles = ['DESUP']
@@ -268,9 +372,17 @@ class AprovarAlocacaoUnidadeView(LoginRequiredMixin, PerfilRequiredMixin, View):
             unidades__id=unidade_id,
             is_vigente=True,
         ).select_related('curso').distinct()
+        from django.db.models import Prefetch
+        linhas_qs = AlocacaoTurmaDocente.objects.filter(
+            alocacao_curricular__unidade_id=unidade_id,
+            alocacao_curricular__semestre=semestre,
+        )
         componentes_sem_docente = sum(
-            matriz.componentes_da_matriz.filter(docente__isnull=True).exclude(status=MatrixComponent.StatusChoices.NAO_OFERECIDA).count()
-            for matriz in matrizes
+            1
+            for componente in MatrixComponent.objects.filter(matriz__in=matrizes).prefetch_related(
+                Prefetch('alocacoes_turma_docente', queryset=linhas_qs, to_attr='linhas_carregadas')
+            )
+            if services.componente_pendente(componente, componente.linhas_carregadas)
         )
         if componentes_sem_docente:
             messages.error(request, f'Ainda existem {componentes_sem_docente} componente(s) sem docente. Complete a alocacao antes de aprovar.')
@@ -352,11 +464,13 @@ class BuscarProfessoresView(LoginRequiredMixin, PerfilRequiredMixin, View):
 
         qs = qs.prefetch_related('unidades').order_by('nome_exibicao')[:20]
 
+        cargos_diretivos = _cargos_diretivos_vigentes()
         results = [
             {
                 'id': p.id,
                 'nome': p.nome,
                 'unidade': ', '.join(u.sigla for u in p.unidades_exibicao),
+                'cargo_diretivo': cargos_diretivos.get(p.id, ''),
             }
             for p in qs
         ]

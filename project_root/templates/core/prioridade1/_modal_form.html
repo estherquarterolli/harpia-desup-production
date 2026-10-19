@@ -18,5 +18,12 @@
         <button type="submit" class="rounded-lg bg-[#025c9f] px-5 py-2.5 text-sm font-black text-white shadow-sm hover:bg-[#153e70]">Salvar</button>
       </div>
     </form>
+    {% if delete_url %}
+      <form method="post" action="{{ delete_url }}" onsubmit="return confirm('Excluir este cargo? Os ocupantes e o histórico dele também serão excluídos. Esta ação não pode ser desfeita.');" class="border-t border-slate-100 px-6 py-3 text-right">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ retorno }}">
+        <button type="submit" class="rounded-lg px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-50">Excluir cargo</button>
+      </form>
+    {% endif %}
   </div>
 </div>

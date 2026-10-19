@@ -79,6 +79,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'apps.accounts.context_processors.superadmin_visualization',
                 'apps.core.context_processors.notificacoes',
+                'apps.core.context_processors.ajuda_pagina',
                 'apps.core.context_processors.delivery_window_context',
             ],
         },

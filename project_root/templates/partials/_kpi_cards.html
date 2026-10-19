@@ -1,0 +1,18 @@
+{# Cartões de resumo no topo das telas. Contexto: kpis = [{rotulo, valor, tom (azul|verde|ambar|vermelho|cinza), icone}]. #}
+{% if kpis %}
+<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 {% if kpis|length > 3 %}xl:grid-cols-4{% else %}xl:grid-cols-3{% endif %}">
+  {% for k in kpis %}
+  <article class="flex items-center gap-4 rounded-2xl border border-white border-l-4 bg-white/90 p-4 shadow-[0_8px_30px_rgba(2,92,159,0.08)]
+    {% if k.tom == 'verde' %}border-l-emerald-500{% elif k.tom == 'ambar' %}border-l-amber-400{% elif k.tom == 'vermelho' %}border-l-red-500{% elif k.tom == 'cinza' %}border-l-slate-300{% else %}border-l-[#025c9f]{% endif %}">
+    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full
+      {% if k.tom == 'verde' %}bg-emerald-100 text-emerald-600{% elif k.tom == 'ambar' %}bg-amber-100 text-amber-600{% elif k.tom == 'vermelho' %}bg-red-100 text-red-600{% elif k.tom == 'cinza' %}bg-slate-100 text-slate-500{% else %}bg-blue-100 text-[#025c9f]{% endif %}" aria-hidden="true">
+      <i class="ph {{ k.icone }} text-2xl"></i>
+    </span>
+    <div class="min-w-0">
+      <p class="text-3xl font-black leading-none text-[#0b2a5b]">{{ k.valor }}</p>
+      <p class="mt-1 truncate text-sm font-semibold text-slate-500">{{ k.rotulo }}</p>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% endif %}

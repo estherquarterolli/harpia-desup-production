@@ -10,8 +10,9 @@ from django.views.generic import CreateView, DeleteView, DetailView, ListView, U
 
 from apps.accounts.mixins import PerfilRequiredMixin
 from apps.core.busca import filtrar_contem
-from apps.core.models import Notificacao, Unidade
-from .forms import ProfessorForm, SolicitacaoCadastroProfessorForm
+from apps.allocations.services import semestre_atual
+from apps.core.models import Notificacao, SolicitacaoProfessorExterno, Unidade
+from .forms import ProfessorForm, SolicitacaoCadastroProfessorForm, SolicitacaoCessaoProfessorForm
 from .models import ContractType, Professor
 
 
@@ -27,23 +28,32 @@ def _bulk_ch_alocada(professor_ids):
     query por professor — com ~190 professores isso sozinho já estourava os
     30s de timeout do Vercel. Mesma lógica de dedup, calculada em lote.
     """
-    from apps.courses.models import MatrixComponent
+    from apps.allocations.services import alocacoes_vigentes
 
-    componentes = MatrixComponent.objects.filter(
+    componentes = alocacoes_vigentes().filter(
         docente_id__in=professor_ids,
-        matriz__is_vigente=True,
-    ).values("docente_id", "componente_curricular_id", "compartilhado", "carga_horaria", "pk")
+    ).values(
+        "docente_id",
+        "componente_matriz__componente_curricular_id",
+        "componente_matriz__compartilhado",
+        "componente_matriz__carga_horaria",
+        "componente_matriz_id",
+    )
 
     mapa = {}
     vistos = {}
     for comp in componentes:
         pid = comp["docente_id"]
         vistos.setdefault(pid, set())
-        chave = comp["componente_curricular_id"] if comp["compartilhado"] else comp["pk"]
+        chave = (
+            comp["componente_matriz__componente_curricular_id"]
+            if comp["componente_matriz__compartilhado"]
+            else comp["componente_matriz_id"]
+        )
         if chave in vistos[pid]:
             continue
         vistos[pid].add(chave)
-        ha_semanal = (comp["carga_horaria"] or 0) / 20.0
+        ha_semanal = (comp["componente_matriz__carga_horaria"] or 0) / 20.0
         mapa[pid] = mapa.get(pid, 0) + ha_semanal
     return mapa
 
@@ -217,6 +227,21 @@ class ProfessorListView(LoginRequiredMixin, ListView):
             self.request.GET.get(k)
             for k in ('q', 'ch', 'cargo', 'regime', 'tipo', 'unidade_id')
         )
+        from django.db.models import Count, Q
+
+        totais = Professor.objects.aggregate(
+            ativos=Count('pk', filter=Q(status=Professor.StatusChoices.ATIVO)),
+            afastados=Count('pk', filter=Q(status=Professor.StatusChoices.AFASTADO)),
+        )
+        ctx['kpis'] = [
+            {'rotulo': 'No sistema', 'valor': ctx['total_professores'], 'tom': 'azul', 'icone': 'ph-chalkboard-teacher'},
+            {'rotulo': 'Ativos', 'valor': totais['ativos'], 'tom': 'verde', 'icone': 'ph-check-circle'},
+            {'rotulo': 'Afastados', 'valor': totais['afastados'], 'tom': 'ambar', 'icone': 'ph-warning-circle'},
+        ]
+        if ctx['filtros_ativos']:
+            ctx['kpis'].append(
+                {'rotulo': 'Encontrados', 'valor': ctx['total_filtrados'], 'tom': 'cinza', 'icone': 'ph-funnel'}
+            )
         ctx['ch_atual'] = self.request.GET.get('ch', '')
         ctx['cargo_atual'] = self.request.GET.get('cargo') or self.request.GET.get('tipo', '')
 
@@ -272,7 +297,8 @@ class ProfessorListView(LoginRequiredMixin, ListView):
         if unidade_atual:
             try:
                 from django.db import transaction as db_transaction
-                from apps.courses.models import CurriculumMatrix, MatrixComponent
+                from apps.allocations.services import alocacoes_vigentes
+                from apps.courses.models import CurriculumMatrix
                 with db_transaction.atomic():
                     matrizes_vigentes = CurriculumMatrix.objects.filter(
                         unidades=unidade_atual,
@@ -288,15 +314,19 @@ class ProfessorListView(LoginRequiredMixin, ListView):
                         })
                     ctx['colunas_cursos'] = colunas_cursos
 
-                    componentes = MatrixComponent.objects.filter(
-                        matriz__in=matrizes_vigentes,
+                    componentes = alocacoes_vigentes().filter(
+                        componente_matriz__matriz__in=matrizes_vigentes,
                         docente__in=professores_list,
-                    ).select_related('componente_curricular', 'matriz')
+                    ).select_related(
+                        'componente_matriz', 'componente_matriz__componente_curricular',
+                        'componente_matriz__matriz',
+                    )
 
                     alocacao_map_por_prof = {}
                     vistos_por_prof = {}
-                    for comp in componentes:
-                        prof_id = comp.docente_id
+                    for linha in componentes:
+                        comp = linha.componente_matriz
+                        prof_id = linha.docente_id
                         if prof_id not in alocacao_map_por_prof:
                             alocacao_map_por_prof[prof_id] = {}
                             vistos_por_prof[prof_id] = set()
@@ -378,7 +408,7 @@ class ProfessorDeleteView(ProfessorEditDeleteMixin, DeleteView):
     # CORR: `DeleteView.delete()` virou código morto no Django 4.0 (a view passou a usar
     # `FormMixin`, e o POST cai em `form_valid()`) — por isso a mensagem de sucesso nunca
     # chegava na tela. Além disso a exclusão precisa tratar `ProtectedError`: o docente
-    # alocado é protegido por `MatrixComponent.docente` (on_delete=PROTECT) e o POST
+    # alocado é protegido por `AlocacaoTurmaDocente.docente` (on_delete=PROTECT) e o POST
     # estourava 500 em vez de explicar o motivo para o usuário.
     def form_valid(self, form):
         professor = self.object
@@ -422,14 +452,19 @@ class ProfessorSolicitarCadastroView(CoordenadorOnlyMixin, View):
     """
 
     template_name = 'professors/professor_solicitar_cadastro.html'
+    contexto = {
+        'titulo': 'Solicitar Cadastro de Professor',
+        'subtitulo': 'Solicitar cadastro à DESUP',
+        'breadcrumb': 'Solicitar cadastro',
+    }
 
     def get(self, request):
-        return render(request, self.template_name, {'form': SolicitacaoCadastroProfessorForm()})
+        return render(request, self.template_name, {'form': SolicitacaoCadastroProfessorForm(), **self.contexto})
 
     def post(self, request):
         form = SolicitacaoCadastroProfessorForm(request.POST)
         if not form.is_valid():
-            return render(request, self.template_name, {'form': form})
+            return render(request, self.template_name, {'form': form, **self.contexto})
 
         dados = form.cleaned_data
         unidade = request.user.unidade
@@ -445,6 +480,15 @@ class ProfessorSolicitarCadastroView(CoordenadorOnlyMixin, View):
             f'Tipo de contrato: {tipo}\n'
             f'Observações: {dados["observacao"] or "Sem observações."}'
         )
+        if unidade:
+            SolicitacaoProfessorExterno.objects.create(
+                tipo=SolicitacaoProfessorExterno.TipoChoices.CADASTRO,
+                unidade_solicitante=unidade,
+                professor_nome=dados['nome'],
+                semestre=semestre_atual(),
+                justificativa=mensagem,
+                solicitado_por=request.user,
+            )
         Notificacao.objects.create(
             destinatario=None,
             unidade_destino=None,
@@ -453,6 +497,67 @@ class ProfessorSolicitarCadastroView(CoordenadorOnlyMixin, View):
             url_acao=reverse('professors:professor_create'),
         )
         messages.success(request, 'Solicitação de cadastro enviada para a DESUP.')
+        return redirect('professors:professor_list')
+
+
+class ProfessorSolicitarCessaoView(CoordenadorOnlyMixin, View):
+    """Coordenador pede à DESUP um professor de outra unidade (cessão)."""
+
+    template_name = 'professors/professor_solicitar_cadastro.html'
+    contexto = {
+        'titulo': 'Solicitar Professor de Outra Unidade',
+        'subtitulo': 'Solicitar cessão à DESUP',
+        'breadcrumb': 'Solicitar professor',
+    }
+
+    def _render(self, request, form):
+        return render(request, self.template_name, {'form': form, **self.contexto})
+
+    def get(self, request):
+        return self._render(request, SolicitacaoCessaoProfessorForm(unidade=request.user.unidade))
+
+    def post(self, request):
+        unidade = request.user.unidade
+        form = SolicitacaoCessaoProfessorForm(request.POST, unidade=unidade)
+        if not unidade:
+            messages.error(request, 'Seu usuário não está vinculado a uma unidade.')
+            return self._render(request, form)
+        if not form.is_valid():
+            return self._render(request, form)
+
+        professor = form.cleaned_data['professor']
+        origem = professor.unidade_principal or professor.unidades.exclude(pk=unidade.pk).first()
+        if origem is None:
+            form.add_error('professor', 'O professor não tem unidade de origem cadastrada.')
+            return self._render(request, form)
+        semestre = semestre_atual()
+        if SolicitacaoProfessorExterno.objects.filter(
+            unidade_solicitante=unidade, professor=professor, semestre=semestre,
+            status=SolicitacaoProfessorExterno.StatusChoices.PENDENTE,
+        ).exists():
+            form.add_error('professor', 'Já existe uma solicitação pendente para este professor.')
+            return self._render(request, form)
+
+        SolicitacaoProfessorExterno.objects.create(
+            tipo=SolicitacaoProfessorExterno.TipoChoices.CESSAO,
+            unidade_solicitante=unidade,
+            unidade_origem=origem,
+            professor=professor,
+            semestre=semestre,
+            justificativa=form.cleaned_data['justificativa'],
+            solicitado_por=request.user,
+        )
+        Notificacao.objects.create(
+            destinatario=None,
+            unidade_destino=None,
+            titulo=f'Solicitação de professor - {unidade.sigla}',
+            mensagem=(
+                f'{unidade.sigla} solicitou o professor {professor.nome} (origem: {origem.sigla}).\n\n'
+                f'Justificativa: {form.cleaned_data["justificativa"]}'
+            ),
+            url_acao=reverse('core:solicitacao_professor_list'),
+        )
+        messages.success(request, 'Solicitação enviada para a DESUP.')
         return redirect('professors:professor_list')
 
 
