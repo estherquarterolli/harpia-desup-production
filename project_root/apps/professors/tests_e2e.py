@@ -1017,6 +1017,35 @@ class SolicitacaoCadastroEMatriculaOpcionalTests(ProfessorE2EBase):
         self.assertEqual(resposta.context['total_professores'], 2)
         self.assertContains(resposta, '2 no sistema')
 
+    def test_listagem_exibe_cargo_vinculo_e_filtra_por_ch(self):
+        contrato_20h = ContractType.objects.create(
+            nome='PROFESSOR FAETEC I 20 H',
+            categoria=ContractType.CategoriaChoices.TERCEIRIZADO,
+            regime_trabalho='20h',
+            max_class_hours=10,
+            max_total_hours=20,
+            max_classes=4,
+        )
+        professor_20h = Professor.objects.create(
+            id_funcional='IDF-CH20',
+            rh_matricula='MAT-CH20',
+            rh_nome='Professor Vinte Horas',
+            tipo_contrato=contrato_20h,
+        )
+        self.client.force_login(self.desup)
+
+        resposta = self.client.get(self.url_lista, {'ch': '20'})
+
+        self.assertEqual(
+            [prof.pk for prof in resposta.context['professores']],
+            [professor_20h.pk],
+        )
+        self.assertContains(resposta, 'Cargo')
+        self.assertContains(resposta, 'Vínculo empregatício')
+        self.assertContains(resposta, 'Professor Vinte Horas')
+        self.assertContains(resposta, 'Terceirizado')
+        self.assertContains(resposta, '20h')
+
     def test_formulario_e_filtro_so_oferecem_os_tipos_oficiais(self):
         ContractType.objects.create(
             nome='Agente Administrativo', max_class_hours=20, max_total_hours=40, max_classes=4,

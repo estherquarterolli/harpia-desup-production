@@ -1,0 +1,22 @@
+<div id="{{ modal_id }}{{ modal_key }}" class="modal-equipe hidden fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+  <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+      <div class="flex items-center gap-2">
+        {% if voltar %}<button type="button" onclick="trocarModal('{{ modal_id }}{{ modal_key }}','{{ voltar }}{{ voltar_key }}')" aria-label="Voltar" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"><i class="ph ph-arrow-left text-lg"></i></button>{% endif %}
+        <div><h3 class="text-base font-black text-[#025c9f]">{{ titulo }}</h3>{% if subtitulo %}<p class="text-xs text-slate-500">{{ subtitulo }}</p>{% endif %}</div>
+      </div>
+      <button type="button" onclick="fecharModal('{{ modal_id }}{{ modal_key }}')" aria-label="Fechar" class="text-slate-400 hover:text-slate-600"><i class="ph ph-x text-xl"></i></button>
+    </div>
+    <form method="post" action="{{ action_url }}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ retorno }}">
+      <div class="max-h-[60vh] overflow-y-auto px-6 py-4">
+        {% include 'core/prioridade1/_campos_form.html' %}
+      </div>
+      <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-6 py-4">
+        <button type="button" onclick="fecharModal('{{ modal_id }}{{ modal_key }}')" class="rounded-lg px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-100">Cancelar</button>
+        <button type="submit" class="rounded-lg bg-[#025c9f] px-5 py-2.5 text-sm font-black text-white shadow-sm hover:bg-[#153e70]">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>

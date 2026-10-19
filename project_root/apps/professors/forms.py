@@ -20,6 +20,8 @@ class ProfessorForm(forms.ModelForm):
             'unidades',
             'cursos',
             'status',
+            'nivel_ensino_origem',
+            'area_atuacao',
         ]
         widgets = {
             'id_funcional': forms.TextInput(attrs={'class': _INPUT_CSS, 'placeholder': 'Ex: 1234567'}),
@@ -35,6 +37,8 @@ class ProfessorForm(forms.ModelForm):
             }),
             'cursos': forms.CheckboxSelectMultiple(),
             'status': forms.Select(attrs={'class': _SELECT_CSS}),
+            'nivel_ensino_origem': forms.Select(attrs={'class': _SELECT_CSS}),
+            'area_atuacao': forms.TextInput(attrs={'class': _INPUT_CSS, 'placeholder': 'Ex: Matemática', 'maxlength': 150}),
             'carga_diferenciada': forms.CheckboxInput(attrs={'class': 'w-4 h-4'}),
             'carga_horaria_personalizada': forms.NumberInput(attrs={'class': _INPUT_CSS, 'min': 1, 'max': 60, 'placeholder': 'Ex: 30'}),
         }
@@ -42,16 +46,21 @@ class ProfessorForm(forms.ModelForm):
             'id_funcional': 'ID',
             'rh_matricula': 'Matrícula RH (opcional)',
             'rh_nome': 'Nome',
-            'tipo_contrato': 'Regime / Tipo de Contrato',
+            'tipo_contrato': 'Cargo',
             'unidades': 'Unidades',
             'cursos': 'Cursos (Checklist)',
             'status': 'Status',
+            'nivel_ensino_origem': 'Nível de ensino de origem',
+            'area_atuacao': 'Área de atuação',
         }
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         self.fields['tipo_contrato'].queryset = ContractType.objects.permitidos().order_by('nome')
+        # Cadastros e integrações anteriores a este campo podem omiti-lo. O
+        # valor institucional seguro nesses casos é "Não informado".
+        self.fields['nivel_ensino_origem'].required = False
 
         is_gestor_unidade = False
         if self.user:
@@ -63,6 +72,7 @@ class ProfessorForm(forms.ModelForm):
                 # O coordenador pode consultar todos os docentes, mas não altera os
                 # vínculos institucionais definidos pela DESUP.
                 self.fields['unidades'].disabled = True
+                self.fields['nivel_ensino_origem'].disabled = True
 
         unidades_iniciais = list(self.instance.unidades.values_list('pk', flat=True)) if self.instance.pk else []
         if not unidades_iniciais and self.instance.pk and self.instance.unidade_principal_id:
@@ -86,6 +96,12 @@ class ProfessorForm(forms.ModelForm):
             ).order_by('nome').distinct()
         else:
             self.fields['cursos'].queryset = Course.objects.none()
+
+    def clean_nivel_ensino_origem(self):
+        return (
+            self.cleaned_data.get('nivel_ensino_origem')
+            or Professor.NivelEnsinoOrigemChoices.NAO_INFORMADO
+        )
 
     def save(self, commit=True):
         professor = super().save(commit=False)

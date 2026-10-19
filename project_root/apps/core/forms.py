@@ -1,11 +1,22 @@
 import re
 
 from django import forms
-from .models import JanelaEntrega
+from .models import (
+    ExcecaoCargaUnidade,
+    JanelaEntrega,
+    LimiteCargaUnidade,
+    OcupacaoEquipeDiretiva,
+    ReadaptacaoProfessor,
+    SolicitacaoProfessorExterno,
+    TipoCargoDiretivo,
+)
 
 # Classe de input consistente com os demais campos das telas de janela.
 _DATE_CSS = ('w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm '
              'bg-slate-50 focus:bg-white focus:border-[#025c9f] outline-none transition')
+_INPUT_CSS = ('w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm '
+              'bg-white focus:border-[#025c9f] focus:ring-2 focus:ring-blue-100 outline-none transition')
+_SELECT_CSS = _INPUT_CSS
 
 # O semestre é usado como chave lógica em alocações/matrizes e aparece cru na tela;
 # sem formato fixo entrava qualquer string ("banana!!") e a janela virava órfã.
@@ -111,3 +122,165 @@ class JanelaEntregaForm(JanelaEntregaValidacaoMixin, forms.ModelForm):
         if commit:
             instance.save()
         return instance
+
+
+class TipoCargoDiretivoForm(forms.ModelForm):
+    class Meta:
+        model = TipoCargoDiretivo
+        fields = ["nome", "exige_curso", "permite_multiplos", "ativo", "ordem"]
+        widgets = {
+            "nome": forms.TextInput(attrs={"class": _INPUT_CSS}),
+            "exige_curso": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
+            "permite_multiplos": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
+            "ativo": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
+            "ordem": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": 0}),
+        }
+
+
+class OcupacaoEquipeDiretivaForm(forms.ModelForm):
+    """Preenche um cargo da equipe diretiva de uma unidade já escolhida na tela."""
+
+    class Meta:
+        model = OcupacaoEquipeDiretiva
+        fields = ["professor", "curso", "data_inicio", "data_fim", "carga_reducao_horas", "observacoes"]
+        widgets = {
+            "professor": forms.Select(attrs={"class": _SELECT_CSS}),
+            "curso": forms.Select(attrs={"class": _SELECT_CSS}),
+            "data_inicio": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
+            "data_fim": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
+            "carga_reducao_horas": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": "0", "max": "168", "step": "0.25"}),
+            "observacoes": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 3}),
+        }
+
+    def __init__(self, *args, unidade, cargo, **kwargs):
+        super().__init__(*args, **kwargs)
+        from django.db.models import Q
+        from apps.courses.models import CourseUnit
+        from apps.professors.models import Professor
+
+        # Atribuídos antes do full_clean para que o clean() do modelo valide
+        # vínculo do servidor, curso da unidade e conflitos de vigência.
+        self.instance.unidade = unidade
+        self.instance.cargo = cargo
+        self.fields["professor"].queryset = Professor.objects.filter(
+            Q(unidade_principal=unidade) | Q(unidades=unidade)
+        ).distinct().order_by("rh_nome")
+        if cargo.exige_curso:
+            self.fields["curso"].required = True
+            self.fields["curso"].queryset = CourseUnit.objects.filter(
+                unidade=unidade, ativo=True,
+            ).select_related("curso", "unidade").order_by("curso__nome")
+        else:
+            del self.fields["curso"]
+
+
+class ReducaoOcupacaoEquipeDiretivaForm(forms.ModelForm):
+    class Meta:
+        model = OcupacaoEquipeDiretiva
+        fields = ["carga_reducao_horas", "observacoes"]
+        widgets = {
+            "carga_reducao_horas": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": "0", "max": "168", "step": "0.25"}),
+            "observacoes": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 3}),
+        }
+
+
+class LimiteCargaUnidadeForm(forms.ModelForm):
+    class Meta:
+        model = LimiteCargaUnidade
+        fields = ["unidade", "limite_horas_semanais", "data_inicio", "data_fim", "observacoes"]
+        widgets = {
+            "unidade": forms.Select(attrs={"class": _SELECT_CSS}),
+            "limite_horas_semanais": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": "0.01", "step": "0.25"}),
+            "data_inicio": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
+            "data_fim": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
+            "observacoes": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 3}),
+        }
+        labels = {"limite_horas_semanais": "Teto semanal (horas-aula)"}
+        help_texts = {
+            "limite_horas_semanais": (
+                "Soma máxima de horas-aula semanais que a unidade pode alocar, "
+                "considerando todos os professores."
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["unidade"].queryset = self.fields["unidade"].queryset.filter(status=True).order_by("nome")
+
+
+class ReadaptacaoProfessorForm(forms.ModelForm):
+    class Meta:
+        model = ReadaptacaoProfessor
+        fields = ["professor", "data_inicio", "data_fim", "justificativa_administrativa"]
+        widgets = {
+            "professor": forms.Select(attrs={"class": _SELECT_CSS}),
+            "data_inicio": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
+            "data_fim": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
+            "justificativa_administrativa": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 4}),
+        }
+        help_texts = {
+            "professor": "Durante a vigência o professor não pode ser alocado em sala; a carga vai para o extracurricular.",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from apps.professors.models import Professor
+
+        self.fields["professor"].queryset = Professor.objects.order_by("rh_nome")
+
+
+class ReadaptacaoProfessorEdicaoForm(forms.ModelForm):
+    """Edição da vigência/justificativa sem trocar o professor da readaptação."""
+
+    class Meta(ReadaptacaoProfessorForm.Meta):
+        fields = ["data_inicio", "data_fim", "justificativa_administrativa"]
+
+
+class DecisaoSolicitacaoProfessorForm(forms.Form):
+    decisao = forms.ChoiceField(
+        label="Decisão",
+        choices=(
+            (SolicitacaoProfessorExterno.StatusChoices.APROVADA, "Aprovar"),
+            (SolicitacaoProfessorExterno.StatusChoices.RECUSADA, "Recusar"),
+        ),
+        widget=forms.Select(attrs={"class": _SELECT_CSS}),
+    )
+    motivo_decisao = forms.CharField(
+        label="Motivo da decisão",
+        widget=forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 3}),
+        required=False,
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        if (
+            cleaned.get("decisao") == SolicitacaoProfessorExterno.StatusChoices.RECUSADA
+            and not (cleaned.get("motivo_decisao") or "").strip()
+        ):
+            self.add_error("motivo_decisao", "Informe o motivo da recusa.")
+        return cleaned
+
+
+class DecisaoExcecaoCargaForm(forms.Form):
+    decisao = forms.ChoiceField(
+        label="Decisão",
+        choices=(
+            (ExcecaoCargaUnidade.StatusChoices.APROVADA, "Aprovar"),
+            (ExcecaoCargaUnidade.StatusChoices.RECUSADA, "Recusar"),
+        ),
+        widget=forms.Select(attrs={"class": _SELECT_CSS}),
+    )
+    motivo_decisao = forms.CharField(
+        label="Motivo da decisão",
+        widget=forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 3}),
+        required=False,
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        if (
+            cleaned.get("decisao") == ExcecaoCargaUnidade.StatusChoices.RECUSADA
+            and not (cleaned.get("motivo_decisao") or "").strip()
+        ):
+            self.add_error("motivo_decisao", "Informe o motivo da recusa.")
+        return cleaned

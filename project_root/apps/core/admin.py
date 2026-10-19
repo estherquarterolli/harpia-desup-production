@@ -1,6 +1,18 @@
 from django.contrib import admin
 from apps.accounts.admin import HarpiaModelAdmin, admin_site
-from .models import Unidade, JanelaEntrega, Notificacao, AuditoriaGlobal, ErroSistema
+from .models import (
+    AuditoriaGlobal,
+    ErroSistema,
+    ExcecaoCargaUnidade,
+    JanelaEntrega,
+    LimiteCargaUnidade,
+    Notificacao,
+    OcupacaoEquipeDiretiva,
+    ReadaptacaoProfessor,
+    SolicitacaoProfessorExterno,
+    TipoCargoDiretivo,
+    Unidade,
+)
 from .forms import JanelaEntregaForm
 
 class UnidadeAdmin(HarpiaModelAdmin):
@@ -61,8 +73,55 @@ class ErroSistemaAdmin(HarpiaModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
+
+class TipoCargoDiretivoAdmin(HarpiaModelAdmin):
+    list_display = ('nome', 'codigo', 'exige_curso', 'permite_multiplos', 'ativo', 'ordem')
+    list_filter = ('ativo', 'exige_curso', 'permite_multiplos')
+    search_fields = ('nome', 'codigo')
+    readonly_fields = ('codigo', 'criado_em', 'atualizado_em')
+
+
+class OcupacaoEquipeDiretivaAdmin(HarpiaModelAdmin):
+    list_display = ('unidade', 'cargo', 'professor', 'curso', 'data_inicio', 'data_fim', 'carga_reducao_horas')
+    list_filter = ('unidade', 'cargo', 'data_inicio', 'data_fim')
+    search_fields = ('professor__rh_nome', 'unidade__nome', 'cargo__nome')
+    readonly_fields = ('criado_em', 'atualizado_em')
+
+
+class SolicitacaoProfessorExternoAdmin(HarpiaModelAdmin):
+    list_display = ('professor', 'unidade_origem', 'unidade_solicitante', 'semestre', 'status', 'criado_em')
+    list_filter = ('status', 'semestre', 'unidade_origem', 'unidade_solicitante')
+    search_fields = ('professor__rh_nome', 'justificativa', 'motivo_decisao')
+    readonly_fields = ('criado_em', 'decidido_em')
+
+
+class LimiteCargaUnidadeAdmin(HarpiaModelAdmin):
+    list_display = ('unidade', 'limite_horas_semanais', 'data_inicio', 'data_fim')
+    list_filter = ('unidade', 'data_inicio', 'data_fim')
+    readonly_fields = ('criado_em', 'atualizado_em')
+
+
+class ExcecaoCargaUnidadeAdmin(HarpiaModelAdmin):
+    list_display = ('unidade', 'professor', 'horas_adicionais', 'data_inicio', 'data_fim', 'status')
+    list_filter = ('status', 'unidade', 'data_inicio', 'data_fim')
+    search_fields = ('professor__rh_nome', 'justificativa', 'motivo_decisao')
+    readonly_fields = ('criado_em', 'decidido_em')
+
+
+class ReadaptacaoProfessorAdmin(HarpiaModelAdmin):
+    list_display = ('professor', 'data_inicio', 'data_fim', 'criado_por')
+    list_filter = ('data_inicio', 'data_fim')
+    search_fields = ('professor__rh_nome', 'professor__id_funcional')
+    readonly_fields = ('criado_em', 'atualizado_em')
+
 admin_site.register(Unidade, UnidadeAdmin)
 admin_site.register(JanelaEntrega, JanelaEntregaAdmin)
 admin_site.register(Notificacao, NotificacaoAdmin)
 admin_site.register(AuditoriaGlobal, AuditoriaGlobalAdmin)
 admin_site.register(ErroSistema, ErroSistemaAdmin)
+admin_site.register(TipoCargoDiretivo, TipoCargoDiretivoAdmin)
+admin_site.register(OcupacaoEquipeDiretiva, OcupacaoEquipeDiretivaAdmin)
+admin_site.register(SolicitacaoProfessorExterno, SolicitacaoProfessorExternoAdmin)
+admin_site.register(LimiteCargaUnidade, LimiteCargaUnidadeAdmin)
+admin_site.register(ExcecaoCargaUnidade, ExcecaoCargaUnidadeAdmin)
+admin_site.register(ReadaptacaoProfessor, ReadaptacaoProfessorAdmin)

@@ -1,0 +1,265 @@
+DISTRIBUIÇÃO DE TAREFAS - EVOLUÇÃO DO HARPIA DESUP
+
+Data: 16/10/2026
+
+RESPONSÁVEIS
+
+Esther: responsável por todas as alterações, configurações, análises e validações pertencentes à DESUP.
+
+Jefferson: responsável por todas as alterações, operações e validações pertencentes às unidades de ensino.
+
+OBJETIVO
+
+Executar as modificações previstas para o sistema Harpia DESUP respeitando a ordem de prioridade, a separação de permissões e a integração entre a visão institucional da DESUP e a operação de cada unidade.
+
+ORIENTAÇÕES OBRIGATÓRIAS PARA OS DOIS RESPONSÁVEIS
+
+- Garantir responsividade em celular, tablet e computador.
+- Aplicar autenticação, autorização e isolamento de dados no servidor.
+- Impedir que uma unidade consulte ou altere dados de outra unidade.
+- Não armazenar senhas, tokens, credenciais ou dados pessoais sensíveis em códigos, mensagens, relatórios ou registros de erro.
+- Manter auditoria individual das ações, sem compartilhamento de contas.
+- Revisar todos os textos conforme a norma-padrão do português brasileiro.
+- Utilizar linguagem clara, respeitosa e institucional.
+- Criar testes para regras de negócio, permissões e tentativas de acesso indevido.
+- Atualizar o arquivo relatoriodemodificações.md ao final de cada alteração, informando a data e mantendo um bloco separado para cada arquivo criado ou modificado.
+- Não considerar uma tarefa concluída sem executar e registrar as verificações correspondentes.
+
+============================================================
+PRIORIDADE 1
+DIRETORIA, VISIBILIDADE, MARCAÇÕES E DASHBOARD
+============================================================
+
+1.1. EQUIPE DIRETIVA, DIRETORIAS ELETIVAS E COORDENAÇÕES
+
+ESTHER - DESUP
+
+- Criar e administrar os tipos de cargo disponíveis no sistema.
+- Incluir, desativar e reativar cargos sem apagar o histórico.
+- Configurar os cargos de Diretor(a), Vice-Diretor(a), Secretário(a), Coordenação de Curso, Coordenação de Pesquisa e Extensão e Coordenação de Estágio.
+- Definir ou ajustar a carga horária de redução de cada ocupação.
+- Consultar e supervisionar as equipes diretivas de todas as unidades.
+- Acompanhar o impacto das funções de direção e coordenação na carga horária.
+- Acompanhar Coordenação e Supervisão de Estágio em âmbito institucional.
+- Validar administrativamente quem poderá nomear, substituir ou encerrar uma ocupação.
+
+JEFFERSON - UNIDADE
+
+- Criar as telas e os fluxos para cadastrar ou atualizar os ocupantes dos cargos disponíveis na própria unidade.
+- Permitir o preenchimento da vigência, do curso e dos demais dados de cada ocupação.
+- Exibir a composição atual e o histórico da equipe diretiva da unidade.
+- Mostrar alerta quando integrante da direção ou coordenação também estiver alocado em sala de aula.
+- Permitir o registro das atividades de estágio e supervisão da própria unidade.
+- Garantir que nenhuma unidade acesse ou altere a equipe diretiva de outra unidade.
+
+1.2. VISIBILIDADE POR UNIDADE E PROFESSOR DE OUTRA UNIDADE
+
+ESTHER - DESUP
+
+- Manter a visão global de professores e solicitações de todas as unidades.
+- Criar a fila de análise das solicitações de professor externo.
+- Permitir que a DESUP aprove, recuse ou acompanhe cada solicitação.
+- Efetivar o novo vínculo do professor após aprovação, sem apagar os vínculos anteriores.
+- Configurar notificações e e-mails referentes às solicitações e movimentações entre unidades.
+- Registrar as decisões e alterações na auditoria.
+
+JEFFERSON - UNIDADE
+
+- Restringir a visualização padrão aos professores vinculados à própria unidade.
+- Criar o botão e o formulário “Solicitar professor de outra unidade”.
+- Permitir o preenchimento da justificativa e do período da solicitação.
+- Criar a tela de acompanhamento das solicitações realizadas pela unidade.
+- Permitir a utilização do professor externo somente após a aprovação da DESUP.
+- Exibir notificações e e-mails relativos ao andamento da solicitação.
+- Testar tentativas de consulta de professores e solicitações de outras unidades.
+
+1.3. MARCAÇÕES VISUAIS, ALERTAS E LIMITES DE CARGA HORÁRIA
+
+ESTHER - DESUP
+
+- Configurar os limites institucionais de carga horária.
+- Criar o fluxo de autorização de exceções, sempre com justificativa.
+- Visualizar saldos, limites, excessos e casos críticos de todas as unidades.
+- Acompanhar professores readaptados e sua alocação no módulo extracurricular.
+- Identificar e acompanhar professores de Ensino Médio atuando no Ensino Superior.
+- Auditar alterações de limite e decisões excepcionais.
+- Validar com a área competente as regras legais de readaptação e atuação no Ensino Superior.
+
+JEFFERSON - UNIDADE
+
+- Destacar professor de outra unidade em amarelo, acompanhado de texto ou ícone explicativo.
+- Sinalizar saldo de carga disponível, limite atingido e carga excedida.
+- Exibir o limite da unidade e os alertas durante a alocação.
+- Destacar permanentemente professor readaptado.
+- Impedir, no servidor, a alocação de professor readaptado em sala de aula.
+- Direcionar a carga permitida do professor readaptado para o fluxo extracurricular.
+- Exibir alerta para professor de Ensino Médio alocado no Ensino Superior.
+- Permitir o encaminhamento de exceções justificadas para análise da DESUP.
+
+1.4. DASHBOARD GERAL DE ALOCAÇÕES
+
+ESTHER - DESUP
+
+- Criar a visão institucional consolidada de todas as unidades.
+- Disponibilizar filtros por unidade, semestre, curso, turno e situação.
+- Exibir indicadores de carga, saldo, carência, pendência e alertas administrativos.
+- Permitir o detalhamento dos dados de qualquer unidade conforme as permissões da DESUP.
+- Garantir que os totais não sejam duplicados por vínculos múltiplos.
+
+JEFFERSON - UNIDADE
+
+- Criar a visão completa das alocações da própria unidade.
+- Exibir professores, cargas, saldos, componentes sem professor e pendências locais.
+- Disponibilizar filtros por semestre, curso, turno e situação.
+- Garantir que os links de detalhamento permaneçam restritos à unidade do usuário.
+- Adaptar cartões, filtros e tabelas para celular, tablet e computador.
+
+============================================================
+PRIORIDADE 2
+REGRAS DE ALOCAÇÃO, VÍNCULOS, LISTA FORÇA E LICENÇAS
+============================================================
+
+2.1. MÚLTIPLAS ALOCAÇÕES NO MESMO COMPONENTE CURRICULAR
+
+ESTHER - DESUP
+
+- Definir e supervisionar as regras institucionais para várias turmas do mesmo componente.
+- Consultar todas as turmas e corrigir inconsistências autorizadas.
+- Acompanhar o impacto das turmas nos totais, dashboards e relatórios.
+- Validar a estratégia de migração das alocações existentes.
+
+JEFFERSON - UNIDADE
+
+- Permitir a criação ou seleção de várias turmas para o mesmo componente curricular.
+- Permitir professores diferentes por turma.
+- Permitir o mesmo professor em mais de uma turma quando a regra autorizar.
+- Evitar dupla contagem de carga em componentes compartilhados.
+- Revisar carga e conflitos antes do envio para análise.
+- Preservar o histórico das alterações de alocação da unidade.
+
+2.2. RAT, PROFESSORES CEDIDOS, COMPLEMENTAÇÃO E CARÊNCIAS
+
+ESTHER - DESUP
+
+- Validar e acompanhar RAT, cessões, complementações e carências.
+- Manter a visão institucional das necessidades de pessoal.
+- Definir os critérios e as transições de aprovação.
+- Relacionar RAT às carências correspondentes e emitir os alertas necessários.
+- Homologar a definição final de “Sem professor” e “Carência”.
+
+JEFFERSON - UNIDADE
+
+- Criar os registros ou as solicitações de RAT, cessão e complementação da própria unidade.
+- Associar professor, período, carga horária e justificativa.
+- Exibir uma legenda clara para “Sem professor” e “Carência”.
+- Acompanhar as decisões da DESUP e ajustar as alocações locais.
+- Integrar as situações aprovadas aos cálculos e indicadores da unidade.
+
+2.3. NOVOS CAMPOS DO PROFESSOR E LISTA FORÇA
+
+ESTHER - DESUP
+
+- Criar o fluxo de importação e atualização da Lista Força.
+- Validar Cargo, Área do Professor, Disciplina de Ingresso e Vínculo Empregatício.
+- Tratar erros, duplicidades e divergências antes da publicação dos dados.
+- Definir quais campos são oficiais do RH e quais podem receber ajuste da DESUP.
+- Disponibilizar consulta e filtros globais pelos novos campos.
+
+JEFFERSON - UNIDADE
+
+- Exibir Cargo em coluna própria nas listagens autorizadas.
+- Exibir Área do Professor, Disciplina de Ingresso e Vínculo Empregatício nos detalhes.
+- Permitir filtros locais pelos novos campos.
+- Utilizar essas informações no planejamento das alocações.
+- Criar um fluxo para comunicar divergências à DESUP sem alterar diretamente os dados oficiais.
+
+2.4. LICENÇAS E PROCESSO SEI OPCIONAL
+
+ESTHER - DESUP
+
+- Visualizar e acompanhar as licenças de todas as unidades conforme autorização.
+- Analisar situações que afetem carga, carência ou substituição.
+- Definir os perfis autorizados a consultar documentos sensíveis.
+- Garantir que os fluxos possam ser processados sem número SEI.
+- Manter a validação do formato quando o número SEI for informado.
+
+JEFFERSON - UNIDADE
+
+- Criar a área de Licença Médica, Licença Especial e Licença Sindical.
+- Permitir o registro do professor, tipo, início, fim, situação e unidade responsável.
+- Proteger documentos e informações médicas contra acesso indevido.
+- Ajustar a disponibilidade e as alocações afetadas pelo período da licença.
+- Remover a obrigatoriedade do SEI nos fluxos curricular e extracurricular.
+- Garantir que a ausência do SEI não impeça salvar, enviar ou concluir um registro.
+
+============================================================
+PRIORIDADE 3
+GOVERNANÇA, RELATÓRIOS, ACESSOS E PADRONIZAÇÃO
+============================================================
+
+3.1. PERÍODO DE ANÁLISE E RELATÓRIOS
+
+ESTHER - DESUP
+
+- Configurar o início, o fim e a abrangência do período de análise.
+- Permitir o fechamento global ou por unidade.
+- Configurar a reabertura quando necessária.
+- Manter as operações institucionais autorizadas durante o período de análise.
+- Criar a visão global dos relatórios gerenciais.
+- Permitir filtros e exportações globais ou por unidade.
+- Acompanhar indicadores, pendências e histórico de fechamento.
+
+JEFFERSON - UNIDADE
+
+- Implementar o modo somente leitura durante o período definido pela DESUP.
+- Bloquear no servidor a criação, alteração, exclusão e o envio de registros.
+- Manter consultas, filtros, detalhes e relatórios locais disponíveis.
+- Exibir aviso claro com o período e o motivo do bloqueio.
+- Criar a página de relatórios da própria unidade.
+- Permitir filtros e exportações somente dos dados autorizados para a unidade.
+
+3.2. PADRONIZAÇÃO INSTITUCIONAL, ACESSOS MÚLTIPLOS E E-MAIL
+
+ESTHER - DESUP
+
+- Validar a relação oficial dos nomes completos e das siglas FAETERJ.
+- Aplicar a padronização sem recriar unidades nem perder vínculos existentes.
+- Criar, vincular, desativar e supervisionar os acessos das unidades.
+- Controlar os perfis e impedir elevação indevida de privilégios.
+- Configurar remetente, destinatários e tipos de e-mail institucional.
+- Acompanhar falhas de envio e autorizar reprocessamento seguro.
+
+JEFFERSON - UNIDADE
+
+- Garantir o funcionamento de várias contas individuais vinculadas à mesma unidade.
+- Manter a rastreabilidade individual das ações realizadas.
+- Impedir o compartilhamento de contas como solução do fluxo.
+- Exibir corretamente o nome e a sigla padronizados da unidade em todas as telas.
+- Receber e apresentar os e-mails e as notificações destinados à unidade.
+- Criar o procedimento para comunicar mudança de responsáveis e solicitar atualização de acessos.
+
+============================================================
+ORDEM DE EXECUÇÃO E INTEGRAÇÃO
+============================================================
+
+1. Executar integralmente a Prioridade 1 antes de iniciar a Prioridade 2.
+2. Executar integralmente a Prioridade 2 antes de iniciar a Prioridade 3.
+3. Em cada item, Esther deve concluir ou definir primeiro as regras, configurações e permissões da DESUP que condicionem o trabalho da unidade.
+4. Jefferson deve implementar a operação da unidade respeitando as regras aprovadas pela DESUP.
+5. Quando houver integração, Esther e Jefferson devem validar juntos o fluxo completo: solicitação da unidade, recebimento pela DESUP, decisão, retorno para a unidade e registro de auditoria.
+6. Nenhum dos responsáveis deve ampliar o próprio perfil para testar funções do outro. Os testes devem utilizar contas separadas e permissões reais.
+7. Qualquer decisão administrativa ainda não definida deve ser registrada como pendência. Não deve ser criada uma regra por suposição.
+
+CRITÉRIO DE CONCLUSÃO
+
+Uma prioridade somente será considerada concluída quando:
+
+- Todas as tarefas de Esther e Jefferson estiverem implementadas e integradas.
+- As permissões da DESUP e da unidade estiverem testadas.
+- O isolamento entre unidades estiver comprovado.
+- As telas estiverem verificadas em celular, tablet e computador.
+- Os textos estiverem revisados.
+- Os testes automatizados estiverem aprovados.
+- O relatoriodemodificações.md estiver atualizado com todos os arquivos alterados.
+
+FIM DO DOCUMENTO

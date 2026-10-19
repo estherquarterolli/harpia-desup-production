@@ -1,0 +1,207 @@
+{% extends 'base.html' %}
+
+{% block title %}Alertas e limites - DESUP{% endblock %}
+{% block header_title %}Alertas e limites de carga{% endblock %}
+
+{% block content %}
+{% with retorno=request.get_full_path %}
+<div class="space-y-6">
+  <section class="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+    <div>
+      <h1 class="text-xl font-black text-slate-900">Supervisão de carga horária</h1>
+      <p class="mt-1 text-sm text-slate-500">Semestre {{ resumo_p1.semestre }}{% if filtro_unidade %} · unidade filtrada{% else %} · todas as unidades{% endif %}</p>
+    </div>
+    <form method="get" class="flex flex-col gap-2 sm:flex-row">
+      <label for="alerta-unidade" class="sr-only">Unidade</label>
+      <select id="alerta-unidade" name="unidade_id" onchange="this.form.submit()" class="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold sm:w-56"><option value="">Todas as unidades</option>{% for unidade in unidades %}<option value="{{ unidade.pk }}" {% if filtro_unidade == unidade.pk|stringformat:'s' %}selected{% endif %}>{{ unidade.sigla }} - {{ unidade.nome }}</option>{% endfor %}</select>
+      <label for="alerta-semestre" class="sr-only">Semestre</label>
+      <input id="alerta-semestre" type="text" name="semestre" value="{{ request.GET.semestre|default:resumo_p1.semestre }}" placeholder="2026.1" onchange="this.form.submit()" class="min-h-11 rounded-xl border border-slate-200 px-3 text-sm sm:w-24">
+      <label for="alerta-turno" class="sr-only">Turno</label>
+      <select id="alerta-turno" name="turno" onchange="this.form.submit()" class="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm sm:w-36"><option value="">Todos os turnos</option><option value="M" {% if request.GET.turno == 'M' %}selected{% endif %}>Manhã</option><option value="T" {% if request.GET.turno == 'T' %}selected{% endif %}>Tarde</option><option value="N" {% if request.GET.turno == 'N' %}selected{% endif %}>Noite</option></select>
+      <noscript><button class="min-h-11 rounded-xl bg-slate-800 px-4 text-sm font-black text-white">Filtrar</button></noscript>
+    </form>
+  </section>
+
+  <nav class="flex gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-sm" role="tablist" aria-label="Seções">
+    <button type="button" role="tab" data-aba="visao" class="aba-btn flex min-h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-black"><i class="ph ph-chart-bar text-lg"></i>Visão geral</button>
+    <button type="button" role="tab" data-aba="readaptacoes" class="aba-btn flex min-h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-black"><i class="ph ph-user-focus text-lg"></i>Readaptações{% if readaptacoes_vigentes %}<span class="rounded-full bg-slate-200 px-1.5 text-[10px] text-slate-700">{{ readaptacoes_vigentes }}</span>{% endif %}</button>
+    <button type="button" role="tab" data-aba="excecoes" class="aba-btn flex min-h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-black"><i class="ph ph-seal-question text-lg"></i>Exceções{% if excecoes_pendentes %}<span class="rounded-full bg-amber-500 px-1.5 text-[10px] text-white">{{ excecoes_pendentes|length }}</span>{% endif %}</button>
+  </nav>
+
+  {# ── Visão geral ── #}
+  <section data-painel="visao" class="aba-painel space-y-4">
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 class="flex items-center gap-2 text-sm font-black text-slate-700"><i class="ph ph-books text-lg text-slate-400"></i>Disciplinas</h2>
+        <div class="mt-4 flex items-end justify-between">
+          <div><p class="text-3xl font-black {% if resumo_p1.componentes_sem_professor %}text-red-600{% else %}text-slate-800{% endif %}">{{ resumo_p1.componentes_sem_professor }}</p><p class="text-xs text-slate-500">sem professor alocado</p></div>
+          <p class="text-right text-xs text-slate-400">de {{ resumo_p1.total_componentes }}<br>componentes</p>
+        </div>
+      </div>
+      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
+        <h2 class="flex items-center gap-2 text-sm font-black text-slate-700"><i class="ph ph-chalkboard-teacher text-lg text-slate-400"></i>Professores em relação à própria carga máxima</h2>
+        <div class="mt-4 grid grid-cols-3 gap-3">
+          <div class="rounded-xl bg-blue-50 p-3"><p class="text-2xl font-black text-blue-700">{{ resumo_p1.professores_com_sobra }}</p><p class="text-xs font-semibold text-blue-700">com horas livres</p></div>
+          <div class="rounded-xl bg-amber-50 p-3"><p class="text-2xl font-black text-amber-700">{{ resumo_p1.professores_no_limite }}</p><p class="text-xs font-semibold text-amber-700">exatamente no limite</p></div>
+          <div class="rounded-xl bg-red-50 p-3"><p class="text-2xl font-black text-red-700">{{ resumo_p1.professores_excedidos }}</p><p class="text-xs font-semibold text-red-700">acima do limite</p></div>
+        </div>
+      </div>
+    </div>
+
+    <details class="group rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
+        <span class="flex items-center gap-2 text-sm font-black text-slate-700"><i class="ph ph-warning-circle text-lg text-amber-500"></i>Pontos de atenção{% if pontos_atencao %}<strong class="rounded-full bg-red-500 px-2 py-0.5 text-xs font-black text-white" title="{{ pontos_atencao }} ponto(s) com ocorrências">{{ pontos_atencao }}</strong>{% endif %}</span>
+        <i class="ph ph-caret-down text-slate-400 transition group-open:rotate-180"></i>
+      </summary>
+      <ul class="divide-y divide-slate-100 border-t border-slate-100 text-sm">
+        <li class="flex items-center justify-between gap-3 px-4 py-3"><span><strong class="text-slate-700">Equipe diretiva dando aula</strong><span class="block text-xs text-slate-500">Diretores e coordenadores que também estão alocados em sala.</span></span><span class="rounded-lg px-2.5 py-1 text-sm font-black {% if resumo_p1.diretivos_em_sala %}bg-violet-100 text-violet-700{% else %}bg-slate-100 text-slate-400{% endif %}">{{ resumo_p1.diretivos_em_sala }}</span></li>
+        <li class="flex items-center justify-between gap-3 px-4 py-3"><span><strong class="text-slate-700">Readaptados alocados em sala</strong><span class="block text-xs text-slate-500">Situação irregular: devem atuar apenas no extracurricular.</span></span><span class="rounded-lg px-2.5 py-1 text-sm font-black {% if resumo_p1.readaptados_em_sala %}bg-red-100 text-red-700{% else %}bg-slate-100 text-slate-400{% endif %}">{{ resumo_p1.readaptados_em_sala }}</span></li>
+        <li class="flex items-center justify-between gap-3 px-4 py-3"><span><strong class="text-slate-700">Professores do Ensino Médio no Superior</strong><span class="block text-xs text-slate-500">Origem no Ensino Médio com alocação em curso superior.</span></span><span class="rounded-lg px-2.5 py-1 text-sm font-black {% if resumo_p1.ensino_medio_superior %}bg-amber-100 text-amber-700{% else %}bg-slate-100 text-slate-400{% endif %}">{{ resumo_p1.ensino_medio_superior }}</span></li>
+      </ul>
+    </details>
+  </section>
+
+  {# ── Readaptações ── #}
+  <section data-painel="readaptacoes" class="aba-painel hidden space-y-4">
+    <div class="flex flex-col gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <p class="flex gap-2 text-sm text-blue-900"><i class="ph ph-info mt-0.5 text-lg"></i><span>Professor <strong>readaptado</strong> é aquele com restrição funcional para dar aula. Enquanto a readaptação estiver vigente, o sistema bloqueia a alocação em sala e a carga vai para o extracurricular.</span></p>
+      <button type="button" onclick="abrirModal('modalNovaReadaptacao')" class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#025c9f] px-4 text-sm font-black text-white hover:bg-[#153e70]"><i class="ph ph-plus-circle text-lg"></i>Registrar</button>
+    </div>
+    <div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <ul class="divide-y divide-slate-100">
+        {% for item in readaptacoes %}
+        <li class="flex items-center justify-between gap-3 p-4">
+          <div class="min-w-0">
+            <p class="flex items-center gap-2 font-bold text-slate-800">{{ item.professor.nome }}{% if item.vigente %}<span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">Vigente</span>{% else %}<span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500">Encerrada</span>{% endif %}</p>
+            <p class="text-xs text-slate-500">{{ item.data_inicio|date:'d/m/Y' }} – {{ item.data_fim|date:'d/m/Y'|default:'sem fim' }}</p>
+          </div>
+          <div class="flex shrink-0 items-center gap-1">
+            <button type="button" onclick="abrirModal('modalReadaptacao{{ item.pk }}')" title="Editar" aria-label="Editar readaptação de {{ item.professor.nome }}" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-blue-50 hover:text-[#025c9f]"><i class="ph ph-pencil-simple text-lg"></i></button>
+            {% if item.vigente %}
+            <button type="button" onclick="abrirModal('modalEncerrar{{ item.pk }}')" title="Encerrar readaptação" aria-label="Encerrar readaptação de {{ item.professor.nome }}" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-amber-50 hover:text-amber-700"><i class="ph ph-stop-circle text-lg"></i></button>
+            {% endif %}
+          </div>
+        </li>
+        {% empty %}
+        <li class="px-4 py-10 text-center text-sm text-slate-500">Nenhuma readaptação registrada.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+
+  {# ── Exceções ── #}
+  <section data-painel="excecoes" class="aba-painel hidden space-y-4">
+    <p class="flex gap-2 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900"><i class="ph ph-info mt-0.5 text-lg"></i><span>Pedidos das unidades para ultrapassar temporariamente o limite de carga. Aprovar libera as horas adicionais durante a vigência; recusar exige motivo.</span></p>
+    <div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <ul class="divide-y divide-slate-100">
+        {% for excecao in excecoes_pendentes %}
+        <li class="flex items-center justify-between gap-3 p-4">
+          <div class="min-w-0">
+            <p class="font-bold text-slate-800">{{ excecao.unidade.sigla }} · <span class="text-amber-700">+{{ excecao.horas_adicionais|floatformat:"-2" }} h</span>{% if excecao.professor %} · {{ excecao.professor.nome }}{% endif %}</p>
+            <p class="text-xs text-slate-500">{{ excecao.data_inicio|date:'d/m/Y' }} – {{ excecao.data_fim|date:'d/m/Y' }}</p>
+          </div>
+          <button type="button" onclick="abrirModal('modalExcecao{{ excecao.pk }}')" class="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-slate-200 px-3 text-sm font-black text-[#025c9f] hover:bg-blue-50"><i class="ph ph-gavel text-lg"></i>Analisar</button>
+        </li>
+        {% empty %}
+        <li class="px-4 py-10 text-center text-sm text-slate-500"><i class="ph ph-check-circle mb-1 block text-3xl text-emerald-400"></i>Nenhuma exceção aguardando análise.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+</div>
+
+{# ── Modais ── #}
+{% url 'core:readaptacao_create' as url_nova_readaptacao %}
+{% include 'core/prioridade1/_modal_form.html' with modal_id='modalNovaReadaptacao' modal_key='' titulo='Registrar readaptação' subtitulo='' voltar='' action_url=url_nova_readaptacao form=form_readaptacao %}
+{% for item, form_item in readaptacoes_forms %}
+{% url 'core:readaptacao_update' item.pk as url_readaptacao %}
+{% include 'core/prioridade1/_modal_form.html' with modal_id='modalReadaptacao' modal_key=item.pk titulo='Editar readaptação' subtitulo=item.professor.nome voltar='' action_url=url_readaptacao form=form_item %}
+{% if item.vigente %}
+<div id="modalEncerrar{{ item.pk }}" class="modal-p1 hidden fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+  <div class="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div class="px-6 py-5 text-center">
+      <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-amber-50"><i class="ph ph-stop-circle text-2xl text-amber-600"></i></div>
+      <h3 class="text-base font-black text-slate-800">Encerrar readaptação</h3>
+      <p class="mt-1 text-sm text-slate-500">A readaptação de <strong class="text-slate-700">{{ item.professor.nome }}</strong> será encerrada hoje e o professor volta a poder ser alocado em sala.</p>
+    </div>
+    <form method="post" action="{% url 'core:readaptacao_encerrar' item.pk %}" class="flex items-center justify-center gap-3 border-t border-slate-100 bg-slate-50/50 px-6 py-4">
+      {% csrf_token %}
+      <button type="button" onclick="fecharModal('modalEncerrar{{ item.pk }}')" class="rounded-lg px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-100">Cancelar</button>
+      <button type="submit" class="rounded-lg bg-amber-500 px-5 py-2.5 text-sm font-black text-white hover:bg-amber-600">Encerrar</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+
+{% for excecao in excecoes_pendentes %}
+<div id="modalExcecao{{ excecao.pk }}" class="modal-p1 hidden fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+  <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+      <div><h3 class="text-base font-black text-[#025c9f]">Exceção de carga</h3><p class="text-xs text-slate-500">{{ excecao.unidade.sigla }} · +{{ excecao.horas_adicionais|floatformat:"-2" }} h · {{ excecao.data_inicio|date:'d/m/Y' }} – {{ excecao.data_fim|date:'d/m/Y' }}</p></div>
+      <button type="button" onclick="fecharModal('modalExcecao{{ excecao.pk }}')" aria-label="Fechar" class="text-slate-400 hover:text-slate-600"><i class="ph ph-x text-xl"></i></button>
+    </div>
+    <form method="post" action="{% url 'core:excecao_carga_decidir' excecao.pk %}">
+      {% csrf_token %}
+      <div class="space-y-4 px-6 py-4">
+        {% if excecao.professor %}<p class="text-sm"><span class="font-bold text-slate-700">Professor:</span> {{ excecao.professor.nome }}</p>{% endif %}
+        <div class="rounded-xl bg-slate-50 p-3 text-sm text-slate-700"><p class="mb-1 text-xs font-black uppercase text-slate-400">Justificativa da unidade</p>{{ excecao.justificativa }}</div>
+        <fieldset class="grid grid-cols-2 gap-2">
+          <legend class="sr-only">Decisão</legend>
+          <label class="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 p-3 text-sm font-black text-emerald-700 has-[:checked]:border-emerald-400 has-[:checked]:bg-emerald-50"><input type="radio" name="decisao" value="APROVADA" checked class="sr-only"><i class="ph ph-check-circle text-lg"></i>Aprovar</label>
+          <label class="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 p-3 text-sm font-black text-red-700 has-[:checked]:border-red-400 has-[:checked]:bg-red-50"><input type="radio" name="decisao" value="RECUSADA" class="sr-only"><i class="ph ph-x-circle text-lg"></i>Recusar</label>
+        </fieldset>
+        <div>
+          <label for="motivo{{ excecao.pk }}" class="mb-1.5 block text-sm font-bold text-slate-700">Motivo <span class="font-normal text-slate-400">(obrigatório ao recusar)</span></label>
+          <textarea id="motivo{{ excecao.pk }}" name="motivo_decisao" rows="2" class="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#025c9f] focus:ring-2 focus:ring-blue-100"></textarea>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-6 py-4">
+        <button type="button" onclick="fecharModal('modalExcecao{{ excecao.pk }}')" class="rounded-lg px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-100">Cancelar</button>
+        <button type="submit" class="rounded-lg bg-[#025c9f] px-5 py-2.5 text-sm font-black text-white shadow-sm hover:bg-[#153e70]">Registrar decisão</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% endwith %}
+
+<script>
+  function abrirModal(id) { document.getElementById(id).classList.remove('hidden'); }
+  function fecharModal(id) { document.getElementById(id).classList.add('hidden'); }
+  function trocarModal(de, para) { fecharModal(de); abrirModal(para); }
+  document.querySelectorAll('.modal-equipe, .modal-p1').forEach(function (m) {
+    m.addEventListener('click', function (e) { if (e.target === m) m.classList.add('hidden'); });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') document.querySelectorAll('.modal-equipe, .modal-p1').forEach(function (m) { m.classList.add('hidden'); });
+  });
+
+  (function () {
+    var botoes = document.querySelectorAll('.aba-btn');
+    var paineis = document.querySelectorAll('.aba-painel');
+    function ativar(nome) {
+      botoes.forEach(function (b) {
+        var ativo = b.dataset.aba === nome;
+        b.setAttribute('aria-selected', ativo);
+        b.classList.toggle('bg-[#025c9f]', ativo);
+        b.classList.toggle('text-white', ativo);
+        b.classList.toggle('text-slate-500', !ativo);
+        b.classList.toggle('hover:bg-slate-50', !ativo);
+      });
+      paineis.forEach(function (p) { p.classList.toggle('hidden', p.dataset.painel !== nome); });
+      try { history.replaceState(null, '', '#' + nome); } catch (e) {}
+    }
+    botoes.forEach(function (b) { b.addEventListener('click', function () { ativar(b.dataset.aba); }); });
+    // Após salvar em um modal, volta para a mesma aba.
+    document.querySelectorAll('.modal-equipe form, .modal-p1 form').forEach(function (f) {
+      f.addEventListener('submit', function () {
+        var next = f.querySelector('input[name="next"]');
+        if (next) next.value = next.value.split('#')[0] + location.hash;
+      });
+    });
+    var inicial = (location.hash || '').slice(1);
+    ativar(document.querySelector('[data-painel="' + inicial + '"]') ? inicial : 'visao');
+  })();
+</script>
+{% endblock %}

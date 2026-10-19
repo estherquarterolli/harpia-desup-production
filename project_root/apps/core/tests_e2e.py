@@ -1039,6 +1039,12 @@ class JornadaDashboardsTests(BaseE2ETestCase):
         nomes = {item['prof'].rh_nome for item in resp.context['alocacoes_dashboard']}
         self.assertEqual(nomes, {'Ana Conforme', 'Bruno Pendente'})
         self.assertContains(resp, 'Ana Conforme')
+        self.assertNotContains(resp, 'Filtros da alocação geral')
+        self.assertContains(resp, 'Cargo')
+        self.assertContains(resp, 'Vínculo empregatício')
+        self.assertContains(resp, '>CH<')
+        self.assertContains(resp, 'Efetivo')
+        self.assertContains(resp, '40h')
 
     def test_dashboard_desup_conta_como_conforme_a_unidade_sem_professor_ativo(self):
         self.prof_ok.status = Professor.StatusChoices.AFASTADO

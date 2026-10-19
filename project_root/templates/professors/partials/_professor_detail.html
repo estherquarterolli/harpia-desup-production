@@ -36,11 +36,15 @@
                 </p>
             </div>
             <div class="rounded-xl bg-slate-50 p-4 sm:col-span-2">
-                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Contrato</p>
+                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Cargo</p>
                 <p class="mt-1 text-sm font-bold text-slate-700">{{ professor.tipo_contrato.nome }}</p>
                 <p class="mt-1 text-xs text-slate-500">
-                    {{ professor.tipo_contrato.get_categoria_display }} · {{ professor.tipo_contrato.regime_trabalho }}
+                    Vínculo {{ professor.tipo_contrato.get_categoria_display }} · CH {{ professor.carga_total_efetiva }}h
                 </p>
+            </div>
+            <div class="rounded-xl bg-slate-50 p-4 sm:col-span-2">
+                <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Área de atuação</p>
+                <p class="mt-1 text-sm font-bold text-slate-700">{{ professor.area_atuacao|default:"Não informada" }}</p>
             </div>
             <div class="rounded-xl bg-slate-50 p-4">
                 <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">E-mail</p>

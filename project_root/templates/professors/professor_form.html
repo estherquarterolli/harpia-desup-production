@@ -38,6 +38,10 @@
           class="tab-btn px-5 py-2.5 text-xs font-black uppercase tracking-widest border-b-2 -mb-px transition-colors">
           Contrato
         </button>
+        <button type="button" role="tab" id="tab-btn-area" data-tab="area"
+          class="tab-btn px-5 py-2.5 text-xs font-black uppercase tracking-widest border-b-2 -mb-px transition-colors">
+          Área
+        </button>
       </div>
 
       <div id="tab-basicos" class="tab-panel space-y-6" role="tabpanel">
@@ -85,7 +89,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
 
           <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Regime / Tipo de Contrato <span class="text-red-400">*</span></label>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Cargo <span class="text-red-400">*</span></label>
             {{ form.tipo_contrato }}
             {% if form.tipo_contrato.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.tipo_contrato.errors.0 }}</p>{% endif %}
           </div>
@@ -124,6 +128,13 @@
             {% if form.status.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.status.errors.0 }}</p>{% endif %}
           </div>
 
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nível de ensino de origem</label>
+            {{ form.nivel_ensino_origem }}
+            <p class="mt-1 text-xs text-slate-500">Informação institucional usada nos alertas da DESUP.</p>
+            {% if form.nivel_ensino_origem.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.nivel_ensino_origem.errors.0 }}</p>{% endif %}
+          </div>
+
         </div>
       </div>
 
@@ -153,6 +164,21 @@
             {% endif %}
           </div>
           {% if form.cursos.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.cursos.errors.0 }}</p>{% endif %}
+        </div>
+      </div>
+      </div>
+
+      <div id="tab-area" class="tab-panel space-y-6 hidden" role="tabpanel">
+      <!-- Área -->
+      <div>
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+          <span class="w-4 h-px bg-slate-200 block"></span>Área<span class="flex-1 h-px bg-slate-100 block"></span>
+        </h3>
+        <div>
+          <label for="{{ form.area_atuacao.id_for_label }}" class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Área de atuação</label>
+          {{ form.area_atuacao }}
+          <p class="mt-1 text-xs text-slate-500">Área de conhecimento em que o professor atua (ex.: Matemática, Computação, Pedagogia).</p>
+          {% if form.area_atuacao.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.area_atuacao.errors.0 }}</p>{% endif %}
         </div>
       </div>
       </div>

@@ -22,7 +22,8 @@
             <p class="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Unidades Conformes</p>
             <h3 class="text-3xl font-black text-slate-800">{{ unidades_conformes_count }}/{{ total_unidades }}</h3>
             {% if unidades_nao_conformes %}
-            <div class="hidden group-hover/card:block absolute bottom-full mb-2 left-0 w-full bg-slate-800 text-white p-3 rounded-lg text-xs z-10 shadow-xl">
+            <div class="hidden group-hover/card:block absolute top-full left-0 w-full pt-2 z-20">
+                <div class="bg-slate-800 text-white p-3 rounded-lg text-xs shadow-xl">
                 <strong class="block mb-1">⚠ Unidades com pendências:</strong>
                 <ul class="space-y-0.5">
                     {% for uni in unidades_nao_conformes %}
@@ -34,10 +35,19 @@
                     </li>
                     {% endfor %}
                 </ul>
+                </div>
             </div>
             {% endif %}
         </div>
     </div>
+
+    <section aria-label="Alertas consolidados" class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+        <a href="{% url 'core:solicitacao_professor_list' %}" class="rounded-2xl border border-amber-200 bg-amber-50 p-4 transition hover:bg-amber-100"><p class="text-[10px] font-black uppercase text-amber-700">Solicitações</p><p class="mt-2 text-2xl font-black text-amber-900">{{ resumo_p1.solicitacoes_pendentes }}</p><p class="mt-1 text-xs text-amber-700">pendentes</p></a>
+        <a href="{% url 'core:alertas_carga_desup' %}" class="rounded-2xl border border-red-200 bg-red-50 p-4 transition hover:bg-red-100"><p class="text-[10px] font-black uppercase text-red-700">Sem professor</p><p class="mt-2 text-2xl font-black text-red-900">{{ resumo_p1.componentes_sem_professor }}</p><p class="mt-1 text-xs text-red-700">componentes</p></a>
+        <a href="{% url 'core:alertas_carga_desup' %}" class="rounded-2xl border border-blue-200 bg-blue-50 p-4 transition hover:bg-blue-100"><p class="text-[10px] font-black uppercase text-blue-700">Com sobra</p><p class="mt-2 text-2xl font-black text-blue-900">{{ resumo_p1.professores_com_sobra }}</p><p class="mt-1 text-xs text-blue-700">professores</p></a>
+        <a href="{% url 'core:alertas_carga_desup' %}" class="rounded-2xl border border-violet-200 bg-violet-50 p-4 transition hover:bg-violet-100"><p class="text-[10px] font-black uppercase text-violet-700">Diretivos em sala</p><p class="mt-2 text-2xl font-black text-violet-900">{{ resumo_p1.diretivos_em_sala }}</p><p class="mt-1 text-xs text-violet-700">alertas</p></a>
+        <a href="{% url 'core:alertas_carga_desup' %}" class="rounded-2xl border border-red-200 bg-red-50 p-4 transition hover:bg-red-100"><p class="text-[10px] font-black uppercase text-red-700">Readaptados em sala</p><p class="mt-2 text-2xl font-black text-red-900">{{ resumo_p1.readaptados_em_sala }}</p><p class="mt-1 text-xs text-red-700">bloqueios</p></a>
+    </section>
 
     <!-- Atalhos do dashboard -->
     <div class="flex flex-wrap items-center gap-3">

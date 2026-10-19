@@ -63,6 +63,24 @@
                 <i class="ph ph-users-three text-2xl flex-shrink-0"></i>
                 <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Usuários</span>
             </a>
+
+            <a href="{% url 'core:equipe_diretiva_desup' %}"
+                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if '/core/desup/equipe-diretiva' in request.path %}bg-white/10{% endif %}">
+                <i class="ph ph-identification-card text-2xl flex-shrink-0"></i>
+                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Equipe diretiva</span>
+            </a>
+
+            <a href="{% url 'core:solicitacao_professor_list' %}"
+                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if '/core/desup/solicitacoes-professor' in request.path %}bg-white/10{% endif %}">
+                <i class="ph ph-arrows-left-right text-2xl flex-shrink-0"></i>
+                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Solicitações externas</span>
+            </a>
+
+            <a href="{% url 'core:alertas_carga_desup' %}"
+                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if '/core/desup/alertas-carga' in request.path %}bg-white/10{% endif %}">
+                <i class="ph ph-warning-circle text-2xl flex-shrink-0"></i>
+                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Alertas de carga</span>
+            </a>
             {% endif %}
 
             <!-- Professores — DESUP e Coordenador de Unidade -->
