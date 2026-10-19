@@ -83,6 +83,15 @@
             </a>
             {% endif %}
 
+            {% if user.perfil == 'COORDENADOR_UNIDADE' %}
+            <!-- Equipe Diretiva e Coordenações — Coordenador de Unidade -->
+            <a href="{% url 'core:equipe_diretiva_unidade' %}"
+                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if '/core/unidade/equipe-diretiva' in request.path %}bg-white/10{% endif %}">
+                <i class="ph ph-identification-card text-2xl flex-shrink-0"></i>
+                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Equipe diretiva</span>
+            </a>
+            {% endif %}
+
             <!-- Professores — DESUP e Coordenador de Unidade -->
             <a href="{% url 'professors:professor_list' %}"
                 class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'professores' in request.path %}bg-white/10{% endif %}">

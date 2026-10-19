@@ -36,6 +36,41 @@ class Unidade(models.Model):
         return f"{self.sigla} - {self.nome}"
 
 
+class UnitBoundQuerySet(models.QuerySet):
+    def for_user(self, user):
+        if user.is_superuser or user.perfil == 'DESUP':
+            return self.all()
+
+        # Professores são uma base institucional compartilhada: todas as
+        # unidades podem consultá-los e utilizá-los na alocação.
+        if (
+            self.model._meta.label_lower == 'professors.professor'
+            and user.perfil == 'COORDENADOR_UNIDADE'
+        ):
+            return self.all()
+
+        if user.perfil == 'COORDENADOR_UNIDADE':
+            if not user.unidade:
+                return self.none()
+
+            # Verifica qual campo de unidade o model possui
+            field_names = [f.name for f in self.model._meta.get_fields()]
+            if 'unidade_principal' in field_names:
+                return self.filter(unidade_principal=user.unidade)
+            elif 'unidade' in field_names:
+                return self.filter(unidade=user.unidade)
+
+        return self.none()
+
+
+class UnitBoundManager(models.Manager):
+    def get_queryset(self):
+        return UnitBoundQuerySet(self.model, using=self._db)
+
+    def for_user(self, user):
+        return self.get_queryset().for_user(user)
+
+
 class TipoCargoDiretivo(models.Model):
     """Cargo configurável que pode compor a equipe diretiva de uma unidade."""
 
@@ -147,6 +182,8 @@ class OcupacaoEquipeDiretiva(models.Model):
     criado_em = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
     atualizado_em = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
 
+    objects = UnitBoundManager()
+
     class Meta:
         db_table = "harpiadb_nucleo_ocupacao_diretiva"
         verbose_name = "Ocupação da equipe diretiva"
@@ -229,6 +266,143 @@ class OcupacaoEquipeDiretiva(models.Model):
     def __str__(self):
         complemento = f" - {self.curso.sigla}" if self.curso_id else ""
         return f"{self.unidade.sigla} - {self.cargo.nome}{complemento}: {self.professor.nome}"
+
+
+class AtividadeEstagioSupervisao(models.Model):
+    """Registro de atividades de estágio e supervisão de uma unidade."""
+
+    class TipoChoices(models.TextChoices):
+        COORDENACAO_ESTAGIO = "COORDENACAO_ESTAGIO", "Coordenação de Estágio"
+        SUPERVISAO_ESTAGIO = "SUPERVISAO_ESTAGIO", "Supervisão de Estágio"
+        ORIENTACAO_ESTAGIO = "ORIENTACAO_ESTAGIO", "Orientação de Estágio"
+
+    unidade = models.ForeignKey(
+        Unidade,
+        on_delete=models.PROTECT,
+        related_name="atividades_estagio_supervisao",
+        verbose_name="Unidade",
+    )
+    professor = models.ForeignKey(
+        "professors.Professor",
+        on_delete=models.PROTECT,
+        related_name="atividades_estagio_supervisao",
+        verbose_name="Servidor",
+        help_text="Selecione o servidor vinculado à unidade.",
+    )
+    curso = models.ForeignKey(
+        "courses.CourseUnit",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="atividades_estagio_supervisao",
+        verbose_name="Curso",
+    )
+    tipo = models.CharField(
+        max_length=30,
+        choices=TipoChoices.choices,
+        default=TipoChoices.SUPERVISAO_ESTAGIO,
+        db_index=True,
+        verbose_name="Tipo de atividade",
+    )
+    semestre = models.CharField(
+        max_length=10,
+        verbose_name="Semestre letivo",
+        validators=[
+            RegexValidator(
+                regex=r"^\d{4}\.[12]$",
+                message="Informe o semestre no formato AAAA.1 ou AAAA.2.",
+            )
+        ],
+    )
+    num_estudantes = models.PositiveSmallIntegerField(
+        default=1,
+        validators=[MinValueValidator(1), MaxValueValidator(200)],
+        verbose_name="Nº de estagiários/supervisionados",
+    )
+    carga_horaria_semanal = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0.00")), MaxValueValidator(Decimal("40.00"))],
+        verbose_name="Carga horária semanal dedicada (h)",
+        help_text="Horas semanais dedicadas à atividade de estágio/supervisão.",
+    )
+    carga_reducao_horas = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0.00")), MaxValueValidator(Decimal("40.00"))],
+        verbose_name="Carga horária de redução semanal (DESUP)",
+        help_text="Definida exclusivamente pela DESUP.",
+    )
+    data_inicio = models.DateField(verbose_name="Início da vigência")
+    data_fim = models.DateField(null=True, blank=True, verbose_name="Fim da vigência")
+    observacoes = models.TextField(blank=True, verbose_name="Observações")
+    criado_por = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="atividades_estagio_criadas",
+        verbose_name="Criado por",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
+    atualizado_em = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
+
+    objects = UnitBoundManager()
+
+    class Meta:
+        db_table = "harpiadb_nucleo_atividade_estagio_supervisao"
+        verbose_name = "Atividade de estágio e supervisão"
+        verbose_name_plural = "Atividades de estágio e supervisão"
+        ordering = ["-semestre", "-data_inicio", "professor__rh_nome"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(data_fim__isnull=True) | models.Q(data_fim__gte=models.F("data_inicio")),
+                name="harpia_estagio_data_valida",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(carga_horaria_semanal__gte=0),
+                name="harpia_estagio_ch_nao_neg",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(carga_reducao_horas__gte=0),
+                name="harpia_estagio_red_nao_neg",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["unidade", "semestre"], name="harpia_estagio_unid_sem_idx"),
+        ]
+
+    @property
+    def vigente(self):
+        hoje = timezone.localdate()
+        return self.data_inicio <= hoje and (self.data_fim is None or self.data_fim >= hoje)
+
+    def clean(self):
+        super().clean()
+        erros = {}
+
+        if self.data_inicio and self.data_fim and self.data_fim < self.data_inicio:
+            erros["data_fim"] = "O fim da vigência não pode ser anterior ao início."
+
+        if self.curso_id and self.unidade_id and self.curso.unidade_id != self.unidade_id:
+            erros["curso"] = "O curso selecionado não pertence à unidade informada."
+
+        if self.professor_id and self.unidade_id:
+            vinculado = (
+                self.professor.unidade_principal_id == self.unidade_id
+                or self.professor.unidades.filter(pk=self.unidade_id).exists()
+            )
+            if not vinculado:
+                erros["professor"] = "O servidor não está vinculado à unidade informada."
+
+        if erros:
+            raise ValidationError(erros)
+
+    def __str__(self):
+        complemento = f" ({self.curso.sigla})" if self.curso_id else ""
+        return f"{self.unidade.sigla} - {self.get_tipo_display()}{complemento}: {self.professor.nome} [{self.semestre}]"
 
 
 class SolicitacaoProfessorExterno(models.Model):
@@ -659,39 +833,6 @@ class JanelaEntrega(models.Model):
         hoje = timezone.localdate()
         return self.status != self.StatusChoices.FECHADO and self.data_inicio <= hoje <= self.data_fim
 
-class UnitBoundQuerySet(models.QuerySet):
-    def for_user(self, user):
-        if user.is_superuser or user.perfil == 'DESUP':
-            return self.all()
-
-        # Professores são uma base institucional compartilhada: todas as
-        # unidades podem consultá-los e utilizá-los na alocação.
-        if (
-            self.model._meta.label_lower == 'professors.professor'
-            and user.perfil == 'COORDENADOR_UNIDADE'
-        ):
-            return self.all()
-        
-        if user.perfil == 'COORDENADOR_UNIDADE':
-
-            if not user.unidade:
-                return self.none()
-            
-            # Verifica qual campo de unidade o model possui
-            field_names = [f.name for f in self.model._meta.get_fields()]
-            if 'unidade_principal' in field_names:
-                return self.filter(unidade_principal=user.unidade)
-            elif 'unidade' in field_names:
-                return self.filter(unidade=user.unidade)
-                
-        return self.none()
-
-class UnitBoundManager(models.Manager):
-    def get_queryset(self):
-        return UnitBoundQuerySet(self.model, using=self._db)
-
-    def for_user(self, user):
-        return self.get_queryset().for_user(user)
 
 class Notificacao(models.Model):
     """

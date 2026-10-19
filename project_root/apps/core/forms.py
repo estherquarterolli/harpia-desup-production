@@ -2,6 +2,7 @@ import re
 
 from django import forms
 from .models import (
+    AtividadeEstagioSupervisao,
     ExcecaoCargaUnidade,
     JanelaEntrega,
     LimiteCargaUnidade,
@@ -188,6 +189,100 @@ class ReducaoOcupacaoEquipeDiretivaForm(forms.ModelForm):
             "carga_reducao_horas": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": "0", "max": "20", "step": "0.25"}),
             "observacoes": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 3}),
         }
+
+
+class OcupacaoEquipeDiretivaUnidadeForm(forms.ModelForm):
+    """
+    Formulário de preenchimento e atualização de ocupante da equipe diretiva
+    pelo Coordenador de Unidade. Não expõe `carga_reducao_horas`, que é
+    definida exclusivamente pela DESUP.
+    """
+
+    class Meta:
+        model = OcupacaoEquipeDiretiva
+        fields = ["professor", "curso", "data_inicio", "data_fim", "observacoes"]
+        widgets = {
+            "professor": forms.Select(attrs={"class": _SELECT_CSS}),
+            "curso": forms.Select(attrs={"class": _SELECT_CSS}),
+            "data_inicio": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
+            "data_fim": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
+            "observacoes": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 3}),
+        }
+
+    def __init__(self, *args, unidade, cargo, **kwargs):
+        super().__init__(*args, **kwargs)
+        from django.db.models import Q
+        from apps.courses.models import CourseUnit
+        from apps.professors.models import Professor
+
+        self.instance.unidade = unidade
+        self.instance.cargo = cargo
+        self.fields["professor"].queryset = Professor.objects.filter(
+            Q(unidade_principal=unidade) | Q(unidades=unidade)
+        ).distinct().order_by("rh_nome")
+        if cargo.exige_curso:
+            self.fields["curso"].required = True
+            cursos_unidade = CourseUnit.objects.filter(
+                unidade=unidade, ativo=True,
+            ).select_related("curso", "unidade").order_by("curso__nome")
+            self.fields["curso"].queryset = cursos_unidade
+            self.fields["curso"].label = "Curso"
+            self.fields["curso"].help_text = (
+                "Selecione um curso ativo desta unidade."
+                if cursos_unidade.exists()
+                else "Nenhum curso ativo cadastrado nesta unidade. Cadastre ou ative um curso antes de preencher este cargo."
+            )
+        else:
+            del self.fields["curso"]
+
+
+class AtividadeEstagioSupervisaoUnidadeForm(forms.ModelForm):
+    """
+    Formulário da unidade para registro e atualização de atividades de estágio
+    e supervisão. O campo `carga_reducao_horas` é exclusivo da DESUP e não é editável aqui.
+    """
+
+    class Meta:
+        model = AtividadeEstagioSupervisao
+        fields = [
+            "tipo",
+            "professor",
+            "curso",
+            "semestre",
+            "num_estudantes",
+            "carga_horaria_semanal",
+            "data_inicio",
+            "data_fim",
+            "observacoes",
+        ]
+        widgets = {
+            "tipo": forms.Select(attrs={"class": _SELECT_CSS}),
+            "professor": forms.Select(attrs={"class": _SELECT_CSS}),
+            "curso": forms.Select(attrs={"class": _SELECT_CSS}),
+            "semestre": forms.TextInput(attrs={"class": _INPUT_CSS, "placeholder": "Ex.: 2026.1"}),
+            "num_estudantes": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": "1", "max": "200"}),
+            "carga_horaria_semanal": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": "0", "max": "40", "step": "0.5"}),
+            "data_inicio": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
+            "data_fim": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
+            "observacoes": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 3}),
+        }
+
+    def __init__(self, *args, unidade, **kwargs):
+        super().__init__(*args, **kwargs)
+        from django.db.models import Q
+        from apps.courses.models import CourseUnit
+        from apps.professors.models import Professor
+
+        self.instance.unidade = unidade
+        self.fields["professor"].queryset = Professor.objects.filter(
+            Q(unidade_principal=unidade) | Q(unidades=unidade)
+        ).distinct().order_by("rh_nome")
+        cursos_unidade = CourseUnit.objects.filter(
+            unidade=unidade, ativo=True,
+        ).select_related("curso", "unidade").order_by("curso__nome")
+        self.fields["curso"].queryset = cursos_unidade
+        self.fields["curso"].required = False
+        self.fields["curso"].empty_label = "Todos os cursos / Não vinculado a curso específico"
 
 
 class LimiteCargaUnidadeForm(forms.ModelForm):

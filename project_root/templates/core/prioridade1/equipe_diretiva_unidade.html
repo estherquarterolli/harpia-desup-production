@@ -1,0 +1,485 @@
+{% extends 'base.html' %}
+
+{% block title %}Equipe Diretiva e Coordenações - {{ unidade.sigla }}{% endblock %}
+{% block header_title %}Equipe Diretiva e Coordenações{% endblock %}
+
+{% block content %}
+{% with retorno=request.get_full_path %}
+<div class="mx-auto w-full max-w-5xl space-y-6">
+  <p class="-mt-2 text-sm text-slate-600">
+    Cadastre e atualize os ocupantes dos cargos diretivos, coordenações e atividades de estágio e supervisão da sua unidade. A redução semanal de carga horária é definida exclusivamente pela DESUP.
+  </p>
+
+  {# ── Cabeçalho da Unidade + Redução Total (Somente Leitura) ── #}
+  <section class="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
+    <div class="flex min-w-0 items-center gap-3.5">
+      <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#025c9f]">
+        <i class="ph ph-buildings text-2xl" aria-hidden="true"></i>
+      </span>
+      <div class="min-w-0">
+        <p class="text-xs font-black uppercase tracking-wider text-slate-400">Unidade vinculada</p>
+        <h2 class="truncate text-base font-black text-slate-900 sm:text-lg">{{ unidade.sigla }} — {{ unidade.nome }}</h2>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-emerald-800"
+           title="Redução total semanal de carga horária definida pela DESUP para os cargos vigentes da unidade">
+        <i class="ph ph-clock text-2xl shrink-0" aria-hidden="true"></i>
+        <div>
+          <p class="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Redução da equipe (DESUP)</p>
+          <p><span class="text-xl font-black text-emerald-950">{{ reducao_total|floatformat:"-2" }} h</span><span class="text-xs font-semibold">/semana</span></p>
+        </div>
+      </div>
+      <button type="button"
+              onclick="abrirModal('modalNovoEstagioUnidade')"
+              class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#025c9f] px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-[#153e70] focus:outline-none focus:ring-2 focus:ring-blue-300">
+        <i class="ph ph-student text-lg" aria-hidden="true"></i>Registrar estágio / supervisão
+      </button>
+    </div>
+  </section>
+
+  {# ── Alerta visual e acessível: integrantes da equipe diretiva/coordenação também em sala de aula ── #}
+  {% if alertas_em_sala %}
+  <section class="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 text-amber-950 shadow-sm sm:p-5"
+           role="alert"
+           aria-labelledby="alerta-equipe-sala-titulo">
+    <div class="flex items-start gap-3.5">
+      <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-200/80 text-amber-900">
+        <i class="ph-fill ph-warning-circle text-2xl" aria-hidden="true"></i>
+      </span>
+      <div class="min-w-0 flex-1 space-y-2">
+        <div>
+          <h2 id="alerta-equipe-sala-titulo" class="text-sm font-black uppercase tracking-wide text-amber-950 sm:text-base">
+            Atenção: integrante(s) da equipe diretiva ou coordenação alocado(s) em sala de aula
+          </h2>
+          <p class="mt-0.5 text-xs font-medium text-amber-900 sm:text-sm">
+            Os servidores abaixo possuem ocupação diretiva/coordenação ou supervisão vigente nesta unidade e também constam com disciplinas alocadas em sala de aula no semestre {{ semestre_corrente }}:
+          </p>
+        </div>
+        <ul class="divide-y divide-amber-200/70 rounded-xl border border-amber-200 bg-white/80">
+          {% for alerta in alertas_em_sala %}
+          <li class="flex flex-col gap-1.5 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
+              <p class="font-black text-slate-900">
+                {{ alerta.professor_nome }}
+                <span class="ml-1 rounded-md bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900">{{ alerta.funcao_label }}</span>
+              </p>
+              <p class="text-xs text-slate-600">
+                Disciplinas em sala: <strong>{{ alerta.disciplinas|join:", "|default:"Turma alocada" }}</strong>
+              </p>
+            </div>
+            <div class="flex shrink-0 flex-wrap items-center gap-2">
+              <span class="inline-flex items-center gap-1 rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-900">
+                <i class="ph ph-chalkboard-teacher" aria-hidden="true"></i>{{ alerta.horas_sala|floatformat:"-2" }} h/sem em sala
+              </span>
+              <span class="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+                <i class="ph ph-clock" aria-hidden="true"></i>Redução DESUP: {{ alerta.reducao_horas|floatformat:"-2" }} h
+              </span>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {# ── Composição Atual: Cargos da Equipe Diretiva e Coordenações ── #}
+  <section class="space-y-3" aria-labelledby="sec-composicao-titulo">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <h2 id="sec-composicao-titulo" class="text-lg font-black text-slate-900">Composição atual da equipe diretiva e coordenações</h2>
+        <p class="text-xs text-slate-500">Toque ou clique em um cargo para visualizar ocupantes, preencher vaga ou atualizar vigência.</p>
+      </div>
+    </div>
+
+    <div class="space-y-3">
+      {% for item in composicao %}
+      {% cycle 'bg-blue-50 text-blue-600' 'bg-violet-50 text-violet-600' 'bg-pink-50 text-pink-600' 'bg-amber-50 text-amber-600' 'bg-emerald-50 text-emerald-600' 'bg-cyan-50 text-cyan-600' as cor silent %}
+      <button type="button"
+              onclick="abrirModal('modalDetalheUnidade{{ item.cargo.pk }}')"
+              class="flex w-full flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-300 sm:flex-nowrap sm:gap-4">
+        <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full {{ cor }} sm:h-14 sm:w-14">
+          <i class="ph{% if not item.ocupantes %}-fill{% endif %} ph-user text-2xl" aria-hidden="true"></i>
+        </span>
+
+        <span class="min-w-0 flex-1">
+          <span class="flex flex-wrap items-center gap-2">
+            <span class="font-black text-slate-900">{{ item.cargo.nome }}</span>
+            {% if item.cargo.exige_curso %}
+            <span class="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Por curso</span>
+            {% endif %}
+          </span>
+          {% if item.ocupantes %}
+          <span class="mt-0.5 block truncate text-sm font-medium text-slate-600">
+            {% for ocupacao in item.ocupantes %}{{ ocupacao.professor.nome }}{% if ocupacao.curso %} ({{ ocupacao.curso.sigla }}){% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}
+          </span>
+          {% else %}
+          <span class="mt-0.5 block text-xs text-slate-400">Nenhum ocupante vigente cadastrado nesta unidade.</span>
+          {% endif %}
+        </span>
+
+        <span class="flex shrink-0 flex-wrap items-center gap-2">
+          {% if item.tem_alerta_sala %}
+          <span class="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-xs font-black text-amber-900"
+                title="Ocupante também alocado em sala de aula">
+            <i class="ph-fill ph-warning-circle text-amber-700" aria-hidden="true"></i>Em sala de aula
+          </span>
+          {% endif %}
+
+          {% if item.ocupantes %}
+          <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800">
+            <i class="ph-fill ph-check-circle" aria-hidden="true"></i>Preenchido ({{ item.ocupantes|length }})
+          </span>
+          {% else %}
+          <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800">
+            <i class="ph ph-user-plus" aria-hidden="true"></i>Vago
+          </span>
+          {% endif %}
+          <i class="ph ph-caret-right text-xl text-slate-500" aria-hidden="true"></i>
+        </span>
+      </button>
+      {% empty %}
+      <div class="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center">
+        <p class="text-sm font-bold text-slate-700">Nenhum tipo de cargo diretivo disponível</p>
+        <p class="mt-1 text-xs text-slate-500">Aguarde a configuração do catálogo de cargos pela DESUP.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  {# ── Atividades de Estágio e Supervisão da Unidade ── #}
+  <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="sec-estagio-titulo">
+    <div class="flex flex-col gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <div>
+        <h2 id="sec-estagio-titulo" class="text-base font-black text-slate-900 sm:text-lg">Atividades de estágio e supervisão da unidade</h2>
+        <p class="text-xs text-slate-500">Registre e acompanhe as atividades de coordenação, supervisão e orientação de estágio vinculadas à unidade {{ unidade.sigla }}.</p>
+      </div>
+      <button type="button"
+              onclick="abrirModal('modalNovoEstagioUnidade')"
+              class="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-blue-50 px-3.5 py-2 text-xs font-black text-[#025c9f] hover:bg-blue-100">
+        <i class="ph-bold ph-plus" aria-hidden="true"></i>Nova atividade
+      </button>
+    </div>
+    <div id="estagio-supervisao-unidade-container">
+      {% include 'core/prioridade1/partials/_estagio_supervisao_list.html' %}
+    </div>
+  </section>
+
+  {# ── Histórico de Ocupações da Unidade (com busca e filtro HTMX) ── #}
+  <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="sec-historico-titulo">
+    <div class="flex flex-col gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <div>
+        <h2 id="sec-historico-titulo" class="text-base font-black text-slate-900 sm:text-lg">Histórico de ocupações da unidade</h2>
+        <p class="text-xs text-slate-500">Consulte ocupações vigentes e encerradas da equipe diretiva de {{ unidade.sigla }}.</p>
+      </div>
+
+      <form method="get"
+            action="{% url 'core:equipe_diretiva_unidade' %}"
+            hx-get="{% url 'core:equipe_diretiva_unidade' %}"
+            hx-target="#historico-equipe-unidade-container"
+            hx-trigger="submit, change from:#filtro-situacao-historico, keyup changed delay:300ms from:#filtro-busca-historico"
+            class="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <input type="hidden" name="partial" value="historico">
+        <div>
+          <label for="filtro-busca-historico" class="sr-only">Buscar no histórico por servidor, cargo ou curso</label>
+          <input id="filtro-busca-historico"
+                 type="search"
+                 name="q"
+                 value="{{ filtro_q }}"
+                 placeholder="Servidor, cargo ou curso..."
+                 class="min-h-10 w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-[#025c9f] focus:ring-2 focus:ring-blue-100 sm:w-52">
+        </div>
+        <div>
+          <label for="filtro-situacao-historico" class="sr-only">Filtrar histórico por situação</label>
+          <select id="filtro-situacao-historico"
+                  name="situacao"
+                  class="min-h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-[#025c9f] sm:w-auto">
+            <option value="" {% if not filtro_situacao %}selected{% endif %}>Todas as situações</option>
+            <option value="vigente" {% if filtro_situacao == 'vigente' %}selected{% endif %}>Somente vigentes</option>
+            <option value="encerrada" {% if filtro_situacao == 'encerrada' %}selected{% endif %}>Somente encerradas</option>
+          </select>
+        </div>
+        <noscript>
+          <button type="submit" class="rounded-lg bg-[#025c9f] px-3 py-1.5 text-xs font-bold text-white">Filtrar</button>
+        </noscript>
+      </form>
+    </div>
+
+    <div id="historico-equipe-unidade-container">
+      {% include 'core/prioridade1/partials/_historico_equipe_unidade.html' %}
+    </div>
+  </section>
+</div>
+
+{# ═══════════════ Modais de Cargos e Ocupações da Unidade ═══════════════ #}
+
+{% for item in composicao %}
+<div id="modalDetalheUnidade{{ item.cargo.pk }}"
+     class="modal-equipe hidden fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="tituloDetalheUnidade{{ item.cargo.pk }}">
+  <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div class="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
+      <div class="min-w-0">
+        <h3 id="tituloDetalheUnidade{{ item.cargo.pk }}" class="truncate text-base font-black text-slate-900">{{ item.cargo.nome }}</h3>
+        <p class="text-xs text-slate-500">{{ unidade.sigla }}{% if item.cargo.exige_curso %} · exige seleção de curso da unidade{% endif %}</p>
+      </div>
+      <button type="button"
+              onclick="fecharModal('modalDetalheUnidade{{ item.cargo.pk }}')"
+              aria-label="Fechar modal de {{ item.cargo.nome }}"
+              class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+        <i class="ph ph-x text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+
+    <ul class="max-h-[58vh] divide-y divide-slate-100 overflow-y-auto">
+      {% for ocupacao in item.ocupantes %}
+      <li class="space-y-2 px-5 py-4 sm:px-6">
+        <div class="flex flex-wrap items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <p class="font-bold text-slate-900">{{ ocupacao.professor.nome }}</p>
+            <p class="text-xs text-slate-500">
+              {% if ocupacao.curso %}<strong>{{ ocupacao.curso.sigla }}</strong> · {% endif %}
+              Vigência: {{ ocupacao.data_inicio|date:"d/m/Y" }}{% if ocupacao.data_fim %} até {{ ocupacao.data_fim|date:"d/m/Y" }}{% else %} (em aberto){% endif %}
+            </p>
+          </div>
+          <span class="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700"
+                title="Carga horária de redução definida exclusivamente pela DESUP">
+            <i class="ph ph-lock-key text-slate-400" aria-hidden="true"></i>Redução DESUP: {{ ocupacao.carga_reducao_horas|floatformat:"-2" }} h
+          </span>
+        </div>
+
+        {% if ocupacao.em_sala %}
+        <div class="flex items-start gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900" role="status">
+          <i class="ph-fill ph-warning-circle mt-0.5 shrink-0 text-amber-600" aria-hidden="true"></i>
+          <span>Docente também alocado em sala de aula ({{ ocupacao.horas_sala|floatformat:"-2" }} h/sem): {{ ocupacao.disciplinas_sala|join:", " }}</span>
+        </div>
+        {% endif %}
+
+        {% if ocupacao.observacoes %}
+        <p class="text-xs text-slate-600">{{ ocupacao.observacoes }}</p>
+        {% endif %}
+
+        <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+          <button type="button"
+                  onclick="trocarModal('modalDetalheUnidade{{ item.cargo.pk }}','modalEditarOcupacaoUnidade{{ ocupacao.pk }}')"
+                  class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-[#025c9f]">
+            <i class="ph ph-pencil-simple" aria-hidden="true"></i>Atualizar dados
+          </button>
+          <form method="post" action="{% url 'core:ocupacao_diretiva_unidade_encerrar' ocupacao.pk %}" class="m-0">
+            {% csrf_token %}
+            <button type="submit"
+                    class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50/70 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100">
+              <i class="ph ph-stop-circle" aria-hidden="true"></i>Encerrar ocupação
+            </button>
+          </form>
+        </div>
+      </li>
+      {% empty %}
+      <li class="flex flex-col items-center gap-1 px-6 py-8 text-center">
+        <i class="ph-fill ph-user text-3xl text-slate-200" aria-hidden="true"></i>
+        <p class="text-sm font-semibold text-slate-600">Cargo vago na unidade {{ unidade.sigla }}.</p>
+        <p class="text-xs text-slate-400">Utilize o botão abaixo para cadastrar o ocupante.</p>
+      </li>
+      {% endfor %}
+    </ul>
+
+    {% if item.pode_adicionar %}
+    <div class="border-t border-slate-100 bg-slate-50/60 px-5 py-4 sm:px-6">
+      <button type="button"
+              onclick="trocarModal('modalDetalheUnidade{{ item.cargo.pk }}','modalPreencherUnidade{{ item.cargo.pk }}')"
+              class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#025c9f] px-4 py-2.5 text-sm font-black text-white hover:bg-[#153e70]">
+        <i class="ph ph-user-plus text-lg" aria-hidden="true"></i>
+        {% if item.ocupantes %}Adicionar ocupante{% else %}Preencher cargo{% endif %}
+      </button>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if item.form %}
+<div id="modalPreencherUnidade{{ item.cargo.pk }}"
+     class="modal-equipe hidden fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="tituloPreencherUnidade{{ item.cargo.pk }}">
+  <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
+      <div class="flex items-center gap-2">
+        <button type="button"
+                onclick="trocarModal('modalPreencherUnidade{{ item.cargo.pk }}','modalDetalheUnidade{{ item.cargo.pk }}')"
+                aria-label="Voltar"
+                class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+          <i class="ph ph-arrow-left text-lg" aria-hidden="true"></i>
+        </button>
+        <div>
+          <h3 id="tituloPreencherUnidade{{ item.cargo.pk }}" class="text-base font-black text-[#025c9f]">Preencher {{ item.cargo.nome }}</h3>
+          <p class="text-xs text-slate-500">{{ unidade.sigla }}</p>
+        </div>
+      </div>
+      <button type="button"
+              onclick="fecharModal('modalPreencherUnidade{{ item.cargo.pk }}')"
+              aria-label="Fechar"
+              class="text-slate-400 hover:text-slate-600">
+        <i class="ph ph-x text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+    <form method="post" action="{% url 'core:ocupacao_diretiva_unidade_create' item.cargo.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ retorno }}">
+      <div class="max-h-[62vh] space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
+        <div class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          <i class="ph ph-lock-key text-base text-slate-400 shrink-0" aria-hidden="true"></i>
+          <span>A <strong>carga horária de redução semanal</strong> é definida exclusivamente pela DESUP.</span>
+        </div>
+        {% include 'core/prioridade1/_campos_form.html' with form=item.form %}
+      </div>
+      <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-4 sm:px-6">
+        <button type="button" onclick="fecharModal('modalPreencherUnidade{{ item.cargo.pk }}')" class="min-h-10 rounded-lg px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100">Cancelar</button>
+        <button type="submit" class="min-h-10 rounded-lg bg-[#025c9f] px-5 py-2 text-sm font-black text-white shadow-sm hover:bg-[#153e70]">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% for ocupacao in item.ocupantes %}
+<div id="modalEditarOcupacaoUnidade{{ ocupacao.pk }}"
+     class="modal-equipe hidden fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="tituloEditarOcupacaoUnidade{{ ocupacao.pk }}">
+  <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
+      <div class="flex items-center gap-2">
+        <button type="button"
+                onclick="trocarModal('modalEditarOcupacaoUnidade{{ ocupacao.pk }}','modalDetalheUnidade{{ item.cargo.pk }}')"
+                aria-label="Voltar"
+                class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+          <i class="ph ph-arrow-left text-lg" aria-hidden="true"></i>
+        </button>
+        <div>
+          <h3 id="tituloEditarOcupacaoUnidade{{ ocupacao.pk }}" class="text-base font-black text-[#025c9f]">Atualizar ocupação</h3>
+          <p class="text-xs text-slate-500">{{ item.cargo.nome }} · {{ unidade.sigla }}</p>
+        </div>
+      </div>
+      <button type="button"
+              onclick="fecharModal('modalEditarOcupacaoUnidade{{ ocupacao.pk }}')"
+              aria-label="Fechar"
+              class="text-slate-400 hover:text-slate-600">
+        <i class="ph ph-x text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+    <form method="post" action="{% url 'core:ocupacao_diretiva_unidade_update' ocupacao.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ retorno }}">
+      <div class="max-h-[62vh] space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
+        <div class="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-700">
+          <span class="font-bold">Redução semanal (definida pela DESUP):</span>
+          <span class="font-black text-emerald-800">{{ ocupacao.carga_reducao_horas|floatformat:"-2" }} h/semana</span>
+        </div>
+        {% include 'core/prioridade1/_campos_form.html' with form=ocupacao.edit_form %}
+      </div>
+      <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-4 sm:px-6">
+        <button type="button" onclick="fecharModal('modalEditarOcupacaoUnidade{{ ocupacao.pk }}')" class="min-h-10 rounded-lg px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100">Cancelar</button>
+        <button type="submit" class="min-h-10 rounded-lg bg-[#025c9f] px-5 py-2 text-sm font-black text-white shadow-sm hover:bg-[#153e70]">Salvar alterações</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% endfor %}
+
+{# ═══════════════ Modais de Atividades de Estágio e Supervisão ═══════════════ #}
+
+<div id="modalNovoEstagioUnidade"
+     class="modal-equipe hidden fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="tituloNovoEstagioUnidade">
+  <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
+      <div>
+        <h3 id="tituloNovoEstagioUnidade" class="text-base font-black text-[#025c9f]">Registrar estágio / supervisão</h3>
+        <p class="text-xs text-slate-500">Unidade {{ unidade.sigla }}</p>
+      </div>
+      <button type="button"
+              onclick="fecharModal('modalNovoEstagioUnidade')"
+              aria-label="Fechar"
+              class="text-slate-400 hover:text-slate-600">
+        <i class="ph ph-x text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+    <form method="post" action="{% url 'core:atividade_estagio_create' %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ retorno }}">
+      <div class="max-h-[62vh] space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
+        <div class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          <i class="ph ph-lock-key text-base text-slate-400 shrink-0" aria-hidden="true"></i>
+          <span>A redução semanal de carga horária é atribuída exclusivamente pela DESUP.</span>
+        </div>
+        {% include 'core/prioridade1/_campos_form.html' with form=form_nova_atividade_estagio %}
+      </div>
+      <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-4 sm:px-6">
+        <button type="button" onclick="fecharModal('modalNovoEstagioUnidade')" class="min-h-10 rounded-lg px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100">Cancelar</button>
+        <button type="submit" class="min-h-10 rounded-lg bg-[#025c9f] px-5 py-2 text-sm font-black text-white shadow-sm hover:bg-[#153e70]">Salvar atividade</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% for atividade in atividades_estagio %}
+<div id="modalEditarEstagioUnidade{{ atividade.pk }}"
+     class="modal-equipe hidden fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="tituloEditarEstagioUnidade{{ atividade.pk }}">
+  <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
+      <div>
+        <h3 id="tituloEditarEstagioUnidade{{ atividade.pk }}" class="text-base font-black text-[#025c9f]">Editar {{ atividade.get_tipo_display }}</h3>
+        <p class="text-xs text-slate-500">{{ atividade.professor.nome }} · {{ unidade.sigla }}</p>
+      </div>
+      <button type="button"
+              onclick="fecharModal('modalEditarEstagioUnidade{{ atividade.pk }}')"
+              aria-label="Fechar"
+              class="text-slate-400 hover:text-slate-600">
+        <i class="ph ph-x text-xl" aria-hidden="true"></i>
+      </button>
+    </div>
+    <form method="post" action="{% url 'core:atividade_estagio_update' atividade.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ retorno }}">
+      <div class="max-h-[62vh] space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
+        <div class="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-700">
+          <span class="font-bold">Redução semanal (definida pela DESUP):</span>
+          <span class="font-black text-emerald-800">{{ atividade.carga_reducao_horas|floatformat:"-2" }} h/semana</span>
+        </div>
+        {% include 'core/prioridade1/_campos_form.html' with form=atividade.edit_form %}
+      </div>
+      <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-4 sm:px-6">
+        <button type="button" onclick="fecharModal('modalEditarEstagioUnidade{{ atividade.pk }}')" class="min-h-10 rounded-lg px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100">Cancelar</button>
+        <button type="submit" class="min-h-10 rounded-lg bg-[#025c9f] px-5 py-2 text-sm font-black text-white shadow-sm hover:bg-[#153e70]">Salvar alterações</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% endwith %}
+
+<script>
+  function abrirModal(id) { var m = document.getElementById(id); if (m) m.classList.remove('hidden'); }
+  function fecharModal(id) { var m = document.getElementById(id); if (m) m.classList.add('hidden'); }
+  function trocarModal(de, para) { fecharModal(de); abrirModal(para); }
+  document.querySelectorAll('.modal-equipe').forEach(function (m) {
+    m.addEventListener('click', function (e) { if (e.target === m) m.classList.add('hidden'); });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') document.querySelectorAll('.modal-equipe').forEach(function (m) { m.classList.add('hidden'); });
+  });
+</script>
+{% endblock %}
+
