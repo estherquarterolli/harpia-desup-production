@@ -44,19 +44,16 @@
         </div>
 
         <nav class="sidebar-scroll sb-nav flex-grow min-h-0 overflow-y-auto" aria-label="Menu principal">
-
-            <!-- Bloco: Visão geral — todos os perfis -->
             <div class="sb-block">
-                <p class="sb-title">Visão geral</p>
+                <p class="sb-title">Início</p>
                 <a href="{% url 'dashboard' %}" class="sb-link {% if request.path == '/dashboard/desup/' or request.path == '/dashboard/unidade/' %}is-active{% endif %}">
                     <i class="ph ph-squares-four"></i><span class="sb-label">Dashboard</span>
                 </a>
             </div>
 
             {% if user.perfil == 'DESUP' or user.is_superuser %}
-            <!-- DESUP · Bloco: Gestão institucional -->
             <div class="sb-block">
-                <p class="sb-title">Gestão institucional</p>
+                <p class="sb-title">Gestão</p>
                 <a href="{% url 'core:unidade_list' %}" class="sb-link {% if '/core/unidades' in request.path %}is-active{% endif %}">
                     <i class="ph ph-buildings"></i><span class="sb-label">Unidades</span>
                 </a>
@@ -72,26 +69,22 @@
                 <a href="{% url 'core:alertas_carga_desup' %}" class="sb-link {% if '/core/desup/alertas-carga' in request.path %}is-active{% endif %}">
                     <i class="ph ph-warning-circle"></i><span class="sb-label">Alertas de carga</span>
                 </a>
+                <a href="{% url 'core:janela_list' %}" class="sb-link {% if '/core/entregas' in request.path %}is-active{% endif %}">
+                    <i class="ph ph-clock-countdown"></i><span class="sb-label">Entrega</span>
+                </a>
             </div>
-            {% endif %}
-
-            {% if user.perfil == 'COORDENADOR_UNIDADE' %}
-            <!-- Unidade · Bloco: Minha unidade -->
+            {% elif user.perfil == 'COORDENADOR_UNIDADE' %}
             <div class="sb-block">
-                <p class="sb-title">Minha unidade</p>
+                <p class="sb-title">Gestão</p>
                 <a href="{% url 'core:equipe_diretiva_unidade' %}" class="sb-link {% if '/core/unidade/equipe-diretiva' in request.path %}is-active{% endif %}">
                     <i class="ph ph-identification-card"></i><span class="sb-label">Equipe diretiva</span>
                 </a>
-                <a href="{% url 'professors:professor_list' %}" class="sb-link {% if 'professores' in request.path %}is-active{% endif %}">
-                    <i class="ph ph-chalkboard-teacher"></i><span class="sb-label">Professores</span>
-                </a>
             </div>
             {% endif %}
 
-            <!-- Bloco: Alocação e carga — DESUP e Unidade -->
             <div class="sb-block">
-                <p class="sb-title">Alocação e carga</p>
-                {% if user.perfil == 'DESUP' or user.is_superuser %}
+                <p class="sb-title">Ensino e currículo</p>
+                {% if user.perfil == 'DESUP' or user.perfil == 'COORDENADOR_UNIDADE' or user.is_superuser %}
                 <a href="{% url 'professors:professor_list' %}" class="sb-link {% if 'professores' in request.path %}is-active{% endif %}">
                     <i class="ph ph-chalkboard-teacher"></i><span class="sb-label">Professores</span>
                 </a>
@@ -102,11 +95,6 @@
                 <a href="{% url 'extra_curricular:pendencia_list' %}" class="sb-link {% if 'extracurriculares' in request.path %}is-active{% endif %}">
                     <i class="ph ph-books"></i><span class="sb-label">Extracurriculares</span>
                 </a>
-            </div>
-
-            <!-- Bloco: Currículo -->
-            <div class="sb-block">
-                <p class="sb-title">Currículo</p>
                 <a href="{% url 'courses:matrix_list' %}" class="sb-link {% if 'courses/matrices' in request.path %}is-active{% endif %}">
                     <i class="ph ph-file-text"></i><span class="sb-label">Matrizes</span>
                 </a>
@@ -116,17 +104,6 @@
                 </a>
                 {% endif %}
             </div>
-
-            {% if user.perfil == 'DESUP' or user.is_superuser %}
-            <!-- DESUP · Bloco: Prazos -->
-            <div class="sb-block">
-                <p class="sb-title">Prazos</p>
-                <a href="{% url 'core:janela_list' %}" class="sb-link {% if '/core/entregas' in request.path %}is-active{% endif %}">
-                    <i class="ph ph-clock-countdown"></i><span class="sb-label">Entrega</span>
-                </a>
-            </div>
-            {% endif %}
-
         </nav>
 
         <div class="sb-footer">
@@ -163,7 +140,7 @@
         {# Cabeçalho fixo: título e ajuda à esquerda; notificações e conta à direita. #}
         <header id="topbar" class="sticky top-0 z-30 -mx-4 mb-6 flex items-center justify-between gap-3 border-b border-slate-200/70 bg-slate-50/90 px-4 py-3 shadow-sm backdrop-blur-md lg:-mx-8 lg:px-8">
             <div class="flex min-w-0 items-center gap-3">
-                <button type="button" id="mobileMenuButton" onclick="toggleMobileSidebar()" aria-label="Abrir menu" class="lg:hidden text-3xl text-[#025c9f]"><i class="ph ph-list" aria-hidden="true"></i></button>
+                <button type="button" id="mobileMenuButton" onclick="toggleMobileSidebar()" aria-label="Abrir menu" class="md:hidden text-3xl text-[#025c9f]"><i class="ph ph-list" aria-hidden="true"></i></button>
                 {% block header_titulo %}<h1 class="truncate text-lg md:text-2xl font-black text-[#025c9f] uppercase tracking-tight">
                     {% block header_title %}HARPIA{% endblock %}
                 </h1>{% endblock %}

@@ -209,7 +209,6 @@ class ProfessorListView(LoginRequiredMixin, ListView):
         ]
         ctx['cargos'] = cargos
         ctx['tipos'] = cargos  # compatibilidade com integrações e testes existentes
-        ctx['total_professores'] = Professor.objects.count()
         ctx['total_filtrados'] = ctx['paginator'].count if ctx.get('paginator') else len(ctx['professores'])
         params = self.request.GET.copy()
         params.pop('page', None)
@@ -218,24 +217,26 @@ class ProfessorListView(LoginRequiredMixin, ListView):
             self.request.GET.get(k)
             for k in ('q', 'ch', 'cargo', 'regime', 'tipo', 'unidade_id')
         )
-        from django.db.models import Count, Q
-
-        totais = Professor.objects.aggregate(
-            ativos=Count('pk', filter=Q(status=Professor.StatusChoices.ATIVO)),
-            afastados=Count('pk', filter=Q(status=Professor.StatusChoices.AFASTADO)),
-        )
-        ctx['kpis'] = [
-            {'rotulo': 'No sistema', 'valor': ctx['total_professores'], 'tom': 'azul', 'icone': 'ph-chalkboard-teacher'},
-            {'rotulo': 'Ativos', 'valor': totais['ativos'], 'tom': 'verde', 'icone': 'ph-check-circle'},
-            {'rotulo': 'Afastados', 'valor': totais['afastados'], 'tom': 'ambar', 'icone': 'ph-warning-circle'},
-        ]
-        if ctx['filtros_ativos']:
-            ctx['kpis'].append(
-                {'rotulo': 'Encontrados', 'valor': ctx['total_filtrados'], 'tom': 'cinza', 'icone': 'ph-funnel'}
-            )
-        # A aba de professores da unidade não mostra o resumo geral do sistema.
-        if user.perfil == 'COORDENADOR_UNIDADE' and not user.is_superuser:
+        visao_unidade = user.perfil == 'COORDENADOR_UNIDADE' and not user.is_superuser
+        if visao_unidade:
             ctx['kpis'] = []
+        else:
+            from django.db.models import Count, Q
+
+            ctx['total_professores'] = Professor.objects.count()
+            totais = Professor.objects.aggregate(
+                ativos=Count('pk', filter=Q(status=Professor.StatusChoices.ATIVO)),
+                afastados=Count('pk', filter=Q(status=Professor.StatusChoices.AFASTADO)),
+            )
+            ctx['kpis'] = [
+                {'rotulo': 'No sistema', 'valor': ctx['total_professores'], 'tom': 'azul', 'icone': 'ph-chalkboard-teacher'},
+                {'rotulo': 'Ativos', 'valor': totais['ativos'], 'tom': 'verde', 'icone': 'ph-check-circle'},
+                {'rotulo': 'Afastados', 'valor': totais['afastados'], 'tom': 'ambar', 'icone': 'ph-warning-circle'},
+            ]
+            if ctx['filtros_ativos']:
+                ctx['kpis'].append(
+                    {'rotulo': 'Encontrados', 'valor': ctx['total_filtrados'], 'tom': 'cinza', 'icone': 'ph-funnel'}
+                )
         ctx['ch_atual'] = self.request.GET.get('ch', '')
         ctx['cargo_atual'] = self.request.GET.get('cargo') or self.request.GET.get('tipo', '')
 

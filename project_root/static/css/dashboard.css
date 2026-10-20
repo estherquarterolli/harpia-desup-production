@@ -59,16 +59,16 @@ h1, h2, h3, h4, h5, h6, .font-black {
 .sb-brand {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     position: relative;
-    padding: 1.25rem 1rem 1rem;
+    padding: 1.25rem 1.25rem 1rem;
     margin-bottom: 0.25rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.10);
 }
 .sb-brand-link {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 0.75rem;
     text-decoration: none;
 }
@@ -232,8 +232,8 @@ h1, h2, h3, h4, h5, h6, .font-black {
 .dash-hero-title { margin: 0.1rem 0 0; font-size: 1.35rem; font-weight: 900; color: #1e293b; }
 .dash-hero-sub { margin: 0.15rem 0 0; font-size: 0.8rem; color: #64748b; }
 
-/* Ajustes de Responsividade do Menu Lateral (celular e tablet) */
-@media (max-width: 1023px) {
+/* O menu permanece aberto em tablets e computadores; somente celulares usam gaveta. */
+@media (max-width: 767px) {
     .sidebar-desktop {
         position: fixed !important;
         top: 0;
@@ -247,21 +247,15 @@ h1, h2, h3, h4, h5, h6, .font-black {
     .sidebar-desktop.sidebar-mobile-open {
         transform: translateX(0);
     }
-    /* Nomes dos itens do menu ficam sempre visíveis no modo gaveta (sem depender de hover) */
-    .sidebar-desktop .sidebar-label {
+    .sidebar-desktop .sb-label {
         display: block !important;
     }
-    /* CORR-010: no rail recolhido (desktop) o ícone é centralizado via
-       `justify-center group-hover:justify-start`. Na gaveta mobile não há hover,
-       então o alinhamento volta a ser à esquerda — mesmo padrão do .sidebar-label
-       acima, que também é forçado aqui. */
-    .sidebar-desktop .sidebar-link {
+    .sidebar-desktop .sb-link {
         justify-content: flex-start !important;
     }
     .sidebar-desktop .sidebar-close-btn {
         display: block !important;
     }
-    .sb-brand { justify-content: flex-start; }
     .main-content {
         padding: 0 1rem 1rem !important;
     }

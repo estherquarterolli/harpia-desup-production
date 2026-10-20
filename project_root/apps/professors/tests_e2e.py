@@ -553,6 +553,16 @@ class IsolamentoUnidadeProfessorE2ETests(ProfessorE2EBase):
         self.assertFalse(resposta.context['is_desup'])
         self.assertEqual(resposta.context['unidade_atual'], self.unidade_a)
 
+    def test_coordenador_nao_ve_resumo_global_de_professores(self):
+        self.client.force_login(self.coord_a)
+
+        resposta = self.client.get(self.url_lista)
+
+        self.assertEqual(resposta.context['kpis'], [])
+        self.assertNotIn('total_professores', resposta.context)
+        for rotulo in ('No sistema', 'Ativos', 'Afastados'):
+            self.assertNotContains(resposta, rotulo)
+
     def test_coordenador_nao_ve_professor_de_outra_unidade_mas_ve_o_compartilhado(self):
         professor_local = self._professor('Zuleica Local', 'A2', self.unidade_a)
         professor_compartilhado = self._professor(
