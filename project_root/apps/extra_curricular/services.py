@@ -152,7 +152,32 @@ def get_professores_com_pendencia(unidade_id: int, semestre: str, q: str = "") -
     professor, que abria uma query por professor (N+1 — chegava a travar/dar
     timeout no Vercel com o banco remoto).
     """
-    professores = Professor.objects.select_related("tipo_contrato")
+    pendentes, _ = _professores_pendentes_com_ch(unidade_id, q)
+    return (
+        Professor.objects.filter(pk__in=[p.pk for p in pendentes])
+        .select_related("tipo_contrato")
+        .prefetch_related("ocupacoes_diretivas")
+    )
+
+
+def _professores_pendentes_com_ch(unidade_id, q: str = ""):
+    """
+    Nucleo compartilhado: devolve `(professores_pendentes, ch_map)`.
+
+    `professores_pendentes` e a lista de objetos `Professor` ja carregados (com
+    `tipo_contrato` e `ocupacoes_diretivas` em prefetch) cuja CH alocada em sala
+    esta abaixo da meta; `ch_map` e o mapa `{professor_id: ch_alocada}` calculado
+    em lote. Mesmo criterio e mesma ordenacao (`Meta.ordering`) de antes.
+
+    Por que existe: `meta_horas_sala` le `ocupacoes_diretivas.all()` (reducao de
+    carga vigente). Sem prefetch isso abria 1 query por professor, e o calculo
+    rodava duas vezes por requisicao (aqui e em `get_pendencias_data`) - N+1 que
+    estourava os 30 s da funcao na Vercel com o banco remoto. Agora o numero de
+    queries de professores e fixo, independente de N.
+    """
+    professores = Professor.objects.select_related("tipo_contrato").prefetch_related(
+        "ocupacoes_diretivas"
+    )
     if unidade_id:
         professores = professores.filter(unidade_principal_id=unidade_id)
 
@@ -167,8 +192,8 @@ def get_professores_com_pendencia(unidade_id: int, semestre: str, q: str = "") -
     for prof in professores:
         meta = prof.meta_horas_sala if prof.tipo_contrato else 20
         if ch_map.get(prof.pk, 0) < meta:
-            pendentes.append(prof.pk)
-    return Professor.objects.filter(pk__in=pendentes).select_related("tipo_contrato")
+            pendentes.append(prof)
+    return pendentes, ch_map
 
 
 def _bulk_ch_alocada(professor_ids):
@@ -216,8 +241,9 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
     professores com pendência + seus registros de PendenciaExtra (se existirem).
     Se um professor tiver múltiplas justificativas, elas retornam como linhas separadas.
     """
-    professores_pendentes = list(get_professores_com_pendencia(unidade_id, semestre, q))
-    ch_alocada_map = _bulk_ch_alocada([p.pk for p in professores_pendentes])
+    # Reaproveita professores (com prefetch) e o ch_map ja calculados - antes
+    # refazia a query por pk__in e rodava `_bulk_ch_alocada` uma segunda vez.
+    professores_pendentes, ch_alocada_map = _professores_pendentes_com_ch(unidade_id, q)
 
     # Buscar todas as pendências extras deste semestre
     filters = {"semestre": semestre}

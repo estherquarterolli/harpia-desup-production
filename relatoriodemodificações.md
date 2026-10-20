@@ -576,3 +576,38 @@ Resumo: o docente deixou de ser um campo de `MatrixComponent` e passou a ser reg
 - `python manage.py check`: sem erros (`0 silenced`).
 - `python manage.py makemigrations --check --dry-run`: `No changes detected`.
 - `python manage.py test apps.core.tests_prioridade1_unidade apps.core.tests_prioridade1_desup apps.core.tests_ajuda --settings=config.settings._tmp_test`: 42 testes executados e aprovados (`OK`).
+
+## 20/10/2026 - Correção do timeout em Extra Curricular (listagem de pendências)
+
+### `project_root/apps/extra_curricular/services.py`
+- Tipo: alterado.
+- Alteração: criada a função interna `_professores_pendentes_com_ch(unidade_id, q)`, que carrega os professores com `select_related("tipo_contrato")` e `prefetch_related("ocupacoes_diretivas")`, calcula `ch_alocada` em lote (`_bulk_ch_alocada`) e devolve `(professores_pendentes, ch_map)`. `get_professores_com_pendencia` passou a usá-la (mantendo assinatura e retorno de `QuerySet`, agora também com prefetch) e `get_pendencias_data` reaproveita os objetos e o `ch_map` já calculados, em vez de refazer a consulta `pk__in` e rodar `_bulk_ch_alocada` uma segunda vez.
+- Motivo: `Professor.meta_horas_sala` → `reducao_carga_vigente` lê `ocupacoes_diretivas.all()`. Sem prefetch isso gerava 1 query por professor, e o cálculo rodava duas vezes por requisição (cerca de 2N queries, antes da paginação). Com o banco remoto, a função da Vercel (`maxDuration: 30`) estourava (`FUNCTION_INVOCATION_TIMEOUT`, LCP de ~30 s). Agora o número de queries não depende da quantidade de professores.
+- Regras de negócio: inalteradas. Mesmo critério de pendência (`ch_alocada < meta_horas_sala`), mesma ordenação (`Meta.ordering`), mesmo escopo por unidade do coordenador, nenhuma verificação de permissão alterada, sem mudança de banco ou migração e sem aumento de timeout.
+
+### `project_root/apps/extra_curricular/tests.py`
+- Tipo: alterado.
+- Alteração: adicionada a classe `ListagemPendenciasSemNPlusUmTests`, com teste de que o número de queries da listagem do coordenador é o mesmo com 2 e com 10 professores e teste de isolamento por unidade (coordenador não vê professor de outra unidade).
+
+### Verificações
+- `manage.py test apps.extra_curricular.tests --settings=config.settings._tmp_test`: 53 testes, 50 aprovados (incluindo os 2 novos de performance/isolamento). Falhas que **não** vêm desta alteração: `test_lista_desup_sem_form_de_status` (confirmado que falha também sem a mudança em `services.py`, via `git stash`) e `test_estouro_de_limite_gera_mensagem_e_nao_500` / `test_soma_de_itens_respeita_o_limite` (erro `ValueError: ... limite_horas_extra` — testes usam um campo que não existe mais em `Professor`). Ficam como pendência separada.
+- A medição em produção (`PROFILE_REQUESTS=1`, linha `PERF` / `Server-Timing`) ainda precisa ser feita após o deploy para confirmar o tempo real. O SQLite local não reproduz a latência do banco remoto.
+- Fora de escopo, mantidos como estão: paginação antes do cálculo, `conn_max_age=0` e índices (sem evidência medida).
+
+## 20/10/2026 - Correção do timeout em Extra Curricular (listagem de pendências)
+
+### `project_root/apps/extra_curricular/services.py`
+- Tipo: alterado.
+- Alteração: criada a função interna `_professores_pendentes_com_ch(unidade_id, q)`, que carrega os professores com `select_related("tipo_contrato")` e `prefetch_related("ocupacoes_diretivas")`, calcula `ch_alocada` em lote (`_bulk_ch_alocada`) e devolve `(professores_pendentes, ch_map)`. `get_professores_com_pendencia` passou a usá-la (mantendo assinatura e retorno de `QuerySet`, agora também com prefetch) e `get_pendencias_data` reaproveita os objetos e o `ch_map` já calculados, em vez de refazer a consulta `pk__in` e rodar `_bulk_ch_alocada` uma segunda vez.
+- Motivo: `Professor.meta_horas_sala` → `reducao_carga_vigente` lê `ocupacoes_diretivas.all()`. Sem prefetch isso gerava 1 query por professor, e o cálculo rodava duas vezes por requisição (cerca de 2N queries, antes da paginação). Com o banco remoto, a função da Vercel (`maxDuration: 30`) estourava (`FUNCTION_INVOCATION_TIMEOUT`, LCP de ~30 s). Agora o número de queries não depende da quantidade de professores.
+- Regras de negócio: inalteradas. Mesmo critério de pendência (`ch_alocada < meta_horas_sala`), mesma ordenação (`Meta.ordering`), mesmo escopo por unidade do coordenador, nenhuma verificação de permissão alterada, sem mudança de banco ou migração e sem aumento de timeout.
+
+### `project_root/apps/extra_curricular/tests.py`
+- Tipo: alterado.
+- Alteração: adicionada a classe `ListagemPendenciasSemNPlusUmTests`, com teste de que o número de queries da listagem do coordenador é o mesmo com 2 e com 10 professores e teste de isolamento por unidade (coordenador não vê professor de outra unidade).
+
+### Verificações
+- `manage.py test apps.extra_curricular.tests --settings=config.settings._tmp_test`: 53 testes, 50 aprovados (incluindo os 2 novos de performance/isolamento). Falhas que **não** vêm desta alteração: `test_lista_desup_sem_form_de_status` (confirmado que falha também sem a mudança em `services.py`, via `git stash`) e `test_estouro_de_limite_gera_mensagem_e_nao_500` / `test_soma_de_itens_respeita_o_limite` (erro `ValueError: ... limite_horas_extra` — testes usam um campo que não existe mais em `Professor`). Ficam como pendência separada.
+- A medição em produção (`PROFILE_REQUESTS=1`, linha `PERF` / `Server-Timing`) ainda precisa ser feita após o deploy para confirmar o tempo real. O SQLite local não reproduz a latência do banco remoto.
+- Fora de escopo, mantidos como estão: paginação antes do cálculo, `conn_max_age=0` e índices (sem evidência medida).
+
