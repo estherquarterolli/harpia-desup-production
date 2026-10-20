@@ -1353,3 +1353,542 @@ class ExcecaoCargaDecidirView(DesupPrioridade1Mixin, View):
         else:
             messages.success(request, f'Exceção {excecao.get_status_display().lower()} com sucesso.')
         return redirect('core:alertas_carga_desup')
+
+
+# ---------------------------------------------------------------------------
+# Prioridade 1.1 - Equipe Diretiva, Coordenações e Estágio (Módulo da Unidade)
+# ---------------------------------------------------------------------------
+
+def _mapa_alocacoes_sala_por_professor(professor_ids):
+    """
+    Retorna dicionário {professor_id: {'disciplinas': [...], 'horas_sala': Decimal}}
+    para todos os professores entre `professor_ids` que possuem alocação vigente
+    em sala de aula no semestre atual.
+    """
+    professor_ids = {pid for pid in professor_ids if pid}
+    if not professor_ids:
+        return {}
+
+    from apps.allocations.services import alocacoes_vigentes
+
+    linhas = alocacoes_vigentes().filter(
+        docente_id__in=professor_ids,
+    ).select_related(
+        'componente_matriz',
+        'componente_matriz__componente_curricular',
+    )
+
+    disciplinas_por_prof = {}
+    horas_por_prof = {}
+    vistos_por_prof = {}
+
+    for linha in linhas:
+        pid = linha.docente_id
+        comp = linha.componente_matriz
+        nome_disc = comp.nome_disciplina
+        if nome_disc:
+            disciplinas_por_prof.setdefault(pid, set()).add(nome_disc)
+
+        chave = (
+            f"catalogo:{comp.componente_curricular_id}"
+            if comp.compartilhado and comp.componente_curricular_id
+            else f"linha:{comp.pk}"
+        )
+        vistos = vistos_por_prof.setdefault(pid, set())
+        if chave not in vistos:
+            vistos.add(chave)
+            ha = Decimal(str(comp.ha_semanal or 0))
+            horas_por_prof[pid] = horas_por_prof.get(pid, Decimal('0.00')) + ha
+
+    resultado = {}
+    for pid in set(disciplinas_por_prof.keys()) | set(horas_por_prof.keys()):
+        resultado[pid] = {
+            'disciplinas': sorted(disciplinas_por_prof.get(pid, set())),
+            'horas_sala': horas_por_prof.get(pid, Decimal('0.00')),
+        }
+    return resultado
+
+
+class UnidadePrioridade1Mixin(LoginRequiredMixin, PerfilRequiredMixin):
+    """Restringe o acesso ao Coordenador de Unidade autenticado com unidade vinculada."""
+    allowed_profiles = ['COORDENADOR_UNIDADE']
+
+    def get_unidade(self):
+        from django.core.exceptions import PermissionDenied
+
+        unidade = getattr(self.request.user, 'unidade', None)
+        if not unidade or not unidade.status:
+            raise PermissionDenied('Sua conta não está vinculada a uma unidade ativa.')
+        return unidade
+
+
+class EquipeDiretivaUnidadeView(UnidadePrioridade1Mixin, TemplateView):
+    """
+    Painel do Coordenador de Unidade para cadastro e atualização dos ocupantes
+    da equipe diretiva, coordenações e atividades de estágio e supervisão da
+    própria unidade, com alertas visuais de docentes alocados em sala de aula.
+    """
+    template_name = 'core/prioridade1/equipe_diretiva_unidade.html'
+
+    def get_template_names(self):
+        if self.request.headers.get('HX-Request'):
+            partial = self.request.GET.get('partial', '')
+            if partial == 'historico':
+                return ['core/prioridade1/partials/_historico_equipe_unidade.html']
+            if partial == 'estagio':
+                return ['core/prioridade1/partials/_estagio_supervisao_list.html']
+        return [self.template_name]
+
+    def get_context_data(self, **kwargs):
+        from django.core.paginator import Paginator
+        from django.utils import timezone
+        from apps.allocations.services import semestre_atual
+        from apps.core.busca import filtrar_contem
+        from .forms import (
+            AtividadeEstagioSupervisaoUnidadeForm,
+            OcupacaoEquipeDiretivaUnidadeForm,
+        )
+        from .models import (
+            AtividadeEstagioSupervisao,
+            OcupacaoEquipeDiretiva,
+            TipoCargoDiretivo,
+        )
+
+        ctx = super().get_context_data(**kwargs)
+        unidade = self.get_unidade()
+        hoje = timezone.localdate()
+        semestre_corrente = semestre_atual()
+
+        # Todas as consultas filtram estritamente pela unidade do usuário via UnitBoundManager.
+        ocupacoes_qs = (
+            OcupacaoEquipeDiretiva.objects.for_user(self.request.user)
+            .filter(unidade=unidade)
+            .select_related('cargo', 'professor', 'curso', 'curso__curso')
+            .order_by('-data_inicio', '-pk')
+        )
+        todas_ocupacoes = list(ocupacoes_qs[:300])
+
+        atividades_estagio = list(
+            AtividadeEstagioSupervisao.objects.for_user(self.request.user)
+            .filter(unidade=unidade)
+            .select_related('professor', 'curso', 'curso__curso')
+            .order_by('-semestre', '-data_inicio', 'professor__rh_nome')[:200]
+        )
+
+        # Coleta IDs de professores para verificar alocações vigentes em sala de aula.
+        prof_ids = {o.professor_id for o in todas_ocupacoes} | {a.professor_id for a in atividades_estagio}
+        mapa_sala = _mapa_alocacoes_sala_por_professor(prof_ids)
+
+        por_cargo = {}
+        reducao_total = Decimal('0.00')
+        alertas_em_sala = []
+        vistos_alerta = set()
+
+        for ocupacao in todas_ocupacoes:
+            info_sala = mapa_sala.get(ocupacao.professor_id)
+            ocupacao.em_sala = bool(info_sala)
+            ocupacao.disciplinas_sala = info_sala['disciplinas'] if info_sala else []
+            ocupacao.horas_sala = info_sala['horas_sala'] if info_sala else Decimal('0.00')
+
+            if ocupacao.vigente:
+                por_cargo.setdefault(ocupacao.cargo_id, []).append(ocupacao)
+                reducao_total += ocupacao.carga_reducao_horas
+                ocupacao.edit_form = OcupacaoEquipeDiretivaUnidadeForm(
+                    instance=ocupacao,
+                    unidade=unidade,
+                    cargo=ocupacao.cargo,
+                    auto_id=f'id_editocup{ocupacao.pk}_%s',
+                )
+                if ocupacao.em_sala:
+                    chave_alerta = ('CARGO', ocupacao.pk)
+                    if chave_alerta not in vistos_alerta:
+                        vistos_alerta.add(chave_alerta)
+                        alertas_em_sala.append({
+                            'ocupacao_pk': ocupacao.pk,
+                            'professor_nome': ocupacao.professor.nome,
+                            'funcao_label': (
+                                f"{ocupacao.cargo.nome} ({ocupacao.curso.sigla})"
+                                if ocupacao.curso_id else ocupacao.cargo.nome
+                            ),
+                            'disciplinas': ocupacao.disciplinas_sala,
+                            'horas_sala': ocupacao.horas_sala,
+                            'reducao_horas': ocupacao.carga_reducao_horas,
+                        })
+
+        for atividade in atividades_estagio:
+            info_sala = mapa_sala.get(atividade.professor_id)
+            atividade.em_sala = bool(info_sala)
+            atividade.disciplinas_sala = info_sala['disciplinas'] if info_sala else []
+            atividade.horas_sala = info_sala['horas_sala'] if info_sala else Decimal('0.00')
+            atividade.edit_form = AtividadeEstagioSupervisaoUnidadeForm(
+                instance=atividade,
+                unidade=unidade,
+                auto_id=f'id_editestagio{atividade.pk}_%s',
+            )
+            if atividade.vigente and atividade.em_sala:
+                chave_alerta = ('ESTAGIO', atividade.pk)
+                if chave_alerta not in vistos_alerta:
+                    vistos_alerta.add(chave_alerta)
+                    alertas_em_sala.append({
+                        'ocupacao_pk': f"estagio-{atividade.pk}",
+                        'professor_nome': atividade.professor.nome,
+                        'funcao_label': (
+                            f"{atividade.get_tipo_display()} ({atividade.curso.sigla})"
+                            if atividade.curso_id else atividade.get_tipo_display()
+                        ),
+                        'disciplinas': atividade.disciplinas_sala,
+                        'horas_sala': atividade.horas_sala,
+                        'reducao_horas': atividade.carga_reducao_horas,
+                    })
+
+        cargos = list(
+            TipoCargoDiretivo.objects.filter(
+                Q(ativo=True) | Q(pk__in=por_cargo.keys())
+            ).order_by('ordem', 'nome')
+        )
+
+        composicao = []
+        for cargo in cargos:
+            ocupantes = por_cargo.get(cargo.pk, [])
+            pode_adicionar = cargo.ativo and (not ocupantes or cargo.permite_multiplos)
+            item = {
+                'cargo': cargo,
+                'ocupantes': ocupantes,
+                'pode_adicionar': pode_adicionar,
+                'tem_alerta_sala': any(o.em_sala for o in ocupantes),
+            }
+            if pode_adicionar:
+                item['form'] = OcupacaoEquipeDiretivaUnidadeForm(
+                    unidade=unidade,
+                    cargo=cargo,
+                    auto_id=f'id_unidocup{cargo.pk}_%s',
+                    initial={'data_inicio': hoje},
+                )
+            composicao.append(item)
+
+        # Filtros do histórico da unidade (busca + situação)
+        filtro_q = self.request.GET.get('q', '').strip()
+        filtro_situacao = self.request.GET.get('situacao', '').strip()
+        historico_qs = ocupacoes_qs
+        if filtro_q:
+            historico_qs = filtrar_contem(
+                historico_qs,
+                filtro_q,
+                ['professor__rh_nome', 'professor__desup_nome', 'cargo__nome', 'curso__curso__sigla'],
+            )
+        if filtro_situacao == 'vigente':
+            historico_qs = historico_qs.filter(
+                data_inicio__lte=hoje,
+            ).filter(Q(data_fim__isnull=True) | Q(data_fim__gte=hoje))
+        elif filtro_situacao == 'encerrada':
+            historico_qs = historico_qs.filter(
+                Q(data_inicio__gt=hoje) | Q(data_fim__lt=hoje)
+            )
+
+        historico_page_obj = Paginator(historico_qs, 15).get_page(self.request.GET.get('page'))
+        for item_hist in historico_page_obj.object_list:
+            info_sala = mapa_sala.get(item_hist.professor_id)
+            item_hist.em_sala = bool(info_sala)
+            item_hist.disciplinas_sala = info_sala['disciplinas'] if info_sala else []
+            item_hist.horas_sala = info_sala['horas_sala'] if info_sala else Decimal('0.00')
+
+        ctx.update({
+            'unidade': unidade,
+            'hoje': hoje,
+            'semestre_corrente': semestre_corrente,
+            'composicao': composicao,
+            'reducao_total': reducao_total,
+            'alertas_em_sala': alertas_em_sala,
+            'historico': historico_page_obj.object_list,
+            'historico_page_obj': historico_page_obj,
+            'filtro_q': filtro_q,
+            'filtro_situacao': filtro_situacao,
+            'atividades_estagio': atividades_estagio,
+            'form_nova_atividade_estagio': AtividadeEstagioSupervisaoUnidadeForm(
+                unidade=unidade,
+                auto_id='id_novoestagio_%s',
+                initial={'data_inicio': hoje, 'semestre': semestre_corrente, 'num_estudantes': 1},
+            ),
+            'retorno': reverse_lazy('core:equipe_diretiva_unidade'),
+        })
+        return ctx
+
+
+class OcupacaoEquipeDiretivaUnidadeCreateView(UnidadePrioridade1Mixin, RetornoOrigemMixin, CreateView):
+    from .forms import OcupacaoEquipeDiretivaUnidadeForm
+    from .models import OcupacaoEquipeDiretiva
+
+    model = OcupacaoEquipeDiretiva
+    form_class = OcupacaoEquipeDiretivaUnidadeForm
+    template_name = 'core/prioridade1/form_unidade.html'
+    success_url = reverse_lazy('core:equipe_diretiva_unidade')
+
+    def _carregar_escopo(self):
+        from .models import TipoCargoDiretivo
+        if not hasattr(self, 'unidade'):
+            self.unidade = self.get_unidade()
+            self.cargo = get_object_or_404(TipoCargoDiretivo, pk=self.kwargs['cargo_pk'], ativo=True)
+
+    def get_form_kwargs(self):
+        self._carregar_escopo()
+        kwargs = super().get_form_kwargs()
+        kwargs.update({'unidade': self.unidade, 'cargo': self.cargo})
+        return kwargs
+
+    def get_initial(self):
+        from django.utils import timezone
+        return {'data_inicio': timezone.localdate()}
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update({
+            'titulo': f'Preencher {self.cargo.nome} — {self.unidade.sigla}',
+            'subtitulo': 'A carga horária de redução semanal é definida exclusivamente pela DESUP.',
+            'cancel_url': self.get_success_url(),
+        })
+        return ctx
+
+    def form_valid(self, form):
+        from .services import registrar_evento_prioridade1
+
+        form.instance.unidade = self.unidade
+        form.instance.cargo = self.cargo
+        form.instance.criado_por = self.request.user
+        # Garantia no servidor: a unidade não define redução na criação.
+        form.instance.carga_reducao_horas = Decimal('0.00')
+        response = super().form_valid(form)
+        registrar_evento_prioridade1(
+            self.request,
+            'OCUPACAO_DIRETIVA_UNIDADE_CRIADA',
+            f'Ocupação {self.object.pk}; unidade {self.unidade.pk}; cargo {self.cargo.pk}; '
+            f'professor {self.object.professor_id}.',
+        )
+        messages.success(self.request, 'Ocupante registrado com sucesso na equipe diretiva.')
+        return response
+
+
+class OcupacaoEquipeDiretivaUnidadeUpdateView(UnidadePrioridade1Mixin, RetornoOrigemMixin, UpdateView):
+    from .forms import OcupacaoEquipeDiretivaUnidadeForm
+    from .models import OcupacaoEquipeDiretiva
+
+    model = OcupacaoEquipeDiretiva
+    form_class = OcupacaoEquipeDiretivaUnidadeForm
+    template_name = 'core/prioridade1/form_unidade.html'
+    success_url = reverse_lazy('core:equipe_diretiva_unidade')
+
+    def get_queryset(self):
+        from .models import OcupacaoEquipeDiretiva
+        unidade = self.get_unidade()
+        return (
+            OcupacaoEquipeDiretiva.objects.for_user(self.request.user)
+            .filter(unidade=unidade)
+            .select_related('cargo', 'unidade', 'professor', 'curso')
+        )
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs.update({'unidade': self.object.unidade, 'cargo': self.object.cargo})
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update({
+            'titulo': f'Atualizar {self.object.cargo.nome} — {self.object.unidade.sigla}',
+            'subtitulo': (
+                f'Redução semanal definida pela DESUP: '
+                f'{self.object.carga_reducao_horas:.2f} h (somente leitura).'
+            ),
+            'reducao_somente_leitura': self.object.carga_reducao_horas,
+            'cancel_url': self.get_success_url(),
+        })
+        return ctx
+
+    def form_valid(self, form):
+        from .models import OcupacaoEquipeDiretiva
+        from .services import registrar_evento_prioridade1
+
+        original = OcupacaoEquipeDiretiva.objects.only('unidade_id', 'cargo_id', 'carga_reducao_horas').get(
+            pk=self.object.pk
+        )
+        form.instance.unidade_id = original.unidade_id
+        form.instance.cargo_id = original.cargo_id
+        form.instance.carga_reducao_horas = original.carga_reducao_horas
+        response = super().form_valid(form)
+        registrar_evento_prioridade1(
+            self.request,
+            'OCUPACAO_DIRETIVA_UNIDADE_ATUALIZADA',
+            f'Ocupação {self.object.pk}; unidade {self.object.unidade_id}; cargo {self.object.cargo_id}.',
+        )
+        messages.success(self.request, 'Ocupação da equipe diretiva atualizada com sucesso.')
+        return response
+
+
+class OcupacaoEquipeDiretivaUnidadeEncerrarView(UnidadePrioridade1Mixin, View):
+    http_method_names = ['post', 'head', 'options']
+
+    def post(self, request, pk):
+        from django.db import transaction
+        from django.utils import timezone
+        from .models import OcupacaoEquipeDiretiva
+        from .services import registrar_evento_prioridade1
+
+        unidade = self.get_unidade()
+        with transaction.atomic():
+            ocupacao = get_object_or_404(
+                OcupacaoEquipeDiretiva.objects.for_user(request.user)
+                .filter(unidade=unidade)
+                .select_for_update(),
+                pk=pk,
+            )
+            hoje = timezone.localdate()
+            if ocupacao.data_fim and ocupacao.data_fim < hoje:
+                messages.info(request, 'Esta ocupação já estava encerrada.')
+                return redirect('core:equipe_diretiva_unidade')
+            ocupacao.data_fim = max(hoje, ocupacao.data_inicio)
+            ocupacao.save(update_fields=['data_fim', 'atualizado_em'])
+            registrar_evento_prioridade1(
+                request,
+                'OCUPACAO_DIRETIVA_UNIDADE_ENCERRADA',
+                f'Ocupação {ocupacao.pk}; unidade {unidade.pk}; fim {ocupacao.data_fim}.',
+            )
+        messages.success(request, 'Ocupação encerrada com sucesso.')
+        return redirect('core:equipe_diretiva_unidade')
+
+
+class AtividadeEstagioSupervisaoCreateView(UnidadePrioridade1Mixin, RetornoOrigemMixin, CreateView):
+    from .forms import AtividadeEstagioSupervisaoUnidadeForm
+    from .models import AtividadeEstagioSupervisao
+
+    model = AtividadeEstagioSupervisao
+    form_class = AtividadeEstagioSupervisaoUnidadeForm
+    template_name = 'core/prioridade1/form_unidade.html'
+    success_url = reverse_lazy('core:equipe_diretiva_unidade')
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['unidade'] = self.get_unidade()
+        return kwargs
+
+    def get_initial(self):
+        from django.utils import timezone
+        from apps.allocations.services import semestre_atual
+        return {
+            'data_inicio': timezone.localdate(),
+            'semestre': semestre_atual(),
+            'num_estudantes': 1,
+        }
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        unidade = self.get_unidade()
+        ctx.update({
+            'titulo': f'Registrar atividade de estágio/supervisão — {unidade.sigla}',
+            'subtitulo': 'Registre atividades de coordenação, supervisão ou orientação de estágio da sua unidade.',
+            'cancel_url': self.get_success_url(),
+        })
+        return ctx
+
+    def form_valid(self, form):
+        from .services import registrar_evento_prioridade1
+
+        unidade = self.get_unidade()
+        form.instance.unidade = unidade
+        form.instance.criado_por = self.request.user
+        form.instance.carga_reducao_horas = Decimal('0.00')
+        response = super().form_valid(form)
+        registrar_evento_prioridade1(
+            self.request,
+            'ATIVIDADE_ESTAGIO_UNIDADE_CRIADA',
+            f'Atividade estágio {self.object.pk}; unidade {unidade.pk}; '
+            f'tipo {self.object.tipo}; professor {self.object.professor_id}.',
+        )
+        messages.success(self.request, 'Atividade de estágio e supervisão registrada com sucesso.')
+        return response
+
+
+class AtividadeEstagioSupervisaoUpdateView(UnidadePrioridade1Mixin, RetornoOrigemMixin, UpdateView):
+    from .forms import AtividadeEstagioSupervisaoUnidadeForm
+    from .models import AtividadeEstagioSupervisao
+
+    model = AtividadeEstagioSupervisao
+    form_class = AtividadeEstagioSupervisaoUnidadeForm
+    template_name = 'core/prioridade1/form_unidade.html'
+    success_url = reverse_lazy('core:equipe_diretiva_unidade')
+
+    def get_queryset(self):
+        from .models import AtividadeEstagioSupervisao
+        unidade = self.get_unidade()
+        return (
+            AtividadeEstagioSupervisao.objects.for_user(self.request.user)
+            .filter(unidade=unidade)
+            .select_related('unidade', 'professor', 'curso')
+        )
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['unidade'] = self.object.unidade
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update({
+            'titulo': f'Atualizar {self.object.get_tipo_display()} — {self.object.unidade.sigla}',
+            'subtitulo': (
+                f'Redução semanal definida pela DESUP: '
+                f'{self.object.carga_reducao_horas:.2f} h (somente leitura).'
+            ),
+            'reducao_somente_leitura': self.object.carga_reducao_horas,
+            'cancel_url': self.get_success_url(),
+        })
+        return ctx
+
+    def form_valid(self, form):
+        from .models import AtividadeEstagioSupervisao
+        from .services import registrar_evento_prioridade1
+
+        original = AtividadeEstagioSupervisao.objects.only('unidade_id', 'carga_reducao_horas').get(
+            pk=self.object.pk
+        )
+        form.instance.unidade_id = original.unidade_id
+        form.instance.carga_reducao_horas = original.carga_reducao_horas
+        response = super().form_valid(form)
+        registrar_evento_prioridade1(
+            self.request,
+            'ATIVIDADE_ESTAGIO_UNIDADE_ATUALIZADA',
+            f'Atividade estágio {self.object.pk}; unidade {self.object.unidade_id}; tipo {self.object.tipo}.',
+        )
+        messages.success(self.request, 'Atividade de estágio e supervisão atualizada com sucesso.')
+        return response
+
+
+class AtividadeEstagioSupervisaoEncerrarView(UnidadePrioridade1Mixin, View):
+    http_method_names = ['post', 'head', 'options']
+
+    def post(self, request, pk):
+        from django.db import transaction
+        from django.utils import timezone
+        from .models import AtividadeEstagioSupervisao
+        from .services import registrar_evento_prioridade1
+
+        unidade = self.get_unidade()
+        with transaction.atomic():
+            atividade = get_object_or_404(
+                AtividadeEstagioSupervisao.objects.for_user(request.user)
+                .filter(unidade=unidade)
+                .select_for_update(),
+                pk=pk,
+            )
+            hoje = timezone.localdate()
+            if atividade.data_fim and atividade.data_fim < hoje:
+                messages.info(request, 'Esta atividade de estágio/supervisão já estava encerrada.')
+                return redirect('core:equipe_diretiva_unidade')
+            atividade.data_fim = max(hoje, atividade.data_inicio)
+            atividade.save(update_fields=['data_fim', 'atualizado_em'])
+            registrar_evento_prioridade1(
+                request,
+                'ATIVIDADE_ESTAGIO_UNIDADE_ENCERRADA',
+                f'Atividade estágio {atividade.pk}; unidade {unidade.pk}; fim {atividade.data_fim}.',
+            )
+        messages.success(request, 'Atividade de estágio e supervisão encerrada com sucesso.')
+        return redirect('core:equipe_diretiva_unidade')
+

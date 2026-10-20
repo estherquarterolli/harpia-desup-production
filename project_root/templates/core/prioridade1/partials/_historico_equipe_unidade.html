@@ -1,0 +1,129 @@
+{% if historico %}
+  {# Cartões responsivos para telas pequenas (< md) #}
+  <div class="divide-y divide-slate-100 md:hidden">
+    {% for ocupacao in historico %}
+    <div class="space-y-2 p-4">
+      <div class="flex flex-wrap items-start justify-between gap-2">
+        <div class="min-w-0 flex-1">
+          <p class="font-black text-slate-900">{{ ocupacao.cargo.nome }}{% if ocupacao.curso %} · {{ ocupacao.curso.sigla }}{% endif %}</p>
+          <p class="text-sm font-semibold text-slate-700">{{ ocupacao.professor.nome }}</p>
+        </div>
+        {% if ocupacao.vigente %}
+        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-black text-emerald-800">
+          <i class="ph-fill ph-check-circle" aria-hidden="true"></i>Vigente
+        </span>
+        {% else %}
+        <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-black text-slate-600">
+          <i class="ph ph-archive" aria-hidden="true"></i>Encerrada
+        </span>
+        {% endif %}
+      </div>
+      <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <span><i class="ph ph-calendar-blank" aria-hidden="true"></i> {{ ocupacao.data_inicio|date:"d/m/Y" }} até {{ ocupacao.data_fim|date:"d/m/Y"|default:"atual" }}</span>
+        <span class="rounded bg-slate-100 px-2 py-0.5 font-bold text-slate-700" title="Carga de redução definida pela DESUP">
+          Redução DESUP: {{ ocupacao.carga_reducao_horas|floatformat:"-2" }} h
+        </span>
+      </div>
+      {% if ocupacao.em_sala %}
+      <div class="flex items-start gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-900" role="status">
+        <i class="ph-fill ph-warning-circle mt-0.5 shrink-0 text-amber-600" aria-hidden="true"></i>
+        <span>Alocado em sala de aula ({{ ocupacao.horas_sala|floatformat:"-2" }} h/sem): {{ ocupacao.disciplinas_sala|join:", " }}</span>
+      </div>
+      {% endif %}
+      {% if ocupacao.observacoes %}
+      <p class="text-xs text-slate-500">{{ ocupacao.observacoes }}</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {# Tabela acessível para tablet e desktop (>= md) #}
+  <div class="hidden overflow-x-auto md:block">
+    <table class="w-full text-left text-sm">
+      <thead class="border-b border-slate-100 bg-slate-50 text-xs font-black uppercase tracking-wider text-slate-500">
+        <tr>
+          <th scope="col" class="px-5 py-3">Cargo / Curso</th>
+          <th scope="col" class="px-5 py-3">Servidor</th>
+          <th scope="col" class="px-5 py-3">Vigência</th>
+          <th scope="col" class="px-5 py-3">Redução (DESUP)</th>
+          <th scope="col" class="px-5 py-3">Situação</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for ocupacao in historico %}
+        <tr class="hover:bg-slate-50/80">
+          <td class="px-5 py-3.5">
+            <p class="font-bold text-slate-900">{{ ocupacao.cargo.nome }}</p>
+            {% if ocupacao.curso %}<p class="text-xs text-slate-500">Curso: {{ ocupacao.curso.sigla }}</p>{% endif %}
+          </td>
+          <td class="px-5 py-3.5">
+            <p class="font-semibold text-slate-800">{{ ocupacao.professor.nome }}</p>
+            {% if ocupacao.em_sala %}
+            <span class="mt-1 inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-900" role="status">
+              <i class="ph-fill ph-warning-circle text-amber-600" aria-hidden="true"></i>
+              Em sala de aula ({{ ocupacao.horas_sala|floatformat:"-2" }} h/sem)
+            </span>
+            {% endif %}
+            {% if ocupacao.observacoes %}
+            <p class="mt-0.5 text-xs text-slate-500">{{ ocupacao.observacoes }}</p>
+            {% endif %}
+          </td>
+          <td class="px-5 py-3.5 text-xs font-medium text-slate-600 whitespace-nowrap">
+            {{ ocupacao.data_inicio|date:"d/m/Y" }} – {{ ocupacao.data_fim|date:"d/m/Y"|default:"atual" }}
+          </td>
+          <td class="px-5 py-3.5 whitespace-nowrap">
+            <span class="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700" title="Definida exclusivamente pela DESUP">
+              <i class="ph ph-lock-key text-slate-400" aria-hidden="true"></i>
+              {{ ocupacao.carga_reducao_horas|floatformat:"-2" }} h/sem
+            </span>
+          </td>
+          <td class="px-5 py-3.5 whitespace-nowrap">
+            {% if ocupacao.vigente %}
+            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-800">
+              <i class="ph-fill ph-check-circle" aria-hidden="true"></i>Vigente
+            </span>
+            {% else %}
+            <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-600">
+              <i class="ph ph-archive" aria-hidden="true"></i>Encerrada
+            </span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if historico_page_obj.has_other_pages %}
+  <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-3">
+    <p class="text-xs font-semibold text-slate-500">
+      Página {{ historico_page_obj.number }} de {{ historico_page_obj.paginator.num_pages }}
+    </p>
+    <div class="flex items-center gap-2">
+      {% if historico_page_obj.has_previous %}
+      <a href="?page={{ historico_page_obj.previous_page_number }}&q={{ filtro_q|urlencode }}&situacao={{ filtro_situacao|urlencode }}"
+         hx-get="{% url 'core:equipe_diretiva_unidade' %}?partial=historico&page={{ historico_page_obj.previous_page_number }}&q={{ filtro_q|urlencode }}&situacao={{ filtro_situacao|urlencode }}"
+         hx-target="#historico-equipe-unidade-container"
+         class="inline-flex min-h-9 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">
+        <i class="ph ph-caret-left" aria-hidden="true"></i>Anterior
+      </a>
+      {% endif %}
+      {% if historico_page_obj.has_next %}
+      <a href="?page={{ historico_page_obj.next_page_number }}&q={{ filtro_q|urlencode }}&situacao={{ filtro_situacao|urlencode }}"
+         hx-get="{% url 'core:equipe_diretiva_unidade' %}?partial=historico&page={{ historico_page_obj.next_page_number }}&q={{ filtro_q|urlencode }}&situacao={{ filtro_situacao|urlencode }}"
+         hx-target="#historico-equipe-unidade-container"
+         class="inline-flex min-h-9 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">
+        Próxima<i class="ph ph-caret-right" aria-hidden="true"></i>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+{% else %}
+  <div class="flex flex-col items-center justify-center gap-2 px-6 py-10 text-center">
+    <i class="ph ph-clock-counter-clockwise text-4xl text-slate-300" aria-hidden="true"></i>
+    <p class="text-sm font-bold text-slate-700">Nenhum registro encontrado no histórico da unidade</p>
+    <p class="max-w-md text-xs text-slate-500">Quando ocupantes forem registrados ou alterados nos cargos diretivos desta unidade, o histórico completo aparecerá aqui.</p>
+  </div>
+{% endif %}
+

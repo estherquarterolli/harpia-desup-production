@@ -544,3 +544,35 @@ Resumo: o docente deixou de ser um campo de `MatrixComponent` e passou a ser reg
 ### Verificações
 - `manage.py test apps.core.tests_ajuda apps.core.tests_resumos_telas apps.core.tests_alertas_detalhes apps.core.tests_prioridade1_desup`: 39 aprovados; `npm run build:css` executado.
 - Tentei validar o tutorial no navegador (Chrome), mas o controle remoto não conseguiu anexar à aba ("Cannot attach to this target"); o comportamento visual do tutorial e a responsividade (360/768/1024/1440 px) NÃO foram verificados em tela e precisam de conferência manual.
+
+## 19/10/2026 — Prioridade 1.1: Equipe Diretiva, Coordenações e Estágio/Supervisão (Módulo da Unidade)
+
+### `project_root/apps/core/models.py`, `apps/core/admin.py`, `apps/core/migrations/0009_atividadeestagiosupervisao.py`
+- Tipo: alterado / criado.
+- Alteração: `UnitBoundQuerySet` e `UnitBoundManager` movidos para o topo de `apps/core/models.py` e associados a `OcupacaoEquipeDiretiva` (`objects = UnitBoundManager()`), garantindo escopo automático por `user.unidade` para `COORDENADOR_UNIDADE`. Criado o modelo `AtividadeEstagioSupervisao` (`harpiadb_nucleo_atividade_estagio_supervisao`) com `UnitBoundManager`, suporte a `COORDENACAO_ESTAGIO`, `SUPERVISAO_ESTAGIO` e `ORIENTACAO_ESTAGIO`, validação de vínculo de servidor e curso com a unidade, formato de semestre (`AAAA.1`/`AAAA.2`), restrições de integridade (`CheckConstraint` de vigência e cargas não negativas) e registro no `HarpiaModelAdmin` (`AtividadeEstagioSupervisaoAdmin`).
+- Motivo: atender à Prioridade 1.1 sob a ótica do `COORDENADOR_UNIDADE`, permitindo registrar e acompanhar ocupantes da equipe diretiva, coordenações e atividades de estágio e supervisão da própria unidade com isolamento multi-tenant no servidor.
+
+### `project_root/apps/core/forms.py`
+- Tipo: alterado.
+- Alteração: criados `OcupacaoEquipeDiretivaUnidadeForm` e `AtividadeEstagioSupervisaoUnidadeForm` para uso exclusivo do `COORDENADOR_UNIDADE`. Ambos restringem `professor` e `curso` (`CourseUnit` ativo) à unidade do usuário autenticado e excluem `carga_reducao_horas`, `unidade`, `cargo` e `criado_por` dos campos editáveis, prevenindo *mass assignment* e mantendo o controle da redução de carga horária exclusivamente com a `DESUP`.
+
+### `project_root/apps/core/views.py`, `apps/core/urls.py`, `apps/core/atalhos.py`
+- Tipo: alterado.
+- Alteração: implementados `_mapa_alocacoes_sala_por_professor`, `UnidadePrioridade1Mixin` (`allowed_profiles = ['COORDENADOR_UNIDADE']`), `EquipeDiretivaUnidadeView`, `OcupacaoEquipeDiretivaUnidadeCreateView`, `OcupacaoEquipeDiretivaUnidadeUpdateView`, `OcupacaoEquipeDiretivaUnidadeEncerrarView`, `AtividadeEstagioSupervisaoCreateView`, `AtividadeEstagioSupervisaoUpdateView` e `AtividadeEstagioSupervisaoEncerrarView`. As views validam propriedade do objeto com `for_user(request.user)` e `select_for_update()` em transações atômicas, preservam `carga_reducao_horas` definida pela DESUP, registram auditoria (`registrar_evento_prioridade1`), cruzam ocupantes vigentes com `alocacoes_vigentes()` para emitir alertas visuais de docentes alocados em sala de aula e suportam parciais HTMX (`?partial=historico` e `?partial=estagio`). Adicionadas as rotas em `core/urls.py` sob `/core/unidade/equipe-diretiva/` e o atalho `equipe_diretiva_unidade` em `ATALHOS_CATALOGO`.
+
+### `project_root/templates/base.html`, `templates/core/prioridade1/equipe_diretiva_unidade.html`, `form_unidade.html`, `partials/_historico_equipe_unidade.html`, `partials/_estagio_supervisao_list.html`
+- Tipo: alterado / criado.
+- Alteração: adicionado item de menu "Equipe diretiva" na barra lateral para `COORDENADOR_UNIDADE` (preservando `justify-center group-hover:justify-start`). Criada a interface responsiva da unidade com resumo de redução semanal (somente leitura, definida pela DESUP), banner acessível (`role="alert"`, ícone `ph-warning-circle` e detalhamento de disciplinas/horas) quando integrantes da equipe diretiva ou supervisão de estágio estão alocados em sala de aula, modais de preenchimento/edição/encerramento de ocupações e de atividades de estágio/supervisão, e histórico filtrável via HTMX com cartões em telas pequenas e tabela em telas médias/grandes.
+
+### `project_root/sql/supabase_prioridade1_1_unidade.sql`
+- Tipo: criado.
+- Alteração: script SQL idempotente para criação da tabela `public.harpiadb_nucleo_atividade_estagio_supervisao`, chaves estrangeiras, restrições `CHECK`, índices e registro em `django_migrations` no Supabase.
+
+### `project_root/apps/core/tests_prioridade1_unidade.py`
+- Tipo: criado.
+- Alteração: 12 testes cobrindo `UnitBoundManager`, validações de modelo, ausência de `carga_reducao_horas` nos formulários da unidade, controle de acesso por perfil (`COORDENADOR_UNIDADE`, `DESUP`, `ADMIN`, anônimo e coordenador sem unidade), prevenção de vazamento entre unidades e IDOR (404), proteção contra *mass assignment* na redução de carga, detecção e exibição acessível de alerta de docente da equipe diretiva em sala de aula, ciclo completo de atividades de estágio e supervisão e parciais HTMX.
+
+### Verificações
+- `python manage.py check`: sem erros (`0 silenced`).
+- `python manage.py makemigrations --check --dry-run`: `No changes detected`.
+- `python manage.py test apps.core.tests_prioridade1_unidade apps.core.tests_prioridade1_desup apps.core.tests_ajuda --settings=config.settings._tmp_test`: 42 testes executados e aprovados (`OK`).

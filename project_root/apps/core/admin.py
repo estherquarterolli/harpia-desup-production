@@ -1,6 +1,7 @@
 from django.contrib import admin
 from apps.accounts.admin import HarpiaModelAdmin, admin_site
 from .models import (
+    AtividadeEstagioSupervisao,
     AuditoriaGlobal,
     ErroSistema,
     ExcecaoCargaUnidade,
@@ -88,6 +89,16 @@ class OcupacaoEquipeDiretivaAdmin(HarpiaModelAdmin):
     readonly_fields = ('criado_em', 'atualizado_em')
 
 
+class AtividadeEstagioSupervisaoAdmin(HarpiaModelAdmin):
+    list_display = (
+        'unidade', 'tipo', 'professor', 'curso', 'semestre',
+        'num_estudantes', 'carga_horaria_semanal', 'carga_reducao_horas', 'data_inicio', 'data_fim',
+    )
+    list_filter = ('unidade', 'tipo', 'semestre', 'data_inicio', 'data_fim')
+    search_fields = ('professor__rh_nome', 'unidade__nome', 'observacoes')
+    readonly_fields = ('criado_em', 'atualizado_em')
+
+
 class SolicitacaoProfessorExternoAdmin(HarpiaModelAdmin):
     list_display = ('professor', 'unidade_origem', 'unidade_solicitante', 'semestre', 'status', 'criado_em')
     list_filter = ('status', 'semestre', 'unidade_origem', 'unidade_solicitante')
@@ -121,6 +132,7 @@ admin_site.register(AuditoriaGlobal, AuditoriaGlobalAdmin)
 admin_site.register(ErroSistema, ErroSistemaAdmin)
 admin_site.register(TipoCargoDiretivo, TipoCargoDiretivoAdmin)
 admin_site.register(OcupacaoEquipeDiretiva, OcupacaoEquipeDiretivaAdmin)
+admin_site.register(AtividadeEstagioSupervisao, AtividadeEstagioSupervisaoAdmin)
 admin_site.register(SolicitacaoProfessorExterno, SolicitacaoProfessorExternoAdmin)
 admin_site.register(LimiteCargaUnidade, LimiteCargaUnidadeAdmin)
 admin_site.register(ExcecaoCargaUnidade, ExcecaoCargaUnidadeAdmin)
