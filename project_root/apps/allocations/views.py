@@ -20,6 +20,22 @@ def _semestre_atual():
     return services.semestre_atual()
 
 
+def _ids_de_outra_unidade(professor_ids, unidade_id):
+    """Subconjunto de `professor_ids` que NÃO pertence à unidade (principal ou vínculo)."""
+    from django.db.models import Q
+    from apps.professors.models import Professor
+
+    ids = {pid for pid in professor_ids if pid}
+    if not ids or not unidade_id:
+        return set()
+    vinculados = set(
+        Professor.objects.filter(pk__in=ids).filter(
+            Q(unidade_principal_id=unidade_id) | Q(unidades__id=unidade_id)
+        ).values_list('pk', flat=True)
+    )
+    return ids - vinculados
+
+
 def _cargos_diretivos_vigentes():
     """{professor_id: 'Cargo (SIGLA)'} dos ocupantes vigentes da equipe diretiva.
 
@@ -130,6 +146,13 @@ class AllocCurricularView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView)
         page_obj = paginator.get_page(self.request.GET.get('page'))
 
         cargos_diretivos = _cargos_diretivos_vigentes()
+        docentes_da_tela = {
+            linha.docente_id
+            for matriz in page_obj.object_list
+            for componente in matriz.componentes_carregados
+            for linha in componente.linhas_carregadas
+        }
+        outras_unidades = _ids_de_outra_unidade(docentes_da_tela, unidade_id)
         matrizes_data = []
         for matriz in page_obj.object_list:
             for componente in matriz.componentes_carregados:
@@ -138,6 +161,7 @@ class AllocCurricularView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView)
                 )
                 for linha in componente.linhas_carregadas:
                     linha.cargo_diretivo = cargos_diretivos.get(linha.docente_id, '')
+                    linha.outra_unidade = linha.docente_id in outras_unidades
             matrizes_data.append({
                 'matriz': matriz,
                 'componentes': matriz.componentes_carregados,
@@ -238,6 +262,24 @@ def _resposta_erro(request, erro):
     return redirect(request.META.get('HTTP_REFERER', '/alocacao-curricular/'))
 
 
+def _avisar_professor_de_outra_unidade(request, comp, unidade, docente):
+    """Notifica a DESUP (e e-mail, via signal) quando um professor de outra unidade é alocado."""
+    from django.urls import reverse
+    from apps.core.models import Notificacao
+
+    Notificacao.objects.create(
+        destinatario=None,
+        unidade_destino=None,
+        titulo=f'Professor de outra unidade alocado - {unidade.sigla}',
+        mensagem=(
+            f'{docente.nome} foi alocado em {comp.nome_disciplina} na unidade {unidade.sigla}, '
+            'mas não está vinculado a ela.\n\n'
+            'Abra o cadastro do professor para ajustar as unidades em que ele atua.'
+        ),
+        url_acao=reverse('professors:professor_update', args=[docente.pk]),
+    )
+
+
 class AlocarDocenteComponenteView(LoginRequiredMixin, PerfilRequiredMixin, View):
     """Define o docente (ou carência / não oferecido) de uma linha do componente.
 
@@ -269,6 +311,12 @@ class AlocarDocenteComponenteView(LoginRequiredMixin, PerfilRequiredMixin, View)
             return _resposta_erro(request, erro)
 
         comp.refresh_from_db(fields=['status'])
+        outra_unidade = bool(
+            linha and linha.docente_id
+            and _ids_de_outra_unidade({linha.docente_id}, unidade.pk if unidade else None)
+        )
+        if outra_unidade and not reload:
+            _avisar_professor_de_outra_unidade(request, comp, unidade, linha.docente)
         # Salvamento automático (fetch): responde JSON e a página não recarrega.
         # Sem `messages`, para o aviso não reaparecer numa navegação posterior.
         if _eh_ajax(request):
@@ -280,6 +328,7 @@ class AlocarDocenteComponenteView(LoginRequiredMixin, PerfilRequiredMixin, View)
                 'linha_id': linha.pk if linha else None,
                 'docente_id': linha.docente_id if linha else None,
                 'docente_nome': linha.docente.rh_nome if linha and linha.docente_id else '',
+                'outra_unidade': outra_unidade,
                 'cargo_diretivo': (
                     _cargos_diretivos_vigentes().get(linha.docente_id, '')
                     if linha and linha.docente_id else ''
@@ -462,15 +511,20 @@ class BuscarProfessoresView(LoginRequiredMixin, PerfilRequiredMixin, View):
             from apps.core.busca import filtrar_contem
             qs = filtrar_contem(qs, q, ['desup_nome', 'rh_nome'])
 
-        qs = qs.prefetch_related('unidades').order_by('nome_exibicao')[:20]
+        qs = qs.prefetch_related('unidades', 'readaptacoes').order_by('nome_exibicao')[:20]
 
         cargos_diretivos = _cargos_diretivos_vigentes()
+        unidade_alocacao = request.GET.get('unidade_alocacao', '')
+        unidade_alocacao = int(unidade_alocacao) if unidade_alocacao.isdigit() else None
+        outras = _ids_de_outra_unidade({p.id for p in qs}, unidade_alocacao)
         results = [
             {
                 'id': p.id,
                 'nome': p.nome,
                 'unidade': ', '.join(u.sigla for u in p.unidades_exibicao),
                 'cargo_diretivo': cargos_diretivos.get(p.id, ''),
+                'outra_unidade': p.id in outras,
+                'readaptado': p.readaptado_vigente,
             }
             for p in qs
         ]

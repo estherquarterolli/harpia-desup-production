@@ -153,6 +153,7 @@
                 {% else %}
                 <p class="text-sm font-bold text-slate-800">{{ prof.nome }}</p>
                 {% endif %}
+                {% if prof.readaptado_vigente %}<span class="ml-1 inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black text-violet-700" title="Professor readaptado: não fica em sala de aula; a alocação é feita no módulo Extracurricular."><i class="ph ph-first-aid-kit text-xs" aria-hidden="true"></i>Readaptado</span>{% endif %}
                 <p class="text-[10px] text-slate-400">{{ prof.rh_matricula|default_if_none:"" }}</p>
               </div>
             </div>

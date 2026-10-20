@@ -172,6 +172,12 @@ def definir_escolha(componente, unidade, valor, linha_id=None):
             docente = Professor.objects.get(pk=int(valor))
         except (ValueError, TypeError, Professor.DoesNotExist):
             raise AlocacaoError('Professor não encontrado.', status=404)
+        if docente.readaptado_vigente:
+            raise AlocacaoError(
+                f'{docente.nome} está readaptado e não pode ficar em sala de aula. '
+                'Registre a atuação dele no módulo Extracurricular.',
+                status=409,
+            )
         if linhas.filter(docente=docente).exclude(pk=linha_id if str(linha_id).isdigit() else None).exists():
             raise AlocacaoError(
                 f'{docente.nome} já está alocado neste componente. Escolha outro docente.',

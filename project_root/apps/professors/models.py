@@ -255,6 +255,26 @@ class Professor(models.Model):
         return total
 
     @property
+    def readaptado_vigente(self) -> bool:
+        """Há readaptação formal (DESUP) vigente hoje. Usa prefetch de `readaptacoes` se existir."""
+        from django.utils import timezone
+
+        hoje = timezone.localdate()
+        return any(
+            r.data_inicio <= hoje and (r.data_fim is None or r.data_fim >= hoje)
+            for r in self.readaptacoes.all()
+        )
+
+    def vinculado_a_unidade(self, unidade_id) -> bool:
+        """Pertence à unidade (principal ou vínculo adicional)."""
+        if not unidade_id:
+            return True
+        unidade_id = int(unidade_id)
+        return self.unidade_principal_id == unidade_id or any(
+            u.pk == unidade_id for u in self.unidades.all()
+        )
+
+    @property
     def meta_horas_base_sala(self) -> int:
         """Limite de horas em sala antes da redução: metade da carga personalizada, ou o do contrato."""
         if self.carga_diferenciada and self.carga_horaria_personalizada:

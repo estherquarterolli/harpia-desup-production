@@ -138,7 +138,7 @@ class ProfessorListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         qs = Professor.objects.select_related(
             'tipo_contrato', 'unidade_principal'
-        ).prefetch_related('cursos', 'unidades', 'ocupacoes_diretivas')
+        ).prefetch_related('cursos', 'unidades', 'ocupacoes_diretivas', 'readaptacoes')
         user = self.request.user
 
         q = self.request.GET.get('q', '')
@@ -179,24 +179,15 @@ class ProfessorListView(LoginRequiredMixin, ListView):
         # primeiro. O Exists evita duplicar professores que possuem mais de um
         # vinculo no ManyToMany e garante que a prioridade seja aplicada antes
         # da paginacao.
-        if user.perfil == 'COORDENADOR_UNIDADE' and user.unidade_id:
-            vinculo_com_unidade_atual = Professor.unidades.through.objects.filter(
-                professor_id=OuterRef('pk'),
-                unidade_id=user.unidade_id,
-            )
-            qs = qs.annotate(
-                _vinculado_unidade_atual=Exists(vinculo_com_unidade_atual),
-            ).annotate(
-                _prioridade_unidade=Case(
-                    When(
-                        Q(unidade_principal_id=user.unidade_id)
-                        | Q(_vinculado_unidade_atual=True),
-                        then=Value(0),
-                    ),
-                    default=Value(1),
-                    output_field=IntegerField(),
-                ),
-            ).order_by('_prioridade_unidade', 'rh_nome', 'pk')
+        # Visibilidade por unidade (Prioridade 1.2): o coordenador vê por padrão apenas os
+        # professores vinculados à própria unidade; a DESUP mantém a visão global. Professores
+        # de outras unidades entram na alocação via busca/solicitação, não por esta listagem.
+        if user.perfil == 'COORDENADOR_UNIDADE' and not user.is_superuser:
+            if not user.unidade_id:
+                return qs.none()
+            qs = qs.filter(
+                Q(unidade_principal_id=user.unidade_id) | Q(unidades__id=user.unidade_id)
+            ).distinct().order_by('rh_nome', 'pk')
         return qs
 
     def get_context_data(self, **kwargs):
@@ -494,7 +485,7 @@ class ProfessorSolicitarCadastroView(CoordenadorOnlyMixin, View):
             unidade_destino=None,
             titulo=f'Solicitação de cadastro de professor - {unidade.sigla if unidade else "Geral"}',
             mensagem=mensagem,
-            url_acao=reverse('professors:professor_create'),
+            url_acao=reverse('core:solicitacao_professor_list'),
         )
         messages.success(request, 'Solicitação de cadastro enviada para a DESUP.')
         return redirect('professors:professor_list')
@@ -553,9 +544,10 @@ class ProfessorSolicitarCessaoView(CoordenadorOnlyMixin, View):
             titulo=f'Solicitação de professor - {unidade.sigla}',
             mensagem=(
                 f'{unidade.sigla} solicitou o professor {professor.nome} (origem: {origem.sigla}).\n\n'
-                f'Justificativa: {form.cleaned_data["justificativa"]}'
+                f'Justificativa: {form.cleaned_data["justificativa"]}\n\n'
+                'Abra o cadastro do professor para ajustar as unidades em que ele atua.'
             ),
-            url_acao=reverse('core:solicitacao_professor_list'),
+            url_acao=reverse('professors:professor_update', args=[professor.pk]),
         )
         messages.success(request, 'Solicitação enviada para a DESUP.')
         return redirect('professors:professor_list')

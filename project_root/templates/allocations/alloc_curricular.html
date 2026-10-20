@@ -350,6 +350,7 @@
       this.currentId = root.dataset.currentId;
       this.currentNome = root.dataset.currentNome;
       this.currentCargo = root.dataset.currentCargo || '';
+      this.currentOutra = root.dataset.currentOutra === '1';
       this.isLocked  = root.dataset.windowLock === 'true';
 
       if (this.input.disabled) return;
@@ -485,6 +486,7 @@
       if (UNIDADE_ID && !IS_DESUP) {
         params.set('unidade_id', UNIDADE_ID);
       }
+      if (UNIDADE_ID) params.set('unidade_alocacao', UNIDADE_ID);
       // DESUP: não envia unidade_id para buscar globalmente
 
       this.results.innerHTML = '<div class="px-3 py-3 text-xs text-center text-slate-400"><i class="ph ph-circle-notch ph-spin text-lg"></i></div>';
@@ -509,14 +511,16 @@
       }
 
       this.results.innerHTML = items.map(p => `
-        <div class="ac-option-result px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 flex items-center justify-between gap-2 transition-colors ${p.cargo_diretivo ? 'ac-state-diretivo' : p.id == this.currentId ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-slate-700'}"
-             data-id="${p.id}" data-nome="${this._escapeAttr(p.nome)}" data-cargo="${this._escapeAttr(p.cargo_diretivo || '')}"
-             ${p.cargo_diretivo ? `title="${this._escapeAttr('Equipe diretiva: ' + p.cargo_diretivo)}"` : ''}>
+        <div class="ac-option-result px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 flex items-center justify-between gap-2 transition-colors ${p.cargo_diretivo ? 'ac-state-diretivo' : p.outra_unidade ? 'ac-state-outra' : p.id == this.currentId ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-slate-700'}"
+             data-id="${p.id}" data-nome="${this._escapeAttr(p.nome)}" data-cargo="${this._escapeAttr(p.cargo_diretivo || '')}" data-outra="${p.outra_unidade ? '1' : ''}" data-readaptado="${p.readaptado ? '1' : ''}"
+             ${p.cargo_diretivo ? `title="${this._escapeAttr('Equipe diretiva: ' + p.cargo_diretivo)}"` : p.outra_unidade ? 'title="Professor de outra unidade"' : ''}>
           <span class="flex items-center gap-2 truncate">
-            <i class="ph ${p.cargo_diretivo ? 'ph-warning-circle' : 'ph-chalkboard-teacher'} text-base ${p.cargo_diretivo ? 'ac-text-diretivo' : 'text-slate-400'} flex-shrink-0"></i>
+            <i class="ph ${p.cargo_diretivo || p.outra_unidade ? 'ph-warning-circle' : 'ph-chalkboard-teacher'} text-base ${p.cargo_diretivo ? 'ac-text-diretivo' : p.outra_unidade ? 'ac-text-outra' : 'text-slate-400'} flex-shrink-0"></i>
             <span class="truncate">${this._escapeHtml(p.nome)}</span>
           </span>
           ${p.cargo_diretivo ? '<span class="text-[10px] font-bold ac-text-diretivo bg-white/70 px-1.5 py-0.5 rounded flex-shrink-0">Diretivo</span>' : ''}
+          ${p.outra_unidade ? '<span class="text-[10px] font-bold ac-text-outra bg-white/70 px-1.5 py-0.5 rounded flex-shrink-0">Outra unidade</span>' : ''}
+          ${p.readaptado ? '<span class="text-[10px] font-bold text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded flex-shrink-0">Readaptado</span>' : ''}
           ${p.unidade ? `<span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded flex-shrink-0">${this._escapeHtml(p.unidade)}</span>` : ''}
         </div>
       `).join('');
@@ -529,7 +533,7 @@
             this._triggerWindowLock();
             return;
           }
-          this._selectValue(el.dataset.id, el.dataset.nome, el.dataset.cargo || '');
+          this._selectValue(el.dataset.id, el.dataset.nome, el.dataset.cargo || '', el.dataset.outra === '1');
         });
       });
 
@@ -538,7 +542,7 @@
       this._position();
     }
 
-    async _selectValue(value, label, cargo) {
+    async _selectValue(value, label, cargo, outra) {
       this._close();
 
       // Escolheu o que já está salvo: nada a enviar.
@@ -550,9 +554,9 @@
 
       // Salvamento automático: a linha é atualizada na hora e o envio roda em
       // segundo plano, sem recarregar a página nem travar o campo.
-      const prev = { id: this.currentId, nome: this.currentNome, cargo: this.currentCargo };
+      const prev = { id: this.currentId, nome: this.currentNome, cargo: this.currentCargo, outra: this.currentOutra };
       const nome = value === 'SEM_PROFESSOR' ? '' : value === 'NAO_OFERECIDA' ? 'Não oferecido' : label;
-      this._applyState(value, nome, cargo || '');
+      this._applyState(value, nome, cargo || '', !!outra);
       this.wrap.classList.add('opacity-60');
 
       try {
@@ -590,9 +594,14 @@
         this.wrap.classList.remove('opacity-60');
         markAllocationChanged();
         const cargoDiretivo = data.cargo_diretivo || '';
-        if (cargoDiretivo !== this.currentCargo) this._applyState(value, nome, cargoDiretivo);
+        const outraUnidade = !!data.outra_unidade;
+        if (cargoDiretivo !== this.currentCargo || outraUnidade !== this.currentOutra) {
+          this._applyState(value, nome, cargoDiretivo, outraUnidade);
+        }
         if (cargoDiretivo) {
           showAllocToast(`Atenção: ${nome} integra a equipe diretiva (${cargoDiretivo}) e foi alocado em sala.`, 'warn');
+        } else if (outraUnidade) {
+          showAllocToast(`${nome} é de outra unidade. A DESUP foi avisada para ajustar as unidades dele.`, 'warn');
         } else if (value === 'SEM_PROFESSOR') {
           showAllocToast('Carência declarada: a turma ficou sem professor.', 'error');
         } else {
@@ -600,7 +609,7 @@
         }
       } catch (err) {
         this.wrap.classList.remove('opacity-60');
-        this._applyState(prev.id, prev.nome, prev.cargo);
+        this._applyState(prev.id, prev.nome, prev.cargo, prev.outra);
         refreshAllocSummary();
         showAllocToast(err.fromServer ? err.message : 'Erro ao salvar a alocação. Tente novamente.', true);
       }
@@ -648,15 +657,18 @@
 
     // Reflete na linha o estado (docente / sem professor / não oferecido),
     // espelhando as classes que o template renderiza no carregamento.
-    _applyState(id, nome, cargo) {
+    _applyState(id, nome, cargo, outra) {
       const isNone = id === 'SEM_PROFESSOR';
       const isNao = id === 'NAO_OFERECIDA';
       const hasDoc = !isNone && !isNao;
       const diretivo = hasDoc && !!cargo;
+      const outraUn = hasDoc && !!outra && !diretivo;
 
       this.currentId = String(id);
       this.currentNome = nome || '';
       this.currentCargo = diretivo ? cargo : '';
+      this.currentOutra = hasDoc && !!outra;
+      this.root.dataset.currentOutra = this.currentOutra ? '1' : '';
       this.root.dataset.currentId = this.currentId;
       this.root.dataset.currentNome = this.currentNome;
       this.root.dataset.currentCargo = this.currentCargo;
@@ -665,13 +677,14 @@
       this.input.placeholder = isNao ? 'Não oferecido' : 'Sem professor';
       // Amarelo = equipe diretiva em sala; vermelho = carência; verde = docente.
       this.input.className = 'ac-input flex-1 min-w-0 bg-transparent outline-none ' +
-        (diretivo ? 'ac-text-diretivo font-semibold' : hasDoc ? 'text-emerald-800 font-semibold'
+        (diretivo ? 'ac-text-diretivo font-semibold' : outraUn ? 'ac-text-outra font-semibold' : hasDoc ? 'text-emerald-800 font-semibold'
           : isNao ? 'text-slate-500 font-semibold' : 'ac-text-carencia font-semibold');
 
       this.wrap.className = 'ac-input-wrap flex items-center gap-1.5 w-full px-3 py-1.5 border rounded text-sm transition cursor-pointer ' +
-        (diretivo ? 'ac-state-diretivo' : hasDoc ? 'border-emerald-300 bg-emerald-50'
+        (diretivo ? 'ac-state-diretivo' : outraUn ? 'ac-state-outra' : hasDoc ? 'border-emerald-300 bg-emerald-50'
           : isNao ? 'border-slate-300 bg-slate-100' : 'ac-state-carencia');
       if (diretivo) this.wrap.title = `Equipe diretiva: ${cargo}. Este docente está alocado em sala.`;
+      else if (outraUn) this.wrap.title = 'Professor de outra unidade: não está vinculado a esta unidade.';
       else if (isNone) this.wrap.title = 'Carência: esta turma está sem professor.';
       else this.wrap.removeAttribute('title');
 
@@ -969,9 +982,11 @@
 <style>
   /* Estados da alocação: amarelo = equipe diretiva em sala, vermelho = carência.
      Classes próprias porque o tailwind.min.css é pré-compilado e não traz todas as cores. */
-  .ac-state-diretivo { background-color: #fef3c7; border-color: #f59e0b; }
+  .ac-state-diretivo { background-color: #ffedd5; border-color: #fb923c; }
+  .ac-state-outra { background-color: #fef9c3; border-color: #eab308; }
   .ac-state-carencia { background-color: #fee2e2; border-color: #f87171; }
-  .ac-text-diretivo { color: #92400e; }
+  .ac-text-diretivo { color: #9a3412; }
+  .ac-text-outra { color: #854d0e; }
   .ac-text-carencia, .ac-carencia-icon { color: #b91c1c; }
   .ac-text-carencia::placeholder { color: #b91c1c; opacity: 1; }
   .alloc-toast-warn { background-color: #d97706; }

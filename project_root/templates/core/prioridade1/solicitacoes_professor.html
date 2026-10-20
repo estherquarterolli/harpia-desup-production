@@ -76,6 +76,11 @@
       <p class="text-xs text-slate-400">Solicitada por {{ solicitacao.solicitado_por.email }} em {{ solicitacao.criado_em|date:'d/m/Y H:i' }}.</p>
       {% if solicitacao.motivo_decisao %}<p><strong class="text-slate-800">Decisão:</strong> {{ solicitacao.motivo_decisao }}</p>{% endif %}
       {% if solicitacao.status == 'PENDENTE' %}
+      {% if solicitacao.professor_id %}
+      <a href="{% url 'professors:professor_update' solicitacao.professor_id %}" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-[#025c9f] px-4 text-sm font-black text-[#025c9f] hover:bg-blue-50"><i class="ph ph-pencil-simple" aria-hidden="true"></i>Abrir cadastro do professor para ajustar as unidades</a>
+      {% elif solicitacao.tipo == 'CADASTRO' %}
+      <a href="{% url 'professors:professor_create' %}" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-[#025c9f] px-4 text-sm font-black text-[#025c9f] hover:bg-blue-50"><i class="ph ph-plus-circle" aria-hidden="true"></i>Cadastrar o professor</a>
+      {% endif %}
       <form method="post" action="{% url 'core:solicitacao_professor_decidir' solicitacao.pk %}" class="space-y-3 border-t border-slate-100 pt-3">
         {% csrf_token %}
         <div>

@@ -538,3 +538,47 @@ class Prioridade1DesupTests(TestCase):
         self.client.force_login(self.desup)
         resposta = self.client.get(reverse("core:solicitacao_professor_list"))
         self.assertContains(resposta, "Cessão de professor")
+
+    def test_notificacao_da_cessao_abre_o_cadastro_do_professor(self):
+        from .models import Notificacao
+
+        self.client.force_login(self.coordenador)
+        self.client.post(
+            reverse("professors:professor_solicitar_cessao"),
+            {"professor": self.professor.pk, "justificativa": "Preciso dele."},
+        )
+
+        notificacao = Notificacao.objects.filter(titulo__startswith="Solicitação de professor").get()
+        self.assertEqual(
+            notificacao.url_acao, reverse("professors:professor_update", args=[self.professor.pk])
+        )
+
+    def test_unidade_ve_na_lista_so_professores_da_propria_unidade(self):
+        self.client.force_login(self.coordenador)
+        resposta = self.client.get(reverse("professors:professor_list"))
+        self.assertNotContains(resposta, "Professor de Teste")
+
+        self.client.force_login(self.desup)
+        resposta = self.client.get(reverse("professors:professor_list"))
+        self.assertContains(resposta, "Professor de Teste")
+
+    def test_busca_marca_professor_de_outra_unidade(self):
+        self.client.force_login(self.coordenador)
+        resposta = self.client.get(
+            reverse("buscar_professores"), {"q": "Professor de Teste", "unidade_alocacao": self.destino.pk}
+        )
+        item = resposta.json()["results"][0]
+        self.assertTrue(item["outra_unidade"])
+
+        resposta = self.client.get(
+            reverse("buscar_professores"), {"q": "Professor de Teste", "unidade_alocacao": self.origem.pk}
+        )
+        self.assertFalse(resposta.json()["results"][0]["outra_unidade"])
+
+    def test_readaptado_vigente_e_detectado(self):
+        self.assertFalse(Professor.objects.get(pk=self.professor.pk).readaptado_vigente)
+        ReadaptacaoProfessor.objects.create(
+            professor=self.professor, data_inicio=self.hoje - timedelta(days=3),
+            justificativa_administrativa="Readaptação administrativa.", criado_por=self.desup,
+        )
+        self.assertTrue(Professor.objects.get(pk=self.professor.pk).readaptado_vigente)
