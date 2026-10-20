@@ -233,6 +233,9 @@ class ProfessorListView(LoginRequiredMixin, ListView):
             ctx['kpis'].append(
                 {'rotulo': 'Encontrados', 'valor': ctx['total_filtrados'], 'tom': 'cinza', 'icone': 'ph-funnel'}
             )
+        # A aba de professores da unidade não mostra o resumo geral do sistema.
+        if user.perfil == 'COORDENADOR_UNIDADE' and not user.is_superuser:
+            ctx['kpis'] = []
         ctx['ch_atual'] = self.request.GET.get('ch', '')
         ctx['cargo_atual'] = self.request.GET.get('cargo') or self.request.GET.get('tipo', '')
 

@@ -541,22 +541,19 @@ class OverrideDesupProfessorE2ETests(ProfessorE2EBase):
 class IsolamentoUnidadeProfessorE2ETests(ProfessorE2EBase):
     """Cenário 11: base compartilhada, com escrita limitada aos vínculos."""
 
-    def test_coordenador_ve_professores_de_todas_as_unidades_na_listagem(self):
+    def test_coordenador_ve_na_listagem_so_professores_da_propria_unidade(self):
         self.client.force_login(self.coord_a)
 
         resposta = self.client.get(self.url_lista)
 
         self.assertEqual(resposta.status_code, 200)
-        self.assertCountEqual(
-            [p.pk for p in resposta.context['professores']],
-            [self.prof_a1.pk, self.prof_b1.pk],
-        )
+        self.assertEqual([p.pk for p in resposta.context['professores']], [self.prof_a1.pk])
         self.assertContains(resposta, 'Ana Alves')
-        self.assertContains(resposta, 'Carla Costa')
+        self.assertNotContains(resposta, 'Carla Costa')
         self.assertFalse(resposta.context['is_desup'])
         self.assertEqual(resposta.context['unidade_atual'], self.unidade_a)
 
-    def test_coordenador_ve_primeiro_todos_os_professores_da_sua_unidade(self):
+    def test_coordenador_nao_ve_professor_de_outra_unidade_mas_ve_o_compartilhado(self):
         professor_local = self._professor('Zuleica Local', 'A2', self.unidade_a)
         professor_compartilhado = self._professor(
             'Zenaide Compartilhada', 'B2', self.unidade_b,
@@ -567,14 +564,9 @@ class IsolamentoUnidadeProfessorE2ETests(ProfessorE2EBase):
 
         resposta = self.client.get(self.url_lista)
 
-        ids_ordenados = [p.pk for p in resposta.context['professores']]
-        ids_da_unidade = {
-            self.prof_a1.pk,
-            professor_local.pk,
-            professor_compartilhado.pk,
-        }
-        self.assertEqual(set(ids_ordenados[:3]), ids_da_unidade)
-        self.assertGreater(ids_ordenados.index(professor_externo.pk), 2)
+        ids = {p.pk for p in resposta.context['professores']}
+        self.assertEqual(ids, {self.prof_a1.pk, professor_local.pk, professor_compartilhado.pk})
+        self.assertNotIn(professor_externo.pk, ids)
 
     def test_desup_ve_todas_as_unidades_e_filtra_por_unidade(self):
         self.client.force_login(self.desup)
@@ -590,28 +582,26 @@ class IsolamentoUnidadeProfessorE2ETests(ProfessorE2EBase):
         self.assertEqual([p.pk for p in resposta.context['professores']], [self.prof_b1.pk])
         self.assertEqual(resposta.context['unidade_atual'], self.unidade_b)
 
-    def test_busca_por_nome_na_listagem_e_global(self):
-        self._professor('Ana Aparecida', 'B2', self.unidade_b)
+    def test_busca_por_nome_na_listagem_respeita_a_unidade_do_coordenador(self):
+        outra = self._professor('Ana Aparecida', 'B2', self.unidade_b)
         self.client.force_login(self.coord_a)
 
         resposta = self.client.get(self.url_lista, {'q': 'Ana'})
+        self.assertEqual([p.pk for p in resposta.context['professores']], [self.prof_a1.pk])
 
-        self.assertCountEqual(
-            [p.pk for p in resposta.context['professores']],
-            [self.prof_a1.pk, Professor.objects.get(id_funcional='IDF-B2').pk],
-        )
+        # A DESUP busca em toda a base.
+        self.client.force_login(self.desup)
+        resposta = self.client.get(self.url_lista, {'q': 'Ana'})
+        self.assertCountEqual([p.pk for p in resposta.context['professores']], [self.prof_a1.pk, outra.pk])
 
-    def test_coordenador_sem_unidade_ainda_ve_a_base_compartilhada(self):
+    def test_coordenador_sem_unidade_nao_ve_professores_na_listagem(self):
         self.coord_a.unidade = None
         self.coord_a.save()
         self.client.force_login(self.coord_a)
 
         resposta = self.client.get(self.url_lista)
 
-        self.assertCountEqual(
-            [p.pk for p in resposta.context['professores']],
-            [self.prof_a1.pk, self.prof_b1.pk],
-        )
+        self.assertEqual(list(resposta.context['professores']), [])
 
     def test_for_user_espelha_o_isolamento_da_tela(self):
         """Coordenadores consultam a mesma base institucional."""

@@ -305,7 +305,7 @@ def decidir_solicitacao_professor_externo(*, request, solicitacao_id, decisao, m
         raise ValidationError("Decisão inválida.")
 
     solicitacao = (
-        SolicitacaoProfessorExterno.objects.select_for_update()
+        SolicitacaoProfessorExterno.objects.select_for_update(of=("self",))
         .select_related("professor", "unidade_solicitante", "unidade_origem")
         .get(pk=solicitacao_id)
     )
@@ -365,7 +365,7 @@ def decidir_excecao_carga(*, request, excecao_id, decisao, motivo=""):
         raise ValidationError("Decisão inválida.")
 
     excecao = (
-        ExcecaoCargaUnidade.objects.select_for_update()
+        ExcecaoCargaUnidade.objects.select_for_update(of=("self",))
         .select_related("unidade", "professor")
         .get(pk=excecao_id)
     )

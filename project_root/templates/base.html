@@ -30,121 +30,110 @@
     </div>
     {% endif %}
 
-    <aside id="sidebar"
-        class="sidebar-desktop group w-20 hover:w-64 bg-[#025c9f] text-white transition-all duration-300 flex flex-col h-screen sticky top-0 z-50">
-        <div class="p-3 mb-10 flex justify-between items-center border-b border-white/5 rounded-xl mx-2 mt-3 transition-all duration-300">
-            <div class="w-14 h-14 rounded-full bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
-                <img src="{% static 'img/logo-harpia-colorida-modificada.PNG' %}" alt="Harpia Logo" class="w-11 h-11 object-contain">
-            </div>
-            <button type="button" onclick="closeMobileSidebar()" class="sidebar-close-btn hidden text-white/80 hover:text-white text-2xl pr-1">
+    <aside id="sidebar" class="sidebar-desktop sb text-white flex flex-col h-screen sticky top-0 z-50">
+        <div class="sb-brand">
+            <a href="{% url 'dashboard' %}" class="sb-brand-link" aria-label="Harpia — ir para o dashboard">
+                <span class="sb-logo">
+                    <img src="{% static 'img/logo-harpia-colorida-modificada.PNG' %}" alt="Harpia Logo">
+                </span>
+                <span class="sb-brand-name">Harpia</span>
+            </a>
+            <button type="button" onclick="closeMobileSidebar()" class="sidebar-close-btn sb-close hidden" aria-label="Fechar menu">
                 <i class="ph ph-x"></i>
             </button>
         </div>
-        <nav class="sidebar-scroll flex-grow min-h-0 space-y-1 px-2 overflow-y-scroll"
-             aria-label="Menu principal">
 
-            <!-- Dashboard — todos os perfis -->
-            <a href="{% url 'dashboard' %}"
-                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if request.path == '/dashboard/desup/' or request.path == '/dashboard/unidade/' %}bg-white/10{% endif %}">
-                <i class="ph ph-squares-four text-2xl flex-shrink-0"></i>
-                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Dashboard</span>
-            </a>
+        <nav class="sidebar-scroll sb-nav flex-grow min-h-0 overflow-y-auto" aria-label="Menu principal">
+
+            <!-- Bloco: Visão geral — todos os perfis -->
+            <div class="sb-block">
+                <p class="sb-title">Visão geral</p>
+                <a href="{% url 'dashboard' %}" class="sb-link {% if request.path == '/dashboard/desup/' or request.path == '/dashboard/unidade/' %}is-active{% endif %}">
+                    <i class="ph ph-squares-four"></i><span class="sb-label">Dashboard</span>
+                </a>
+            </div>
 
             {% if user.perfil == 'DESUP' or user.is_superuser %}
-            <!-- Unidades — apenas DESUP -->
-            <a href="{% url 'core:unidade_list' %}"
-                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if '/core/unidades' in request.path %}bg-white/10{% endif %}">
-                <i class="ph ph-buildings text-2xl flex-shrink-0"></i>
-                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Unidades</span>
-            </a>
-
-            <a href="{% url 'desup_user_list' %}"
-                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if '/accounts/usuarios' in request.path %}bg-white/10{% endif %}">
-                <i class="ph ph-users-three text-2xl flex-shrink-0"></i>
-                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Usuários</span>
-            </a>
-
-            <a href="{% url 'core:equipe_diretiva_desup' %}"
-                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if '/core/desup/equipe-diretiva' in request.path %}bg-white/10{% endif %}">
-                <i class="ph ph-identification-card text-2xl flex-shrink-0"></i>
-                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Equipe diretiva</span>
-            </a>
-
-            <a href="{% url 'core:solicitacao_professor_list' %}"
-                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if '/core/desup/solicitacoes-professor' in request.path %}bg-white/10{% endif %}">
-                <i class="ph ph-arrows-left-right text-2xl flex-shrink-0"></i>
-                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Solicitações</span>
-            </a>
-
-            <a href="{% url 'core:alertas_carga_desup' %}"
-                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if '/core/desup/alertas-carga' in request.path %}bg-white/10{% endif %}">
-                <i class="ph ph-warning-circle text-2xl flex-shrink-0"></i>
-                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Alertas de carga</span>
-            </a>
+            <!-- DESUP · Bloco: Gestão institucional -->
+            <div class="sb-block">
+                <p class="sb-title">Gestão institucional</p>
+                <a href="{% url 'core:unidade_list' %}" class="sb-link {% if '/core/unidades' in request.path %}is-active{% endif %}">
+                    <i class="ph ph-buildings"></i><span class="sb-label">Unidades</span>
+                </a>
+                <a href="{% url 'desup_user_list' %}" class="sb-link {% if '/accounts/usuarios' in request.path %}is-active{% endif %}">
+                    <i class="ph ph-users-three"></i><span class="sb-label">Usuários</span>
+                </a>
+                <a href="{% url 'core:equipe_diretiva_desup' %}" class="sb-link {% if '/core/desup/equipe-diretiva' in request.path %}is-active{% endif %}">
+                    <i class="ph ph-identification-card"></i><span class="sb-label">Equipe diretiva</span>
+                </a>
+                <a href="{% url 'core:solicitacao_professor_list' %}" class="sb-link {% if '/core/desup/solicitacoes-professor' in request.path %}is-active{% endif %}">
+                    <i class="ph ph-arrows-left-right"></i><span class="sb-label">Solicitações</span>
+                </a>
+                <a href="{% url 'core:alertas_carga_desup' %}" class="sb-link {% if '/core/desup/alertas-carga' in request.path %}is-active{% endif %}">
+                    <i class="ph ph-warning-circle"></i><span class="sb-label">Alertas de carga</span>
+                </a>
+            </div>
             {% endif %}
 
             {% if user.perfil == 'COORDENADOR_UNIDADE' %}
-            <!-- Equipe Diretiva e Coordenações — Coordenador de Unidade -->
-            <a href="{% url 'core:equipe_diretiva_unidade' %}"
-                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if '/core/unidade/equipe-diretiva' in request.path %}bg-white/10{% endif %}">
-                <i class="ph ph-identification-card text-2xl flex-shrink-0"></i>
-                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Equipe diretiva</span>
-            </a>
+            <!-- Unidade · Bloco: Minha unidade -->
+            <div class="sb-block">
+                <p class="sb-title">Minha unidade</p>
+                <a href="{% url 'core:equipe_diretiva_unidade' %}" class="sb-link {% if '/core/unidade/equipe-diretiva' in request.path %}is-active{% endif %}">
+                    <i class="ph ph-identification-card"></i><span class="sb-label">Equipe diretiva</span>
+                </a>
+                <a href="{% url 'professors:professor_list' %}" class="sb-link {% if 'professores' in request.path %}is-active{% endif %}">
+                    <i class="ph ph-chalkboard-teacher"></i><span class="sb-label">Professores</span>
+                </a>
+            </div>
             {% endif %}
 
-            <!-- Professores — DESUP e Coordenador de Unidade -->
-            <a href="{% url 'professors:professor_list' %}"
-                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'professores' in request.path %}bg-white/10{% endif %}">
-                <i class="ph ph-chalkboard-teacher text-2xl flex-shrink-0"></i>
-                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Professores</span>
-            </a>
+            <!-- Bloco: Alocação e carga — DESUP e Unidade -->
+            <div class="sb-block">
+                <p class="sb-title">Alocação e carga</p>
+                {% if user.perfil == 'DESUP' or user.is_superuser %}
+                <a href="{% url 'professors:professor_list' %}" class="sb-link {% if 'professores' in request.path %}is-active{% endif %}">
+                    <i class="ph ph-chalkboard-teacher"></i><span class="sb-label">Professores</span>
+                </a>
+                {% endif %}
+                <a href="{% url 'alloc_curricular' %}" class="sb-link {% if 'alocacao-curricular' in request.path %}is-active{% endif %}">
+                    <i class="ph ph-calendar-check"></i><span class="sb-label">Alocação</span>
+                </a>
+                <a href="{% url 'extra_curricular:pendencia_list' %}" class="sb-link {% if 'extracurriculares' in request.path %}is-active{% endif %}">
+                    <i class="ph ph-books"></i><span class="sb-label">Extracurriculares</span>
+                </a>
+            </div>
 
-            <!-- Alocação — DESUP e Coordenador de Unidade -->
-            <a href="{% url 'alloc_curricular' %}"
-                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'alocacao-curricular' in request.path %}bg-white/10{% endif %}">
-                <i class="ph ph-calendar-check text-2xl flex-shrink-0"></i>
-                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Alocação</span>
-            </a>
-
-            <!-- Extracurriculares — DESUP e Coordenador de Unidade -->
-            <a href="{% url 'extra_curricular:pendencia_list' %}"
-                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'extracurriculares' in request.path %}bg-white/10{% endif %}">
-                <i class="ph ph-books text-2xl flex-shrink-0"></i>
-                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Extracurriculares</span>
-            </a>
-
-            <!-- Matrizes — DESUP e Coordenador de Unidade -->
-            <a href="{% url 'courses:matrix_list' %}"
-                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'courses/matrices' in request.path %}bg-white/10{% endif %}">
-                <i class="ph ph-file-text text-2xl flex-shrink-0"></i>
-                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Matrizes</span>
-            </a>
+            <!-- Bloco: Currículo -->
+            <div class="sb-block">
+                <p class="sb-title">Currículo</p>
+                <a href="{% url 'courses:matrix_list' %}" class="sb-link {% if 'courses/matrices' in request.path %}is-active{% endif %}">
+                    <i class="ph ph-file-text"></i><span class="sb-label">Matrizes</span>
+                </a>
+                {% if user.perfil == 'DESUP' or user.is_superuser %}
+                <a href="{% url 'courses:component_list' %}" class="sb-link {% if 'courses/componentes' in request.path %}is-active{% endif %}">
+                    <i class="ph ph-book-open"></i><span class="sb-label">Componentes</span>
+                </a>
+                {% endif %}
+            </div>
 
             {% if user.perfil == 'DESUP' or user.is_superuser %}
-            <!-- Componentes Curriculares — apenas DESUP -->
-            <a href="{% url 'courses:component_list' %}"
-                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if 'courses/componentes' in request.path %}bg-white/10{% endif %}">
-                <i class="ph ph-book-open text-2xl flex-shrink-0"></i>
-                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Componentes</span>
-            </a>
-
-            <!-- Entrega — apenas DESUP -->
-            <a href="{% url 'core:janela_list' %}"
-                class="sidebar-link flex items-center justify-center group-hover:justify-start gap-4 p-3 rounded-lg transition-colors hover:bg-white/10 {% if '/core/entregas' in request.path %}bg-white/10{% endif %}">
-                <i class="ph ph-clock-countdown text-2xl flex-shrink-0"></i>
-                <span class="sidebar-label hidden group-hover:block whitespace-nowrap text-sm font-semibold">Entrega</span>
-            </a>
+            <!-- DESUP · Bloco: Prazos -->
+            <div class="sb-block">
+                <p class="sb-title">Prazos</p>
+                <a href="{% url 'core:janela_list' %}" class="sb-link {% if '/core/entregas' in request.path %}is-active{% endif %}">
+                    <i class="ph ph-clock-countdown"></i><span class="sb-label">Entrega</span>
+                </a>
+            </div>
             {% endif %}
 
         </nav>
 
-        <div class="p-4 border-t border-white/10">
+        <div class="sb-footer">
             <form action="{% url 'logout' %}" method="post" class="w-full m-0 p-0">
                 {% csrf_token %}
-                <button type="submit"
-                    class="sidebar-link w-full flex items-center justify-center group-hover:justify-start gap-4 p-3 text-red-400 hover:bg-red-900/20 rounded-lg text-left transition-colors">
-                    <i class="ph ph-sign-out text-2xl flex-shrink-0"></i>
-                    <span class="sidebar-label hidden group-hover:block text-sm font-semibold">Sair</span>
+                <button type="submit" class="sb-link sb-logout w-full text-left">
+                    <i class="ph ph-sign-out"></i><span class="sb-label">Sair</span>
                 </button>
             </form>
         </div>

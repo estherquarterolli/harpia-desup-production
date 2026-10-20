@@ -890,8 +890,8 @@ class TituloDasTelasTests(TestCase):
                 self.assertNotIn('<title>HARPIA</title>', html)
 
 
-class SidebarIconesCentralizadosTests(TestCase):
-    """CORR-010: no rail recolhido (w-20) os ícones ficavam encostados à esquerda."""
+class SidebarAbertaEmBlocosTests(TestCase):
+    """Menu lateral sempre aberto, com marca centralizada e itens agrupados em blocos."""
 
     def setUp(self):
         self.desup = User.objects.create_user(
@@ -900,27 +900,40 @@ class SidebarIconesCentralizadosTests(TestCase):
         )
         self.client.force_login(self.desup)
 
-    def test_links_da_sidebar_centralizam_quando_recolhido(self):
+    def test_menu_fixo_aberto_com_marca_centralizada(self):
         html = self.client.get('/core/unidades/').content.decode()
 
-        # Todo .sidebar-link centraliza recolhido e alinha à esquerda no hover.
-        total_links = html.count('class="sidebar-link')
-        self.assertGreater(total_links, 0)
-        self.assertEqual(
-            html.count('justify-center group-hover:justify-start'), total_links,
-        )
-        # O botão "Sair" também virou .sidebar-link (antes ficava de fora).
-        self.assertIn('sidebar-link w-full flex items-center justify-center', html)
+        self.assertIn('class="sb-brand"', html)
+        self.assertIn('sb-brand-name">Harpia<', html)
+        # Não depende mais de hover para abrir.
+        self.assertNotIn('hover:w-64', html)
+        self.assertNotIn('group-hover:justify-start', html)
 
-    def test_menu_principal_exibe_barra_de_rolagem_vertical(self):
+    def test_desup_ve_todos_os_blocos_do_menu(self):
         html = self.client.get('/core/unidades/').content.decode()
 
-        self.assertIn('sidebar-scroll flex-grow min-h-0', html)
-        self.assertIn('overflow-y-scroll', html)
-        self.assertNotIn(
-            '<nav class="flex-grow space-y-1 px-2 overflow-y-auto no-scrollbar">',
-            html,
+        for titulo in ('Visão geral', 'Gestão institucional', 'Alocação e carga', 'Currículo', 'Prazos'):
+            self.assertIn(f'sb-title">{titulo}<', html)
+
+    def test_unidade_ve_blocos_proprios_sem_gestao_da_desup(self):
+        unidade = Unidade.objects.create(nome='Unidade Menu', sigla='UMN')
+        coord = User.objects.create_user(
+            email='coord_menu@teste.com', password='pw', perfil='COORDENADOR_UNIDADE',
+            unidade=unidade, forcar_troca_senha=False,
         )
+        self.client.force_login(coord)
+
+        html = self.client.get('/dashboard/unidade/').content.decode()
+
+        self.assertIn('sb-title">Minha unidade<', html)
+        self.assertNotIn('sb-title">Gestão institucional<', html)
+        self.assertNotIn('sb-title">Prazos<', html)
+
+    def test_menu_principal_continua_com_rolagem_vertical(self):
+        html = self.client.get('/core/unidades/').content.decode()
+
+        self.assertIn('sidebar-scroll sb-nav flex-grow min-h-0', html)
+        self.assertIn('overflow-y-auto', html)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
