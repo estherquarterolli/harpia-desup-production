@@ -16,7 +16,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
-from django.views.generic import ListView, DetailView, CreateView, UpdateView
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, TemplateView
 from django.core.paginator import Paginator
 
 from apps.accounts.mixins import PerfilRequiredMixin
@@ -428,13 +428,6 @@ class _BaseItemSaveView(LoginRequiredMixin, PerfilRequiredMixin, View):
         if blocked:
             return blocked
 
-        # Regra de 5 dias sem SEI = bloqueio de edições
-        if not pendencia.sei_numero:
-            dias_passados = (timezone.now() - pendencia.data_criacao).days
-            if dias_passados >= 5:
-                messages.error(request, "Prazo de 5 dias excedido. O preenchimento do número SEI no cabeçalho é OBRIGATÓRIO para prosseguir com novas justificativas.")
-                return redirect(reverse_lazy("extra_curricular:pendencia_detail", kwargs={"pk": pk}))
-
         # Itens já enviados em definitivo (bloqueado=True) ficam fora do formset:
         # não podem ser editados nem marcados para exclusão pela unidade.
         formset = self.formset_class(
@@ -663,13 +656,12 @@ class EnviarParaDesupLoteView(LoginRequiredMixin, PerfilRequiredMixin, View):
         enviadas = 0
         nomes_professores = []
         for pendencia in pendencias:
-            if pendencia.sei_numero:
-                pendencia.status = PendenciaExtra.StatusChoices.ENVIADO
-                pendencia.save()
-                # Envio definitivo: trava os itens já enviados.
-                pendencia.bloquear_itens_enviados()
-                enviadas += 1
-                nomes_professores.append(pendencia.professor.nome)
+            pendencia.status = PendenciaExtra.StatusChoices.ENVIADO
+            pendencia.save()
+            # Envio definitivo: trava os itens já enviados.
+            pendencia.bloquear_itens_enviados()
+            enviadas += 1
+            nomes_professores.append(pendencia.professor.nome)
         if enviadas:
             # Criar notificação para DESUP
             from apps.core.models import Notificacao
@@ -687,12 +679,9 @@ class EnviarParaDesupLoteView(LoginRequiredMixin, PerfilRequiredMixin, View):
             )
             messages.success(request, f"{enviadas} pendência(s) enviada(s) para a DESUP.")
             return redirect("extra_curricular:pendencia_list")
-        if not enviadas:
-            messages.error(request, "Nenhuma pendência enviada. Verifique se o número SEI foi preenchido.")
-            ids_str = request.POST.get("ids", "")
-            return redirect(
-                f"{reverse_lazy('extra_curricular:pendencia_lote')}?ids={ids_str}&sei_error=1"
-            )
+        messages.error(request, "Nenhuma pendência encontrada para envio.")
+        ids_str = request.POST.get("ids", "")
+        return redirect(f"{reverse_lazy('extra_curricular:pendencia_lote')}?ids={ids_str}")
 
 
 class PendenciaSEIUpdateLoteView(LoginRequiredMixin, PerfilRequiredMixin, View):
@@ -973,12 +962,6 @@ class EnviarParaDesupView(LoginRequiredMixin, PerfilRequiredMixin, View):
         if blocked:
             return blocked
 
-        if not pendencia.sei_numero:
-            messages.error(request, "Informe o número SEI antes de enviar para a DESUP.")
-            return redirect(
-                reverse_lazy("extra_curricular:pendencia_detail", kwargs={"pk": pk}).__str__() + "?sei_error=1"
-            )
-
         pendencia.status = PendenciaExtra.StatusChoices.ENVIADO
         pendencia.save()
         # Envio definitivo: trava os itens já enviados (unidade não edita/exclui mais).
@@ -1063,3 +1046,195 @@ class PendenciaSEIUpdateView(LoginRequiredMixin, PerfilRequiredMixin, UpdateView
         if user.perfil == "COORDENADOR_UNIDADE" and obj.unidade != user.unidade:
             raise PermissionDenied
         return obj
+
+
+# ==============================================================================
+# Prioridade 1.1 - Supervisão de Estágio (Módulo Extracurricular)
+# ==============================================================================
+
+class SupervisaoEstagioListView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
+    """
+    Janela de Supervisão de Estágio na Alocação Extracurricular.
+    Permite à Unidade gerenciar as atividades de coordenação, supervisão e orientação de estágio.
+    """
+    allowed_profiles = ["COORDENADOR_UNIDADE", "DESUP"]
+    template_name = "extra_curricular/supervisao_estagio_list.html"
+
+    def get_context_data(self, **kwargs):
+        from decimal import Decimal
+        from django.utils import timezone
+        from apps.allocations.services import semestre_atual
+        from apps.core.forms import AtividadeEstagioSupervisaoUnidadeForm
+        from apps.core.models import AtividadeEstagioSupervisao, Unidade
+        from apps.core.views import _mapa_alocacoes_sala_por_professor
+
+        ctx = super().get_context_data(**kwargs)
+        user = self.request.user
+        perfil = user.perfil
+        hoje = timezone.localdate()
+        semestre_corrente = semestre_atual()
+
+        unidade = None
+        unidades = []
+        if perfil == "COORDENADOR_UNIDADE":
+            unidade = user.unidade
+            if not unidade:
+                messages.error(self.request, "Seu usuário não está vinculado a uma unidade.")
+                return ctx
+            unidades = [unidade]
+        else:
+            unidades = Unidade.objects.filter(status=True).order_by("nome")
+            unidade_id = self.request.GET.get("unidade_id")
+            unidade = Unidade.objects.filter(pk=unidade_id).first() if unidade_id else None
+
+        atividades_estagio = []
+        if unidade:
+            atividades_estagio = list(
+                AtividadeEstagioSupervisao.objects.for_user(user)
+                .filter(unidade=unidade)
+                .select_related("professor", "curso", "curso__curso")
+                .order_by("-semestre", "-data_inicio", "professor__rh_nome")[:200]
+            )
+
+        prof_ids = {a.professor_id for a in atividades_estagio}
+        mapa_sala = _mapa_alocacoes_sala_por_professor(prof_ids) if prof_ids else {}
+
+        for atividade in atividades_estagio:
+            info_sala = mapa_sala.get(atividade.professor_id)
+            atividade.em_sala = bool(info_sala)
+            atividade.disciplinas_sala = info_sala["disciplinas"] if info_sala else []
+            atividade.horas_sala = info_sala["horas_sala"] if info_sala else Decimal("0.00")
+            if unidade:
+                atividade.edit_form = AtividadeEstagioSupervisaoUnidadeForm(
+                    instance=atividade,
+                    unidade=unidade,
+                    auto_id=f"id_editestagio{atividade.pk}_%s",
+                )
+
+        form_nova = None
+        if unidade:
+            form_nova = AtividadeEstagioSupervisaoUnidadeForm(
+                unidade=unidade,
+                auto_id="id_novoestagio_%s",
+                initial={"data_inicio": hoje, "semestre": semestre_corrente, "num_estudantes": 1},
+            )
+
+        ctx.update({
+            "unidade": unidade,
+            "unidade_selecionada": unidade,
+            "unidades": unidades,
+            "hoje": hoje,
+            "semestre_corrente": semestre_corrente,
+            "atividades_estagio": atividades_estagio,
+            "form_nova_atividade_estagio": form_nova,
+            "is_coordenador": perfil == "COORDENADOR_UNIDADE",
+            "is_desup": perfil == "DESUP" or user.is_superuser,
+            "retorno": reverse_lazy("extra_curricular:supervisao_estagio"),
+        })
+        return ctx
+
+
+class AtividadeEstagioCreateView(LoginRequiredMixin, PerfilRequiredMixin, CreateView):
+    allowed_profiles = ["COORDENADOR_UNIDADE"]
+    template_name = "core/prioridade1/form_unidade.html"
+    success_url = reverse_lazy("extra_curricular:supervisao_estagio")
+
+    def get_form_class(self):
+        from apps.core.forms import AtividadeEstagioSupervisaoUnidadeForm
+        return AtividadeEstagioSupervisaoUnidadeForm
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["unidade"] = self.request.user.unidade
+        return kwargs
+
+    def form_valid(self, form):
+        from decimal import Decimal
+        from apps.core.services import registrar_evento_prioridade1
+        unidade = self.request.user.unidade
+        form.instance.unidade = unidade
+        form.instance.criado_por = self.request.user
+        form.instance.carga_reducao_horas = Decimal("0.00")
+        response = super().form_valid(form)
+        registrar_evento_prioridade1(
+            self.request,
+            "ATIVIDADE_ESTAGIO_UNIDADE_CRIADA",
+            f"Atividade estágio {self.object.pk}; unidade {unidade.pk}; "
+            f"tipo {self.object.tipo}; professor {self.object.professor_id}.",
+        )
+        messages.success(self.request, "Atividade de estágio e supervisão registrada com sucesso.")
+        return response
+
+
+class AtividadeEstagioUpdateView(LoginRequiredMixin, PerfilRequiredMixin, UpdateView):
+    allowed_profiles = ["COORDENADOR_UNIDADE"]
+    template_name = "core/prioridade1/form_unidade.html"
+    success_url = reverse_lazy("extra_curricular:supervisao_estagio")
+
+    def get_queryset(self):
+        from apps.core.models import AtividadeEstagioSupervisao
+        unidade = self.request.user.unidade
+        return (
+            AtividadeEstagioSupervisao.objects.for_user(self.request.user)
+            .filter(unidade=unidade)
+            .select_related("unidade", "professor", "curso")
+        )
+
+    def get_form_class(self):
+        from apps.core.forms import AtividadeEstagioSupervisaoUnidadeForm
+        return AtividadeEstagioSupervisaoUnidadeForm
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["unidade"] = self.object.unidade
+        return kwargs
+
+    def form_valid(self, form):
+        from apps.core.models import AtividadeEstagioSupervisao
+        from apps.core.services import registrar_evento_prioridade1
+        original = AtividadeEstagioSupervisao.objects.only("unidade_id", "carga_reducao_horas").get(
+            pk=self.object.pk
+        )
+        form.instance.unidade_id = original.unidade_id
+        form.instance.carga_reducao_horas = original.carga_reducao_horas
+        response = super().form_valid(form)
+        registrar_evento_prioridade1(
+            self.request,
+            "ATIVIDADE_ESTAGIO_UNIDADE_ATUALIZADA",
+            f"Atividade estágio {self.object.pk}; unidade {self.object.unidade_id}; tipo {self.object.tipo}.",
+        )
+        messages.success(self.request, "Atividade de estágio e supervisão atualizada com sucesso.")
+        return response
+
+
+class AtividadeEstagioEncerrarView(LoginRequiredMixin, PerfilRequiredMixin, View):
+    allowed_profiles = ["COORDENADOR_UNIDADE"]
+    http_method_names = ["post", "head", "options"]
+
+    def post(self, request, pk):
+        from django.db import transaction
+        from django.utils import timezone
+        from apps.core.models import AtividadeEstagioSupervisao
+        from apps.core.services import registrar_evento_prioridade1
+
+        unidade = request.user.unidade
+        with transaction.atomic():
+            atividade = get_object_or_404(
+                AtividadeEstagioSupervisao.objects.for_user(request.user)
+                .filter(unidade=unidade)
+                .select_for_update(),
+                pk=pk,
+            )
+            hoje = timezone.localdate()
+            if atividade.data_fim and atividade.data_fim < hoje:
+                messages.info(request, "Esta atividade de estágio/supervisão já estava encerrada.")
+                return redirect("extra_curricular:supervisao_estagio")
+            atividade.data_fim = max(hoje, atividade.data_inicio)
+            atividade.save(update_fields=["data_fim", "atualizado_em"])
+            registrar_evento_prioridade1(
+                request,
+                "ATIVIDADE_ESTAGIO_UNIDADE_ENCERRADA",
+                f"Atividade estágio {atividade.pk}; unidade {unidade.pk}; fim {atividade.data_fim}.",
+            )
+        messages.success(request, "Atividade de estágio e supervisão encerrada com sucesso.")
+        return redirect("extra_curricular:supervisao_estagio")

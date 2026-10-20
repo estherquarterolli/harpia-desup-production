@@ -1435,8 +1435,6 @@ class EquipeDiretivaUnidadeView(UnidadePrioridade1Mixin, TemplateView):
             partial = self.request.GET.get('partial', '')
             if partial == 'historico':
                 return ['core/prioridade1/partials/_historico_equipe_unidade.html']
-            if partial == 'estagio':
-                return ['core/prioridade1/partials/_estagio_supervisao_list.html']
         return [self.template_name]
 
     def get_context_data(self, **kwargs):
@@ -1445,11 +1443,9 @@ class EquipeDiretivaUnidadeView(UnidadePrioridade1Mixin, TemplateView):
         from apps.allocations.services import semestre_atual
         from apps.core.busca import filtrar_contem
         from .forms import (
-            AtividadeEstagioSupervisaoUnidadeForm,
             OcupacaoEquipeDiretivaUnidadeForm,
         )
         from .models import (
-            AtividadeEstagioSupervisao,
             OcupacaoEquipeDiretiva,
             TipoCargoDiretivo,
         )
@@ -1468,15 +1464,8 @@ class EquipeDiretivaUnidadeView(UnidadePrioridade1Mixin, TemplateView):
         )
         todas_ocupacoes = list(ocupacoes_qs[:300])
 
-        atividades_estagio = list(
-            AtividadeEstagioSupervisao.objects.for_user(self.request.user)
-            .filter(unidade=unidade)
-            .select_related('professor', 'curso', 'curso__curso')
-            .order_by('-semestre', '-data_inicio', 'professor__rh_nome')[:200]
-        )
-
         # Coleta IDs de professores para verificar alocações vigentes em sala de aula.
-        prof_ids = {o.professor_id for o in todas_ocupacoes} | {a.professor_id for a in atividades_estagio}
+        prof_ids = {o.professor_id for o in todas_ocupacoes}
         mapa_sala = _mapa_alocacoes_sala_por_professor(prof_ids)
 
         por_cargo = {}
@@ -1515,31 +1504,7 @@ class EquipeDiretivaUnidadeView(UnidadePrioridade1Mixin, TemplateView):
                             'reducao_horas': ocupacao.carga_reducao_horas,
                         })
 
-        for atividade in atividades_estagio:
-            info_sala = mapa_sala.get(atividade.professor_id)
-            atividade.em_sala = bool(info_sala)
-            atividade.disciplinas_sala = info_sala['disciplinas'] if info_sala else []
-            atividade.horas_sala = info_sala['horas_sala'] if info_sala else Decimal('0.00')
-            atividade.edit_form = AtividadeEstagioSupervisaoUnidadeForm(
-                instance=atividade,
-                unidade=unidade,
-                auto_id=f'id_editestagio{atividade.pk}_%s',
-            )
-            if atividade.vigente and atividade.em_sala:
-                chave_alerta = ('ESTAGIO', atividade.pk)
-                if chave_alerta not in vistos_alerta:
-                    vistos_alerta.add(chave_alerta)
-                    alertas_em_sala.append({
-                        'ocupacao_pk': f"estagio-{atividade.pk}",
-                        'professor_nome': atividade.professor.nome,
-                        'funcao_label': (
-                            f"{atividade.get_tipo_display()} ({atividade.curso.sigla})"
-                            if atividade.curso_id else atividade.get_tipo_display()
-                        ),
-                        'disciplinas': atividade.disciplinas_sala,
-                        'horas_sala': atividade.horas_sala,
-                        'reducao_horas': atividade.carga_reducao_horas,
-                    })
+
 
         cargos = list(
             TipoCargoDiretivo.objects.filter(
@@ -1603,12 +1568,6 @@ class EquipeDiretivaUnidadeView(UnidadePrioridade1Mixin, TemplateView):
             'historico_page_obj': historico_page_obj,
             'filtro_q': filtro_q,
             'filtro_situacao': filtro_situacao,
-            'atividades_estagio': atividades_estagio,
-            'form_nova_atividade_estagio': AtividadeEstagioSupervisaoUnidadeForm(
-                unidade=unidade,
-                auto_id='id_novoestagio_%s',
-                initial={'data_inicio': hoje, 'semestre': semestre_corrente, 'num_estudantes': 1},
-            ),
             'retorno': reverse_lazy('core:equipe_diretiva_unidade'),
         })
         return ctx
@@ -1762,7 +1721,7 @@ class AtividadeEstagioSupervisaoCreateView(UnidadePrioridade1Mixin, RetornoOrige
     model = AtividadeEstagioSupervisao
     form_class = AtividadeEstagioSupervisaoUnidadeForm
     template_name = 'core/prioridade1/form_unidade.html'
-    success_url = reverse_lazy('core:equipe_diretiva_unidade')
+    success_url = reverse_lazy('extra_curricular:supervisao_estagio')
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -1813,7 +1772,7 @@ class AtividadeEstagioSupervisaoUpdateView(UnidadePrioridade1Mixin, RetornoOrige
     model = AtividadeEstagioSupervisao
     form_class = AtividadeEstagioSupervisaoUnidadeForm
     template_name = 'core/prioridade1/form_unidade.html'
-    success_url = reverse_lazy('core:equipe_diretiva_unidade')
+    success_url = reverse_lazy('extra_curricular:supervisao_estagio')
 
     def get_queryset(self):
         from .models import AtividadeEstagioSupervisao
@@ -1881,7 +1840,7 @@ class AtividadeEstagioSupervisaoEncerrarView(UnidadePrioridade1Mixin, View):
             hoje = timezone.localdate()
             if atividade.data_fim and atividade.data_fim < hoje:
                 messages.info(request, 'Esta atividade de estágio/supervisão já estava encerrada.')
-                return redirect('core:equipe_diretiva_unidade')
+                return redirect('extra_curricular:supervisao_estagio')
             atividade.data_fim = max(hoje, atividade.data_inicio)
             atividade.save(update_fields=['data_fim', 'atualizado_em'])
             registrar_evento_prioridade1(
@@ -1890,5 +1849,5 @@ class AtividadeEstagioSupervisaoEncerrarView(UnidadePrioridade1Mixin, View):
                 f'Atividade estágio {atividade.pk}; unidade {unidade.pk}; fim {atividade.data_fim}.',
             )
         messages.success(request, 'Atividade de estágio e supervisão encerrada com sucesso.')
-        return redirect('core:equipe_diretiva_unidade')
+        return redirect('extra_curricular:supervisao_estagio')
 

@@ -144,7 +144,7 @@
           <form method="POST" action="{% url 'extra_curricular:enviar_desup' pk=object.pk %}" class="m-0" onsubmit="this.querySelector('button[type=submit], input[type=submit]').disabled=true; return true;">
             {% csrf_token %}
             <button type="submit"
-              onclick="if(!confirm('Tem certeza que deseja enviar para a DESUP? Após o envio não será possível alterar as justificativas e o SEI passa a ser obrigatório.')) return false;"
+              onclick="if(!confirm('Tem certeza que deseja enviar para a DESUP? Após o envio não será possível alterar as justificativas.')) return false;"
               class="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-black text-xs px-4 py-2 rounded-xl transition-colors shadow-sm">
               <i class="ph ph-paper-plane-right"></i> Enviar para Aprovação
             </button>
@@ -185,10 +185,10 @@
         </button>
         {% endif %}
         {% else %}
-        <span class="text-slate-400 italic">Número SEI ainda não informado.</span>
+        <span class="text-slate-500 italic">Número SEI não informado (opcional).</span>
         {% if is_coordenador %}
-        <button onclick="toggleElement('seiForm')" class="text-xs text-orange-500 hover:underline flex items-center gap-1 font-bold ml-2 bg-orange-50 px-2 py-1 rounded">
-            <i class="ph ph-pencil-simple"></i> Clique aqui para preencher o SEI
+        <button onclick="toggleElement('seiForm')" class="text-xs text-[#025c9f] hover:underline flex items-center gap-1 font-bold ml-2 bg-blue-50 px-2 py-1 rounded">
+            <i class="ph ph-pencil-simple"></i> Preencher SEI
         </button>
         {% endif %}
         {% endif %}
@@ -234,69 +234,27 @@
       {% endif %}
     </div>
 
-    {% if request.GET.sei_error and is_coordenador %}
-    <div id="seiErrorPopup"
-         class="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm px-4">
-      <div class="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl border border-red-200">
-        <div class="px-6 py-5 border-b border-red-100 bg-red-50 flex items-start gap-3">
-          <i class="ph ph-warning-circle text-3xl text-red-600 mt-0.5"></i>
-          <div>
-            <h3 class="text-base font-black text-red-700 uppercase tracking-wide">SEI obrigatório</h3>
-            <p class="mt-2 text-sm text-slate-700 font-semibold">
-              Para enviar para a DESUP, você precisa preencher o número SEI.
-            </p>
-          </div>
-        </div>
-        <div class="px-6 py-5 flex flex-wrap gap-3 justify-end">
-          <button type="button"
-                  class="px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
-                  onclick="document.getElementById('seiErrorPopup')?.remove()">
-            Fechar
-          </button>
-          <button type="button"
-                  class="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-black transition-colors"
-                  onclick="toggleElement('seiForm'); document.getElementById('seiErrorPopup')?.remove(); document.querySelector('input[name=sei_numero]')?.focus();">
-            Clique aqui para editar SEI
-          </button>
-        </div>
-      </div>
-    </div>
-    {% endif %}
-
     {# Form Oculto para Editar SEI #}
     {% if is_coordenador %}
     <div id="seiForm" class="menu-hidden mt-4 pt-4 border-t border-slate-100">
         <form method="POST" action="{% url 'extra_curricular:editar_sei' pk=object.pk %}" class="flex items-end gap-3 flex-wrap max-w-sm" onsubmit="this.querySelector('button[type=submit], input[type=submit]').disabled=true; return true;">
             {% csrf_token %}
             <div class="flex-1">
-                <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Número SEI</label>
+                <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Número SEI (Opcional)</label>
                 <input type="text" name="sei_numero" value="{{ object.sei_numero|default:'' }}" class="form-field" placeholder="SEI-999999/999999/9999">
             </div>
-            <button type="submit" class="bg-[#025c9f] hover:bg-[#025c9f] text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 h-[38px]">
+            <button type="submit" class="bg-[#025c9f] hover:bg-[#153e70] text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 h-[38px]">
                 <i class="ph ph-floppy-disk"></i> Salvar
             </button>
         </form>
     </div>
     {% endif %}
-
-    {# Bloqueio de 5 dias #}
-    {% if not object.sei_numero %}
-    {% load tz %}
-    {% now "Y-m-d" as todays_date %}
-    <!-- Calculo rudimentar no template (o back-end já bloqueia a submissão), apenas aviso visual -->
-    <div class="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-700 flex items-center gap-3">
-        <i class="ph ph-warning-circle text-2xl flex-shrink-0"></i>
-        <span>Essa pendencia não possui número SEI, seu rascunho ficará salvo por 5 dias! Após isso ele será excluído.</span>
-    </div>
-    {% endif %}
   </div>
-
 
   <div class="mb-4 rounded-xl border border-blue-100 bg-blue-50 p-4 text-xs text-blue-700 flex items-center gap-3">
     <i class="ph ph-info text-xl flex-shrink-0"></i>
     <span>
-      <strong>Regra SEI:</strong> O processo SEI principal deve conter <strong>somente</strong> as justificativas 
-      previstas abaixo (TCC, Extensão e Redução de CH). Casos não enquadrados exigem SEI.
+      <strong>Processo SEI (Opcional):</strong> Caso utilize processo SEI, informe o identificador para acompanhamento das justificativas previstas abaixo (TCC, Extensão e Redução de CH).
     </span>
   </div>
 

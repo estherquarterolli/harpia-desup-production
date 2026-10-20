@@ -611,3 +611,194 @@ Resumo: o docente deixou de ser um campo de `MatrixComponent` e passou a ser reg
 - A medição em produção (`PROFILE_REQUESTS=1`, linha `PERF` / `Server-Timing`) ainda precisa ser feita após o deploy para confirmar o tempo real. O SQLite local não reproduz a latência do banco remoto.
 - Fora de escopo, mantidos como estão: paginação antes do cálculo, `conn_max_age=0` e índices (sem evidência medida).
 
+
+
+## 20/10/2026 — Adequação das regras de negócio: SEI Opcional, Supervisão de Estágio e Restrição de Professores por Unidade
+
+### `project_root/apps/extra_curricular/views.py`
+- Tipo: alterado.
+- Alteração: remoção da trava que impedia salvar justificativas após 5 dias da criação da pendência sem número SEI (`_BaseItemSaveView`); remoção da obrigatoriedade do SEI no envio individual (`EnviarParaDesupView`) e no envio em lote (`EnviarParaDesupLoteView`). Criadas as views de gestão de estágio: `SupervisaoEstagioListView`, `AtividadeEstagioCreateView`, `AtividadeEstagioUpdateView` e `AtividadeEstagioEncerrarView` com suporte a controle por unidade via `UnidadePrioridade1Mixin`.
+- Motivo: atender às Mudanças 1 e 2 da especificação, tornando o preenchimento do SEI totalmente opcional tanto no cadastro quanto no envio para a DESUP, e viabilizando a gestão das atividades de estágio diretamente no módulo de alocação extracurricular.
+
+### `project_root/apps/extra_curricular/urls.py`
+- Tipo: alterado.
+- Alteração: adição das rotas `estagio/` (`supervisao_estagio`), `estagio/novo/` (`estagio_create`), `estagio/<int:pk>/editar/` (`estagio_update`) e `estagio/<int:pk>/encerrar/` (`estagio_encerrar`) sob o namespace `extra_curricular`.
+- Motivo: expor as operações de visualização, criação, edição e encerramento da nova janela Supervisão de Estágio.
+
+### `project_root/templates/extra_curricular/pendencia_detail.html` e `pendencia_lote.html`
+- Tipo: alterado.
+- Alteração: remoção de indicadores visuais de obrigatoriedade (como texto "Obrigatório" e badge de trava de 5 dias), remoção do bloqueio por pop-up em JavaScript (`seiErrorPopup`) e ajuste do texto do modal de confirmação para informar que o SEI é opcional.
+- Motivo: garantir coerência visual e de usabilidade no frontend da Alocação Extracurricular, permitindo envio sem preenchimento do SEI.
+
+### `project_root/templates/extra_curricular/partials/_accordion_extensao.html`, `_accordion_extensao_lote.html`, `_accordion_reducao.html`, `_accordion_reducao_lote.html`, `_accordion_tcc.html`, `_accordion_tcc_lote.html`
+- Tipo: alterado.
+- Alteração: atualização dos textos informativos nos accordions de justificativa, substituindo menções a "Justificativa SEI obrigatória" por textos neutros de instrução cadastral.
+- Motivo: alinhamento com a nova diretriz de SEI opcional.
+
+### `project_root/templates/core/prioridade1/equipe_diretiva_unidade.html`
+- Tipo: alterado.
+- Alteração: remoção do botão "Registrar estágio / supervisão", da seção de atividades de estágio (`_estagio_supervisao_list.html`) e dos modais de cadastro e edição de estágio (`#modalNovoEstagioUnidade` e `#modalEditarEstagioUnidade`). Preservadas intactas as funções da equipe diretiva.
+- Motivo: atender à Etapa B da Mudança 2, retirando a funcionalidade de estágio da aba Equipe Diretiva.
+
+### `project_root/apps/core/views.py`
+- Tipo: alterado.
+- Alteração: remoção da consulta e do contexto de estágio em `EquipeDiretivaUnidadeView`; ajuste de redirecionamento em `AtividadeEstagioSupervisaoCreateView`, `AtividadeEstagioSupervisaoUpdateView` e `AtividadeEstagioSupervisaoEncerrarView` para a nova rota `extra_curricular:supervisao_estagio`.
+- Motivo: sincronizar o backend da Equipe Diretiva e manter compatibilidade retroativa redirecionando fluxos de estágio para a nova aba.
+
+### `project_root/templates/extra_curricular/pendencia_list.html`
+- Tipo: alterado.
+- Alteração: adição da aba de navegação superior "Supervisão de Estágio" ao lado de "Pendências" e "Rascunhos" na Alocação Extracurricular.
+- Motivo: fornecer ponto de entrada claro e integrado para a nova janela de estágio.
+
+### `project_root/templates/extra_curricular/supervisao_estagio_list.html`
+- Tipo: criado.
+- Alteração: criação do template completo da janela Supervisão de Estágio, contendo abas de navegação, botão de cadastro, resumo de horas em sala x redução, tabela de atividades ativas com modal de encerramento e edição, listagem de atividades encerradas e modais integrados.
+- Motivo: disponibilizar na aba Alocação Extracurricular as operações de estágio antes localizadas na Equipe Diretiva, preservando dados históricos e conformidade visual com o Harpia.
+
+### `project_root/apps/professors/models.py`
+- Tipo: alterado.
+- Alteração: atualização do método `Professor.vinculado_a_unidade(unidade)` para reconhecer formally cessões aprovadas registradas em `SolicitacaoProfessorExterno` com `status='APROVADA'` e `tipo='CESSAO'`.
+- Motivo: garantir consistência no model entre professores lotados originalmente na unidade e professores cedidos aprovados pela DESUP.
+
+### `project_root/apps/allocations/services.py`
+- Tipo: alterado.
+- Alteração: implementação das funções de segurança `professores_autorizados_unidade_qs(unidade_id)` e `professor_autorizado_para_unidade(docente_id, unidade_id)`. Atualização de `definir_escolha` para impedir alocações de docentes não autorizados caso o usuário seja Coordenador de Unidade.
+- Motivo: centralizar no serviço de alocação a regra de isolamento de professores por unidade e cessão formal aprovada.
+
+### `project_root/apps/allocations/views.py`
+- Tipo: alterado.
+- Alteração: `BuscarProfessoresView` força `user.unidade_id` para usuários do perfil `COORDENADOR_UNIDADE` (ignorando manipulações de querystring como `unidade_alocacao` ou `unidade_id`); `AlocarDocenteComponenteView` verifica `professor_autorizado_para_unidade` e responde com HTTP 403 Forbidden se houver tentativa de alocar docente externo sem cessão aprovada; `AllocCurricularView` restringe `professores_unidade` aos docentes autorizados da unidade.
+- Motivo: atender integralmente à Mudança 3, blindando tanto o autocomplete/busca quanto a alocação no backend contra tentativas de contorno ou manipulação direta via POST.
+
+### `project_root/apps/professors/views.py`
+- Tipo: alterado.
+- Alteração: filtro de `htmx_tabela_alocacao` ajustado para restringir a unidade do usuário quando não for DESUP/ADMIN.
+- Motivo: impedir vazamento de listagens de professores em requisições parciais.
+
+### `project_root/apps/professors/migrations/0005_remove_limite_horas_extra.py` e `0008_professor_locais_lotacao.py`
+- Tipo: alterado.
+- Alteração: inclusão de checagem condicional de banco (`schema_editor.connection.vendor == 'postgresql'`) para comandos de SQL cru incompatíveis com o runner SQLite de testes locais.
+- Motivo: garantir execução transparente de testes automatizados locais mantendo compatibilidade plena com o banco PostgreSQL de produção.
+
+### `project_root/apps/core/tests_prioridade1_unidade.py`
+- Tipo: alterado.
+- Alteração: ajuste de redirecionamentos e verificação de template nos testes de atividades de estágio para apontar para `extra_curricular:supervisao_estagio`.
+- Motivo: sincronizar a suíte de testes legada de Prioridade 1 com a transferência da funcionalidade de estágio para Alocação Extracurricular.
+
+### `project_root/apps/core/tests_regras_negocio_alocacao.py`
+- Tipo: criado.
+- Alteração: suíte de 15 testes automatizados cobrindo exaustivamente todos os critérios de aceite das três mudanças de regras de negócio:
+  1. Cadastro e edição extracurricular com SEI vazio.
+  2. Persistência de SEI preenchido no formato oficial.
+  3. Envio individual e em lote para a DESUP sem preenchimento do SEI.
+  4. Salvar justificativa após 5 dias da pendência sem bloquear por ausência de SEI.
+  5. Remoção do acesso e botões de estágio na tela Equipe Diretiva.
+  6. Presença da aba Supervisão de Estágio em Alocação Extracurricular.
+  7. Visualização de registros históricos e cadastro de novas atividades de estágio na nova janela.
+  8. Omissão de professores de outras unidades na busca do coordenador.
+  9. Presença de professores cedidos com cessão aprovada na busca do coordenador.
+  10. Bloqueio no backend com HTTP 403 Forbidden em tentativa de alocar professor externo sem cessão.
+  11. Sucesso ao alocar professor da própria unidade e professor cedido autorizado.
+  12. Preservação da visão global e acesso irrestrito para o perfil DESUP.
+
+### Verificações
+- `python manage.py check`: 0 problemas encontrados (`0 silenced`).
+- `python manage.py test apps.core.tests_regras_negocio_alocacao`: 15 testes executados, 15 aprovados (`OK`).
+- `python manage.py test apps.core.tests_prioridade1_unidade`: 12 testes executados, 12 aprovados (`OK`).
+- `python manage.py test apps.allocations.tests`: 5 testes executados, 5 aprovados (`OK`).
+
+
+## 20/10/2026 — Adequação das regras de negócio: SEI Opcional, Supervisão de Estágio e Restrição de Professores por Unidade
+
+### `project_root/apps/extra_curricular/views.py`
+- Tipo: alterado.
+- Alteração: remoção da trava que impedia salvar justificativas após 5 dias da criação da pendência sem número SEI (`_BaseItemSaveView`); remoção da obrigatoriedade do SEI no envio individual (`EnviarParaDesupView`) e no envio em lote (`EnviarParaDesupLoteView`). Criadas as views de gestão de estágio: `SupervisaoEstagioListView`, `AtividadeEstagioCreateView`, `AtividadeEstagioUpdateView` e `AtividadeEstagioEncerrarView` com suporte a controle por unidade via `UnidadePrioridade1Mixin`.
+- Motivo: atender às Mudanças 1 e 2 da especificação, tornando o preenchimento do SEI totalmente opcional tanto no cadastro quanto no envio para a DESUP, e viabilizando a gestão das atividades de estágio diretamente no módulo de alocação extracurricular.
+
+### `project_root/apps/extra_curricular/urls.py`
+- Tipo: alterado.
+- Alteração: adição das rotas `estagio/` (`supervisao_estagio`), `estagio/novo/` (`estagio_create`), `estagio/<int:pk>/editar/` (`estagio_update`) e `estagio/<int:pk>/encerrar/` (`estagio_encerrar`) sob o namespace `extra_curricular`.
+- Motivo: expor as operações de visualização, criação, edição e encerramento da nova janela Supervisão de Estágio.
+
+### `project_root/templates/extra_curricular/pendencia_detail.html` e `pendencia_lote.html`
+- Tipo: alterado.
+- Alteração: remoção de indicadores visuais de obrigatoriedade (como texto "Obrigatório" e badge de trava de 5 dias), remoção do bloqueio por pop-up em JavaScript (`seiErrorPopup`) e ajuste do texto do modal de confirmação para informar que o SEI é opcional.
+- Motivo: garantir coerência visual e de usabilidade no frontend da Alocação Extracurricular, permitindo envio sem preenchimento do SEI.
+
+### `project_root/templates/extra_curricular/partials/_accordion_extensao.html`, `_accordion_extensao_lote.html`, `_accordion_reducao.html`, `_accordion_reducao_lote.html`, `_accordion_tcc.html`, `_accordion_tcc_lote.html`
+- Tipo: alterado.
+- Alteração: atualização dos textos informativos nos accordions de justificativa, substituindo menções a "Justificativa SEI obrigatória" por textos neutros de instrução cadastral.
+- Motivo: alinhamento com a nova diretriz de SEI opcional.
+
+### `project_root/templates/core/prioridade1/equipe_diretiva_unidade.html`
+- Tipo: alterado.
+- Alteração: remoção do botão "Registrar estágio / supervisão", da seção de atividades de estágio (`_estagio_supervisao_list.html`) e dos modais de cadastro e edição de estágio (`#modalNovoEstagioUnidade` e `#modalEditarEstagioUnidade`). Preservadas intactas as funções da equipe diretiva.
+- Motivo: atender à Etapa B da Mudança 2, retirando a funcionalidade de estágio da aba Equipe Diretiva.
+
+### `project_root/apps/core/views.py`
+- Tipo: alterado.
+- Alteração: remoção da consulta e do contexto de estágio em `EquipeDiretivaUnidadeView`; ajuste de redirecionamento em `AtividadeEstagioSupervisaoCreateView`, `AtividadeEstagioSupervisaoUpdateView` e `AtividadeEstagioSupervisaoEncerrarView` para a nova rota `extra_curricular:supervisao_estagio`.
+- Motivo: sincronizar o backend da Equipe Diretiva e manter compatibilidade retroativa redirecionando fluxos de estágio para a nova aba.
+
+### `project_root/templates/extra_curricular/pendencia_list.html`
+- Tipo: alterado.
+- Alteração: adição da aba de navegação superior "Supervisão de Estágio" ao lado de "Pendências" e "Rascunhos" na Alocação Extracurricular.
+- Motivo: fornecer ponto de entrada claro e integrado para a nova janela de estágio.
+
+### `project_root/templates/extra_curricular/supervisao_estagio_list.html`
+- Tipo: criado.
+- Alteração: criação do template completo da janela Supervisão de Estágio, contendo abas de navegação, botão de cadastro, resumo de horas em sala x redução, tabela de atividades ativas com modal de encerramento e edição, listagem de atividades encerradas e modais integrados.
+- Motivo: disponibilizar na aba Alocação Extracurricular as operações de estágio antes localizadas na Equipe Diretiva, preservando dados históricos e conformidade visual com o Harpia.
+
+### `project_root/apps/professors/models.py`
+- Tipo: alterado.
+- Alteração: atualização do método `Professor.vinculado_a_unidade(unidade)` para reconhecer formally cessões aprovadas registradas em `SolicitacaoProfessorExterno` com `status='APROVADA'` e `tipo='CESSAO'`.
+- Motivo: garantir consistência no model entre professores lotados originalmente na unidade e professores cedidos aprovados pela DESUP.
+
+### `project_root/apps/allocations/services.py`
+- Tipo: alterado.
+- Alteração: implementação das funções de segurança `professores_autorizados_unidade_qs(unidade_id)` e `professor_autorizado_para_unidade(docente_id, unidade_id)`. Atualização de `definir_escolha` para impedir alocações de docentes não autorizados caso o usuário seja Coordenador de Unidade.
+- Motivo: centralizar no serviço de alocação a regra de isolamento de professores por unidade e cessão formal aprovada.
+
+### `project_root/apps/allocations/views.py`
+- Tipo: alterado.
+- Alteração: `BuscarProfessoresView` força `user.unidade_id` para usuários do perfil `COORDENADOR_UNIDADE` (ignorando manipulações de querystring como `unidade_alocacao` ou `unidade_id`); `AlocarDocenteComponenteView` verifica `professor_autorizado_para_unidade` e responde com HTTP 403 Forbidden se houver tentativa de alocar docente externo sem cessão aprovada; `AllocCurricularView` restringe `professores_unidade` aos docentes autorizados da unidade.
+- Motivo: atender integralmente à Mudança 3, blindando tanto o autocomplete/busca quanto a alocação no backend contra tentativas de contorno ou manipulação direta via POST.
+
+### `project_root/apps/professors/views.py`
+- Tipo: alterado.
+- Alteração: filtro de `htmx_tabela_alocacao` ajustado para restringir a unidade do usuário quando não for DESUP/ADMIN.
+- Motivo: impedir vazamento de listagens de professores em requisições parciais.
+
+### `project_root/apps/professors/migrations/0005_remove_limite_horas_extra.py` e `0008_professor_locais_lotacao.py`
+- Tipo: alterado.
+- Alteração: inclusão de checagem condicional de banco (`schema_editor.connection.vendor == 'postgresql'`) para comandos de SQL cru incompatíveis com o runner SQLite de testes locais.
+- Motivo: garantir execução transparente de testes automatizados locais mantendo compatibilidade plena com o banco PostgreSQL de produção.
+
+### `project_root/apps/core/tests_prioridade1_unidade.py`
+- Tipo: alterado.
+- Alteração: ajuste de redirecionamentos e verificação de template nos testes de atividades de estágio para apontar para `extra_curricular:supervisao_estagio`.
+- Motivo: sincronizar a suíte de testes legada de Prioridade 1 com a transferência da funcionalidade de estágio para Alocação Extracurricular.
+
+### `project_root/apps/core/tests_regras_negocio_alocacao.py`
+- Tipo: criado.
+- Alteração: suíte de 15 testes automatizados cobrindo exaustivamente todos os critérios de aceite das três mudanças de regras de negócio:
+  1. Cadastro e edição extracurricular com SEI vazio.
+  2. Persistência de SEI preenchido no formato oficial.
+  3. Envio individual e em lote para a DESUP sem preenchimento do SEI.
+  4. Salvar justificativa após 5 dias da pendência sem bloquear por ausência de SEI.
+  5. Remoção do acesso e botões de estágio na tela Equipe Diretiva.
+  6. Presença da aba Supervisão de Estágio em Alocação Extracurricular.
+  7. Visualização de registros históricos e cadastro de novas atividades de estágio na nova janela.
+  8. Omissão de professores de outras unidades na busca do coordenador.
+  9. Presença de professores cedidos com cessão aprovada na busca do coordenador.
+  10. Bloqueio no backend com HTTP 403 Forbidden em tentativa de alocar professor externo sem cessão.
+  11. Sucesso ao alocar professor da própria unidade e professor cedido autorizado.
+  12. Preservação da visão global e acesso irrestrito para o perfil DESUP.
+
+### Verificações
+- `python manage.py check`: 0 problemas encontrados (`0 silenced`).
+- `python manage.py test apps.core.tests_regras_negocio_alocacao`: 15 testes executados, 15 aprovados (`OK`).
+- `python manage.py test apps.core.tests_prioridade1_unidade`: 12 testes executados, 12 aprovados (`OK`).
+- `python manage.py test apps.allocations.tests`: 5 testes executados, 5 aprovados (`OK`).
+

@@ -26,14 +26,13 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
 (COORDENADOR_UNIDADE; DESUP/superuser fazem bypass da janela).
 {% endcomment %}
 
-  {% if not is_desup %}
-  <nav class="mb-4 flex items-end gap-1 border-b border-slate-200" aria-label="Visualizações das pendências">
+  <nav class="mb-4 flex items-end gap-1 border-b border-slate-200" aria-label="Visualizações das pendências e estágio">
     <a href="{% url 'extra_curricular:pendencia_list' %}"
        class="inline-flex min-h-10 items-center gap-2 rounded-t-xl border border-b-white border-slate-200 bg-white px-4 py-2 text-xs font-black text-[#025c9f]">
       <i class="ph ph-list-bullets text-base"></i>
       Pendências
     </a>
-    {% if rascunhos_count %}
+    {% if not is_desup and rascunhos_count %}
     <a href="{% url 'extra_curricular:pendencia_lote' %}?ids={{ rascunho_professor_ids }}"
        class="inline-flex min-h-10 items-center gap-2 rounded-t-xl border border-transparent px-4 py-2 text-xs font-black text-amber-700 transition-colors hover:border-amber-200 hover:bg-amber-50"
        title="Editar todos os rascunhos de uma vez">
@@ -42,8 +41,12 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
       <span class="inline-flex min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">{{ rascunhos_count }}</span>
     </a>
     {% endif %}
+    <a href="{% url 'extra_curricular:supervisao_estagio' %}"
+       class="inline-flex min-h-10 items-center gap-2 rounded-t-xl border border-transparent px-4 py-2 text-xs font-black text-slate-600 transition-colors hover:border-slate-200 hover:bg-slate-50">
+      <i class="ph ph-student text-base"></i>
+      Supervisão de Estágio
+    </a>
   </nav>
-  {% endif %}
 
   {# Unidade permanece visível; os demais filtros ficam recolhidos. #}
   <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

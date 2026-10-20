@@ -606,9 +606,19 @@ def alloc_curricular_view(request):
 def htmx_tabela_alocacao(request):
     from django.core.paginator import Paginator
 
-    queryset = Professor.objects.select_related('tipo_contrato').prefetch_related(
-        'unidades', 'ocupacoes_diretivas'
-    ).order_by('rh_nome')
+    user = request.user
+    if not _perfil_desup(user):
+        if user.unidade_id:
+            from apps.allocations.services import professores_autorizados_unidade_qs
+            queryset = professores_autorizados_unidade_qs(user.unidade_id).select_related('tipo_contrato').prefetch_related(
+                'unidades', 'ocupacoes_diretivas'
+            ).order_by('rh_nome')
+        else:
+            queryset = Professor.objects.none()
+    else:
+        queryset = Professor.objects.select_related('tipo_contrato').prefetch_related(
+            'unidades', 'ocupacoes_diretivas'
+        ).order_by('rh_nome')
 
     # Esta tela legada era o Ãºltimo ponto que ainda materializava todos os
     # professores antes de calcular suas cargas. Paginar antes dos cÃ¡lculos
