@@ -130,12 +130,11 @@ class PrimeiroAcessoObrigatorioE2ETests(BaseE2ETestCase):
         self.assertEqual(formulario.status_code, 200)
         self.assertTemplateUsed(formulario, 'registration/password_change_form.html')
         self.assertContains(formulario, 'você deve alterar a sua senha antes de prosseguir')
-        self.assertContains(formulario, 'name="old_password"')
+        self.assertNotContains(formulario, 'name="old_password"')
         self.assertContains(formulario, 'name="new_password1"')
 
-        # 4) Troca efetivada: volta ao login com o aviso de sucesso.
+        # 4) Troca efetivada (sem pedir a senha atual no primeiro acesso).
         troca = self.client.post(URL_TROCA_SENHA, {
-            'old_password': self.senha_inicial,
             'new_password1': self.senha_nova,
             'new_password2': self.senha_nova,
         })
@@ -199,7 +198,6 @@ class PrimeiroAcessoObrigatorioE2ETests(BaseE2ETestCase):
         self.fazer_login(self.novato.email, self.senha_inicial)
 
         recusa = self.client.post(URL_TROCA_SENHA, {
-            'old_password': self.senha_inicial,
             'new_password1': 'senha123',
             'new_password2': 'senha123',
         })

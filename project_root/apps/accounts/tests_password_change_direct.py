@@ -67,12 +67,11 @@ class DirectPasswordChangeTests(TestCase):
             ).exists()
         )
 
-    def test_primeiro_acesso_tambem_exige_a_senha_atual(self):
+    def test_primeiro_acesso_nao_exige_a_senha_atual(self):
         self.user.forcar_troca_senha = True
         self.user.save(update_fields=['forcar_troca_senha'])
 
         response = self.client.post('/accounts/password_change/', {
-            'old_password': self.current_password,
             'new_password1': self.new_password,
             'new_password2': self.new_password,
         })

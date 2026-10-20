@@ -237,6 +237,13 @@ class CustomPasswordChangeView(LoginRequiredMixin, PasswordChangeView):
     template_name = 'registration/password_change_form.html'
     form_class = PasswordChangeForm
 
+    def get_form_class(self):
+        # Primeiro acesso / senha redefinida pela DESUP: o usuário acabou de entrar
+        # com a senha temporária, então não pedimos a senha atual de novo.
+        if getattr(self.request.user, 'forcar_troca_senha', False):
+            return SetPasswordForm
+        return self.form_class
+
     def get_success_url(self):
         return str(reverse_lazy('profile'))
 
