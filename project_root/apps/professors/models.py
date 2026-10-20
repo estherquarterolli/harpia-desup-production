@@ -240,11 +240,35 @@ class Professor(models.Model):
         return self.tipo_contrato.max_total_hours if self.tipo_contrato else 0
 
     @property
-    def meta_horas_sala(self) -> int:
-        """Limite de horas em sala: metade da carga personalizada, ou o do contrato."""
+    def reducao_carga_vigente(self) -> float:
+        """Horas semanais de redução determinadas pela DESUP (equipe diretiva) hoje vigentes.
+
+        Usa `ocupacoes_diretivas` — se a consulta já fez prefetch, não gera query por professor.
+        """
+        from django.utils import timezone
+
+        hoje = timezone.localdate()
+        total = 0.0
+        for ocupacao in self.ocupacoes_diretivas.all():
+            if ocupacao.data_inicio <= hoje and (ocupacao.data_fim is None or ocupacao.data_fim >= hoje):
+                total += float(ocupacao.carga_reducao_horas or 0)
+        return total
+
+    @property
+    def meta_horas_base_sala(self) -> int:
+        """Limite de horas em sala antes da redução: metade da carga personalizada, ou o do contrato."""
         if self.carga_diferenciada and self.carga_horaria_personalizada:
             return self.carga_horaria_personalizada // 2
         return self.tipo_contrato.max_class_hours if self.tipo_contrato else 0
+
+    @property
+    def meta_horas_sala(self):
+        """Limite de horas em sala já descontada a redução vigente determinada pela DESUP."""
+        base = self.meta_horas_base_sala
+        reducao = self.reducao_carga_vigente
+        if not reducao:
+            return base
+        return max(base - reducao, 0.0)
 
     @property
     def ch_total(self) -> int:
@@ -315,7 +339,7 @@ class Professor(models.Model):
     def ch_nao_alocada(self) -> int:
         """Retorna as horas restantes do professor."""
         try:
-            saldo = self.ch_total - (self.ch_alocada + self.ch_justificada)
+            saldo = self.ch_total - (self.ch_alocada + self.ch_justificada + self.reducao_carga_vigente)
             return max(saldo, 0)
         except Exception:
             return 0
@@ -326,7 +350,7 @@ class Professor(models.Model):
         try:
             if self.ch_total == 0:
                 return 0.0
-            total_alocado = self.ch_alocada + self.ch_justificada
+            total_alocado = self.ch_alocada + self.ch_justificada + self.reducao_carga_vigente
             percentual = min((total_alocado / self.ch_total) * 100, 100.0)
             return round(percentual, 2)
         except Exception:

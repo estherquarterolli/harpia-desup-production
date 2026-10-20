@@ -138,7 +138,7 @@ class ProfessorListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         qs = Professor.objects.select_related(
             'tipo_contrato', 'unidade_principal'
-        ).prefetch_related('cursos', 'unidades')
+        ).prefetch_related('cursos', 'unidades', 'ocupacoes_diretivas')
         user = self.request.user
 
         q = self.request.GET.get('q', '')
@@ -367,7 +367,7 @@ class ProfessorDetailView(DesupOnlyMixin, DetailView):
     def get_queryset(self):
         return Professor.objects.select_related(
             'tipo_contrato', 'unidade_principal'
-        ).prefetch_related('cursos', 'unidades')
+        ).prefetch_related('cursos', 'unidades', 'ocupacoes_diretivas')
 
 class ProfessorCreateView(DesupOnlyMixin, CreateView):
     model = Professor
@@ -611,7 +611,7 @@ def htmx_tabela_alocacao(request):
     from django.core.paginator import Paginator
 
     queryset = Professor.objects.select_related('tipo_contrato').prefetch_related(
-        'unidades'
+        'unidades', 'ocupacoes_diretivas'
     ).order_by('rh_nome')
 
     # Esta tela legada era o Ãºltimo ponto que ainda materializava todos os

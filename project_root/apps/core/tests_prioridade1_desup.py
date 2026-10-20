@@ -487,3 +487,54 @@ class Prioridade1DesupTests(TestCase):
         self.assertIn(f'id="{ocupacao.pk}-reducao"', html)
         self.assertIn('Redução total (20 h)', html)
         self.assertNotIn('max="168"', html.split('modalPreencher')[1].split('</form>')[0])
+
+    def test_reducao_de_carga_da_desup_diminui_a_meta_em_sala(self):
+        cargo = TipoCargoDiretivo.objects.create(nome="Direção Red", codigo="DIRECAO_RED")
+        OcupacaoEquipeDiretiva.objects.create(
+            unidade=self.origem, cargo=cargo, professor=self.professor,
+            data_inicio=self.hoje - timedelta(days=5), carga_reducao_horas=Decimal("6.00"),
+            criado_por=self.desup,
+        )
+        professor = Professor.objects.get(pk=self.professor.pk)
+
+        self.assertEqual(professor.reducao_carga_vigente, 6.0)
+        self.assertEqual(professor.meta_horas_sala, 14.0)
+
+    def test_reducao_encerrada_nao_diminui_a_meta(self):
+        cargo = TipoCargoDiretivo.objects.create(nome="Direção Antiga", codigo="DIRECAO_ANTIGA")
+        OcupacaoEquipeDiretiva.objects.create(
+            unidade=self.origem, cargo=cargo, professor=self.professor,
+            data_inicio=self.hoje - timedelta(days=60), data_fim=self.hoje - timedelta(days=10),
+            carga_reducao_horas=Decimal("6.00"), criado_por=self.desup,
+        )
+        professor = Professor.objects.get(pk=self.professor.pk)
+
+        self.assertEqual(professor.meta_horas_sala, 20)
+
+    def test_pedido_de_cadastro_aparece_em_solicitacoes(self):
+        self.client.force_login(self.coordenador)
+        self.client.post(reverse("professors:professor_solicitar_cadastro"), {"nome": "Novo Docente"})
+
+        solicitacao = SolicitacaoProfessorExterno.objects.get()
+        self.assertEqual(solicitacao.tipo, SolicitacaoProfessorExterno.TipoChoices.CADASTRO)
+        self.assertEqual(solicitacao.unidade_solicitante, self.destino)
+
+        self.client.force_login(self.desup)
+        resposta = self.client.get(reverse("core:solicitacao_professor_list"))
+        self.assertContains(resposta, "Novo Docente")
+        self.assertContains(resposta, "Cadastro de professor")
+
+    def test_pedido_de_professor_de_outra_unidade_aparece_em_solicitacoes(self):
+        self.client.force_login(self.coordenador)
+        self.client.post(
+            reverse("professors:professor_solicitar_cessao"),
+            {"professor": self.professor.pk, "justificativa": "Preciso dele."},
+        )
+
+        solicitacao = SolicitacaoProfessorExterno.objects.get()
+        self.assertEqual(solicitacao.tipo, SolicitacaoProfessorExterno.TipoChoices.CESSAO)
+        self.assertEqual(solicitacao.unidade_origem, self.origem)
+
+        self.client.force_login(self.desup)
+        resposta = self.client.get(reverse("core:solicitacao_professor_list"))
+        self.assertContains(resposta, "Cessão de professor")

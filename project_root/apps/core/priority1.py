@@ -127,7 +127,7 @@ def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, t
             Q(unidades__id=unidade_id) | Q(unidade_principal_id=unidade_id)
         ).distinct()
     professores = list(
-        professores_escopo.select_related("tipo_contrato").prefetch_related("unidades")
+        professores_escopo.select_related("tipo_contrato").prefetch_related("unidades", "ocupacoes_diretivas")
     )
     professores_escopo_ids = {professor.pk for professor in professores}
     extra = _carga_extracurricular_aprovada(professores_escopo_ids, semestre)
