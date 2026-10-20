@@ -29,6 +29,9 @@ def user_can_bypass_window(user):
     return bool(user and user.is_authenticated and (user.is_superuser or user.perfil == "DESUP"))
 
 
+_ultima_varredura_janelas = {}
+
+
 def fechar_janelas_expiradas():
     """
     Fecha automaticamente as janelas cujo período (data_fim) já passou, mas que
@@ -41,10 +44,17 @@ def fechar_janelas_expiradas():
     # é UTC, então das 21h à meia-noite de Brasília o "hoje" já era o dia seguinte
     # em UTC — a janela era gravada como Fechado 3h antes do fim do prazo.
     hoje = timezone.localdate()
+
+    # Roda no máximo uma vez por dia por processo: antes era um UPDATE (ida ao
+    # banco remoto) em toda requisição das telas de alocação, via context
+    # processor + views. O vencimento só muda na virada do dia.
+    if _ultima_varredura_janelas.get("dia") == hoje:
+        return
     JanelaEntrega.objects.filter(
         status__in=ACTIVE_WINDOW_STATUSES,
         data_fim__lt=hoje,
     ).update(status=JanelaEntrega.StatusChoices.FECHADO)
+    _ultima_varredura_janelas["dia"] = hoje
 
 
 def get_delivery_window(unidade=None):
