@@ -876,13 +876,14 @@ class EquipeDiretivaDesupView(DesupPrioridade1Mixin, TemplateView):
         historico = []
         reducao_total = Decimal('0.00')
         if unidade_selecionada:
-            historico = list(
+            ocupacoes = (
                 OcupacaoEquipeDiretiva.objects.filter(unidade=unidade_selecionada)
                 .select_related('cargo', 'professor', 'curso', 'curso__curso')
-                .order_by('-data_inicio')[:200]
+                .order_by('-data_inicio')
             )
+            historico = ocupacoes.filter(data_fim__lte=hoje)
             por_cargo = {}
-            for ocupacao in historico:
+            for ocupacao in ocupacoes.filter(OcupacaoEquipeDiretiva.filtro_vigente(hoje)):
                 if ocupacao.vigente:
                     por_cargo.setdefault(ocupacao.cargo_id, []).append(ocupacao)
                     reducao_total += ocupacao.carga_reducao_horas
@@ -1462,7 +1463,7 @@ class EquipeDiretivaUnidadeView(UnidadePrioridade1Mixin, TemplateView):
             .select_related('cargo', 'professor', 'curso', 'curso__curso')
             .order_by('-data_inicio', '-pk')
         )
-        todas_ocupacoes = list(ocupacoes_qs[:300])
+        todas_ocupacoes = list(ocupacoes_qs.filter(OcupacaoEquipeDiretiva.filtro_vigente(hoje)))
 
         # Coleta IDs de professores para verificar alocações vigentes em sala de aula.
         prof_ids = {o.professor_id for o in todas_ocupacoes}
@@ -1531,25 +1532,16 @@ class EquipeDiretivaUnidadeView(UnidadePrioridade1Mixin, TemplateView):
                 )
             composicao.append(item)
 
-        # Filtros do histórico da unidade (busca + situação)
+        # Histórico funcional: somente períodos encerrados, com busca por servidor/cargo/curso.
         filtro_q = self.request.GET.get('q', '').strip()
-        filtro_situacao = self.request.GET.get('situacao', '').strip()
-        historico_qs = ocupacoes_qs
+        filtro_situacao = 'encerrada'
+        historico_qs = ocupacoes_qs.filter(data_fim__lte=hoje)
         if filtro_q:
             historico_qs = filtrar_contem(
                 historico_qs,
                 filtro_q,
                 ['professor__rh_nome', 'professor__desup_nome', 'cargo__nome', 'curso__curso__sigla'],
             )
-        if filtro_situacao == 'vigente':
-            historico_qs = historico_qs.filter(
-                data_inicio__lte=hoje,
-            ).filter(Q(data_fim__isnull=True) | Q(data_fim__gte=hoje))
-        elif filtro_situacao == 'encerrada':
-            historico_qs = historico_qs.filter(
-                Q(data_inicio__gt=hoje) | Q(data_fim__lt=hoje)
-            )
-
         historico_page_obj = Paginator(historico_qs, 15).get_page(self.request.GET.get('page'))
         for item_hist in historico_page_obj.object_list:
             info_sala = mapa_sala.get(item_hist.professor_id)
@@ -1700,10 +1692,13 @@ class OcupacaoEquipeDiretivaUnidadeEncerrarView(UnidadePrioridade1Mixin, View):
                 pk=pk,
             )
             hoje = timezone.localdate()
-            if ocupacao.data_fim and ocupacao.data_fim < hoje:
+            if ocupacao.data_fim and ocupacao.data_fim <= hoje:
                 messages.info(request, 'Esta ocupação já estava encerrada.')
                 return redirect('core:equipe_diretiva_unidade')
-            ocupacao.data_fim = max(hoje, ocupacao.data_inicio)
+            if ocupacao.data_inicio > hoje:
+                messages.error(request, 'Ocupação futura: corrija ou exclua o cadastro indevido.')
+                return redirect('core:equipe_diretiva_unidade')
+            ocupacao.data_fim = hoje
             ocupacao.save(update_fields=['data_fim', 'atualizado_em'])
             registrar_evento_prioridade1(
                 request,
@@ -1712,6 +1707,8 @@ class OcupacaoEquipeDiretivaUnidadeEncerrarView(UnidadePrioridade1Mixin, View):
             )
         messages.success(request, 'Ocupação encerrada com sucesso.')
         return redirect('core:equipe_diretiva_unidade')
+
+
 class OcupacaoEquipeDiretivaUnidadeRemoverView(UnidadePrioridade1Mixin, View):
     """
     Remove ou desvincula um ocupante de seu cargo diretivo na unidade.
@@ -1747,6 +1744,12 @@ class OcupacaoEquipeDiretivaUnidadeRemoverView(UnidadePrioridade1Mixin, View):
 
             professor_nome = professor.nome
             cargo_nome = cargo.nome
+            detalhes = (
+                f'Ocupação {pk} removida por cadastro indevido; cargo {cargo.pk}: {cargo_nome}; '
+                f'professor {professor.pk}: {professor_nome}; unidade {unidade.pk}; '
+                f'curso {ocupacao.curso_id}; início {ocupacao.data_inicio}; fim {ocupacao.data_fim}; '
+                f'redução {ocupacao.carga_reducao_horas}.'
+            )
 
             # Remove apenas o vínculo com o cargo, preservando o cadastro do profissional
             ocupacao.delete()
@@ -1754,7 +1757,7 @@ class OcupacaoEquipeDiretivaUnidadeRemoverView(UnidadePrioridade1Mixin, View):
             registrar_evento_prioridade1(
                 request,
                 'OCUPACAO_DIRETIVA_UNIDADE_REMOVIDA',
-                f'Ocupação {pk} removida; cargo {cargo_nome}; professor {professor_nome}; unidade {unidade.pk}.',
+                detalhes,
             )
 
         messages.success(request, f'{professor_nome} foi desvinculado(a) do cargo de {cargo_nome} com sucesso.')
