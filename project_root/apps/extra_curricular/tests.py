@@ -1160,3 +1160,67 @@ class AprovacaoParcialTests(TestCase):
             status_token({"pendencia": self.pendencia, "status_item": "PARCIAL"}),
             "parcial",
         )
+
+
+class ListagemPendenciasSemNPlusUmTests(TestCase):
+    """
+    Regressao de performance (timeout na Vercel): a listagem do coordenador
+    abria 1 query por professor em `meta_horas_sala` -> `ocupacoes_diretivas`
+    (e o calculo rodava duas vezes). O numero de queries deve ser constante,
+    independente da quantidade de professores da unidade.
+    """
+
+    def setUp(self):
+        self.client = Client()
+        self.unidade = Unidade.objects.create(nome="Unidade Perf", sigla="UPF")
+        self.outra = Unidade.objects.create(nome="Outra Perf", sigla="OPF")
+        self.contrato = ContractType.objects.create(
+            nome="ES Perf", max_class_hours=20, max_classes=10,
+        )
+        self.coord = User.objects.create_user(
+            email="coord_perf@teste.com", perfil="COORDENADOR_UNIDADE",
+            unidade=self.unidade, forcar_troca_senha=False,
+        )
+        self.url = reverse("extra_curricular:pendencia_list")
+        self._seq = 0
+
+    def _professor(self, unidade):
+        self._seq += 1
+        n = self._seq
+        return Professor.objects.create(
+            rh_nome=f"Docente Perf {n}",
+            rh_email=f"perf_{n}@teste.com",
+            id_funcional=f"9{n:05d}",
+            rh_matricula=f"MP{n:05d}",
+            unidade_principal=unidade,
+            tipo_contrato=self.contrato,
+        )
+
+    def _queries(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        self.client.force_login(self.coord)
+        with CaptureQueriesContext(connection) as ctx:
+            resp = self.client.get(self.url, {"semestre": semestre_atual()})
+        self.assertEqual(resp.status_code, 200)
+        return len(ctx), resp
+
+    def test_numero_de_queries_nao_cresce_com_professores(self):
+        for _ in range(2):
+            self._professor(self.unidade)
+        pequeno, _ = self._queries()
+
+        for _ in range(8):
+            self._professor(self.unidade)
+        grande, resp = self._queries()
+
+        self.assertEqual(resp.context["total_pendencias"], 10)
+        self.assertEqual(pequeno, grande)
+
+    def test_isolamento_por_unidade_preservado(self):
+        meu = self._professor(self.unidade)
+        alheio = self._professor(self.outra)
+        _, resp = self._queries()
+        ids = {d["professor"].pk for d in resp.context["pendencias_data"]}
+        self.assertIn(meu.pk, ids)
+        self.assertNotIn(alheio.pk, ids)

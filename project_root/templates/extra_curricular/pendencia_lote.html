@@ -147,9 +147,9 @@
         </button>
         {% endif %}
         {% else %}
-        <span class="text-slate-400 italic">O SEI da Unidade ainda não foi informado.</span>
+        <span class="text-slate-500 italic">O SEI da Unidade não foi informado (opcional).</span>
         {% if is_coordenador %}
-        <button onclick="toggleElement('seiForm')" class="text-xs text-[#ffb800] hover:underline flex items-center gap-1 font-bold ml-2 bg-yellow-50 px-2 py-1 rounded">
+        <button onclick="toggleElement('seiForm')" class="text-xs text-[#025c9f] hover:underline flex items-center gap-1 font-bold ml-2 bg-blue-50 px-2 py-1 rounded">
             <i class="ph ph-pencil-simple"></i> Preencher SEI da Unidade
         </button>
         {% endif %}
@@ -164,7 +164,7 @@
             {% csrf_token %}
             <input type="hidden" name="ids" value="{{ query_string }}">
             <div class="flex-1">
-                <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Processo SEI (Único p/ todos)</label>
+                <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Processo SEI (Opcional - Único p/ todos)</label>
                 <input type="text" name="sei_numero" value="{{ sei_numero|default:'' }}" class="form-field" placeholder="SEI-999999/999999/9999">
             </div>
             <button type="submit" class="flex h-[38px] w-full items-center justify-center gap-1 rounded-lg bg-[#025c9f] px-4 py-2 text-sm font-bold text-white hover:bg-[#153e70] sm:w-auto">
@@ -173,51 +173,12 @@
         </form>
     </div>
     {% endif %}
-
-    {# Bloqueio de 5 dias #}
-    {% if not sei_numero %}
-    <div id="seiWarning" class="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-700 flex items-center gap-3">
-        <i class="ph ph-warning-circle text-2xl flex-shrink-0"></i>
-        <span>Essa pendencia não possui número SEI, seu rascunho ficará salvo por 5 dias! Após isso ele será excluído.</span>
-    </div>
-    {% endif %}
-
-    {% if request.GET.sei_error and is_coordenador %}
-    <div id="seiErrorPopup"
-         class="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm px-4">
-      <div class="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl border border-red-200">
-        <div class="px-6 py-5 border-b border-red-100 bg-red-50 flex items-start gap-3">
-          <i class="ph ph-warning-circle text-3xl text-red-600 mt-0.5"></i>
-          <div>
-            <h3 class="text-base font-black text-red-700 uppercase tracking-wide">SEI obrigatório</h3>
-            <p class="mt-2 text-sm text-slate-700 font-semibold">
-              Você precisa preencher o número SEI antes de enviar para a DESUP.
-            </p>
-          </div>
-        </div>
-        <div class="px-6 py-5 flex flex-wrap gap-3 justify-end">
-          <button type="button"
-                  class="px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
-                  onclick="document.getElementById('seiErrorPopup')?.remove()">
-            Fechar
-          </button>
-          <button type="button"
-                  class="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-black transition-colors"
-                  onclick="toggleElement('seiForm'); document.getElementById('seiErrorPopup')?.remove(); document.querySelector('#seiForm input[name=sei_numero]')?.focus();">
-            Clique aqui para editar SEI
-          </button>
-        </div>
-      </div>
-    </div>
-    {% endif %}
   </div>
-
 
   <div class="mb-4 rounded-xl border border-blue-100 bg-blue-50 p-4 text-xs text-blue-700 flex items-center gap-3">
     <i class="ph ph-info text-xl flex-shrink-0"></i>
     <span>
-      <strong>Regra SEI:</strong> O processo SEI principal deve conter <strong>somente</strong> as justificativas 
-      previstas abaixo (TCC, Extensão e Redução de CH). Casos não enquadrados exigem SEI.
+      <strong>Processo SEI (Opcional):</strong> Caso utilize processo SEI, informe o identificador para acompanhamento das justificativas previstas abaixo (TCC, Extensão e Redução de CH).
     </span>
   </div>
 

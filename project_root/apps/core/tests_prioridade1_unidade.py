@@ -478,7 +478,7 @@ class Prioridade1UnidadeTests(TestCase):
                 "carga_reducao_horas": "10.00",  # Deve ser ignorado
             },
         )
-        self.assertRedirects(resp_create, reverse("core:atividade_estagio_unidade") if False else reverse("core:equipe_diretiva_unidade"))
+        self.assertRedirects(resp_create, reverse("extra_curricular:supervisao_estagio"))
 
         atividade = AtividadeEstagioSupervisao.objects.get()
         self.assertEqual(atividade.unidade, self.unidade_a)
@@ -507,7 +507,7 @@ class Prioridade1UnidadeTests(TestCase):
                 "carga_reducao_horas": "20.00",
             },
         )
-        self.assertRedirects(resp_update, reverse("core:equipe_diretiva_unidade"))
+        self.assertRedirects(resp_update, reverse("extra_curricular:supervisao_estagio"))
         atividade.refresh_from_db()
         self.assertEqual(atividade.tipo, AtividadeEstagioSupervisao.TipoChoices.COORDENACAO_ESTAGIO)
         self.assertEqual(atividade.num_estudantes, 15)
@@ -525,7 +525,7 @@ class Prioridade1UnidadeTests(TestCase):
         resp_encerrar = self.client.post(
             reverse("core:atividade_estagio_encerrar", args=[atividade.pk])
         )
-        self.assertRedirects(resp_encerrar, reverse("core:equipe_diretiva_unidade"))
+        self.assertRedirects(resp_encerrar, reverse("extra_curricular:supervisao_estagio"))
         atividade.refresh_from_db()
         self.assertEqual(atividade.data_fim, self.hoje)
 
@@ -560,8 +560,7 @@ class Prioridade1UnidadeTests(TestCase):
         self.assertNotContains(resp_hist, "Docente Gama Unidade B")
 
         resp_estagio = self.client.get(
-            f"{reverse('core:equipe_diretiva_unidade')}?partial=estagio",
-            HTTP_HX_REQUEST="true",
+            reverse("extra_curricular:supervisao_estagio"),
         )
         self.assertEqual(resp_estagio.status_code, 200)
-        self.assertTemplateUsed(resp_estagio, "core/prioridade1/partials/_estagio_supervisao_list.html")
+        self.assertTemplateUsed(resp_estagio, "extra_curricular/supervisao_estagio_list.html")
