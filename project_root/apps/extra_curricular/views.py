@@ -7,6 +7,8 @@ Perfis e permissões:
   DESUP               → vê todas as unidades; edita apenas parecer e motivo via
                         ParecerUpdateView (HTMX inline).
 """
+from decimal import Decimal
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -76,6 +78,18 @@ def _extracurricular_navigation_context(user, unidade, semestre, raw_data=None):
         atividades_qs = atividades_qs.filter(unidade_id=unidade_id)
 
     return {
+        "nav_desup_pendentes_count": sum(
+            1 for item in raw_data
+            if item.get("pendencia") and item.get("status_token") == "pendente"
+        ),
+        "nav_desup_reprovados_count": sum(
+            1 for item in raw_data
+            if item.get("pendencia") and item.get("status_token") == "indeferido"
+        ),
+        "nav_desup_aprovados_count": sum(
+            1 for item in raw_data
+            if item.get("pendencia") and item.get("status_token") == "finalizado"
+        ),
         "nav_pendencias_count": len({
             item["professor"].pk
             for item in raw_data
@@ -134,10 +148,18 @@ class PendenciaListView(LoginRequiredMixin, PerfilRequiredMixin, View):
         status_filtro = request.GET.get("status", "").strip().lower().replace(" ", "_")
         justificativa_filtro = request.GET.get("justificativa", "").strip().lower()
         aba_ativa = request.GET.get("aba", "pendencias").strip().lower()
-        if aba_ativa == "justificativas":  # URL antiga: todos os tipos enviados
-            aba_ativa = "pendencias"
-        if aba_ativa not in {"pendencias", "rascunhos", "tcc", "extensao", "reducao", "licenca"}:
-            aba_ativa = "pendencias"
+        is_desup = perfil == "DESUP" or user.is_superuser
+        if is_desup:
+            # Para a DESUP, o estado é definido exclusivamente pelas três abas.
+            # Ignora URLs antigas com ?status= para não cruzar filtros incompatíveis.
+            status_filtro = ""
+            if aba_ativa not in {"pendencias", "reprovados", "aprovados"}:
+                aba_ativa = "pendencias"
+        else:
+            if aba_ativa == "justificativas":  # URL antiga: todos os tipos enviados
+                aba_ativa = "pendencias"
+            if aba_ativa not in {"pendencias", "rascunhos", "tcc", "extensao", "reducao", "licenca"}:
+                aba_ativa = "pendencias"
 
         # Dados de pendência
         unidade_id_to_filter = unidade.id if unidade else None
@@ -161,7 +183,18 @@ class PendenciaListView(LoginRequiredMixin, PerfilRequiredMixin, View):
         # data-status das linhas (filtro instantâneo em JS). Antes cada camada usava
         # um vocabulário próprio e "Sem registro" nunca casava com 'sem_registro'.
         pendencias_data = raw_data
-        if aba_ativa == "rascunhos":
+        if is_desup:
+            token_por_aba = {
+                "pendencias": "pendente",
+                "reprovados": "indeferido",
+                "aprovados": "finalizado",
+            }
+            pendencias_data = [
+                item for item in pendencias_data
+                if item.get("pendencia")
+                and item.get("status_token") == token_por_aba[aba_ativa]
+            ]
+        elif aba_ativa == "rascunhos":
             pendencias_data = [
                 item for item in pendencias_data
                 if item.get("status_token") == "rascunho"
@@ -265,7 +298,7 @@ class PendenciaListView(LoginRequiredMixin, PerfilRequiredMixin, View):
             "querystring": params.urlencode(),
             "total_pendencias": paginator.count,
             "q": q,
-            "is_desup": (perfil == "DESUP" or user.is_superuser),
+            "is_desup": is_desup,
             "status_filtro": status_filtro,
             "justificativa_filtro": justificativa_filtro,
             "aba_ativa": aba_ativa,
@@ -977,6 +1010,82 @@ class ParecerReducaoUpdateView(_BaseParecerView):
     model_class = ReducaoCargaHoraria
     form_class  = ParecerReducaoForm
     prefix_base = "pred"
+
+
+class ParecerRapidoDesupView(LoginRequiredMixin, PerfilRequiredMixin, View):
+    """Decisão simplificada da DESUP diretamente na listagem."""
+
+    allowed_profiles = ["DESUP"]
+    _modelos = {
+        "tcc": OrientacaoTCC,
+        "ext": AtividadeExtensionista,
+        "red": ReducaoCargaHoraria,
+        "lic": LicencaDocente,
+    }
+
+    def _redirect(self, request):
+        destino = request.POST.get("next", "")
+        if destino and url_has_allowed_host_and_scheme(
+            destino,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            return redirect(destino)
+        return redirect("extra_curricular:pendencia_list")
+
+    @transaction.atomic
+    def post(self, request, pk, tipo, item_pk):
+        model = self._modelos.get(tipo)
+        if model is None:
+            messages.error(request, "Tipo de justificativa inválido.")
+            return self._redirect(request)
+
+        pendencia = get_object_or_404(PendenciaExtra, pk=pk)
+        item = get_object_or_404(model, pk=item_pk, pendencia=pendencia)
+        parecer = request.POST.get("parecer_desup", "").strip().upper()
+        motivo = request.POST.get("motivo_parecer", "").strip()
+
+        if parecer not in {ParecerChoices.APROVADO, ParecerChoices.INDEFERIDO}:
+            messages.error(request, "Selecione Aprovado ou Reprovado.")
+            return self._redirect(request)
+        if parecer == ParecerChoices.INDEFERIDO and not motivo:
+            messages.error(request, "Informe a justificativa da reprovação.")
+            return self._redirect(request)
+        if pendencia.status == PendenciaExtra.StatusChoices.RASCUNHO:
+            messages.error(request, "Rascunhos ainda não podem ser analisados pela DESUP.")
+            return self._redirect(request)
+
+        aprovado = parecer == ParecerChoices.APROVADO
+        if isinstance(item, OrientacaoTCC):
+            item.num_orientandos_aprovados = item.num_orientandos if aprovado else 0
+        elif isinstance(item, AtividadeExtensionista):
+            item.num_estudantes_aprovados = item.num_estudantes if aprovado else 0
+        else:
+            item.horas_aprovadas = item.horas_reduzidas if aprovado else Decimal("0")
+
+        item.parecer_desup = parecer
+        item.motivo_parecer = motivo
+
+        if aprovado:
+            limite = pendencia.professor.limite_horas_extra_efetivo
+            outros = _ch_aprovada_outros(pendencia, model, item.pk)
+            if (outros + float(item.ch_aprovada)) > limite:
+                messages.error(
+                    request,
+                    f"Limite de horas extras excedido. O docente {pendencia.professor.nome} possui "
+                    f"{limite}h disponíveis e as demais justificativas já somam {outros}h.",
+                )
+                return self._redirect(request)
+
+        item.save()
+        sincronizar_status_pendencia(pendencia)
+        messages.success(
+            request,
+            "Justificativa aprovada e horas contabilizadas."
+            if aprovado
+            else "Justificativa reprovada; as horas não foram contabilizadas.",
+        )
+        return self._redirect(request)
 
 
 class PendenciaStatusUpdateView(LoginRequiredMixin, PerfilRequiredMixin, View):

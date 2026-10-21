@@ -5,7 +5,7 @@ from decimal import Decimal
 from django.db.models import QuerySet
 
 from apps.professors.models import Professor
-from apps.extra_curricular.models import PendenciaExtra
+from apps.extra_curricular.models import ParecerChoices, PendenciaExtra
 
 
 # ──────────────────────────────────────────────────────────────
@@ -85,9 +85,9 @@ def sincronizar_status_pendencia(pendencia: PendenciaExtra) -> str:
       - todos os itens indeferidos      => INDEFERIDO
       - misto (aprovado + indeferido)   => PARCIAL
 
-    Antes, `any(INDEFERIDO)` derrubava a pendência inteira para INDEFERIDO. Como
-    `ch_total_justificada` zera fora dos status finalizados, um único item
-    indeferido apagava TODA a CH que a DESUP já tinha aprovado nos outros itens.
+    Antes, `any(INDEFERIDO)` derrubava a pendência inteira para INDEFERIDO. Um
+    único item indeferido podia esconder a CH que a DESUP já havia aprovado
+    nos outros itens.
     O `PARCIAL` separa "a análise terminou com resultado misto" de "nada foi
     deferido": o que foi aprovado conta, o indeferido apenas não entra na soma.
     """
@@ -281,12 +281,6 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
             status_rascunho = (
                 pendencia.status == PendenciaExtra.StatusChoices.RASCUNHO
             )
-            # Só conta como CH Justificada (coluna da lista) quando a pendência está
-            # de fato APROVADA. Após uma reabertura (status volta a ENVIADO) a CH
-            # aprovada anteriormente deixa de contar até ser aprovada novamente.
-            # CORR-023: PARCIAL também é estado finalizado — o item aprovado conta.
-            conta_justificada = pendencia.status in PendenciaExtra.STATUS_FINALIZADOS
-
             # Obter itens de justificativa
             tcc_items = list(pendencia.orientacoes_tcc.all())
             ext_items = list(pendencia.atividades_extensao.all())
@@ -301,7 +295,11 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                         "meta_horas": meta,
                         "ch_alocada": ch_alocada,
                         "ch_pendente": ch_pendente,
-                        "ch_justificada": item.ch_aprovada if conta_justificada else 0,
+                        "ch_justificada": (
+                            item.ch_aprovada
+                            if not status_rascunho
+                            and item.parecer_desup == ParecerChoices.APROVADO else 0
+                        ),
                         "ch_faltante": ch_faltante,
                         "pendencia": pendencia,
                         "justificativa_detalhe": f"Orientação de TCC ({item.num_orientandos} orientando{'s' if item.num_orientandos > 1 else ''})",
@@ -315,6 +313,7 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                         "item_tipo": "tcc",
                         "item_pk": item.pk,
                         "item_horas_aprovadas": item.horas_aprovadas,
+                        "item_motivo_parecer": item.motivo_parecer,
                     })
                 for item in ext_items:
                     result.append({
@@ -322,7 +321,11 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                         "meta_horas": meta,
                         "ch_alocada": ch_alocada,
                         "ch_pendente": ch_pendente,
-                        "ch_justificada": item.ch_aprovada if conta_justificada else 0,
+                        "ch_justificada": (
+                            item.ch_aprovada
+                            if not status_rascunho
+                            and item.parecer_desup == ParecerChoices.APROVADO else 0
+                        ),
                         "ch_faltante": ch_faltante,
                         "pendencia": pendencia,
                         "justificativa_detalhe": f"Atividade Extensionista ({item.num_estudantes} estudante{'s' if item.num_estudantes > 1 else ''})",
@@ -336,6 +339,7 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                         "item_tipo": "ext",
                         "item_pk": item.pk,
                         "item_horas_aprovadas": item.horas_aprovadas,
+                        "item_motivo_parecer": item.motivo_parecer,
                     })
                 for item in red_items:
                     result.append({
@@ -343,7 +347,11 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                         "meta_horas": meta,
                         "ch_alocada": ch_alocada,
                         "ch_pendente": ch_pendente,
-                        "ch_justificada": item.ch_aprovada if conta_justificada else 0,
+                        "ch_justificada": (
+                            item.ch_aprovada
+                            if not status_rascunho
+                            and item.parecer_desup == ParecerChoices.APROVADO else 0
+                        ),
                         "ch_faltante": ch_faltante,
                         "pendencia": pendencia,
                         "justificativa_detalhe": f"Redução de CH ({item.horas_reduzidas}h) - Motivo: {item.motivo_reducao}",
@@ -357,6 +365,7 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                         "item_tipo": "red",
                         "item_pk": item.pk,
                         "item_horas_aprovadas": item.horas_aprovadas,
+                        "item_motivo_parecer": item.motivo_parecer,
                     })
                 for item in lic_items:
                     result.append({
@@ -364,7 +373,11 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                         "meta_horas": meta,
                         "ch_alocada": ch_alocada,
                         "ch_pendente": ch_pendente,
-                        "ch_justificada": item.ch_aprovada if conta_justificada else 0,
+                        "ch_justificada": (
+                            item.ch_aprovada
+                            if not status_rascunho
+                            and item.parecer_desup == ParecerChoices.APROVADO else 0
+                        ),
                         "ch_faltante": ch_faltante,
                         "pendencia": pendencia,
                         "justificativa_detalhe": f"Licença ({item.horas_reduzidas}h) - Motivo: {item.motivo_licenca}",
@@ -378,6 +391,7 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                         "item_tipo": "lic",
                         "item_pk": item.pk,
                         "item_horas_aprovadas": item.horas_aprovadas,
+                        "item_motivo_parecer": item.motivo_parecer,
                     })
             else:
                 # Pendência existe mas não tem nenhum item cadastrado

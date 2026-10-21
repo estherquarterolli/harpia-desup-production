@@ -288,8 +288,49 @@ class DashboardUnidadeView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView
     allowed_profiles = ['COORDENADOR_UNIDADE']
 
     def get_context_data(self, **kwargs):
+        from django.core.paginator import Paginator
+        from apps.core.busca import filtrar_contem
+        from apps.professors.models import Professor
+        from apps.professors.views import enriquecer_professores_com_carga
+
         ctx = super().get_context_data(**kwargs)
         ctx.update(_contexto_atalhos_dashboard(self.request.user))
+
+        unidade = self.request.user.unidade
+        qs = Professor.objects.none()
+        if unidade:
+            qs = Professor.objects.select_related(
+                'tipo_contrato', 'unidade_principal',
+            ).prefetch_related(
+                'unidades', 'ocupacoes_diretivas', 'readaptacoes',
+            ).filter(
+                Q(unidade_principal_id=unidade.pk) | Q(unidades__id=unidade.pk)
+            ).distinct().order_by('rh_nome', 'pk')
+            q = self.request.GET.get('q', '').strip()
+            if q:
+                qs = filtrar_contem(
+                    qs, q, ['rh_nome', 'desup_nome', 'id_funcional', 'rh_matricula'],
+                )
+        else:
+            q = ''
+
+        paginator = Paginator(qs, 20)
+        page_obj = paginator.get_page(self.request.GET.get('page'))
+        dados = enriquecer_professores_com_carga(page_obj.object_list, unidade)
+        from apps.professors.views import detalhar_alocacoes_professores
+        detalhar_alocacoes_professores(dados['professores'], self.request.user)
+        params = self.request.GET.copy()
+        params.pop('page', None)
+        ctx.update({
+            'professores_unidade': dados['professores'],
+            'colunas_cursos': dados['colunas_cursos'],
+            'page_obj': page_obj,
+            'paginator': paginator,
+            'is_paginated': page_obj.has_other_pages(),
+            'querystring': params.urlencode(),
+            'filtro_q': q,
+            'total_professores_unidade': paginator.count,
+        })
         return ctx
 
 # --- CRUD de Unidade ---
