@@ -5,73 +5,46 @@
 {% block header_title %}Supervisão de Estágio{% endblock %}
 
 {% block content %}
-<div class="p-2 md:p-0">
+<div class="extra-module p-1 sm:p-2 md:p-0">
 
-  {# ── Navegação de Abas do Módulo Extracurricular ── #}
-  {% if not is_desup %}
-  <nav class="mb-4 flex items-end gap-1 border-b border-slate-200" aria-label="Visualizações das pendências e estágio">
-    <a href="{% url 'extra_curricular:pendencia_list' %}"
-       class="inline-flex min-h-10 items-center gap-2 rounded-t-xl border border-transparent px-4 py-2 text-xs font-black text-slate-600 transition-colors hover:border-slate-200 hover:bg-slate-50">
-      <i class="ph ph-list-bullets text-base"></i>
-      Pendências
-    </a>
-    <a href="{% url 'extra_curricular:supervisao_estagio' %}"
-       class="inline-flex min-h-10 items-center gap-2 rounded-t-xl border border-b-white border-slate-200 bg-white px-4 py-2 text-xs font-black text-[#025c9f]">
-      <i class="ph ph-student text-base"></i>
-      Supervisão de Estágio
-    </a>
-  </nav>
-  {% else %}
-  <nav class="mb-4 flex items-end gap-1 border-b border-slate-200" aria-label="Visualizações das pendências e estágio">
-    <a href="{% url 'extra_curricular:pendencia_list' %}"
-       class="inline-flex min-h-10 items-center gap-2 rounded-t-xl border border-transparent px-4 py-2 text-xs font-black text-slate-600 transition-colors hover:border-slate-200 hover:bg-slate-50">
-      <i class="ph ph-list-bullets text-base"></i>
-      Pendências
-    </a>
-    <a href="{% url 'extra_curricular:supervisao_estagio' %}"
-       class="inline-flex min-h-10 items-center gap-2 rounded-t-xl border border-b-white border-slate-200 bg-white px-4 py-2 text-xs font-black text-[#025c9f]">
-      <i class="ph ph-student text-base"></i>
-      Supervisão de Estágio
-    </a>
-  </nav>
-  {% endif %}
+  {% include 'extra_curricular/_module_tabs.html' %}
 
-  {# ── Cabeçalho com Unidade e Ações ── #}
-  <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-    <div class="w-full min-w-0 sm:max-w-md">
-      <label class="mb-1 block text-[10px] font-black uppercase tracking-wide text-[#025c9f]">Unidade</label>
-    {% if is_desup %}
-      <form method="get" action="{% url 'extra_curricular:supervisao_estagio' %}">
-        <div class="relative">
-          <select id="filter-unidade" name="unidade_id" onchange="this.form.submit()"
-            class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer pr-10 appearance-none">
-            <option value="">Selecione uma unidade...</option>
-            {% for u in unidades %}
-            <option value="{{ u.pk }}" {% if unidade_selecionada and unidade_selecionada.pk == u.pk %}selected{% endif %}>
-              {{ u.sigla }} — {{ u.nome }}
-            </option>
-            {% endfor %}
-          </select>
-          <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
+  {# ── Barra: unidade + ação ── #}
+  <section class="extra-section-card mb-4">
+    <div class="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-end sm:justify-between sm:px-5">
+      <div class="w-full min-w-0 sm:max-w-md">
+        <label class="mb-1 block text-[10px] font-black uppercase tracking-wide text-[#025c9f]">Unidade</label>
+      {% if is_desup %}
+        <form method="get" action="{% url 'extra_curricular:supervisao_estagio' %}">
+          <div class="relative">
+            <select id="filter-unidade" name="unidade_id" onchange="this.form.submit()"
+              class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer pr-10 appearance-none">
+              <option value="">Selecione uma unidade...</option>
+              {% for u in unidades %}
+              <option value="{{ u.pk }}" {% if unidade_selecionada and unidade_selecionada.pk == u.pk %}selected{% endif %}>
+                {{ u.sigla }} — {{ u.nome }}
+              </option>
+              {% endfor %}
+            </select>
+            <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
+          </div>
+        </form>
+      {% else %}
+        <div class="flex min-h-[42px] w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm select-none">
+          <i class="ph ph-buildings text-base"></i>
+          {% if unidade %}{{ unidade.sigla }} — {{ unidade.nome }}{% else %}—{% endif %}
         </div>
-      </form>
-    {% else %}
-      <div class="flex min-h-[42px] w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm select-none">
-        <i class="ph ph-buildings text-base"></i>
-        {% if unidade %}{{ unidade.sigla }} — {{ unidade.nome }}{% else %}—{% endif %}
+      {% endif %}
       </div>
-    {% endif %}
-    </div>
 
-    {% if is_coordenador and form_nova_atividade_estagio %}
-    <button type="button"
-            onclick="abrirModal('modalNovoEstagio')"
-            class="flex items-center justify-center gap-2 w-full sm:w-auto bg-[#025c9f] hover:bg-[#153e70] text-white font-black text-sm px-5 py-2.5 rounded-xl shadow-md transition-all hover:scale-105 active:scale-100">
-      <i class="ph ph-plus-circle text-lg"></i>
-      Registrar estágio / supervisão
-    </button>
-    {% endif %}
-  </div>
+      {% if is_coordenador and form_nova_atividade_estagio %}
+      <button type="button" onclick="abrirModal('modalNovoEstagio')" class="extra-action extra-action-new">
+        <i class="ph ph-plus-circle" aria-hidden="true"></i>
+        Registrar estágio / supervisão
+      </button>
+      {% endif %}
+    </div>
+  </section>
 
   {# ── Listagem das Atividades de Estágio ── #}
   {% if unidade %}
@@ -167,11 +140,11 @@
 {# ═══════════════ Modais de Cadastro e Edição ═══════════════ #}
 {% if is_coordenador and form_nova_atividade_estagio %}
 <div id="modalNovoEstagio"
-     class="modal-estagio hidden fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4"
+     class="modal-estagio hidden fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-2 sm:p-4"
      role="dialog"
      aria-modal="true"
      aria-labelledby="tituloNovoEstagio">
-  <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+  <div class="estagio-modal-panel w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
     <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
       <div>
         <h3 id="tituloNovoEstagio" class="text-base font-black text-[#025c9f]">Registrar estágio / supervisão</h3>
@@ -184,19 +157,19 @@
         <i class="ph ph-x text-xl" aria-hidden="true"></i>
       </button>
     </div>
-    <form method="post" action="{% url 'extra_curricular:atividade_estagio_create' %}">
+    <form method="post" action="{% url 'extra_curricular:atividade_estagio_create' %}" class="estagio-modal-form">
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ retorno }}">
-      <div class="max-h-[62vh] space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
+      <div class="estagio-modal-body space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
         <div class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
           <i class="ph ph-lock-key text-base text-slate-400 shrink-0" aria-hidden="true"></i>
           <span>A redução semanal de carga horária é atribuída exclusivamente pela DESUP.</span>
         </div>
         {% include 'core/prioridade1/_campos_form.html' with form=form_nova_atividade_estagio %}
       </div>
-      <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-4 sm:px-6">
-        <button type="button" onclick="fecharModal('modalNovoEstagio')" class="min-h-10 rounded-lg px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100">Cancelar</button>
-        <button type="submit" class="min-h-10 rounded-lg bg-[#025c9f] px-5 py-2 text-sm font-black text-white shadow-sm hover:bg-[#153e70]">Salvar atividade</button>
+      <div class="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-end sm:gap-3 sm:px-6 sm:py-4">
+        <button type="button" onclick="fecharModal('modalNovoEstagio')" class="min-h-10 w-full rounded-lg px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 sm:w-auto">Cancelar</button>
+        <button type="submit" class="min-h-10 w-full rounded-lg bg-[#025c9f] px-5 py-2 text-sm font-black text-white shadow-sm hover:bg-[#153e70] sm:w-auto">Salvar atividade</button>
       </div>
     </form>
   </div>
@@ -206,11 +179,11 @@
 {% if is_coordenador %}
 {% for atividade in atividades_estagio %}
 <div id="modalEditarEstagio{{ atividade.pk }}"
-     class="modal-estagio hidden fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4"
+     class="modal-estagio hidden fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-2 sm:p-4"
      role="dialog"
      aria-modal="true"
      aria-labelledby="tituloEditarEstagio{{ atividade.pk }}">
-  <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+  <div class="estagio-modal-panel w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
     <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
       <div>
         <h3 id="tituloEditarEstagio{{ atividade.pk }}" class="text-base font-black text-[#025c9f]">Editar {{ atividade.get_tipo_display }}</h3>
@@ -223,19 +196,19 @@
         <i class="ph ph-x text-xl" aria-hidden="true"></i>
       </button>
     </div>
-    <form method="post" action="{% url 'extra_curricular:atividade_estagio_update' atividade.pk %}">
+    <form method="post" action="{% url 'extra_curricular:atividade_estagio_update' atividade.pk %}" class="estagio-modal-form">
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ retorno }}">
-      <div class="max-h-[62vh] space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
+      <div class="estagio-modal-body space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
         <div class="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-700">
           <span class="font-bold">Redução semanal (definida pela DESUP):</span>
           <span class="font-black text-emerald-800">{{ atividade.carga_reducao_horas|floatformat:"-2" }} h/semana</span>
         </div>
         {% include 'core/prioridade1/_campos_form.html' with form=atividade.edit_form %}
       </div>
-      <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-4 sm:px-6">
-        <button type="button" onclick="fecharModal('modalEditarEstagio{{ atividade.pk }}')" class="min-h-10 rounded-lg px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100">Cancelar</button>
-        <button type="submit" class="min-h-10 rounded-lg bg-[#025c9f] px-5 py-2 text-sm font-black text-white shadow-sm hover:bg-[#153e70]">Salvar alterações</button>
+      <div class="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-end sm:gap-3 sm:px-6 sm:py-4">
+        <button type="button" onclick="fecharModal('modalEditarEstagio{{ atividade.pk }}')" class="min-h-10 w-full rounded-lg px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 sm:w-auto">Cancelar</button>
+        <button type="submit" class="min-h-10 w-full rounded-lg bg-[#025c9f] px-5 py-2 text-sm font-black text-white shadow-sm hover:bg-[#153e70] sm:w-auto">Salvar alterações</button>
       </div>
     </form>
   </div>

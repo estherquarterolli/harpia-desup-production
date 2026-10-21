@@ -70,14 +70,14 @@ def _bulk_ch_justificada(professor_ids):
     pendencias = PendenciaExtra.objects.filter(
         professor_id__in=professor_ids,
         semestre=semestre_atual(),
-    ).prefetch_related("orientacoes_tcc", "atividades_extensao", "reducoes_ch")
+    ).prefetch_related("orientacoes_tcc", "atividades_extensao", "reducoes_ch", "licencas")
 
     mapa = {}
     for p in pendencias:
         if p.status not in PendenciaExtra.STATUS_FINALIZADOS:
             continue
         total = 0.0
-        for itens in (p.orientacoes_tcc.all(), p.atividades_extensao.all(), p.reducoes_ch.all()):
+        for itens in (p.orientacoes_tcc.all(), p.atividades_extensao.all(), p.reducoes_ch.all(), p.licencas.all()):
             total += sum(
                 float(item.ch_aprovada) for item in itens
                 if item.parecer_desup == ParecerChoices.APROVADO

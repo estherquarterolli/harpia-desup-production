@@ -3,6 +3,7 @@ from unfold.admin import TabularInline
 from apps.accounts.admin import HarpiaModelAdmin, admin_site
 from apps.extra_curricular.models import (
     AtividadeExtensionista,
+    LicencaDocente,
     OrientacaoTCC,
     PendenciaExtra,
     ReducaoCargaHoraria,
@@ -30,6 +31,12 @@ class ReducaoCargaHorariaInline(TabularInline):
     fields = ["motivo_reducao", "horas_reduzidas", "parecer_desup", "motivo_parecer"]
 
 
+class LicencaDocenteInline(TabularInline):
+    model  = LicencaDocente
+    extra  = 0
+    fields = ["motivo_licenca", "data_inicio", "data_fim", "horas_reduzidas", "parecer_desup", "motivo_parecer"]
+
+
 # ── PendenciaExtra Admin ──────────────────────────────────────────────────────
 class PendenciaExtraAdmin(HarpiaModelAdmin):
     list_display  = [
@@ -43,6 +50,7 @@ class PendenciaExtraAdmin(HarpiaModelAdmin):
         OrientacaoTCCInline,
         AtividadeExtensionistaInline,
         ReducaoCargaHorariaInline,
+        LicencaDocenteInline,
     ]
 
     @admin.display(description="CH Justificada Total")

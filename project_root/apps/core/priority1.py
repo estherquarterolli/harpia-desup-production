@@ -37,10 +37,10 @@ def _carga_extracurricular_aprovada(professor_ids, semestre):
             semestre=semestre,
             status__in=PendenciaExtra.STATUS_FINALIZADOS,
         )
-        .prefetch_related("orientacoes_tcc", "atividades_extensao", "reducoes_ch")
+        .prefetch_related("orientacoes_tcc", "atividades_extensao", "reducoes_ch", "licencas")
     )
     for pendencia in pendencias:
-        for related_name in ("orientacoes_tcc", "atividades_extensao", "reducoes_ch"):
+        for related_name in ("orientacoes_tcc", "atividades_extensao", "reducoes_ch", "licencas"):
             for item in getattr(pendencia, related_name).all():
                 if item.parecer_desup == ParecerChoices.APROVADO:
                     totais[pendencia.professor_id] += _decimal(item.ch_aprovada)

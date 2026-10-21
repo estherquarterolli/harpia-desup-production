@@ -564,6 +564,42 @@ class FluxoLoteUnidadeTests(_BaseFluxoE2E):
         self.assertNotContains(resp, "Mesa de Trabalho Lote")
         self.assertNotContains(resp, "Mesa de Justificativas em Lote")
 
+    def test_licenca_e_supervisao_aparecem_na_mesa_de_lote(self):
+        self._criar_pendencia_pela_rota([self.prof_a])
+        ids = self._ids(self.prof_a)
+        pend = PendenciaExtra.objects.get(professor=self.prof_a, semestre=self.semestre)
+
+        resp = self.client.post(
+            reverse("extra_curricular:salvar_licenca_lote"),
+            {
+                "ids": ids, "pendencia_id": str(pend.pk),
+                "motivo_licenca": "Licença-saúde", "data_inicio": "2026-08-01",
+                "data_fim": "", "horas_reduzidas": "2,5",
+            },
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(pend.licencas.count(), 1)
+        self.assertEqual(pend.licencas.get().horas_reduzidas, 2.5)
+
+        mesa = self.client.get(reverse("extra_curricular:pendencia_lote"), {"ids": ids})
+        self.assertContains(mesa, "Licença do Docente")
+        self.assertContains(mesa, "Supervisão de Estágio")
+        self.assertContains(mesa, "Licença-saúde")
+
+        # Licença inválida (fim antes do início) é recusada.
+        self.client.post(
+            reverse("extra_curricular:salvar_licenca_lote"),
+            {
+                "ids": ids, "pendencia_id": str(pend.pk), "motivo_licenca": "X",
+                "data_inicio": "2026-08-10", "data_fim": "2026-08-01", "horas_reduzidas": "1",
+            },
+        )
+        self.assertEqual(pend.licencas.count(), 1)
+
+        aba = self.client.get(reverse("extra_curricular:pendencia_list"), {"aba": "licenca"})
+        self.assertEqual(aba.status_code, 200)
+        self.assertContains(aba, "Registrar nova justificativa")
+
     def test_rascunhos_aparecem_em_aba_e_abrem_todos_em_lote(self):
         self._criar_pendencia_pela_rota([self.prof_a, self.prof_a2])
         ids = self._ids(self.prof_a, self.prof_a2)
@@ -578,13 +614,20 @@ class FluxoLoteUnidadeTests(_BaseFluxoE2E):
             {"ids": ids, "pendencia_id": str(pend_a.pk), "num_orientandos": "2"},
         )
 
-        resp = self.client.get(reverse("extra_curricular:pendencia_list"))
+        resp = self.client.get(
+            reverse("extra_curricular:pendencia_list"),
+            {"aba": "rascunhos"},
+        )
         url_lote = f'{reverse("extra_curricular:pendencia_lote")}?ids={ids}'
 
         self.assertEqual(resp.context["rascunhos_count"], 2)
         self.assertEqual(resp.context["rascunho_professor_ids"], ids)
         self.assertContains(resp, "Rascunhos")
-        self.assertContains(resp, url_lote, count=3)
+        # Seleção múltipla: um checkbox por linha + "selecionar todos"; o link do
+        # lote é montado no navegador a partir dos docentes marcados.
+        self.assertContains(resp, 'class="rascunho-sel', count=len(resp.context["pendencias_data"]))
+        self.assertContains(resp, 'id="rascunho-sel-all"')
+        self.assertContains(resp, f'data-base="{reverse("extra_curricular:pendencia_lote")}"')
         linhas_rascunho = [
             linha for linha in resp.context["pendencias_data"]
             if linha.get("pendencia")
@@ -1753,16 +1796,90 @@ class ListagemPendenciasTests(_BaseFluxoE2E):
         self.assertEqual(resp.context["unidade_selecionada"], self.unidade_a)
         self.assertFalse(resp.context["is_desup"])
 
-    def test_filtros_iniciam_recolhidos_e_so_unidade_fica_fora(self):
+    def test_busca_fica_ao_lado_do_botao_que_abre_filtros_em_modal(self):
         self._login(self.desup)
         resp = self.client.get(self.url, {"semestre": self.semestre})
         html = resp.content.decode()
 
-        details_at = html.index('<details class="group')
-        self.assertLess(html.index('id="filter-unidade"'), details_at)
-        self.assertGreater(html.index('id="filter-semestre"'), details_at)
-        self.assertGreater(html.index('id="filter-status"'), details_at)
-        self.assertNotIn('<details open', html)
+        busca_at = html.index('id="search-extracurricular"')
+        botao_at = html.index('data-extra-filter-open')
+        modal_at = html.index('id="modalFiltrosExtracurriculares"')
+        self.assertLess(busca_at, botao_at)
+        self.assertLess(botao_at, modal_at)
+        self.assertIn('placeholder="Pesquisar nesta aba..."', html)
+        self.assertIn('id="filter-unidade"', html)
+        self.assertIn('id="filter-semestre"', html)
+        self.assertIn('id="filter-status"', html)
+        self.assertIn('id="filter-aba"', html)
+        self.assertNotIn('<details open class="group extra-filter-summary"', html)
+
+    def test_pesquisa_ampla_encontra_processo_sei_e_texto_da_justificativa(self):
+        pendencia = PendenciaExtra.objects.create(
+            professor=self.prof_a,
+            unidade=self.unidade_a,
+            semestre=self.semestre,
+            sei_numero="SEI-987654/2026",
+            status=PendenciaExtra.StatusChoices.ENVIADO,
+        )
+        ReducaoCargaHoraria.objects.create(
+            pendencia=pendencia,
+            motivo_reducao="Projeto Laboratório Maker",
+            horas_reduzidas=Decimal("2"),
+        )
+        self._login(self.coord_a)
+
+        por_sei = self.client.get(self.url, {"semestre": self.semestre, "q": "987654"})
+        por_justificativa = self.client.get(
+            self.url,
+            {"semestre": self.semestre, "q": "laboratorio maker"},
+        )
+
+        self.assertEqual({l["professor"].pk for l in self._linhas(por_sei)}, {self.prof_a.pk})
+        self.assertEqual(
+            {l["professor"].pk for l in self._linhas(por_justificativa)},
+            {self.prof_a.pk},
+        )
+
+    def test_navegacao_exibe_abas_e_separa_rascunhos_de_justificativas_por_tipo(self):
+        rascunho = PendenciaExtra.objects.create(
+            professor=self.prof_a,
+            unidade=self.unidade_a,
+            semestre=self.semestre,
+            status=PendenciaExtra.StatusChoices.RASCUNHO,
+        )
+        OrientacaoTCC.objects.create(pendencia=rascunho, num_orientandos=2)
+        enviada = PendenciaExtra.objects.create(
+            professor=self.prof_a2,
+            unidade=self.unidade_a,
+            semestre=self.semestre,
+            status=PendenciaExtra.StatusChoices.ENVIADO,
+        )
+        AtividadeExtensionista.objects.create(pendencia=enviada, num_estudantes=3)
+        self._login(self.coord_a)
+
+        visao_geral = self.client.get(self.url, {"semestre": self.semestre})
+        for titulo in ("Pendências", "Rascunhos", "Orientação de TCC", "Extensão", "Redução de CH", "Supervisão de Estágio"):
+            self.assertContains(visao_geral, titulo)
+        self.assertEqual(visao_geral.context["aba_ativa"], "pendencias")
+        self.assertEqual(visao_geral.context["nav_rascunhos_count"], 1)
+        self.assertEqual(visao_geral.context["nav_extensao_count"], 1)
+        self.assertEqual(visao_geral.context["nav_tcc_count"], 0)
+
+        aba_rascunhos = self.client.get(
+            self.url, {"semestre": self.semestre, "aba": "rascunhos"}
+        )
+        self.assertEqual(
+            {linha["professor"].pk for linha in self._linhas(aba_rascunhos)},
+            {self.prof_a.pk},
+        )
+
+        aba_justificativas = self.client.get(
+            self.url, {"semestre": self.semestre, "aba": "extensao"}
+        )
+        self.assertEqual(
+            {linha["professor"].pk for linha in self._linhas(aba_justificativas)},
+            {self.prof_a2.pk},
+        )
 
     def test_desup_ve_todas_as_unidades_e_filtra_por_unidade(self):
         self._login(self.desup)

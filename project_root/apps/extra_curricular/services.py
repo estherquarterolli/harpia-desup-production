@@ -35,6 +35,7 @@ _JUSTIFICATIVA_TOKENS = {
     "tcc": "tcc",
     "ext": "extensao",
     "red": "reducao",
+    "lic": "licenca",
 }
 
 
@@ -92,6 +93,7 @@ def sincronizar_status_pendencia(pendencia: PendenciaExtra) -> str:
     """
     from apps.extra_curricular.models import (
         AtividadeExtensionista,
+        LicencaDocente,
         OrientacaoTCC,
         ParecerChoices,
         ReducaoCargaHoraria,
@@ -109,6 +111,7 @@ def sincronizar_status_pendencia(pendencia: PendenciaExtra) -> str:
     itens.extend(list(OrientacaoTCC.objects.filter(pendencia=pendencia).values_list("parecer_desup", flat=True)))
     itens.extend(list(AtividadeExtensionista.objects.filter(pendencia=pendencia).values_list("parecer_desup", flat=True)))
     itens.extend(list(ReducaoCargaHoraria.objects.filter(pendencia=pendencia).values_list("parecer_desup", flat=True)))
+    itens.extend(list(LicencaDocente.objects.filter(pendencia=pendencia).values_list("parecer_desup", flat=True)))
 
     tem_aprovado = any(status == ParecerChoices.APROVADO for status in itens)
     tem_indeferido = any(status == ParecerChoices.INDEFERIDO for status in itens)
@@ -155,7 +158,7 @@ def get_professores_com_pendencia(unidade_id: int, semestre: str, q: str = "") -
     pendentes, _ = _professores_pendentes_com_ch(unidade_id, q)
     return (
         Professor.objects.filter(pk__in=[p.pk for p in pendentes])
-        .select_related("tipo_contrato")
+        .select_related("tipo_contrato", "unidade_principal")
         .prefetch_related("ocupacoes_diretivas")
     )
 
@@ -175,7 +178,7 @@ def _professores_pendentes_com_ch(unidade_id, q: str = ""):
     estourava os 30 s da funcao na Vercel com o banco remoto. Agora o numero de
     queries de professores e fixo, independente de N.
     """
-    professores = Professor.objects.select_related("tipo_contrato").prefetch_related(
+    professores = Professor.objects.select_related("tipo_contrato", "unidade_principal").prefetch_related(
         "ocupacoes_diretivas"
     )
     if unidade_id:
@@ -254,6 +257,7 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
         "orientacoes_tcc",
         "atividades_extensao",
         "reducoes_ch",
+        "licencas",
     )
 
     pendencias_existentes = {
@@ -287,9 +291,10 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
             tcc_items = list(pendencia.orientacoes_tcc.all())
             ext_items = list(pendencia.atividades_extensao.all())
             red_items = list(pendencia.reducoes_ch.all())
+            lic_items = list(pendencia.licencas.all())
 
             # Se existirem itens, criar uma linha para cada um
-            if tcc_items or ext_items or red_items:
+            if tcc_items or ext_items or red_items or lic_items:
                 for item in tcc_items:
                     result.append({
                         "professor": prof,
@@ -350,6 +355,27 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                         "justificativa_tipo": "Redução",
                         "sei_numero": pendencia.sei_numero,
                         "item_tipo": "red",
+                        "item_pk": item.pk,
+                        "item_horas_aprovadas": item.horas_aprovadas,
+                    })
+                for item in lic_items:
+                    result.append({
+                        "professor": prof,
+                        "meta_horas": meta,
+                        "ch_alocada": ch_alocada,
+                        "ch_pendente": ch_pendente,
+                        "ch_justificada": item.ch_aprovada if conta_justificada else 0,
+                        "ch_faltante": ch_faltante,
+                        "pendencia": pendencia,
+                        "justificativa_detalhe": f"Licença ({item.horas_reduzidas}h) - Motivo: {item.motivo_licenca}",
+                        "status_item": (
+                            PendenciaExtra.StatusChoices.RASCUNHO
+                            if status_rascunho else item.parecer_desup
+                        ),
+                        "justificativa_ch": item.ch_aprovada,
+                        "justificativa_tipo": "Licença",
+                        "sei_numero": pendencia.sei_numero,
+                        "item_tipo": "lic",
                         "item_pk": item.pk,
                         "item_horas_aprovadas": item.horas_aprovadas,
                     })

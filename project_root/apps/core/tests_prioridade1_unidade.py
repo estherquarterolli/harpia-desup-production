@@ -449,9 +449,8 @@ class Prioridade1UnidadeTests(TestCase):
         self.assertEqual(alertas[0]["horas_sala"], Decimal("4.0"))
         self.assertIn("Engenharia de Software I", alertas[0]["disciplinas"])
 
-        # Verifica acessibilidade e elementos visuais na interface (role="alert", ícone e texto)
-        self.assertContains(resposta, 'role="alert"')
-        self.assertContains(resposta, "alocado(s) em sala de aula")
+        # O aviso geral foi removido; o sinal fica no cartão do cargo e no modal.
+        self.assertNotContains(resposta, "alocado(s) em sala de aula")
         self.assertContains(resposta, "Engenharia de Software I")
         self.assertContains(resposta, "Em sala de aula")
 
