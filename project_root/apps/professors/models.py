@@ -266,13 +266,21 @@ class Professor(models.Model):
         )
 
     def vinculado_a_unidade(self, unidade_id) -> bool:
-        """Pertence à unidade (principal ou vínculo adicional)."""
+        """Pertence à unidade (principal, vínculo adicional ou cessão aprovada)."""
         if not unidade_id:
             return True
         unidade_id = int(unidade_id)
-        return self.unidade_principal_id == unidade_id or any(
+        if self.unidade_principal_id == unidade_id or any(
             u.pk == unidade_id for u in self.unidades.all()
-        )
+        ):
+            return True
+        from apps.core.models import SolicitacaoProfessorExterno
+        return SolicitacaoProfessorExterno.objects.filter(
+            professor_id=self.pk,
+            unidade_solicitante_id=unidade_id,
+            tipo=SolicitacaoProfessorExterno.TipoChoices.CESSAO,
+            status=SolicitacaoProfessorExterno.StatusChoices.APROVADA,
+        ).exists()
 
     @property
     def meta_horas_base_sala(self) -> int:

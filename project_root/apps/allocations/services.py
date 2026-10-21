@@ -28,6 +28,45 @@ class AlocacaoError(Exception):
         self.status = status
 
 
+def professores_autorizados_unidade_qs(unidade_id):
+    """
+    QuerySet de professores autorizados para visualização e alocação na unidade:
+    1. Professores com lotação principal na unidade (unidade_principal_id = unidade_id)
+    2. Professores com vínculo adicional na unidade (unidades__id = unidade_id)
+    3. Professores com cessão deferida para a unidade (SolicitacaoProfessorExterno CESSAO aprovada)
+    """
+    from django.db.models import Q
+    from apps.core.models import SolicitacaoProfessorExterno
+    from apps.professors.models import Professor
+
+    if not unidade_id:
+        return Professor.objects.none()
+
+    cessao_aprovada_ids = SolicitacaoProfessorExterno.objects.filter(
+        unidade_solicitante_id=unidade_id,
+        tipo=SolicitacaoProfessorExterno.TipoChoices.CESSAO,
+        status=SolicitacaoProfessorExterno.StatusChoices.APROVADA,
+    ).values_list('professor_id', flat=True)
+
+    return Professor.objects.filter(
+        Q(unidade_principal_id=unidade_id)
+        | Q(unidades__id=unidade_id)
+        | Q(id__in=cessao_aprovada_ids)
+    ).distinct()
+
+
+def professor_autorizado_para_unidade(professor_id, unidade_id) -> bool:
+    """Verifica se um professor específico está autorizado para atuar na unidade."""
+    if not professor_id or not unidade_id:
+        return False
+    try:
+        p_id = int(professor_id)
+        u_id = int(unidade_id)
+    except (ValueError, TypeError):
+        return False
+    return professores_autorizados_unidade_qs(u_id).filter(id=p_id).exists()
+
+
 def semestre_atual():
     hoje = timezone.localdate()
     return f"{hoje.year}.{'1' if hoje.month <= 6 else '2'}"
@@ -142,7 +181,7 @@ def _sincronizar_carencia(linha):
 
 
 @transaction.atomic
-def definir_escolha(componente, unidade, valor, linha_id=None):
+def definir_escolha(componente, unidade, valor, linha_id=None, usuario=None):
     """Aplica a escolha do usuário (docente, "Sem professor" ou "Não oferecido").
 
     `linha_id`: pk da linha a alterar; `NOVA_LINHA` cria uma linha adicional;
@@ -172,6 +211,13 @@ def definir_escolha(componente, unidade, valor, linha_id=None):
             docente = Professor.objects.get(pk=int(valor))
         except (ValueError, TypeError, Professor.DoesNotExist):
             raise AlocacaoError('Professor não encontrado.', status=404)
+        if usuario and getattr(usuario, 'perfil', None) == 'COORDENADOR_UNIDADE' and not usuario.is_superuser:
+            unidade_alvo = unidade.pk if unidade else getattr(usuario, 'unidade_id', None)
+            if not professor_autorizado_para_unidade(docente.pk, unidade_alvo):
+                raise AlocacaoError(
+                    f'O docente {docente.nome} não pertence a esta unidade e não possui cessão autorizada.',
+                    status=403,
+                )
         if docente.readaptado_vigente:
             raise AlocacaoError(
                 f'{docente.nome} está readaptado e não pode ficar em sala de aula. '

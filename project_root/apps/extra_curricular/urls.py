@@ -33,4 +33,10 @@ urlpatterns = [
     path("pendencias/<int:pk>/sei/editar/", views.PendenciaSEIUpdateView.as_view(), name="editar_sei"),
 
     path("api/calcular-ch/", views.CalcularCHView.as_view(), name="calcular_ch"),
+
+    # Supervisão de Estágio na Alocação Extracurricular
+    path("estagio/", views.SupervisaoEstagioListView.as_view(), name="supervisao_estagio"),
+    path("estagio/novo/", views.AtividadeEstagioCreateView.as_view(), name="atividade_estagio_create"),
+    path("estagio/<int:pk>/editar/", views.AtividadeEstagioUpdateView.as_view(), name="atividade_estagio_update"),
+    path("estagio/<int:pk>/encerrar/", views.AtividadeEstagioEncerrarView.as_view(), name="atividade_estagio_encerrar"),
 ]

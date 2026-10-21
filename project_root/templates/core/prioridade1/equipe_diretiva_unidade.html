@@ -7,7 +7,7 @@
 {% with retorno=request.get_full_path %}
 <div class="mx-auto w-full max-w-5xl space-y-6">
   <p class="-mt-2 text-sm text-slate-600">
-    Cadastre e atualize os ocupantes dos cargos diretivos, coordenações e atividades de estágio e supervisão da sua unidade. A redução semanal de carga horária é definida exclusivamente pela DESUP.
+    Cadastre e atualize os ocupantes dos cargos diretivos e coordenações da sua unidade. A redução semanal de carga horária é definida exclusivamente pela DESUP.
   </p>
 
   {# ── Cabeçalho da Unidade + Redução Total (Somente Leitura) ── #}
@@ -31,11 +31,7 @@
           <p><span class="text-xl font-black text-emerald-950">{{ reducao_total|floatformat:"-2" }} h</span><span class="text-xs font-semibold">/semana</span></p>
         </div>
       </div>
-      <button type="button"
-              onclick="abrirModal('modalNovoEstagioUnidade')"
-              class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#025c9f] px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-[#153e70] focus:outline-none focus:ring-2 focus:ring-blue-300">
-        <i class="ph ph-student text-lg" aria-hidden="true"></i>Registrar estágio / supervisão
-      </button>
+
     </div>
   </section>
 
@@ -149,23 +145,7 @@
     </div>
   </section>
 
-  {# ── Atividades de Estágio e Supervisão da Unidade ── #}
-  <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="sec-estagio-titulo">
-    <div class="flex flex-col gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-      <div>
-        <h2 id="sec-estagio-titulo" class="text-base font-black text-slate-900 sm:text-lg">Atividades de estágio e supervisão da unidade</h2>
-        <p class="text-xs text-slate-500">Registre e acompanhe as atividades de coordenação, supervisão e orientação de estágio vinculadas à unidade {{ unidade.sigla }}.</p>
-      </div>
-      <button type="button"
-              onclick="abrirModal('modalNovoEstagioUnidade')"
-              class="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-blue-50 px-3.5 py-2 text-xs font-black text-[#025c9f] hover:bg-blue-100">
-        <i class="ph-bold ph-plus" aria-hidden="true"></i>Nova atividade
-      </button>
-    </div>
-    <div id="estagio-supervisao-unidade-container">
-      {% include 'core/prioridade1/partials/_estagio_supervisao_list.html' %}
-    </div>
-  </section>
+
 
   {# ── Histórico de Ocupações da Unidade (com busca e filtro HTMX) ── #}
   <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="sec-historico-titulo">
@@ -393,81 +373,7 @@
 {% endfor %}
 {% endfor %}
 
-{# ═══════════════ Modais de Atividades de Estágio e Supervisão ═══════════════ #}
 
-<div id="modalNovoEstagioUnidade"
-     class="modal-equipe hidden fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4"
-     role="dialog"
-     aria-modal="true"
-     aria-labelledby="tituloNovoEstagioUnidade">
-  <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
-    <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
-      <div>
-        <h3 id="tituloNovoEstagioUnidade" class="text-base font-black text-[#025c9f]">Registrar estágio / supervisão</h3>
-        <p class="text-xs text-slate-500">Unidade {{ unidade.sigla }}</p>
-      </div>
-      <button type="button"
-              onclick="fecharModal('modalNovoEstagioUnidade')"
-              aria-label="Fechar"
-              class="text-slate-400 hover:text-slate-600">
-        <i class="ph ph-x text-xl" aria-hidden="true"></i>
-      </button>
-    </div>
-    <form method="post" action="{% url 'core:atividade_estagio_create' %}">
-      {% csrf_token %}
-      <input type="hidden" name="next" value="{{ retorno }}">
-      <div class="max-h-[62vh] space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
-        <div class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-          <i class="ph ph-lock-key text-base text-slate-400 shrink-0" aria-hidden="true"></i>
-          <span>A redução semanal de carga horária é atribuída exclusivamente pela DESUP.</span>
-        </div>
-        {% include 'core/prioridade1/_campos_form.html' with form=form_nova_atividade_estagio %}
-      </div>
-      <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-4 sm:px-6">
-        <button type="button" onclick="fecharModal('modalNovoEstagioUnidade')" class="min-h-10 rounded-lg px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100">Cancelar</button>
-        <button type="submit" class="min-h-10 rounded-lg bg-[#025c9f] px-5 py-2 text-sm font-black text-white shadow-sm hover:bg-[#153e70]">Salvar atividade</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-{% for atividade in atividades_estagio %}
-<div id="modalEditarEstagioUnidade{{ atividade.pk }}"
-     class="modal-equipe hidden fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4"
-     role="dialog"
-     aria-modal="true"
-     aria-labelledby="tituloEditarEstagioUnidade{{ atividade.pk }}">
-  <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
-    <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
-      <div>
-        <h3 id="tituloEditarEstagioUnidade{{ atividade.pk }}" class="text-base font-black text-[#025c9f]">Editar {{ atividade.get_tipo_display }}</h3>
-        <p class="text-xs text-slate-500">{{ atividade.professor.nome }} · {{ unidade.sigla }}</p>
-      </div>
-      <button type="button"
-              onclick="fecharModal('modalEditarEstagioUnidade{{ atividade.pk }}')"
-              aria-label="Fechar"
-              class="text-slate-400 hover:text-slate-600">
-        <i class="ph ph-x text-xl" aria-hidden="true"></i>
-      </button>
-    </div>
-    <form method="post" action="{% url 'core:atividade_estagio_update' atividade.pk %}">
-      {% csrf_token %}
-      <input type="hidden" name="next" value="{{ retorno }}">
-      <div class="max-h-[62vh] space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
-        <div class="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-700">
-          <span class="font-bold">Redução semanal (definida pela DESUP):</span>
-          <span class="font-black text-emerald-800">{{ atividade.carga_reducao_horas|floatformat:"-2" }} h/semana</span>
-        </div>
-        {% include 'core/prioridade1/_campos_form.html' with form=atividade.edit_form %}
-      </div>
-      <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-4 sm:px-6">
-        <button type="button" onclick="fecharModal('modalEditarEstagioUnidade{{ atividade.pk }}')" class="min-h-10 rounded-lg px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100">Cancelar</button>
-        <button type="submit" class="min-h-10 rounded-lg bg-[#025c9f] px-5 py-2 text-sm font-black text-white shadow-sm hover:bg-[#153e70]">Salvar alterações</button>
-      </div>
-    </form>
-  </div>
-</div>
-{% endfor %}
 {% endwith %}
 
 <script>

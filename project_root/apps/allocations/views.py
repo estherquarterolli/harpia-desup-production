@@ -88,7 +88,10 @@ class AllocCurricularView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView)
         # A base de docentes é consultada sob demanda pelo autocomplete. Este
         # queryset permanece no contexto apenas por compatibilidade com integrações
         # existentes; o template não o materializa.
-        context['professores_unidade'] = Professor.objects.all().order_by('rh_nome')
+        if perfil == 'COORDENADOR_UNIDADE' and not user.is_superuser:
+            context['professores_unidade'] = services.professores_autorizados_unidade_qs(user.unidade_id).order_by('rh_nome')
+        else:
+            context['professores_unidade'] = Professor.objects.all().order_by('rh_nome')
 
         # Antes, abrir a tela DESUP sem filtro carregava matrizes e componentes de
         # TODAS as unidades. Além de confuso, era o principal pico de memória/DOM.
@@ -299,13 +302,24 @@ class AlocarDocenteComponenteView(LoginRequiredMixin, PerfilRequiredMixin, View)
         linha_id = request.POST.get('linha_id') or None
         linha = None
         reload = False
+        docente_id_param = request.POST.get('docente_id')
+        user = request.user
+        if user.perfil == 'COORDENADOR_UNIDADE' and not user.is_superuser:
+            if docente_id_param not in (None, '', services.SEM_PROFESSOR, services.NAO_OFERECIDA):
+                unidade_alvo_id = unidade.pk if unidade else user.unidade_id
+                if not services.professor_autorizado_para_unidade(docente_id_param, unidade_alvo_id):
+                    erro = services.AlocacaoError(
+                        'Acesso negado: docente não vinculado a esta unidade e sem cessão autorizada.',
+                        status=403,
+                    )
+                    return _resposta_erro(request, erro)
         try:
             if request.POST.get('acao') == 'remover':
                 msg = services.remover_linha(comp, unidade, linha_id)
                 reload = True
             else:
                 msg, linha, reload = services.definir_escolha(
-                    comp, unidade, request.POST.get('docente_id'), linha_id
+                    comp, unidade, docente_id_param, linha_id, usuario=user
                 )
         except services.AlocacaoError as erro:
             return _resposta_erro(request, erro)
@@ -485,7 +499,8 @@ class DesfazerAprovacaoUnidadeView(LoginRequiredMixin, PerfilRequiredMixin, View
 class BuscarProfessoresView(LoginRequiredMixin, PerfilRequiredMixin, View):
     """Endpoint JSON para busca dinâmica de professores (autocomplete).
 
-    A busca é global: todas as unidades consultam a mesma base de docentes.
+    A busca é restrita aos professores autorizados da unidade (próprios e cedidos).
+    A DESUP possui visão global ou pode filtrar por unidade.
     """
     allowed_profiles = ['DESUP', 'COORDENADOR_UNIDADE']
 
@@ -494,9 +509,23 @@ class BuscarProfessoresView(LoginRequiredMixin, PerfilRequiredMixin, View):
         from django.db.models.functions import Coalesce, NullIf
 
         from apps.professors.models import Professor
+        from apps.allocations.services import professores_autorizados_unidade_qs
 
+        user = request.user
         q = request.GET.get('q', '').strip()
-        qs = Professor.objects.filter(status='Ativo')
+
+        if user.perfil == 'COORDENADOR_UNIDADE' and not user.is_superuser:
+            if not user.unidade_id:
+                return JsonResponse({'results': []})
+            unidade_alocacao = user.unidade_id
+            qs = professores_autorizados_unidade_qs(unidade_alocacao).filter(status='Ativo')
+        else:
+            unidade_param = request.GET.get('unidade_alocacao', '')
+            unidade_alocacao = int(unidade_param) if unidade_param.isdigit() else None
+            if unidade_alocacao:
+                qs = professores_autorizados_unidade_qs(unidade_alocacao).filter(status='Ativo')
+            else:
+                qs = Professor.objects.filter(status='Ativo')
 
         # Regra #3: o ajuste da DESUP (`desup_nome`) prevalece sobre o dado do RH — é o
         # que `Professor.nome` devolve e o que a tela mostra. Antes o endpoint filtrava e
@@ -514,8 +543,6 @@ class BuscarProfessoresView(LoginRequiredMixin, PerfilRequiredMixin, View):
         qs = qs.prefetch_related('unidades', 'readaptacoes').order_by('nome_exibicao')[:20]
 
         cargos_diretivos = _cargos_diretivos_vigentes()
-        unidade_alocacao = request.GET.get('unidade_alocacao', '')
-        unidade_alocacao = int(unidade_alocacao) if unidade_alocacao.isdigit() else None
         outras = _ids_de_outra_unidade({p.id for p in qs}, unidade_alocacao)
         results = [
             {
