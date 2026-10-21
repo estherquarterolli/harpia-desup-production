@@ -127,21 +127,27 @@ class DecisaoDesupTests(TestCase):
         )
 
     # ── Lista: coluna Status somente leitura ────────────────────────
-    def test_lista_desup_sem_form_de_status(self):
-        """A lista para DESUP não deve conter o form de status nem os inputs."""
-        OrientacaoTCC.objects.create(pendencia=self.pendencia, num_orientandos=4)
+    def test_lista_desup_exibe_select_e_justificativa_do_parecer(self):
+        """A DESUP decide cada item diretamente pela lista."""
+        item = OrientacaoTCC.objects.create(pendencia=self.pendencia, num_orientandos=4)
         self.client.force_login(self.desup)
         url = reverse("extra_curricular:pendencia_list")
         resp = self.client.get(url, {"semestre": semestre_atual()})
         self.assertEqual(resp.status_code, 200)
         html = resp.content.decode()
-        # Não deve conter o form de finalização inline nem seus inputs
         self.assertNotIn('name="status"', html)
         self.assertNotIn('name="item_horas_aprovadas"', html)
         self.assertNotIn('name="item_tipo"', html)
-        # Deve exibir o docente (a linha existe) e o badge somente-leitura
+        self.assertIn('name="parecer_desup"', html)
+        self.assertIn('name="motivo_parecer"', html)
+        self.assertIn(
+            reverse(
+                "extra_curricular:parecer_rapido",
+                kwargs={"pk": self.pendencia.pk, "tipo": "tcc", "item_pk": item.pk},
+            ),
+            html,
+        )
         self.assertIn("Docente Decisão", html)
-        self.assertIn("badge-enviado", html)
 
     # ── Finalizar (consolidação) DESUP-only ─────────────────────────
     def test_atualizar_status_finaliza_sem_sobrescrever_pareceres(self):
@@ -573,6 +579,10 @@ class FiltroStatusPendenciaTests(TestCase):
         self.desup = User.objects.create_user(
             email="desup_corr015@teste.com", perfil="DESUP", forcar_troca_senha=False,
         )
+        self.coord = User.objects.create_user(
+            email="coord_corr015@teste.com", perfil="COORDENADOR_UNIDADE",
+            unidade=self.unidade, forcar_troca_senha=False,
+        )
         self.url = reverse("extra_curricular:pendencia_list")
 
     def _professor(self, sufixo):
@@ -597,7 +607,7 @@ class FiltroStatusPendenciaTests(TestCase):
     def _get(self, **params):
         params.setdefault("semestre", semestre_atual())
         params.setdefault("unidade_id", self.unidade.pk)
-        self.client.force_login(self.desup)
+        self.client.force_login(self.coord)
         return self.client.get(self.url, params)
 
     # ── O caso relatado ─────────────────────────────────────────────
@@ -1107,7 +1117,7 @@ class AprovacaoParcialTests(TestCase):
         self.assertEqual(self.pendencia.ch_total_justificada, 0.0)
 
     def test_item_ainda_pendente_mantem_em_analise(self):
-        """Sem todos os itens julgados, não é PARCIAL — a análise não acabou."""
+        """A análise segue aberta, mas o item já aprovado passa a contar."""
         self._tcc(ParecerChoices.APROVADO, num=4, aprovados=4)
         self._reducao(ParecerChoices.INDEFERIDO)
         self._reducao(ParecerChoices.PENDENTE, horas="3.0")
@@ -1117,7 +1127,7 @@ class AprovacaoParcialTests(TestCase):
             PendenciaExtra.StatusChoices.ENVIADO,
         )
         self.pendencia.refresh_from_db()
-        self.assertEqual(self.pendencia.ch_total_justificada, 0.0)
+        self.assertEqual(self.pendencia.ch_total_justificada, 2.0)
 
     # ── Interações com o resto do fluxo ─────────────────────────────
     def test_rascunho_nao_vira_parcial(self):

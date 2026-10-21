@@ -14,7 +14,6 @@
       </span>
       <div class="min-w-0">
         <h2 class="truncate text-base font-black text-slate-900 sm:text-lg">{{ unidade.sigla }} — {{ unidade.nome }}</h2>
-        <p class="text-xs text-slate-500">Cadastre e atualize os ocupantes dos cargos diretivos e coordenações. A redução semanal de carga horária é definida exclusivamente pela DESUP.</p>
       </div>
     </div>
 
@@ -22,20 +21,14 @@
          title="Redução total semanal de carga horária definida pela DESUP para os cargos vigentes da unidade">
       <i class="ph ph-clock text-2xl shrink-0" aria-hidden="true"></i>
       <div>
-        <p class="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Redução da equipe (DESUP)</p>
+        <p class="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Redução da equipe</p>
         <p><span class="text-xl font-black text-emerald-950">{{ reducao_total|floatformat:"-2" }} h</span><span class="text-xs font-semibold">/semana</span></p>
       </div>
     </div>
   </section>
 
   {# ── Composição Atual: Cargos da Equipe Diretiva e Coordenações ── #}
-  <section class="space-y-3" aria-labelledby="sec-composicao-titulo">
-    <div class="flex flex-wrap items-center justify-between gap-2">
-      <div>
-        <h2 id="sec-composicao-titulo" class="text-lg font-black text-slate-900">Composição atual da equipe diretiva e coordenações</h2>
-        <p class="text-xs text-slate-500">Toque ou clique em um cargo para visualizar ocupantes, preencher vaga ou atualizar vigência.</p>
-      </div>
-    </div>
+  <section class="space-y-3" aria-label="Cargos da equipe diretiva e coordenações">
 
     <div class="grid gap-3 md:grid-cols-2">
       {% for item in composicao %}

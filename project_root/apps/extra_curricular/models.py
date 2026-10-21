@@ -121,13 +121,12 @@ class PendenciaExtra(models.Model):
         Itens INDEFERIDOS, que também mantêm `horas_aprovadas` preenchido, ficam
         de fora pelo mesmo motivo.
 
-        CORR-023: `PARCIAL` conta igual a `APROVADO` — o que foi deferido vale, o
-        indeferido só não entra na soma. O gate pelo status do cabeçalho continua
-        existindo porque é ele que faz a CH parar de contar depois de uma
-        REABERTURA (o status volta a ENVIADO enquanto os itens seguem marcados
-        como aprovados).
+        Cada item passa a contar assim que recebe parecer APROVADO, mesmo que
+        existam outros itens ainda em análise. Na reabertura, os pareceres dos
+        itens voltam a PENDENTE e, por isso, deixam naturalmente de entrar na
+        soma.
         """
-        if self.status not in self.STATUS_FINALIZADOS:
+        if self.status == self.StatusChoices.RASCUNHO:
             return 0.0
 
         def _aprovados(queryset):
