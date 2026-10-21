@@ -1,6 +1,29 @@
 {% firstof semestre semestre_corrente as nav_semestre %}
 <div class="extra-tabs-bar">
 <nav class="extra-tabs" aria-label="Seções de alocação extracurricular">
+  {% if is_desup %}
+  <div class="extra-tab-card extra-tab-blue {% if aba_ativa == 'pendencias' %}is-active{% endif %}">
+    <a href="{% url 'extra_curricular:pendencia_list' %}?semestre={{ nav_semestre|urlencode }}{% if unidade_selecionada %}&amp;unidade_id={{ unidade_selecionada.pk }}{% endif %}" class="extra-tab-link" {% if aba_ativa == 'pendencias' %}aria-current="page"{% endif %}>
+      <i class="ph ph-clock-countdown extra-tab-icon" aria-hidden="true"></i>
+      <span>Pendentes</span>
+      <span class="extra-desup-count">{{ nav_desup_pendentes_count|default:0 }}</span>
+    </a>
+  </div>
+  <div class="extra-tab-card extra-tab-rose {% if aba_ativa == 'reprovados' %}is-active{% endif %}">
+    <a href="{% url 'extra_curricular:pendencia_list' %}?aba=reprovados&amp;semestre={{ nav_semestre|urlencode }}{% if unidade_selecionada %}&amp;unidade_id={{ unidade_selecionada.pk }}{% endif %}" class="extra-tab-link" {% if aba_ativa == 'reprovados' %}aria-current="page"{% endif %}>
+      <i class="ph ph-x-circle extra-tab-icon" aria-hidden="true"></i>
+      <span>Reprovados</span>
+      <span class="extra-desup-count">{{ nav_desup_reprovados_count|default:0 }}</span>
+    </a>
+  </div>
+  <div class="extra-tab-card extra-tab-emerald {% if aba_ativa == 'aprovados' %}is-active{% endif %}">
+    <a href="{% url 'extra_curricular:pendencia_list' %}?aba=aprovados&amp;semestre={{ nav_semestre|urlencode }}{% if unidade_selecionada %}&amp;unidade_id={{ unidade_selecionada.pk }}{% endif %}" class="extra-tab-link" {% if aba_ativa == 'aprovados' %}aria-current="page"{% endif %}>
+      <i class="ph ph-check-circle extra-tab-icon" aria-hidden="true"></i>
+      <span>Aprovados</span>
+      <span class="extra-desup-count">{{ nav_desup_aprovados_count|default:0 }}</span>
+    </a>
+  </div>
+  {% else %}
   <div class="extra-tab-card extra-tab-blue {% if aba_ativa == 'pendencias' %}is-active{% endif %}">
     <a href="{% url 'extra_curricular:pendencia_list' %}?semestre={{ nav_semestre|urlencode }}{% if unidade_selecionada %}&amp;unidade_id={{ unidade_selecionada.pk }}{% endif %}" class="extra-tab-link" {% if aba_ativa == 'pendencias' %}aria-current="page"{% endif %}>
       <i class="ph ph-clipboard-text extra-tab-icon" aria-hidden="true"></i>
@@ -44,5 +67,6 @@
       <span>Supervisão de Estágio</span>
     </a>
   </div>
+  {% endif %}
 </nav>
 </div>

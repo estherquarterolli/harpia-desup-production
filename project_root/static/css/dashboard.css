@@ -616,6 +616,18 @@ h1, h2, h3, h4, h5, h6, .font-black {
     text-decoration: none;
 }
 .extra-tab-add:hover { filter: brightness(.9); }
+.extra-desup-count {
+    display: inline-flex;
+    min-width: 1.4rem;
+    height: 1.4rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--tab-soft);
+    color: var(--tab-color);
+    font-size: .68rem;
+    font-weight: 900;
+}
 .extra-tab-blue { --tab-color: #0369a1; --tab-soft: #e0f2fe; }
 .extra-tab-amber { --tab-color: #c2410c; --tab-soft: #ffedd5; }
 .extra-tab-violet { --tab-color: #7c3aed; --tab-soft: #ede9fe; }
@@ -751,6 +763,48 @@ h1, h2, h3, h4, h5, h6, .font-black {
     background: #fff;
     box-shadow: 0 7px 24px rgba(15, 23, 42, .06);
 }
+.desup-analysis-table {
+    min-width: 1280px !important;
+}
+.desup-decision-form {
+    display: grid;
+    grid-template-columns: 8.5rem minmax(13rem, 1fr) auto;
+    gap: .45rem;
+    align-items: center;
+    min-width: 30rem;
+}
+.desup-decision-select,
+.desup-decision-reason {
+    width: 100%;
+    min-height: 2.35rem;
+    border: 1px solid #cbd5e1;
+    border-radius: .65rem;
+    background: #fff;
+    padding: .5rem .7rem;
+    color: #334155;
+    font-size: .75rem;
+    font-weight: 700;
+    outline: none;
+}
+.desup-decision-select:focus,
+.desup-decision-reason:focus {
+    border-color: #0284c7;
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, .14);
+}
+.desup-decision-save {
+    display: inline-flex;
+    min-height: 2.35rem;
+    align-items: center;
+    justify-content: center;
+    gap: .3rem;
+    border-radius: .65rem;
+    background: #025c9f;
+    padding: .5rem .75rem;
+    color: #fff;
+    font-size: .72rem;
+    font-weight: 900;
+}
+.desup-decision-save:hover { background: #014a82; }
 .estagio-modal-panel {
     display: flex;
     max-height: calc(100dvh - 2rem);
@@ -795,6 +849,11 @@ h1, h2, h3, h4, h5, h6, .font-black {
         background: transparent;
         box-shadow: none;
     }
+    .desup-decision-form {
+        grid-template-columns: 1fr;
+        min-width: 0;
+        width: 100%;
+    }
     .estagio-modal-panel {
         max-height: calc(100dvh - 1rem);
         border-radius: .9rem;
@@ -837,4 +896,110 @@ tbody tr,
         scroll-behavior: auto !important;
         transition-duration: 0.01ms !important;
     }
+}
+
+/* --- Linhas expansíveis de professores (dashboard da unidade) ----------
+   CSS próprio: o tailwind.min.css do projeto é pré-compilado e não gera
+   classes com valores arbitrários nem variantes como group-open. */
+.prof-row {
+    width: 100%;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .06);
+    transition: border-color .12s, box-shadow .12s;
+}
+.prof-list-shell {
+    container-type: inline-size;
+}
+.prof-table-panel {
+    padding: .8rem;
+    border: 1px solid #dbe5ef;
+    border-radius: 1.15rem;
+    background: rgba(248, 250, 252, .94);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, .06);
+}
+.prof-table-body {
+    display: grid;
+    gap: .75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.prof-table-head {
+    display: none;
+}
+.prof-row[open] {
+    border-color: #93c5fd;
+    box-shadow: 0 8px 22px rgba(2, 92, 159, .12);
+}
+.prof-row-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "id caret"
+        "cargo vinculo"
+        "unidades unidades"
+        "status horas";
+    gap: .7rem 1rem;
+    align-items: center;
+    padding: 1rem;
+    text-align: left;
+    cursor: pointer;
+    list-style: none;
+}
+.prof-row-summary::-webkit-details-marker { display: none; }
+.prof-row-summary:hover { background: rgba(248, 250, 252, .9); }
+.prof-row-summary:focus-visible {
+    outline: 3px solid rgba(14, 165, 233, .35);
+    outline-offset: -3px;
+}
+.prof-id { grid-area: id; }
+.prof-cargo { grid-area: cargo; }
+.prof-vinculo { grid-area: vinculo; justify-self: end; }
+.prof-unidades { grid-area: unidades; }
+.prof-status { grid-area: status; }
+.prof-horas { grid-area: horas; justify-self: end; }
+.prof-caret {
+    grid-area: caret;
+    color: #025c9f;
+    font-size: 1.15rem;
+    transition: transform .15s;
+}
+.prof-row[open] .prof-caret { transform: rotate(180deg); }
+
+@container (min-width: 860px) {
+    .prof-table-panel {
+        padding: .85rem 1rem 1rem;
+    }
+    .prof-table-head {
+        display: grid;
+        grid-template-columns: minmax(13rem, 2.3fr) minmax(10rem, 1.6fr) minmax(5rem, .75fr) minmax(7rem, 1fr) minmax(7.5rem, 1fr) minmax(6rem, .75fr) 1.25rem;
+        gap: .75rem;
+        align-items: center;
+        padding: 0 .9rem .75rem;
+        color: #64748b;
+        font-size: .65rem;
+        font-weight: 900;
+        letter-spacing: .045em;
+        text-transform: uppercase;
+    }
+    .prof-table-head > :nth-child(4),
+    .prof-table-head > :nth-child(5),
+    .prof-table-head > :nth-child(6) {
+        text-align: center;
+    }
+    .prof-row-summary {
+        grid-template-columns: minmax(13rem, 2.3fr) minmax(10rem, 1.6fr) minmax(5rem, .75fr) minmax(7rem, 1fr) minmax(7.5rem, 1fr) minmax(6rem, .75fr) 1.25rem;
+        grid-template-areas: "id cargo vinculo unidades status horas caret";
+        gap: .75rem;
+        min-height: 4.5rem;
+        padding: .75rem .9rem;
+    }
+    .prof-vinculo { justify-self: start; }
+    .prof-unidades,
+    .prof-status,
+    .prof-horas { justify-self: center; }
+    .prof-caret { justify-self: center; }
 }

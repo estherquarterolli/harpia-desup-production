@@ -275,6 +275,11 @@ class CicloCompletoUnidadeDesupTests(_BaseFluxoE2E):
             PendenciaExtra.StatusChoices.ENVIADO,
             "Com itens ainda pendentes a pendência não pode ser finalizada",
         )
+        self.assertEqual(
+            pendencia.ch_total_justificada,
+            2.0,
+            "As horas do item aprovado devem contar imediatamente",
+        )
 
         self.assertEqual(
             self._post_parecer("ext", pendencia, ext, ParecerChoices.APROVADO, aprovados=8).status_code,
@@ -318,7 +323,11 @@ class CicloCompletoUnidadeDesupTests(_BaseFluxoE2E):
         # ── 9. A listagem da DESUP mostra as 3 linhas como finalizadas ─
         lista = self.client.get(
             reverse("extra_curricular:pendencia_list"),
-            {"semestre": self.semestre, "unidade_id": self.unidade_a.pk},
+            {
+                "aba": "aprovados",
+                "semestre": self.semestre,
+                "unidade_id": self.unidade_a.pk,
+            },
         )
         linhas = [l for l in lista.context["pendencias_data"] if l["professor"].pk == self.prof_a.pk]
         self.assertEqual(len(linhas), 3)
@@ -369,16 +378,34 @@ class CicloCompletoUnidadeDesupTests(_BaseFluxoE2E):
         self.assertEqual(ext.motivo_parecer, "Atividade já prevista na matriz curricular.")
 
         # A tela mostra a linha indeferida sem CH justificada.
-        lista = self.client.get(
+        aprovados = self.client.get(
             reverse("extra_curricular:pendencia_list"),
-            {"semestre": self.semestre, "unidade_id": self.unidade_a.pk},
+            {
+                "aba": "aprovados",
+                "semestre": self.semestre,
+                "unidade_id": self.unidade_a.pk,
+            },
         )
-        tokens = {
+        reprovados = self.client.get(
+            reverse("extra_curricular:pendencia_list"),
+            {
+                "aba": "reprovados",
+                "semestre": self.semestre,
+                "unidade_id": self.unidade_a.pk,
+            },
+        )
+        tokens_aprovados = {
             l["status_token"]
-            for l in lista.context["pendencias_data"]
+            for l in aprovados.context["pendencias_data"]
             if l["professor"].pk == self.prof_a.pk
         }
-        self.assertEqual(tokens, {"finalizado", "indeferido"})
+        tokens_reprovados = {
+            l["status_token"]
+            for l in reprovados.context["pendencias_data"]
+            if l["professor"].pk == self.prof_a.pk
+        }
+        self.assertEqual(tokens_aprovados, {"finalizado"})
+        self.assertEqual(tokens_reprovados, {"indeferido"})
 
     def test_desup_reverte_indeferimento_e_pendencia_volta_a_aprovado(self):
         """A DESUP pode reavaliar um item indeferido; ao deferir todos, o
@@ -1787,6 +1814,110 @@ class ListagemPendenciasTests(_BaseFluxoE2E):
             linhas = [l for l in linhas if l["professor"].pk == professor.pk]
         return linhas
 
+    def _item_enviado_para_desup(self, professor=None, orientandos=4):
+        professor = professor or self.prof_a
+        pendencia = PendenciaExtra.objects.create(
+            professor=professor,
+            unidade=professor.unidade_principal,
+            semestre=self.semestre,
+            status=PendenciaExtra.StatusChoices.ENVIADO,
+            sei_numero="SEI-987654/123456/2026",
+        )
+        item = OrientacaoTCC.objects.create(
+            pendencia=pendencia,
+            num_orientandos=orientandos,
+        )
+        return pendencia, item
+
+    def test_desup_tem_apenas_abas_de_pendentes_reprovados_e_aprovados(self):
+        pendencia, item = self._item_enviado_para_desup()
+        self._login(self.desup)
+
+        resp = self.client.get(
+            self.url,
+            {"semestre": self.semestre, "unidade_id": self.unidade_a.pk},
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        for titulo in ("Pendentes", "Reprovados", "Aprovados"):
+            self.assertContains(resp, titulo)
+        self.assertContains(resp, 'class="extra-tab-card', count=3)
+        self.assertNotContains(resp, 'aba=rascunhos')
+        self.assertNotContains(resp, 'aba=tcc')
+        self.assertNotContains(resp, 'aba=extensao')
+        self.assertContains(resp, 'name="parecer_desup"')
+        self.assertContains(resp, 'name="motivo_parecer"')
+        self.assertContains(
+            resp,
+            reverse(
+                "extra_curricular:parecer_rapido",
+                kwargs={"pk": pendencia.pk, "tipo": "tcc", "item_pk": item.pk},
+            ),
+        )
+
+    def test_parecer_rapido_aprova_contabiliza_horas_e_move_para_aprovados(self):
+        pendencia, item = self._item_enviado_para_desup(orientandos=4)
+        self._login(self.desup)
+        url = reverse(
+            "extra_curricular:parecer_rapido",
+            kwargs={"pk": pendencia.pk, "tipo": "tcc", "item_pk": item.pk},
+        )
+
+        resp = self.client.post(
+            url,
+            {"parecer_desup": "APROVADO", "motivo_parecer": "Documentação regular."},
+        )
+
+        self.assertEqual(resp.status_code, 302)
+        item.refresh_from_db()
+        pendencia.refresh_from_db()
+        self.assertEqual(item.parecer_desup, ParecerChoices.APROVADO)
+        self.assertEqual(item.ch_aprovada, 2.0)
+        self.assertEqual(pendencia.status, PendenciaExtra.StatusChoices.APROVADO)
+        self.assertEqual(pendencia.ch_total_justificada, 2.0)
+
+        aprovados = self.client.get(
+            self.url,
+            {"aba": "aprovados", "semestre": self.semestre, "unidade_id": self.unidade_a.pk},
+        )
+        self.assertEqual(
+            {linha["professor"].pk for linha in self._linhas(aprovados)},
+            {self.prof_a.pk},
+        )
+
+    def test_parecer_rapido_exige_motivo_para_reprovar_e_nao_contabiliza(self):
+        pendencia, item = self._item_enviado_para_desup(orientandos=4)
+        self._login(self.desup)
+        url = reverse(
+            "extra_curricular:parecer_rapido",
+            kwargs={"pk": pendencia.pk, "tipo": "tcc", "item_pk": item.pk},
+        )
+
+        sem_motivo = self.client.post(url, {"parecer_desup": "INDEFERIDO"})
+        self.assertEqual(sem_motivo.status_code, 302)
+        item.refresh_from_db()
+        self.assertEqual(item.parecer_desup, ParecerChoices.PENDENTE)
+
+        self.client.post(
+            url,
+            {"parecer_desup": "INDEFERIDO", "motivo_parecer": "Documento insuficiente."},
+        )
+        item.refresh_from_db()
+        pendencia.refresh_from_db()
+        self.assertEqual(item.parecer_desup, ParecerChoices.INDEFERIDO)
+        self.assertEqual(item.motivo_parecer, "Documento insuficiente.")
+        self.assertEqual(pendencia.status, PendenciaExtra.StatusChoices.INDEFERIDO)
+        self.assertEqual(pendencia.ch_total_justificada, 0.0)
+
+        reprovados = self.client.get(
+            self.url,
+            {"aba": "reprovados", "semestre": self.semestre, "unidade_id": self.unidade_a.pk},
+        )
+        self.assertEqual(
+            {linha["professor"].pk for linha in self._linhas(reprovados)},
+            {self.prof_a.pk},
+        )
+
     def test_coordenador_ve_apenas_os_docentes_da_sua_unidade(self):
         self._login(self.coord_a)
         resp = self.client.get(self.url, {"semestre": self.semestre})
@@ -1882,10 +2013,12 @@ class ListagemPendenciasTests(_BaseFluxoE2E):
         )
 
     def test_desup_ve_todas_as_unidades_e_filtra_por_unidade(self):
+        self._item_enviado_para_desup(self.prof_a)
+        self._item_enviado_para_desup(self.prof_b)
         self._login(self.desup)
         todas = self.client.get(self.url, {"semestre": self.semestre})
         pks = {l["professor"].pk for l in self._linhas(todas)}
-        self.assertEqual(pks, {self.prof_a.pk, self.prof_a2.pk, self.prof_b.pk})
+        self.assertEqual(pks, {self.prof_a.pk, self.prof_b.pk})
         self.assertTrue(todas.context["is_desup"])
 
         so_b = self.client.get(self.url, {"semestre": self.semestre, "unidade_id": self.unidade_b.pk})
@@ -1922,8 +2055,10 @@ class ListagemPendenciasTests(_BaseFluxoE2E):
         self.assertEqual(por_tipo["tcc"]["justificativa_token"], "tcc")
         self.assertEqual(por_tipo["ext"]["justificativa_token"], "extensao")
         self.assertEqual(por_tipo["red"]["justificativa_token"], "reducao")
-        # Pendência não APROVADA => nenhuma linha conta CH justificada.
-        self.assertEqual({l["ch_justificada"] for l in linhas}, {0})
+        # O item aprovado conta imediatamente; os demais não contam.
+        self.assertEqual(float(por_tipo["tcc"]["ch_justificada"]), 2.0)
+        self.assertEqual(por_tipo["ext"]["ch_justificada"], 0)
+        self.assertEqual(por_tipo["red"]["ch_justificada"], 0)
         # E o SEI aparece em todas as linhas do docente.
         self.assertEqual(
             {l["sei_numero"] for l in linhas}, {"SEI-181818/181818/2026"}
