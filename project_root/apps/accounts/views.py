@@ -362,6 +362,7 @@ class CustomPasswordChangeView(LoginRequiredMixin, PasswordChangeView):
             )
 
     def form_valid(self, form):
+        primeiro_acesso = getattr(self.request.user, 'forcar_troca_senha', False)
         response = super().form_valid(form)
         # Ao alterar a senha com sucesso, desativa a flag de forçar troca
         self.request.user.forcar_troca_senha = False
@@ -371,7 +372,11 @@ class CustomPasswordChangeView(LoginRequiredMixin, PasswordChangeView):
             "PASSWORD_CHANGED_BY_USER",
             usuario=self.request.user,
             email=self.request.user.email,
-            detalhes="Senha alterada pelo próprio usuário após confirmação da senha atual.",
+            detalhes=(
+                "Senha alterada pelo próprio usuário no primeiro acesso (sem exigência da senha atual)."
+                if primeiro_acesso
+                else "Senha alterada pelo próprio usuário após confirmação da senha atual."
+            ),
         )
         logger.info(
             "Senha alterada pelo usuario autenticado.",
@@ -379,6 +384,7 @@ class CustomPasswordChangeView(LoginRequiredMixin, PasswordChangeView):
                 "user_id": self.request.user.pk,
                 "user_email": self.request.user.email,
                 "path": self.request.path,
+                "primeiro_acesso": primeiro_acesso,
             },
         )
         messages.success(self.request, "Senha alterada com sucesso.")

@@ -200,8 +200,18 @@
           <form method="post" action="{% url 'core:ocupacao_diretiva_unidade_encerrar' ocupacao.pk %}" class="m-0">
             {% csrf_token %}
             <button type="submit"
-                    class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50/70 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100">
+                    class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100"
+                    title="Definir fim da vigência como hoje">
               <i class="ph ph-stop-circle" aria-hidden="true"></i>Encerrar ocupação
+            </button>
+          </form>
+          <form method="post" action="{% url 'core:ocupacao_diretiva_unidade_remover' ocupacao.pk %}" class="m-0">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ retorno }}">
+            <button type="submit"
+                    class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50/70 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100"
+                    title="Remover ocupante e liberar o cargo">
+              <i class="ph ph-user-minus" aria-hidden="true"></i>Remover do cargo
             </button>
           </form>
         </div>

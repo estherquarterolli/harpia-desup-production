@@ -1712,6 +1712,61 @@ class OcupacaoEquipeDiretivaUnidadeEncerrarView(UnidadePrioridade1Mixin, View):
             )
         messages.success(request, 'Ocupação encerrada com sucesso.')
         return redirect('core:equipe_diretiva_unidade')
+class OcupacaoEquipeDiretivaUnidadeRemoverView(UnidadePrioridade1Mixin, View):
+    """
+    Remove ou desvincula um ocupante de seu cargo diretivo na unidade.
+    - Exclusão restrita aos usuários autorizados (Coordenador de Unidade) e à própria unidade.
+    - O cargo fica imediatamente vago e liberado para nova atribuição.
+    - Preserva o cadastro do profissional, excluindo apenas o vínculo/ocupação com o cargo.
+    - Atualiza os efeitos sobre a redução de carga horária (HR), restaurando o saldo do professor
+      e o total da unidade.
+    """
+    http_method_names = ['post', 'head', 'options']
+
+    def post(self, request, pk):
+        from django.db import transaction
+        from django.core.exceptions import PermissionDenied
+        from django.utils.http import url_has_allowed_host_and_scheme
+        from .models import OcupacaoEquipeDiretiva
+        from .services import registrar_evento_prioridade1
+
+        unidade = self.get_unidade()
+        with transaction.atomic():
+            ocupacao = get_object_or_404(
+                OcupacaoEquipeDiretiva.objects.for_user(request.user)
+                .filter(unidade=unidade)
+                .select_for_update(),
+                pk=pk,
+            )
+            professor = ocupacao.professor
+            cargo = ocupacao.cargo
+
+            # Restringe aos profissionais vinculados à própria unidade
+            if not professor.vinculado_a_unidade(unidade.pk):
+                raise PermissionDenied('O profissional não está vinculado a esta unidade.')
+
+            professor_nome = professor.nome
+            cargo_nome = cargo.nome
+
+            # Remove apenas o vínculo com o cargo, preservando o cadastro do profissional
+            ocupacao.delete()
+
+            registrar_evento_prioridade1(
+                request,
+                'OCUPACAO_DIRETIVA_UNIDADE_REMOVIDA',
+                f'Ocupação {pk} removida; cargo {cargo_nome}; professor {professor_nome}; unidade {unidade.pk}.',
+            )
+
+        messages.success(request, f'{professor_nome} foi desvinculado(a) do cargo de {cargo_nome} com sucesso.')
+        destino = request.POST.get('next', '')
+        if destino and url_has_allowed_host_and_scheme(
+            destino,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            return redirect(destino)
+        return redirect('core:equipe_diretiva_unidade')
+
 
 
 class AtividadeEstagioSupervisaoCreateView(UnidadePrioridade1Mixin, RetornoOrigemMixin, CreateView):

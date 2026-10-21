@@ -802,3 +802,49 @@ Resumo: o docente deixou de ser um campo de `MatrixComponent` e passou a ser reg
 - `python manage.py test apps.core.tests_prioridade1_unidade`: 12 testes executados, 12 aprovados (`OK`).
 - `python manage.py test apps.allocations.tests`: 5 testes executados, 5 aprovados (`OK`).
 
+
+## 21/10/2026 - Primeiro acesso, exclusão direta de atalhos e remoção de ocupantes da equipe diretiva
+
+### `project_root/apps/accounts/views.py`
+- Tipo: alterado.
+- Alteração: refinamento da auditoria e logs em `CustomPasswordChangeView.form_valid` para discriminar com exatidão a alteração realizada no primeiro acesso (sob `forcar_troca_senha`, utilizando `SetPasswordForm` sem exigir senha atual) da alteração convencional (sob `PasswordChangeForm`, com obrigatoriedade da senha atual).
+- Motivo: atender ao critério de segurança e rastreabilidade para troca de senha no primeiro login versus alterações convencionais.
+
+### `project_root/templates/dashboard/desup.html` e `project_root/templates/dashboard/partials/_atalhos_unidade.html`
+- Tipo: alterado.
+- Alteração: remoção do pop-up modal `#modalRemoveAtalho` e da função intermediária JavaScript `abrirRemoverAtalho`. A exclusão do atalho agora é disparada diretamente pela ação do usuário através de um formulário POST com token CSRF direcionado a `core:atalho_remove`.
+- Motivo: atender à solicitação de remoção do pop-up de confirmação de exclusão de atalhos, preservando autorização por usuário no servidor e atualização da interface via redirecionamento com mensagem de confirmação.
+
+### `project_root/apps/core/ajuda.py`
+- Tipo: alterado.
+- Alteração: atualização dos tutoriais de dashboard (DESUP e Unidade) no passo "Remova um atalho", apontando o seletor diretamente para `button[title="Remover atalho"]` sem acionar o modal extinto.
+- Motivo: manter a consistência do módulo interativo de ajuda após a eliminação do pop-up.
+
+### `project_root/apps/core/urls.py`
+- Tipo: alterado.
+- Alteração: inclusão da rota `unidade/equipe-diretiva/ocupacoes/<int:pk>/remover/` com nome `ocupacao_diretiva_unidade_remover`.
+- Motivo: expor o endpoint seguro de desvinculação de ocupantes de cargos diretivos da unidade.
+
+### `project_root/apps/core/views.py`
+- Tipo: alterado.
+- Alteração: implementação da view `OcupacaoEquipeDiretivaUnidadeRemoverView`, protegida por `UnidadePrioridade1Mixin` (`allowed_profiles = ['COORDENADOR_UNIDADE']`), executada em transação atômica com `select_for_update()`, verificação de vínculo do docente com a unidade (`vinculado_a_unidade`), exclusão da instância de ocupação (`ocupacao.delete()`), preservação do cadastro do profissional e registro de evento em `AuditoriaGlobal` (`OCUPACAO_DIRETIVA_UNIDADE_REMOVIDA`).
+- Motivo: viabilizar a desvinculação de ocupantes de cargos da equipe diretiva, liberando o cargo imediatamente para novas atribuições e atualizando automaticamente os efeitos sobre a redução de carga horária (HR).
+
+### `project_root/templates/core/prioridade1/equipe_diretiva_unidade.html`
+- Tipo: alterado.
+- Alteração: inclusão do botão "Remover do cargo" acompanhado do ícone `ph-user-minus` no modal de detalhes de cada cargo (`modalDetalheUnidade`), submetendo diretamente via POST para a rota de remoção com retorno à tela atual.
+- Motivo: disponibilizar na interface de gerenciamento da unidade a opção de remoção/desvinculação do ocupante.
+
+### `project_root/apps/core/tests_prioridade1_unidade.py`
+- Tipo: alterado.
+- Alteração: inclusão de testes automatizados para:
+  1. Remoção bem-sucedida do ocupante, preservação do docente, liberação do cargo como vago para novo preenchimento e recálculo da redução de carga horária (HR).
+  2. Bloqueio contra IDOR ao tentar remover ocupação de outra unidade (404 Not Found).
+  3. Bloqueio para usuário não autenticado (302) e coordenador sem unidade (403 Forbidden).
+  4. Bloqueio para professor desvinculado da unidade (403 Forbidden).
+
+### Verificações
+- `python manage.py check`: 0 problemas encontrados (`0 silenced`).
+- `python manage.py test apps.accounts.tests_password_change_direct`: 6 testes executados, 6 aprovados (`OK`).
+- `python manage.py test apps.core.tests_prioridade1_unidade`: 15 testes executados, 15 aprovados (`OK`).
+- `python manage.py test apps.core.tests_ajuda apps.core.tests_e2e.JornadaAtalhosDashboardTests apps.core.tests.AtalhoDashboardTests`: 26 testes executados, 26 aprovados (`OK`).
