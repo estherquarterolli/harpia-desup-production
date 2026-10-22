@@ -215,16 +215,28 @@ class OcupacaoEquipeDiretiva(models.Model):
     @property
     def vigente(self):
         hoje = timezone.localdate()
-        return self.data_inicio <= hoje and (self.data_fim is None or self.data_fim >= hoje)
+        return self.data_inicio <= hoje and (self.data_fim is None or self.data_fim > hoje)
+
+    @staticmethod
+    def filtro_vigente(data=None):
+        """Periodo [inicio, fim): o dia do encerramento libera o cargo."""
+        data = data or timezone.localdate()
+        return models.Q(data_inicio__lte=data) & (
+            models.Q(data_fim__isnull=True) | models.Q(data_fim__gt=data)
+        )
 
     def conflitos_de_vigencia(self):
         if not self.unidade_id or not self.cargo_id or not self.data_inicio:
             return type(self).objects.none()
 
+        # Um encerramento no dia do inicio tem duracao zero.
+        if self.data_fim == self.data_inicio:
+            return type(self).objects.none()
+
         conflitos = type(self).objects.filter(
             unidade_id=self.unidade_id,
             cargo_id=self.cargo_id,
-        ).exclude(pk=self.pk)
+        ).exclude(pk=self.pk).exclude(data_fim=models.F("data_inicio"))
 
         if self.cargo.permite_multiplos:
             if self.cargo.exige_curso:
@@ -234,9 +246,9 @@ class OcupacaoEquipeDiretiva(models.Model):
             conflitos = conflitos.filter(professor_id=self.professor_id)
 
         if self.data_fim:
-            conflitos = conflitos.filter(data_inicio__lte=self.data_fim)
+            conflitos = conflitos.filter(data_inicio__lt=self.data_fim)
         return conflitos.filter(
-            models.Q(data_fim__isnull=True) | models.Q(data_fim__gte=self.data_inicio)
+            models.Q(data_fim__isnull=True) | models.Q(data_fim__gt=self.data_inicio)
         )
 
     def clean(self):

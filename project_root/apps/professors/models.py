@@ -250,7 +250,7 @@ class Professor(models.Model):
         hoje = timezone.localdate()
         total = 0.0
         for ocupacao in self.ocupacoes_diretivas.all():
-            if ocupacao.data_inicio <= hoje and (ocupacao.data_fim is None or ocupacao.data_fim >= hoje):
+            if ocupacao.vigente:
                 total += float(ocupacao.carga_reducao_horas or 0)
         return total
 

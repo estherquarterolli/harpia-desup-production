@@ -52,6 +52,7 @@ urlpatterns = [
     path('unidade/equipe-diretiva/cargos/<int:cargo_pk>/preencher/', views.OcupacaoEquipeDiretivaUnidadeCreateView.as_view(), name='ocupacao_diretiva_unidade_create'),
     path('unidade/equipe-diretiva/ocupacoes/<int:pk>/editar/', views.OcupacaoEquipeDiretivaUnidadeUpdateView.as_view(), name='ocupacao_diretiva_unidade_update'),
     path('unidade/equipe-diretiva/ocupacoes/<int:pk>/encerrar/', views.OcupacaoEquipeDiretivaUnidadeEncerrarView.as_view(), name='ocupacao_diretiva_unidade_encerrar'),
+    path('unidade/equipe-diretiva/ocupacoes/<int:pk>/remover/', views.OcupacaoEquipeDiretivaUnidadeRemoverView.as_view(), name='ocupacao_diretiva_unidade_remover'),
     path('unidade/equipe-diretiva/estagio/novo/', views.AtividadeEstagioSupervisaoCreateView.as_view(), name='atividade_estagio_create'),
     path('unidade/equipe-diretiva/estagio/<int:pk>/editar/', views.AtividadeEstagioSupervisaoUpdateView.as_view(), name='atividade_estagio_update'),
     path('unidade/equipe-diretiva/estagio/<int:pk>/encerrar/', views.AtividadeEstagioSupervisaoEncerrarView.as_view(), name='atividade_estagio_encerrar'),
