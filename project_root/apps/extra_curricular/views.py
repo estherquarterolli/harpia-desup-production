@@ -7,6 +7,8 @@ Perfis e permissões:
   DESUP               → vê todas as unidades; edita apenas parecer e motivo via
                         ParecerUpdateView (HTMX inline).
 """
+from decimal import Decimal
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -25,9 +27,12 @@ from apps.core.services import build_window_lock_context, create_window_ticket, 
 from apps.extra_curricular.forms import (
     AtividadeExtensionistaForm,
     AtividadeExtensionistaFormSet,
+    LicencaDocenteForm,
+    LicencaDocenteFormSet,
     OrientacaoTCCForm,
     OrientacaoTCCFormSet,
     ParecerExtensaoForm,
+    ParecerLicencaForm,
     ParecerReducaoForm,
     ParecerTCCForm,
     PendenciaExtraForm,
@@ -37,6 +42,7 @@ from apps.extra_curricular.forms import (
 from apps.extra_curricular.services import sincronizar_status_pendencia
 from apps.extra_curricular.models import (
     AtividadeExtensionista,
+    LicencaDocente,
     OrientacaoTCC,
     ParecerChoices,
     PendenciaExtra,
@@ -53,6 +59,56 @@ def _semestre_atual():
     # (reusada também pelo cálculo de CH justificada do professor).
     from apps.extra_curricular.utils import semestre_atual
     return semestre_atual()
+
+
+def _extracurricular_navigation_context(user, unidade, semestre, raw_data=None):
+    """Contadores compartilhados pelas abas do módulo extracurricular."""
+    from apps.core.models import AtividadeEstagioSupervisao
+
+    unidade_id = unidade.pk if unidade else None
+    if raw_data is None:
+        raw_data = get_pendencias_data(unidade_id, semestre)
+
+    pendencias_qs = PendenciaExtra.objects.filter(semestre=semestre)
+    atividades_qs = AtividadeEstagioSupervisao.objects.for_user(user).filter(
+        semestre=semestre,
+    )
+    if unidade_id:
+        pendencias_qs = pendencias_qs.filter(unidade_id=unidade_id)
+        atividades_qs = atividades_qs.filter(unidade_id=unidade_id)
+
+    return {
+        "nav_desup_pendentes_count": sum(
+            1 for item in raw_data
+            if item.get("pendencia") and item.get("status_token") == "pendente"
+        ),
+        "nav_desup_reprovados_count": sum(
+            1 for item in raw_data
+            if item.get("pendencia") and item.get("status_token") == "indeferido"
+        ),
+        "nav_desup_aprovados_count": sum(
+            1 for item in raw_data
+            if item.get("pendencia") and item.get("status_token") == "finalizado"
+        ),
+        "nav_pendencias_count": len({
+            item["professor"].pk
+            for item in raw_data
+            if item.get("ch_faltante", 0) > 0
+        }),
+        "nav_rascunhos_count": pendencias_qs.filter(
+            status=PendenciaExtra.StatusChoices.RASCUNHO,
+        ).count(),
+        **{
+            f"nav_{token}_count": sum(
+                1 for item in raw_data
+                if item.get("pendencia")
+                and item.get("status_token") != "rascunho"
+                and item.get("justificativa_token") == token
+            )
+            for token in ("tcc", "extensao", "reducao", "licenca")
+        },
+        "nav_estagios_count": atividades_qs.count(),
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -91,19 +147,102 @@ class PendenciaListView(LoginRequiredMixin, PerfilRequiredMixin, View):
         # compatível qualquer URL antiga com `?status=Sem registro`.
         status_filtro = request.GET.get("status", "").strip().lower().replace(" ", "_")
         justificativa_filtro = request.GET.get("justificativa", "").strip().lower()
+        aba_ativa = request.GET.get("aba", "pendencias").strip().lower()
+        is_desup = perfil == "DESUP" or user.is_superuser
+        if is_desup:
+            # Para a DESUP, o estado é definido exclusivamente pelas três abas.
+            # Ignora URLs antigas com ?status= para não cruzar filtros incompatíveis.
+            status_filtro = ""
+            if aba_ativa not in {"pendencias", "reprovados", "aprovados"}:
+                aba_ativa = "pendencias"
+        else:
+            if aba_ativa == "justificativas":  # URL antiga: todos os tipos enviados
+                aba_ativa = "pendencias"
+            if aba_ativa not in {"pendencias", "rascunhos", "tcc", "extensao", "reducao", "licenca"}:
+                aba_ativa = "pendencias"
 
         # Dados de pendência
         unidade_id_to_filter = unidade.id if unidade else None
         if perfil == 'COORDENADOR_UNIDADE':
             unidade_id_to_filter = unidade.id
 
-        raw_data = get_pendencias_data(unidade_id_to_filter, semestre, q)
+        # A busca textual é aplicada depois da montagem das linhas para alcançar
+        # todos os dados exibidos (docente, ID, SEI, justificativa, status e CH),
+        # não somente o nome do professor.
+        raw_data = get_pendencias_data(unidade_id_to_filter, semestre)
+
+        nav_context = _extracurricular_navigation_context(
+            user,
+            unidade,
+            semestre,
+            raw_data=raw_data,
+        )
 
         # Filtro de Status — CORR-015: compara com o token canônico calculado em
         # services.status_token(), o MESMO consumido pelos <option value> e pelo
         # data-status das linhas (filtro instantâneo em JS). Antes cada camada usava
         # um vocabulário próprio e "Sem registro" nunca casava com 'sem_registro'.
         pendencias_data = raw_data
+        if is_desup:
+            token_por_aba = {
+                "pendencias": "pendente",
+                "reprovados": "indeferido",
+                "aprovados": "finalizado",
+            }
+            pendencias_data = [
+                item for item in pendencias_data
+                if item.get("pendencia")
+                and item.get("status_token") == token_por_aba[aba_ativa]
+            ]
+        elif aba_ativa == "rascunhos":
+            pendencias_data = [
+                item for item in pendencias_data
+                if item.get("status_token") == "rascunho"
+            ]
+        elif aba_ativa in {"tcc", "extensao", "reducao", "licenca"}:
+            pendencias_data = [
+                item for item in pendencias_data
+                if item.get("pendencia")
+                and item.get("status_token") != "rascunho"
+                and item.get("justificativa_token") == aba_ativa
+            ]
+        if q:
+            from apps.core.busca import texto_casa
+
+            def corresponde_busca(item):
+                professor = item["professor"]
+                unidade_professor = getattr(professor, "unidade_principal", None)
+                status_legenda = {
+                    "rascunho": "Rascunho",
+                    "pendente": "Pendente enviado em análise",
+                    "finalizado": "Finalizado aprovado",
+                    "indeferido": "Indeferido",
+                    "parcial": "Finalizado parcialmente",
+                    "sem_registro": "Sem registro",
+                }.get(item.get("status_token"), "")
+                return texto_casa(
+                    q,
+                    professor.nome,
+                    professor.rh_nome,
+                    professor.desup_nome,
+                    professor.id_funcional,
+                    professor.rh_matricula,
+                    getattr(unidade_professor, "sigla", ""),
+                    getattr(unidade_professor, "nome", ""),
+                    item.get("sei_numero"),
+                    item.get("justificativa_detalhe"),
+                    item.get("justificativa_tipo"),
+                    item.get("status_item"),
+                    item.get("status_token"),
+                    status_legenda,
+                    item.get("meta_horas"),
+                    item.get("ch_alocada"),
+                    item.get("ch_pendente"),
+                    item.get("ch_justificada"),
+                    item.get("ch_faltante"),
+                )
+
+            pendencias_data = [item for item in pendencias_data if corresponde_busca(item)]
         if status_filtro:
             pendencias_data = [
                 item for item in pendencias_data
@@ -159,12 +298,14 @@ class PendenciaListView(LoginRequiredMixin, PerfilRequiredMixin, View):
             "querystring": params.urlencode(),
             "total_pendencias": paginator.count,
             "q": q,
-            "is_desup": (perfil == "DESUP" or user.is_superuser),
+            "is_desup": is_desup,
             "status_filtro": status_filtro,
             "justificativa_filtro": justificativa_filtro,
+            "aba_ativa": aba_ativa,
             "rascunho_professor_ids": rascunho_professor_ids,
             "rascunhos_count": rascunhos_count,
         }
+        ctx.update(nav_context)
         try:
             ctx.update(build_window_lock_context(
                 user,
@@ -296,8 +437,28 @@ class PendenciaLoteView(LoginRequiredMixin, PerfilRequiredMixin, View):
         tcc_items = OrientacaoTCC.objects.filter(pendencia__in=pendencias).select_related('pendencia__professor')
         ext_items = AtividadeExtensionista.objects.filter(pendencia__in=pendencias).select_related('pendencia__professor')
         red_items = ReducaoCargaHoraria.objects.filter(pendencia__in=pendencias).select_related('pendencia__professor')
+        lic_items = LicencaDocente.objects.filter(pendencia__in=pendencias).select_related('pendencia__professor')
+
+        from django.utils import timezone
+        from apps.core.models import AtividadeEstagioSupervisao
+        from apps.courses.models import CourseUnit
+        sup_items = list(
+            AtividadeEstagioSupervisao.objects.for_user(user)
+            .filter(professor__in=professores, semestre=_semestre_atual())
+            .select_related("professor", "curso")
+            .order_by("professor__rh_nome", "-data_inicio")
+        )
+        cursos_unidade = (
+            CourseUnit.objects.filter(unidade=user.unidade, ativo=True)
+            .select_related("curso").order_by("curso__nome")
+            if user.perfil == "COORDENADOR_UNIDADE" and user.unidade else []
+        )
 
         ctx = {
+            "sup_items": sup_items,
+            "cursos_unidade": cursos_unidade,
+            "tipos_estagio": AtividadeEstagioSupervisao.TipoChoices.choices,
+            "hoje": timezone.localdate(),
             "professores": professores,
             "pendencias": pendencias,
             "sei_numero": sei_numero,
@@ -305,6 +466,7 @@ class PendenciaLoteView(LoginRequiredMixin, PerfilRequiredMixin, View):
             "tcc_items": tcc_items,
             "ext_items": ext_items,
             "red_items": red_items,
+            "lic_items": lic_items,
             "is_coordenador": user.perfil == "COORDENADOR_UNIDADE",
             "is_desup": user.perfil == "DESUP",
             "query_string": ids_str,
@@ -319,6 +481,10 @@ class PendenciaLoteView(LoginRequiredMixin, PerfilRequiredMixin, View):
             "parecer_red_forms": [
                 (item, ParecerReducaoForm(instance=item, prefix=f"pred-{item.pk}"))
                 for item in red_items
+            ],
+            "parecer_lic_forms": [
+                (item, ParecerLicencaForm(instance=item, prefix=f"plic-{item.pk}"))
+                for item in lic_items
             ],
         }
         ctx.update(build_window_lock_context(
@@ -351,6 +517,7 @@ class PendenciaDetailView(LoginRequiredMixin, PerfilRequiredMixin, DetailView):
         tcc_items = list(object_.orientacoes_tcc.all())
         ext_items = list(object_.atividades_extensao.all())
         red_items = list(object_.reducoes_ch.all())
+        lic_items = list(object_.licencas.all())
 
         ctx.update({
             "is_coordenador": self.request.user.perfil == "COORDENADOR_UNIDADE",
@@ -358,6 +525,11 @@ class PendenciaDetailView(LoginRequiredMixin, PerfilRequiredMixin, DetailView):
             "tcc_items": tcc_items,
             "ext_items": ext_items,
             "red_items": red_items,
+            "lic_items": lic_items,
+            "lic_form": LicencaDocenteFormSet(
+                instance=object_, prefix="lic",
+                queryset=LicencaDocente.objects.filter(pendencia=object_, bloqueado=False),
+            ),
             "tcc_form": OrientacaoTCCFormSet(
                 instance=object_, prefix="tcc",
                 queryset=OrientacaoTCC.objects.filter(pendencia=object_, bloqueado=False),
@@ -381,6 +553,10 @@ class PendenciaDetailView(LoginRequiredMixin, PerfilRequiredMixin, DetailView):
             "parecer_red_forms": [
                 (item, ParecerReducaoForm(instance=item, prefix=f"pred-{item.pk}"))
                 for item in red_items
+            ],
+            "parecer_lic_forms": [
+                (item, ParecerLicencaForm(instance=item, prefix=f"plic-{item.pk}"))
+                for item in lic_items
             ],
         })
         ctx.update(build_window_lock_context(
@@ -456,6 +632,11 @@ class SalvarExtensaoView(_BaseItemSaveView):
 class SalvarReducaoView(_BaseItemSaveView):
     formset_class = ReducaoCargaHorariaFormSet
     prefix        = "red"
+
+
+class SalvarLicencaView(_BaseItemSaveView):
+    formset_class = LicencaDocenteFormSet
+    prefix        = "lic"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -589,6 +770,18 @@ class SalvarReducaoLoteView(_BaseItemLoteCreateView):
         return dados
 
 
+class SalvarLicencaLoteView(_BaseItemLoteCreateView):
+    form_class  = LicencaDocenteForm
+    acordeao    = "lic"
+    msg_sucesso = "Licença adicionada com sucesso."
+
+    def _dados_do_form(self, request):
+        dados = request.POST.copy()
+        horas = dados.get("horas_reduzidas") or ""
+        dados["horas_reduzidas"] = horas.replace(",", ".")
+        return dados
+
+
 class DeletarItemLoteView(LoginRequiredMixin, PerfilRequiredMixin, View):
     """Deleta um item de uma pendência em lote, redirecionando de volta."""
     allowed_profiles = ["COORDENADOR_UNIDADE", "DESUP"]
@@ -597,6 +790,7 @@ class DeletarItemLoteView(LoginRequiredMixin, PerfilRequiredMixin, View):
         "tcc": OrientacaoTCC,
         "ext": AtividadeExtensionista,
         "red": ReducaoCargaHoraria,
+        "lic": LicencaDocente,
     }
 
     def post(self, request, tipo, item_pk):
@@ -745,6 +939,7 @@ def _ch_aprovada_outros(pendencia, model_atual, item_pk):
         (OrientacaoTCC, pendencia.orientacoes_tcc),
         (AtividadeExtensionista, pendencia.atividades_extensao),
         (ReducaoCargaHoraria, pendencia.reducoes_ch),
+        (LicencaDocente, pendencia.licencas),
     )
     for model, related in grupos:
         qs = related.filter(parecer_desup=ParecerChoices.APROVADO)
@@ -805,10 +1000,136 @@ class ParecerExtensaoUpdateView(_BaseParecerView):
     prefix_base = "pext"
 
 
+class ParecerLicencaUpdateView(_BaseParecerView):
+    model_class = LicencaDocente
+    form_class  = ParecerLicencaForm
+    prefix_base = "plic"
+
+
 class ParecerReducaoUpdateView(_BaseParecerView):
     model_class = ReducaoCargaHoraria
     form_class  = ParecerReducaoForm
     prefix_base = "pred"
+
+
+class _AcaoRapidaDesupView(LoginRequiredMixin, PerfilRequiredMixin, View):
+    """Base das ações por item executadas pela DESUP na listagem."""
+
+    allowed_profiles = ["DESUP"]
+    _modelos = {
+        "tcc": OrientacaoTCC,
+        "ext": AtividadeExtensionista,
+        "red": ReducaoCargaHoraria,
+        "lic": LicencaDocente,
+    }
+
+    def _redirect(self, request):
+        destino = request.POST.get("next", "")
+        if destino and url_has_allowed_host_and_scheme(
+            destino,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            return redirect(destino)
+        return redirect("extra_curricular:pendencia_list")
+
+
+def _zerar_aprovacao_item(item):
+    """Remove somente a quantidade/CH concedida pela DESUP no item informado."""
+    if isinstance(item, OrientacaoTCC):
+        item.num_orientandos_aprovados = 0
+    elif isinstance(item, AtividadeExtensionista):
+        item.num_estudantes_aprovados = 0
+    else:
+        item.horas_aprovadas = Decimal("0")
+
+
+class ParecerRapidoDesupView(_AcaoRapidaDesupView):
+    """Decisão simplificada da DESUP diretamente na listagem."""
+
+    @transaction.atomic
+    def post(self, request, pk, tipo, item_pk):
+        model = self._modelos.get(tipo)
+        if model is None:
+            messages.error(request, "Tipo de justificativa inválido.")
+            return self._redirect(request)
+
+        pendencia = get_object_or_404(PendenciaExtra, pk=pk)
+        item = get_object_or_404(model, pk=item_pk, pendencia=pendencia)
+        parecer = request.POST.get("parecer_desup", "").strip().upper()
+        motivo = request.POST.get("motivo_parecer", "").strip()
+
+        if parecer not in {ParecerChoices.APROVADO, ParecerChoices.INDEFERIDO}:
+            messages.error(request, "Selecione Aprovado ou Reprovado.")
+            return self._redirect(request)
+        if parecer == ParecerChoices.INDEFERIDO and not motivo:
+            messages.error(request, "Informe a justificativa da reprovação.")
+            return self._redirect(request)
+        if pendencia.status == PendenciaExtra.StatusChoices.RASCUNHO:
+            messages.error(request, "Rascunhos ainda não podem ser analisados pela DESUP.")
+            return self._redirect(request)
+
+        aprovado = parecer == ParecerChoices.APROVADO
+        if isinstance(item, OrientacaoTCC):
+            item.num_orientandos_aprovados = item.num_orientandos if aprovado else 0
+        elif isinstance(item, AtividadeExtensionista):
+            item.num_estudantes_aprovados = item.num_estudantes if aprovado else 0
+        else:
+            item.horas_aprovadas = item.horas_reduzidas if aprovado else Decimal("0")
+
+        item.parecer_desup = parecer
+        item.motivo_parecer = motivo
+
+        if aprovado:
+            limite = pendencia.professor.limite_horas_extra_efetivo
+            outros = _ch_aprovada_outros(pendencia, model, item.pk)
+            if (outros + float(item.ch_aprovada)) > limite:
+                messages.error(
+                    request,
+                    f"Limite de horas extras excedido. O docente {pendencia.professor.nome} possui "
+                    f"{limite}h disponíveis e as demais justificativas já somam {outros}h.",
+                )
+                return self._redirect(request)
+
+        item.save()
+        sincronizar_status_pendencia(pendencia)
+        messages.success(
+            request,
+            "Justificativa aprovada e horas contabilizadas."
+            if aprovado
+            else "Justificativa reprovada; as horas não foram contabilizadas.",
+        )
+        return self._redirect(request)
+
+
+class CancelarExtracurricularDesupView(_AcaoRapidaDesupView):
+    """Cancela um único extracurricular aprovado, preservando o histórico."""
+
+    @transaction.atomic
+    def post(self, request, pk, tipo, item_pk):
+        model = self._modelos.get(tipo)
+        if model is None:
+            messages.error(request, "Tipo de justificativa inválido.")
+            return self._redirect(request)
+
+        pendencia = get_object_or_404(PendenciaExtra, pk=pk)
+        item = get_object_or_404(model, pk=item_pk, pendencia=pendencia)
+        if item.parecer_desup != ParecerChoices.APROVADO:
+            messages.error(request, "Somente um extracurricular aprovado pode ser cancelado.")
+            return self._redirect(request)
+
+        motivo = request.POST.get("motivo_cancelamento", "").strip()
+        _zerar_aprovacao_item(item)
+        item.parecer_desup = ParecerChoices.INDEFERIDO
+        item.motivo_parecer = motivo or "Aprovação cancelada pela DESUP."
+        item.save()
+        sincronizar_status_pendencia(pendencia)
+
+        messages.success(
+            request,
+            "Extracurricular cancelado. A carga horária deixou de ser contabilizada.",
+        )
+        return self._redirect(request)
 
 
 class PendenciaStatusUpdateView(LoginRequiredMixin, PerfilRequiredMixin, View):
@@ -860,7 +1181,7 @@ class PendenciaReabrirView(LoginRequiredMixin, PerfilRequiredMixin, View):
         # aprovadas como ponto de partida) e re-deriva o status agregado. Enquanto o
         # status não voltar a APROVADO, a CH aprovada anteriormente deixa de contar.
         with transaction.atomic():
-            for related in (pendencia.orientacoes_tcc, pendencia.atividades_extensao, pendencia.reducoes_ch):
+            for related in (pendencia.orientacoes_tcc, pendencia.atividades_extensao, pendencia.reducoes_ch, pendencia.licencas):
                 related.update(parecer_desup=ParecerChoices.PENDENTE)
             sincronizar_status_pendencia(pendencia)
 
@@ -901,6 +1222,7 @@ class DeletarItemView(LoginRequiredMixin, PerfilRequiredMixin, View):
         "tcc":    OrientacaoTCC,
         "ext":    AtividadeExtensionista,
         "red":    ReducaoCargaHoraria,
+        "lic":    LicencaDocente,
     }
 
     def post(self, request, pk, tipo, item_pk):
@@ -1130,7 +1452,13 @@ class SupervisaoEstagioListView(LoginRequiredMixin, PerfilRequiredMixin, Templat
             "is_coordenador": perfil == "COORDENADOR_UNIDADE",
             "is_desup": perfil == "DESUP" or user.is_superuser,
             "retorno": reverse_lazy("extra_curricular:supervisao_estagio"),
+            "aba_ativa": "supervisao",
         })
+        ctx.update(_extracurricular_navigation_context(
+            user,
+            unidade,
+            semestre_corrente,
+        ))
         return ctx
 
 
@@ -1138,6 +1466,16 @@ class AtividadeEstagioCreateView(LoginRequiredMixin, PerfilRequiredMixin, Create
     allowed_profiles = ["COORDENADOR_UNIDADE"]
     template_name = "core/prioridade1/form_unidade.html"
     success_url = reverse_lazy("extra_curricular:supervisao_estagio")
+
+    def get_success_url(self):
+        # Permite voltar à mesa de lote quando o cadastro nasceu de lá.
+        destino = self.request.POST.get("next", "")
+        if destino.startswith("/") and url_has_allowed_host_and_scheme(
+            destino, allowed_hosts={self.request.get_host()},
+            require_https=self.request.is_secure(),
+        ):
+            return destino
+        return str(self.success_url)
 
     def get_form_class(self):
         from apps.core.forms import AtividadeEstagioSupervisaoUnidadeForm

@@ -70,14 +70,14 @@ def _bulk_ch_justificada(professor_ids):
     pendencias = PendenciaExtra.objects.filter(
         professor_id__in=professor_ids,
         semestre=semestre_atual(),
-    ).prefetch_related("orientacoes_tcc", "atividades_extensao", "reducoes_ch")
+    ).prefetch_related("orientacoes_tcc", "atividades_extensao", "reducoes_ch", "licencas")
 
     mapa = {}
     for p in pendencias:
         if p.status not in PendenciaExtra.STATUS_FINALIZADOS:
             continue
         total = 0.0
-        for itens in (p.orientacoes_tcc.all(), p.atividades_extensao.all(), p.reducoes_ch.all()):
+        for itens in (p.orientacoes_tcc.all(), p.atividades_extensao.all(), p.reducoes_ch.all(), p.licencas.all()):
             total += sum(
                 float(item.ch_aprovada) for item in itens
                 if item.parecer_desup == ParecerChoices.APROVADO
@@ -125,6 +125,197 @@ class ProfessorEditDeleteMixin(LoginRequiredMixin, PerfilRequiredMixin):
                 Q(unidades__id=user.unidade_id) | Q(unidade_principal_id=user.unidade_id)
             ).distinct()
         return queryset.none()
+
+
+def enriquecer_professores_com_carga(professores, unidade_atual=None):
+    """Anexa a cada professor as cargas (alocada, justificada, total, sobra, %) em lote.
+
+    Quando `unidade_atual` é informada, também devolve as colunas por matriz
+    vigente da unidade e o `alocacao_map` de cada professor. Usado pela lista de
+    professores e pela visão geral do dashboard da unidade (mesmas colunas).
+    """
+    resultado = {'colunas_cursos': []}
+    professores_list = list(professores)
+    professor_ids = [p.pk for p in professores_list]
+    ch_alocada_map = _bulk_ch_alocada(professor_ids)
+    ch_justificada_map = _bulk_ch_justificada(professor_ids)
+    for prof in professores_list:
+        prof.alocacao_map = {}
+        ch_alocada_total = ch_alocada_map.get(prof.pk, 0)
+        ch_justificada_total = ch_justificada_map.get(prof.pk, 0.0)
+        prof.ch_alocada_total = ch_alocada_total
+        prof.ch_justificada_total = ch_justificada_total
+        prof.soma_horas = ch_alocada_total + ch_justificada_total
+        # "Não alocado" é a sobra de horas EM SALA (max_class_hours do
+        # contrato — ex.: 20h de um contrato de 40h), não do total do
+        # contrato (ch_total/max_total_hours). Usar ch_total aqui inflava
+        # o saldo (ex.: professor 40h com 6h em sala aparecia com 34h de
+        # sobra em vez de 14h) — mesma meta já usada em
+        # extra_curricular/services.py (get_pendencias_data).
+        meta_horas = prof.meta_horas_sala
+        prof.ch_nao_alocada_total = max(meta_horas - prof.soma_horas, 0)
+        # Redução da equipe diretiva (definida pela DESUP) conta como alocação:
+        # sem isso, um diretivo cuja redução zera a meta aparecia "Sem alocação".
+        prof.reducao_diretiva = prof.reducao_carga_vigente
+        if meta_horas:
+            prof.percentual_alocado_total = round(min((prof.soma_horas / meta_horas) * 100, 100.0), 2)
+        else:
+            prof.percentual_alocado_total = 100.0 if prof.reducao_diretiva else 0.0
+
+    if unidade_atual:
+        try:
+            from django.db import transaction as db_transaction
+            from apps.allocations.services import alocacoes_vigentes
+            from apps.courses.models import CurriculumMatrix
+            with db_transaction.atomic():
+                matrizes_vigentes = CurriculumMatrix.objects.filter(
+                    unidades=unidade_atual,
+                    is_vigente=True,
+                ).select_related('curso').order_by('curso__sigla', 'turno')
+
+                colunas_cursos = []
+                for matriz in matrizes_vigentes:
+                    turno_display = matriz.get_turno_display() or 'N/A'
+                    colunas_cursos.append({
+                        'id': matriz.id,
+                        'nome': f'{matriz.curso.sigla} - {turno_display}',
+                    })
+                resultado['colunas_cursos'] = colunas_cursos
+
+                componentes = alocacoes_vigentes().filter(
+                    componente_matriz__matriz__in=matrizes_vigentes,
+                    docente__in=professores_list,
+                ).select_related(
+                    'componente_matriz', 'componente_matriz__componente_curricular',
+                    'componente_matriz__matriz',
+                )
+
+                alocacao_map_por_prof = {}
+                vistos_por_prof = {}
+                for linha in componentes:
+                    comp = linha.componente_matriz
+                    prof_id = linha.docente_id
+                    if prof_id not in alocacao_map_por_prof:
+                        alocacao_map_por_prof[prof_id] = {}
+                        vistos_por_prof[prof_id] = set()
+                    chave = (
+                        comp.componente_curricular_id
+                        if comp.compartilhado
+                        else f'{comp.matriz_id}-{comp.pk}'
+                    )
+                    if chave in vistos_por_prof[prof_id]:
+                        continue
+                    vistos_por_prof[prof_id].add(chave)
+                    alocacao_map_por_prof[prof_id][comp.matriz_id] = (
+                        alocacao_map_por_prof[prof_id].get(comp.matriz_id, 0) + comp.ha_semanal
+                    )
+
+                for prof in professores_list:
+                    prof.alocacao_map = alocacao_map_por_prof.get(prof.id, {})
+                    # soma_horas/ch_*_total já vêm calculados em lote acima;
+                    # este bloco só adiciona o detalhamento por matriz (alocacao_map).
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("Erro ao montar contexto de professores")
+    resultado['professores'] = professores_list
+    return resultado
+
+
+def detalhar_alocacoes_professores(professores, user=None):
+    """Anexa `detalhe_alocacao` (linhas de sala + atividades extras) a cada professor.
+
+    Cada linha: unidade, atividade, turma, horas por turno (M/T/N), CH e situação.
+    Tudo em lote (sem query por professor). As linhas de sala seguem a mesma
+    deduplicação de `_bulk_ch_alocada` para que a soma bata com os totais.
+    """
+    from apps.allocations.services import alocacoes_vigentes
+    from apps.extra_curricular.models import ParecerChoices, PendenciaExtra
+
+    ids = [p.pk for p in professores]
+    for prof in professores:
+        prof.detalhe_alocacao = []
+    por_id = {p.pk: p for p in professores}
+    if not ids:
+        return professores
+
+    vistos = {}
+    linhas = alocacoes_vigentes().filter(docente_id__in=ids).select_related(
+        'alocacao_curricular__unidade',
+        'componente_matriz__componente_curricular',
+        'turma',
+    ).order_by('alocacao_curricular__unidade__sigla', 'componente_matriz__periodo')
+    for linha in linhas:
+        comp = linha.componente_matriz
+        chave = comp.componente_curricular_id if comp.compartilhado else comp.pk
+        vistos.setdefault(linha.docente_id, set())
+        if chave in vistos[linha.docente_id]:
+            continue
+        vistos[linha.docente_id].add(chave)
+        turno = linha.alocacao_curricular.turno
+        horas = round(comp.ha_semanal, 1)
+        por_id[linha.docente_id].detalhe_alocacao.append({
+            'unidade': linha.alocacao_curricular.unidade.sigla,
+            'atividade': comp.nome_disciplina or '—',
+            'turma': linha.turma.identificador if linha.turma_id else '—',
+            'manha': horas if turno == 'M' else None,
+            'tarde': horas if turno == 'T' else None,
+            'noite': horas if turno == 'N' else None,
+            'ch': horas,
+            'situacao': 'Alocado',
+            'tom': 'verde',
+        })
+
+    # Atividades extracurriculares do semestre (justificativas e estágio).
+    semestre = semestre_atual()
+    pendencias = PendenciaExtra.objects.filter(
+        professor_id__in=ids, semestre=semestre,
+    ).select_related('unidade').prefetch_related(
+        'orientacoes_tcc', 'atividades_extensao', 'reducoes_ch', 'licencas',
+    )
+    tom_parecer = {
+        ParecerChoices.APROVADO: 'verde',
+        ParecerChoices.INDEFERIDO: 'vermelho',
+    }
+    for pend in pendencias:
+        rascunho = pend.status == PendenciaExtra.StatusChoices.RASCUNHO
+        itens = (
+            [(f'Orientação de TCC ({i.num_orientandos} orientando{"s" if i.num_orientandos != 1 else ""})', i)
+             for i in pend.orientacoes_tcc.all()]
+            + [(f'Atividade extensionista ({i.num_estudantes} estudante{"s" if i.num_estudantes != 1 else ""})', i)
+               for i in pend.atividades_extensao.all()]
+            + [('Redução de CH', i) for i in pend.reducoes_ch.all()]
+            + [('Licença', i) for i in pend.licencas.all()]
+        )
+        for rotulo, item in itens:
+            por_id[pend.professor_id].detalhe_alocacao.append({
+                'unidade': pend.unidade.sigla,
+                'atividade': rotulo,
+                'turma': 'Diversas',
+                'manha': None, 'tarde': None, 'noite': None,
+                'ch': round(float(item.ch_aprovada), 1),
+                'situacao': 'Rascunho' if rascunho else item.get_parecer_desup_display(),
+                'tom': 'cinza' if rascunho else tom_parecer.get(item.parecer_desup, 'ambar'),
+            })
+
+    from apps.core.models import AtividadeEstagioSupervisao
+    estagios = AtividadeEstagioSupervisao.objects.filter(
+        professor_id__in=ids, semestre=semestre,
+    ).select_related('unidade')
+    if user is not None:
+        estagios = AtividadeEstagioSupervisao.objects.for_user(user).filter(
+            professor_id__in=ids, semestre=semestre,
+        ).select_related('unidade')
+    for est in estagios:
+        por_id[est.professor_id].detalhe_alocacao.append({
+            'unidade': est.unidade.sigla,
+            'atividade': est.get_tipo_display(),
+            'turma': 'Diversas',
+            'manha': None, 'tarde': None, 'noite': None,
+            'ch': round(float(est.carga_horaria_semanal), 1),
+            'situacao': 'Vigente' if est.vigente else 'Encerrada',
+            'tom': 'verde' if est.vigente else 'cinza',
+        })
+    return professores
 
 
 class ProfessorListView(LoginRequiredMixin, ListView):
@@ -264,86 +455,10 @@ class ProfessorListView(LoginRequiredMixin, ListView):
         # no template) multiplicava por N professores. Calculado em lote uma vez só
         # e exposto como atributo simples (_total) que o template usa no lugar da
         # property crua.
-        professores_list = list(ctx['professores'])
-        professor_ids = [p.pk for p in professores_list]
-        ch_alocada_map = _bulk_ch_alocada(professor_ids)
-        ch_justificada_map = _bulk_ch_justificada(professor_ids)
-        for prof in professores_list:
-            prof.alocacao_map = {}
-            ch_alocada_total = ch_alocada_map.get(prof.pk, 0)
-            ch_justificada_total = ch_justificada_map.get(prof.pk, 0.0)
-            prof.ch_alocada_total = ch_alocada_total
-            prof.ch_justificada_total = ch_justificada_total
-            prof.soma_horas = ch_alocada_total + ch_justificada_total
-            # "Não alocado" é a sobra de horas EM SALA (max_class_hours do
-            # contrato — ex.: 20h de um contrato de 40h), não do total do
-            # contrato (ch_total/max_total_hours). Usar ch_total aqui inflava
-            # o saldo (ex.: professor 40h com 6h em sala aparecia com 34h de
-            # sobra em vez de 14h) — mesma meta já usada em
-            # extra_curricular/services.py (get_pendencias_data).
-            meta_horas = prof.meta_horas_sala
-            prof.ch_nao_alocada_total = max(meta_horas - prof.soma_horas, 0)
-            prof.percentual_alocado_total = (
-                round(min((prof.soma_horas / meta_horas) * 100, 100.0), 2)
-                if meta_horas else 0.0
-            )
-        ctx['professores'] = professores_list
-
+        dados = enriquecer_professores_com_carga(ctx['professores'], unidade_atual)
+        ctx['professores'] = dados['professores']
         if unidade_atual:
-            try:
-                from django.db import transaction as db_transaction
-                from apps.allocations.services import alocacoes_vigentes
-                from apps.courses.models import CurriculumMatrix
-                with db_transaction.atomic():
-                    matrizes_vigentes = CurriculumMatrix.objects.filter(
-                        unidades=unidade_atual,
-                        is_vigente=True,
-                    ).select_related('curso').order_by('curso__sigla', 'turno')
-
-                    colunas_cursos = []
-                    for matriz in matrizes_vigentes:
-                        turno_display = matriz.get_turno_display() or 'N/A'
-                        colunas_cursos.append({
-                            'id': matriz.id,
-                            'nome': f'{matriz.curso.sigla} - {turno_display}',
-                        })
-                    ctx['colunas_cursos'] = colunas_cursos
-
-                    componentes = alocacoes_vigentes().filter(
-                        componente_matriz__matriz__in=matrizes_vigentes,
-                        docente__in=professores_list,
-                    ).select_related(
-                        'componente_matriz', 'componente_matriz__componente_curricular',
-                        'componente_matriz__matriz',
-                    )
-
-                    alocacao_map_por_prof = {}
-                    vistos_por_prof = {}
-                    for linha in componentes:
-                        comp = linha.componente_matriz
-                        prof_id = linha.docente_id
-                        if prof_id not in alocacao_map_por_prof:
-                            alocacao_map_por_prof[prof_id] = {}
-                            vistos_por_prof[prof_id] = set()
-                        chave = (
-                            comp.componente_curricular_id
-                            if comp.compartilhado
-                            else f'{comp.matriz_id}-{comp.pk}'
-                        )
-                        if chave in vistos_por_prof[prof_id]:
-                            continue
-                        vistos_por_prof[prof_id].add(chave)
-                        alocacao_map_por_prof[prof_id][comp.matriz_id] = (
-                            alocacao_map_por_prof[prof_id].get(comp.matriz_id, 0) + comp.ha_semanal
-                        )
-
-                    for prof in professores_list:
-                        prof.alocacao_map = alocacao_map_por_prof.get(prof.id, {})
-                        # soma_horas/ch_*_total já vêm calculados em lote acima;
-                        # este bloco só adiciona o detalhamento por matriz (alocacao_map).
-            except Exception:
-                import logging
-                logging.getLogger(__name__).exception("Erro ao montar contexto de professores")
+            ctx['colunas_cursos'] = dados['colunas_cursos']
 
         return ctx
 class DesupOnlyMixin(LoginRequiredMixin, PerfilRequiredMixin):
@@ -369,10 +484,45 @@ class ProfessorCreateView(DesupOnlyMixin, CreateView):
     form_class = ProfessorForm
     template_name = 'professors/professor_form.html'
     success_url = reverse_lazy('professors:professor_list')
+
+    def _solicitacao_origem(self):
+        if not hasattr(self, '_solicitacao_origem_cache'):
+            solicitacao_id = self.request.GET.get('solicitacao', '')
+            self._solicitacao_origem_cache = None
+            if solicitacao_id.isdigit():
+                self._solicitacao_origem_cache = (
+                    SolicitacaoProfessorExterno.objects.filter(
+                        pk=solicitacao_id,
+                        tipo=SolicitacaoProfessorExterno.TipoChoices.CADASTRO,
+                        status=SolicitacaoProfessorExterno.StatusChoices.PENDENTE,
+                    )
+                    .select_related('unidade_solicitante', 'tipo_contrato_solicitado')
+                    .first()
+                )
+        return self._solicitacao_origem_cache
+
+    def get_initial(self):
+        initial = super().get_initial()
+        solicitacao = self._solicitacao_origem()
+        if solicitacao:
+            initial.update({
+                'rh_nome': solicitacao.professor_nome,
+                'id_funcional': solicitacao.professor_id_funcional,
+                'rh_matricula': solicitacao.professor_rh_matricula,
+                'tipo_contrato': solicitacao.tipo_contrato_solicitado_id,
+                'unidades': [solicitacao.unidade_solicitante_id],
+            })
+        return initial
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
         return kwargs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['solicitacao_origem'] = self._solicitacao_origem()
+        return ctx
 
     def form_valid(self, form):
         messages.success(self.request, 'Professor cadastrado com sucesso.')
@@ -480,6 +630,10 @@ class ProfessorSolicitarCadastroView(CoordenadorOnlyMixin, View):
                 tipo=SolicitacaoProfessorExterno.TipoChoices.CADASTRO,
                 unidade_solicitante=unidade,
                 professor_nome=dados['nome'],
+                professor_id_funcional=dados['id_funcional'],
+                professor_rh_matricula=dados['rh_matricula'],
+                tipo_contrato_solicitado=dados['tipo_contrato'],
+                observacao_cadastro=dados['observacao'],
                 semestre=semestre_atual(),
                 justificativa=mensagem,
                 solicitado_por=request.user,
@@ -644,10 +798,10 @@ def htmx_tabela_alocacao(request):
         # total do contrato (ch_total/max_total_hours).
         meta_horas = prof.meta_horas_sala
         prof.ch_nao_alocada_total = max(meta_horas - soma, 0)
-        prof.percentual_alocado_total = (
-            round(min((soma / meta_horas) * 100, 100.0), 2)
-            if meta_horas else 0.0
-        )
+        if meta_horas:
+            prof.percentual_alocado_total = round(min((soma / meta_horas) * 100, 100.0), 2)
+        else:
+            prof.percentual_alocado_total = 100.0 if prof.reducao_carga_vigente else 0.0
 
     return render(request, 'professors/partials/_linhas_alocacao.html', {
         'professores': professores,

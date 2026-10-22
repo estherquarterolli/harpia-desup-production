@@ -49,7 +49,7 @@
       </button>
       <form method="POST" action="{% url 'desfazer_aprovacao_unidade' unidade_id=unidade_selecionada_id %}" class="m-0"
             data-confirm-title="Desfazer aprovação"
-            data-confirm-message="Desfazer a aprovação desta unidade? A alocação voltará a ser editável."
+            data-confirm-message="Desfazer a aprovação desta unidade? As alocações atuais serão mantidas e voltarão a ser editáveis pela unidade."
             data-confirm-label="Desfazer"
             data-confirm-tone="warn">
         {% csrf_token %}

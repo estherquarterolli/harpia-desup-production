@@ -41,7 +41,7 @@
     <button type="button" onclick="abrirModal('modalDetalhe{{ item.cargo.pk }}')"{% if item.pode_adicionar and not item.ocupantes %} data-tour-vago{% endif %}{% if item.ocupantes %} data-tour-ocupado{% endif %} class="flex w-full items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-200 {% if not item.cargo.ativo %}opacity-60{% endif %}">
       <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full {{ cor }}"><i class="ph{% if not item.ocupantes %}-fill{% endif %} ph-user text-2xl"></i></span>
       <span class="min-w-0 flex-1">
-        <span class="block font-black text-slate-900">{{ item.cargo.nome }}</span>
+        <span class="block font-black text-slate-900">{{ item.cargo.nome }}<span class="ml-2 text-xs font-bold text-emerald-700">{{ item.cargo.carga_reducao_horas|floatformat:"-2" }} h de redução</span></span>
         {% if item.ocupantes %}
         <span class="block truncate text-sm text-slate-500">{% for ocupacao in item.ocupantes %}{{ ocupacao.professor.nome }}{% if ocupacao.curso %} ({{ ocupacao.curso.sigla }}){% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
         {% endif %}

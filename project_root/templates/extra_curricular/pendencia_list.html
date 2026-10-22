@@ -1,8 +1,8 @@
 ﻿{% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Alocações Extracurriculares — Harpia-DESUP{% endblock %}
-{% block header_title %}Alocações Extracurriculares{% endblock %}
+{% block title %}Extracurriculares — Harpia-DESUP{% endblock %}
+{% block header_title %}Extracurriculares{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -16,7 +16,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="p-2 md:p-0">
+<div class="extra-module p-1 sm:p-2 md:p-0">
 
 {% comment %}
 CORR-014: o aviso "Janela de entrega fechada" fica SÓ no base.html (o ramo de
@@ -26,156 +26,144 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
 (COORDENADOR_UNIDADE; DESUP/superuser fazem bypass da janela).
 {% endcomment %}
 
-  <nav class="mb-4 flex items-end gap-1 border-b border-slate-200" aria-label="Visualizações das pendências e estágio">
-    <a href="{% url 'extra_curricular:pendencia_list' %}"
-       class="inline-flex min-h-10 items-center gap-2 rounded-t-xl border border-b-white border-slate-200 bg-white px-4 py-2 text-xs font-black text-[#025c9f]">
-      <i class="ph ph-list-bullets text-base"></i>
-      Pendências
-    </a>
-    {% if not is_desup and rascunhos_count %}
-    <a href="{% url 'extra_curricular:pendencia_lote' %}?ids={{ rascunho_professor_ids }}"
-       class="inline-flex min-h-10 items-center gap-2 rounded-t-xl border border-transparent px-4 py-2 text-xs font-black text-amber-700 transition-colors hover:border-amber-200 hover:bg-amber-50"
-       title="Editar todos os rascunhos de uma vez">
-      <i class="ph ph-pencil-simple text-base"></i>
-      Rascunhos
-      <span class="inline-flex min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">{{ rascunhos_count }}</span>
-    </a>
-    {% endif %}
-    <a href="{% url 'extra_curricular:supervisao_estagio' %}"
-       class="inline-flex min-h-10 items-center gap-2 rounded-t-xl border border-transparent px-4 py-2 text-xs font-black text-slate-600 transition-colors hover:border-slate-200 hover:bg-slate-50">
-      <i class="ph ph-student text-base"></i>
-      Supervisão de Estágio
-    </a>
-  </nav>
+  {% include 'extra_curricular/_module_tabs.html' %}
 
-  {# Unidade permanece visível; os demais filtros ficam recolhidos. #}
-  <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-    <div class="w-full min-w-0 sm:max-w-md">
-      <label class="mb-1 block text-[10px] font-black uppercase tracking-wide text-[#025c9f]">Unidade</label>
-    {% if is_desup %}
-      <div class="relative">
-        <select id="filter-unidade" name="unidade_id"
-          hx-get="{% url 'extra_curricular:pendencia_list' %}"
-          hx-target="#pendencias-content"
-          hx-select="#pendencias-content"
-          hx-push-url="false"
-          hx-trigger="change"
-          hx-include="#filter-semestre,#filter-unidade,#search-docente,#filter-status,#filter-justificativa"
-          class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer pr-10 appearance-none">
-          <option value="">Todas as Unidades</option>
-          {% for u in unidades %}
-          <option value="{{ u.pk }}" {% if unidade_selecionada and unidade_selecionada.pk == u.pk %}selected{% endif %}>
-            {{ u.sigla }} — {{ u.nome }}
-          </option>
-          {% endfor %}
-        </select>
-        <i class="ph ph-caret-down absolute right-5 top-1/2 -translate-y-1/2 text-[#025c9f] pointer-events-none"></i>
-      </div>
-    {% else %}
-    <div class="flex min-h-[42px] w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-[#025c9f] shadow-sm opacity-80 select-none">
-      <i class="ph ph-buildings text-base"></i>
-      {% if unidade_selecionada %}{{ unidade_selecionada.sigla }} — {{ unidade_selecionada.nome }}{% else %}—{% endif %}
-    </div>
-    {% endif %}
-    </div>
+  <section class="extra-section-card">
+    <form id="extra-filter-form" method="get" action="{% url 'extra_curricular:pendencia_list' %}">
+      <input type="hidden" id="filter-aba" name="aba" value="{{ aba_ativa }}">
 
-    {% if not is_desup %}
-    <a href="{% url 'extra_curricular:pendencia_create' %}"
-       class="flex items-center justify-center gap-2 w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white font-black text-sm px-5 py-2.5 rounded-xl shadow-md transition-all hover:scale-105 active:scale-100">
-      <i class="ph ph-plus-circle text-lg"></i>
-      Nova Justificativa
-    </a>
-    {% endif %}
-  </div>
-
-  <details class="group mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-    <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-[#025c9f] sm:px-5">
-      <span class="flex min-w-0 items-center gap-2">
-        <i class="ph ph-funnel text-lg"></i>
-        Filtros e pesquisa
-      </span>
-      <span class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-        Clique para abrir
-        <i class="ph ph-caret-down text-base transition-transform group-open:rotate-180"></i>
-      </span>
-    </summary>
-
-    <div class="filter-grid border-t border-slate-100 bg-slate-50/50 p-4 sm:p-5">
-      <div>
-        <label class="mb-1 block text-[10px] font-black uppercase tracking-wide text-[#025c9f]">Semestre</label>
-        <div class="relative">
-          <select id="filter-semestre" name="semestre"
+      {# Barra compacta: busca ampla + acesso aos filtros avançados. #}
+      <div class="extra-search-toolbar extra-search-toolbar-flat">
+        <label for="search-extracurricular" class="sr-only">Pesquisar nesta aba</label>
+        <div class="relative min-w-0 flex-1">
+          <input type="search" id="search-extracurricular" name="q" value="{{ q }}"
+            placeholder="Pesquisar nesta aba..."
             hx-get="{% url 'extra_curricular:pendencia_list' %}"
             hx-target="#pendencias-content"
             hx-select="#pendencias-content"
             hx-push-url="false"
-            hx-trigger="change"
-            hx-include="#filter-semestre,#filter-unidade,#search-docente,#filter-status,#filter-justificativa"
-            class="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm font-bold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer">
-            {% for s in semestres %}
-            <option value="{{ s }}" {% if s == semestre %}selected{% endif %}>{{ s }}</option>
-            {% endfor %}
-          </select>
-          <i class="ph ph-caret-down pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[#025c9f]"></i>
+            hx-trigger="input changed delay:500ms, search"
+            hx-include="#filter-aba,#filter-semestre,#filter-unidade,#search-extracurricular,#filter-status,#filter-justificativa"
+            class="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm font-semibold text-[#025c9f] shadow-sm outline-none transition focus:border-[#025c9f] focus:ring-2 focus:ring-blue-100"
+            autocomplete="off">
+          <i class="ph ph-magnifying-glass pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-lg text-slate-400"></i>
         </div>
+        {% if not is_desup %}
+        <a href="{% url 'extra_curricular:pendencia_create' %}" class="extra-action extra-action-new">
+          <i class="ph ph-plus-circle" aria-hidden="true"></i> Registrar nova justificativa
+        </a>
+        {% endif %}
+        <button type="button" data-extra-filter-open onclick="abrirFiltrosExtra()"
+          class="extra-filter-button" aria-haspopup="dialog" aria-controls="modalFiltrosExtracurriculares">
+          <i class="ph ph-funnel text-lg" aria-hidden="true"></i>
+          <span>Filtros</span>
+          {% if status_filtro or justificativa_filtro or unidade_selecionada and is_desup %}
+          <span class="extra-filter-dot" aria-label="Há filtros ativos"></span>
+          {% endif %}
+        </button>
       </div>
 
-      <div class="filter-wide">
-        <label class="mb-1 block text-[10px] font-black uppercase tracking-wide text-[#025c9f]">Pesquisar docente</label>
-        <div class="relative">
-          <input type="text" id="search-docente" name="q" value="{{ q }}" placeholder="Buscar por nome do docente..."
-            hx-get="{% url 'extra_curricular:pendencia_list' %}"
-            hx-target="#pendencias-content"
-            hx-select="#pendencias-content"
-            hx-trigger="input changed delay:500ms"
-            hx-include="#filter-semestre,#filter-unidade,#search-docente,#filter-status,#filter-justificativa"
-            class="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm font-semibold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f]" autocomplete="off">
-          <i class="ph ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-base text-slate-400"></i>
-        </div>
-      </div>
+      <div id="modalFiltrosExtracurriculares"
+           class="hidden fixed inset-0 z-[145] items-center justify-center bg-slate-950/55 p-3 sm:p-4"
+           role="dialog" aria-modal="true" aria-labelledby="tituloFiltrosExtracurriculares"
+           onclick="if (event.target === this) fecharFiltrosExtra()">
+        <div class="extra-filter-modal-panel flex w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div class="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
+            <div>
+              <h3 id="tituloFiltrosExtracurriculares" class="text-base font-black text-[#025c9f]">Filtros</h3>
+              <p class="mt-0.5 text-xs text-slate-500">Refine os resultados desta aba.</p>
+            </div>
+            <button type="button" onclick="fecharFiltrosExtra()" aria-label="Fechar filtros"
+              class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+              <i class="ph ph-x text-xl" aria-hidden="true"></i>
+            </button>
+          </div>
 
-      <div>
-        <label class="mb-1 block text-[10px] font-black uppercase tracking-wide text-[#025c9f]">Status</label>
-        <div class="relative">
-          <select id="filter-status" name="status"
-            hx-get="{% url 'extra_curricular:pendencia_list' %}"
-            hx-target="#pendencias-content"
-            hx-select="#pendencias-content"
-            hx-trigger="change"
-            hx-include="#filter-semestre,#filter-unidade,#search-docente,#filter-status,#filter-justificativa"
-            class="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm font-semibold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer">
-            <option value="">Todos os status</option>
-            <option value="rascunho" {% if status_filtro == 'rascunho' %}selected{% endif %}>Rascunho</option>
-            <option value="pendente" {% if status_filtro == 'pendente' %}selected{% endif %}>Pendente</option>
-            <option value="finalizado" {% if status_filtro == 'finalizado' %}selected{% endif %}>Finalizado</option>
-            <option value="indeferido" {% if status_filtro == 'indeferido' %}selected{% endif %}>Indeferido</option>
-            <option value="sem_registro" {% if status_filtro == 'sem_registro' %}selected{% endif %}>Sem registro</option>
-          </select>
-          <i class="ph ph-caret-down pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[#025c9f]"></i>
-        </div>
-      </div>
+          <div class="extra-filter-modal-body grid gap-4 overflow-y-auto px-5 py-4 sm:grid-cols-2 sm:px-6">
+            <div>
+              <label for="filter-semestre" class="mb-1.5 block text-xs font-black uppercase tracking-wide text-[#025c9f]">Semestre</label>
+              <div class="relative">
+                <select id="filter-semestre" name="semestre"
+                  class="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm font-bold text-[#025c9f] outline-none focus:ring-2 focus:ring-blue-100">
+                  {% for s in semestres %}
+                  <option value="{{ s }}" {% if s == semestre %}selected{% endif %}>{{ s }}</option>
+                  {% endfor %}
+                </select>
+                <i class="ph ph-caret-down pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[#025c9f]"></i>
+              </div>
+            </div>
 
-      <div>
-        <label class="mb-1 block text-[10px] font-black uppercase tracking-wide text-[#025c9f]">Justificativa</label>
-        <div class="relative">
-          <select id="filter-justificativa" name="justificativa"
-            hx-get="{% url 'extra_curricular:pendencia_list' %}"
-            hx-target="#pendencias-content"
-            hx-select="#pendencias-content"
-            hx-trigger="change"
-            hx-include="#filter-semestre,#filter-unidade,#search-docente,#filter-status,#filter-justificativa"
-            class="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm font-semibold text-[#025c9f] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f] cursor-pointer">
-            <option value="">Todos os tipos</option>
-            <option value="tcc" {% if justificativa_filtro == 'tcc' %}selected{% endif %}>Orientação de TCC</option>
-            <option value="extensao" {% if justificativa_filtro == 'extensao' %}selected{% endif %}>Atividade extensionista</option>
-            <option value="reducao" {% if justificativa_filtro == 'reducao' %}selected{% endif %}>Redução de CH</option>
-            <option value="sem_registro" {% if justificativa_filtro == 'sem_registro' %}selected{% endif %}>Sem registro</option>
-          </select>
-          <i class="ph ph-caret-down pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[#025c9f]"></i>
+            {% if not is_desup %}
+            <div>
+              <label for="filter-status" class="mb-1.5 block text-xs font-black uppercase tracking-wide text-[#025c9f]">Status</label>
+              <div class="relative">
+                <select id="filter-status" name="status"
+                  class="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm font-semibold text-[#025c9f] outline-none focus:ring-2 focus:ring-blue-100">
+                  <option value="">Todos os status</option>
+                  <option value="rascunho" {% if status_filtro == 'rascunho' %}selected{% endif %}>Rascunho</option>
+                  <option value="pendente" {% if status_filtro == 'pendente' %}selected{% endif %}>Pendente</option>
+                  <option value="finalizado" {% if status_filtro == 'finalizado' %}selected{% endif %}>Finalizado</option>
+                  <option value="parcial" {% if status_filtro == 'parcial' %}selected{% endif %}>Parcial</option>
+                  <option value="indeferido" {% if status_filtro == 'indeferido' %}selected{% endif %}>Indeferido</option>
+                  <option value="sem_registro" {% if status_filtro == 'sem_registro' %}selected{% endif %}>Sem registro</option>
+                </select>
+                <i class="ph ph-caret-down pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[#025c9f]"></i>
+              </div>
+            </div>
+            {% endif %}
+
+            <div>
+              <label for="filter-justificativa" class="mb-1.5 block text-xs font-black uppercase tracking-wide text-[#025c9f]">Justificativa</label>
+              <div class="relative">
+                <select id="filter-justificativa" name="justificativa"
+                  class="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm font-semibold text-[#025c9f] outline-none focus:ring-2 focus:ring-blue-100">
+                  <option value="">Todos os tipos</option>
+                  <option value="tcc" {% if justificativa_filtro == 'tcc' %}selected{% endif %}>Orientação de TCC</option>
+                  <option value="extensao" {% if justificativa_filtro == 'extensao' %}selected{% endif %}>Atividade extensionista</option>
+                  <option value="reducao" {% if justificativa_filtro == 'reducao' %}selected{% endif %}>Redução de CH</option>
+                  <option value="licenca" {% if justificativa_filtro == 'licenca' %}selected{% endif %}>Licença</option>
+                  {% if not is_desup %}<option value="sem_registro" {% if justificativa_filtro == 'sem_registro' %}selected{% endif %}>Sem registro</option>{% endif %}
+                </select>
+                <i class="ph ph-caret-down pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[#025c9f]"></i>
+              </div>
+            </div>
+
+            <div>
+              <label for="filter-unidade" class="mb-1.5 block text-xs font-black uppercase tracking-wide text-[#025c9f]">Unidade</label>
+              {% if is_desup %}
+              <div class="relative">
+                <select id="filter-unidade" name="unidade_id"
+                  class="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm font-semibold text-[#025c9f] outline-none focus:ring-2 focus:ring-blue-100">
+                  <option value="">Todas as unidades</option>
+                  {% for u in unidades %}
+                  <option value="{{ u.pk }}" {% if unidade_selecionada and unidade_selecionada.pk == u.pk %}selected{% endif %}>{{ u.sigla }} — {{ u.nome }}</option>
+                  {% endfor %}
+                </select>
+                <i class="ph ph-caret-down pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[#025c9f]"></i>
+              </div>
+              {% else %}
+              <div id="filter-unidade" class="flex min-h-[42px] items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-[#025c9f]">
+                <i class="ph ph-buildings" aria-hidden="true"></i>
+                <span class="truncate">{% if unidade_selecionada %}{{ unidade_selecionada.sigla }} — {{ unidade_selecionada.nome }}{% else %}—{% endif %}</span>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50/70 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <a href="{% url 'extra_curricular:pendencia_list' %}?aba={{ aba_ativa }}"
+              class="inline-flex min-h-10 items-center justify-center rounded-xl px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-200/70">Limpar filtros</a>
+            <div class="flex flex-col-reverse gap-2 sm:flex-row">
+              <button type="button" onclick="fecharFiltrosExtra()"
+                class="min-h-10 rounded-xl px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-200/70">Cancelar</button>
+              <button type="submit"
+                class="min-h-10 rounded-xl bg-[#025c9f] px-5 py-2 text-sm font-black text-white shadow-sm hover:bg-[#153e70]">Aplicar filtros</button>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  </details>
+    </form>
+  </section>
 
   <div id="pendencias-content">
 
@@ -188,21 +176,74 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
 
   {# ── Nenhuma pendência encontrada ── #}
   {% elif pendencias_data|length == 0 %}
-  <div class="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-slate-200 border-dashed">
-    <i class="ph ph-check-circle text-5xl text-emerald-300 mb-3"></i>
-    <p class="text-sm font-bold text-slate-500">Nenhuma pendência encontrada para {{ semestre }}</p>
-    <p class="text-xs text-slate-400 mt-1">Todos os docentes atingiram a meta de carga horária.</p>
+  <div class="mt-4 flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center">
+    <i class="ph ph-check-circle mb-3 text-5xl text-emerald-300"></i>
+    {% if is_desup %}
+      {% if aba_ativa == 'reprovados' %}
+      <p class="text-sm font-bold text-slate-600">Nenhuma justificativa reprovada em {{ semestre }}</p>
+      {% elif aba_ativa == 'aprovados' %}
+      <p class="text-sm font-bold text-slate-600">Nenhuma justificativa aprovada em {{ semestre }}</p>
+      {% else %}
+      <p class="text-sm font-bold text-slate-600">Nenhuma justificativa aguardando análise em {{ semestre }}</p>
+      {% endif %}
+    {% elif aba_ativa == 'rascunhos' %}
+    <p class="text-sm font-bold text-slate-600">Nenhum rascunho encontrado em {{ semestre }}</p>
+    <p class="mt-1 text-xs text-slate-400">As justificativas iniciadas aparecerão nesta aba.</p>
+    {% elif aba_ativa == 'tcc' or aba_ativa == 'extensao' or aba_ativa == 'reducao' or aba_ativa == 'licenca' %}
+    <p class="text-sm font-bold text-slate-600">Nenhuma justificativa deste tipo enviada em {{ semestre }}</p>
+    <p class="mt-1 text-xs text-slate-400">Os registros enviados para análise aparecerão nesta aba.</p>
+    {% else %}
+    <p class="text-sm font-bold text-slate-600">Nenhuma pendência encontrada para {{ semestre }}</p>
+    <p class="mt-1 text-xs text-slate-400">Todos os docentes atingiram a meta de carga horária.</p>
+    {% endif %}
   </div>
 
   {# ── Tabela de pendências ── #}
   {% else %}
   
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-    <div class="overflow-x-auto">
-      <table class="w-full text-left min-w-[1000px] stack-table" id="pendencias-table">
+  <div class="extra-table-wrap">
+    <div class="flex flex-col gap-2 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+      <div class="flex items-center gap-2.5">
+        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-[#025c9f]">
+          <i class="ph ph-list-checks text-lg" aria-hidden="true"></i>
+        </span>
+        <h3 class="text-sm font-black text-[#0b2a5b]">
+          {% if is_desup and aba_ativa == 'reprovados' %}Justificativas reprovadas
+          {% elif is_desup and aba_ativa == 'aprovados' %}Justificativas aprovadas
+          {% elif is_desup %}Pendentes de análise
+          {% elif aba_ativa == 'rascunhos' %}Rascunhos da unidade
+          {% elif aba_ativa == 'tcc' %}Orientações de TCC
+          {% elif aba_ativa == 'extensao' %}Atividades extensionistas
+          {% elif aba_ativa == 'reducao' %}Reduções de CH
+          {% elif aba_ativa == 'licenca' %}Licenças
+          {% else %}Situação dos docentes{% endif %}
+        </h3>
+        <span class="inline-flex min-w-6 items-center justify-center rounded-full bg-red-50 px-2 py-0.5 text-xs font-black text-red-600">{{ total_pendencias }}</span>
+      </div>
+      {% if aba_ativa == 'rascunhos' %}
+      <div class="flex items-center gap-2">
+        <span id="rascunho-sel-count" class="text-xs font-bold text-slate-500">Nenhum selecionado</span>
+        <a id="rascunho-sel-edit" href="#" data-base="{% url 'extra_curricular:pendencia_lote' %}"
+           class="extra-action extra-action-amber is-disabled" aria-disabled="true">
+          <i class="ph ph-pencil-simple" aria-hidden="true"></i> Editar selecionados
+        </a>
+      </div>
+      {% else %}
+      <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Semestre {{ semestre }}</span>
+      {% endif %}
+    </div>
+    <div class="overflow-x-auto{% if is_desup %} desup-analysis-scroll{% endif %}">
+      <table class="w-full text-left stack-table {% if is_desup %}desup-analysis-table{% else %}min-w-[1000px]{% endif %}" id="pendencias-table">
         <thead>
           <tr class="bg-[#025c9f] text-white text-[10px] font-black uppercase tracking-widest border-b border-slate-200">
+            {% if aba_ativa == 'rascunhos' %}
+            <th class="w-10 px-4 py-4 rounded-tl-2xl">
+              <input type="checkbox" id="rascunho-sel-all" class="h-4 w-4 cursor-pointer accent-orange-500" aria-label="Selecionar todos os rascunhos">
+            </th>
+            <th class="px-5 py-4">Docente</th>
+            {% else %}
             <th class="px-5 py-4 rounded-tl-2xl">Docente</th>
+            {% endif %}
             <th class="px-5 py-4">Processo SEI</th>
             <th class="px-5 py-4">Justificativa</th>
             <th class="px-5 py-4 text-center">Meta CH</th>
@@ -210,7 +251,7 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
             <th class="px-5 py-4 text-center">CH Pendente</th>
             <th class="px-5 py-4 text-center">CH Justificada</th>
             <th class="px-5 py-4 text-center">Não alocado</th>
-            <th class="px-5 py-4 text-center rounded-tr-2xl">Status</th>
+            <th class="px-5 py-4 text-center rounded-tr-2xl">{% if is_desup %}Parecer DESUP e justificativa{% else %}Status{% endif %}</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -221,8 +262,15 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
               data-status="{{ item.status_token }}"
               data-justificativa="{{ item.justificativa_token }}">
 
+            {% if aba_ativa == 'rascunhos' %}
+            <td class="w-10 px-4 py-4" data-label="Selecionar">
+              <input type="checkbox" class="rascunho-sel h-4 w-4 cursor-pointer accent-orange-500"
+                     value="{{ item.professor.pk }}" aria-label="Selecionar {{ item.professor.nome }}">
+            </td>
+            {% endif %}
+
             {# Docente #}
-            <td class="px-5 py-4">
+            <td class="px-5 py-4" data-label="Docente">
               <div class="flex items-center gap-2">
                 {% if item.pendencia %}
                   {% if item.status_item == 'RASCUNHO' %}
@@ -248,8 +296,7 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
                 {% endif %}
                 <div>
                   {% if item.pendencia %}
-                  <a href="{% if item.status_item == 'RASCUNHO' and rascunho_professor_ids and not is_desup %}{% url 'extra_curricular:pendencia_lote' %}?ids={{ rascunho_professor_ids }}{% else %}{% url 'extra_curricular:pendencia_detail' pk=item.pendencia.pk %}{% endif %}"
-                     {% if item.status_item == 'RASCUNHO' and rascunho_professor_ids and not is_desup %}title="Editar todos os rascunhos de uma vez"{% endif %}
+                  <a href="{% url 'extra_curricular:pendencia_detail' pk=item.pendencia.pk %}"
                      class="text-sm font-black text-[#025c9f] hover:text-[#025c9f] hover:underline">
                     {{ item.professor.nome }}
                   </a>
@@ -319,8 +366,44 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
             </td>
 
             {# Status da pendência (somente leitura) #}
-            <td class="px-5 py-4 text-center" data-label="Status">
-              {% if item.pendencia %}
+            <td class="px-5 py-4 text-center" data-label="{% if is_desup %}Parecer DESUP{% else %}Status{% endif %}">
+              {% if is_desup and item.item_pk %}
+              <form method="post"
+                    action="{% url 'extra_curricular:parecer_rapido' pk=item.pendencia.pk tipo=item.item_tipo item_pk=item.item_pk %}"
+                    class="desup-decision-form">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <label class="sr-only" for="parecer-{{ item.item_tipo }}-{{ item.item_pk }}">Parecer da DESUP</label>
+                <select id="parecer-{{ item.item_tipo }}-{{ item.item_pk }}" name="parecer_desup"
+                        class="desup-decision-select" required>
+                  <option value="">Selecione</option>
+                  <option value="APROVADO" {% if item.status_item == 'APROVADO' %}selected{% endif %}>Aprovado</option>
+                  <option value="INDEFERIDO" {% if item.status_item == 'INDEFERIDO' %}selected{% endif %}>Reprovado</option>
+                </select>
+                <label class="sr-only" for="motivo-{{ item.item_tipo }}-{{ item.item_pk }}">Justificativa do parecer</label>
+                <input id="motivo-{{ item.item_tipo }}-{{ item.item_pk }}" type="text" name="motivo_parecer"
+                       value="{{ item.item_motivo_parecer|default_if_none:'' }}"
+                       placeholder="Justificativa do parecer..." class="desup-decision-reason">
+                <button type="submit" class="desup-decision-save" title="Salvar parecer" aria-label="Salvar parecer de {{ item.professor.nome }}">
+                  <i class="ph ph-floppy-disk" aria-hidden="true"></i>
+                  <span>Salvar</span>
+                </button>
+                {% if item.status_item == 'APROVADO' %}
+                <button type="submit"
+                        formaction="{% url 'extra_curricular:cancelar_extracurricular' pk=item.pendencia.pk tipo=item.item_tipo item_pk=item.item_pk %}"
+                        formnovalidate
+                        class="desup-decision-cancel"
+                        title="Cancelar extracurricular aprovado"
+                        aria-label="Cancelar extracurricular aprovado de {{ item.professor.nome }}"
+                        onclick="return confirm('Cancelar este extracurricular? Somente esta carga horária deixará de ser contabilizada.');">
+                  <i class="ph ph-x-circle" aria-hidden="true"></i>
+                  <span>Cancelar</span>
+                </button>
+                {% endif %}
+              </form>
+              {% elif is_desup %}
+              <span class="text-xs font-semibold text-slate-400">Sem justificativa para analisar</span>
+              {% elif item.pendencia %}
                 {% if item.status_item == 'RASCUNHO' %}
                   <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase badge-rascunho">
                     <i class="ph ph-pencil-simple"></i> Rascunho
@@ -358,7 +441,7 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
           </tr>
           {% endfor %}
           <tr id="no-results-row" style="display: none;">
-            <td colspan="9" class="px-5 py-12 text-center text-slate-400">
+            <td colspan="{% if aba_ativa == "rascunhos" %}10{% else %}9{% endif %}" class="px-5 py-12 text-center text-slate-400">
               <i class="ph ph-magnifying-glass text-4xl mb-2 text-slate-300"></i>
               <p class="text-sm font-bold">Nenhum registro encontrado</p>
               <p class="text-xs text-slate-400 mt-1">Experimente alterar os termos de busca ou filtros aplicados.</p>
@@ -385,4 +468,60 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
   </div>{# /pendencias-content #}
 
 </div>
+
+<script>
+  function abrirFiltrosExtra() {
+    var modal = document.getElementById('modalFiltrosExtracurriculares');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    var primeiroCampo = modal.querySelector('select, input, button');
+    if (primeiroCampo) primeiroCampo.focus({ preventScroll: true });
+  }
+
+  function fecharFiltrosExtra() {
+    var modal = document.getElementById('modalFiltrosExtracurriculares');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') fecharFiltrosExtra();
+  });
+
+  // Seleção múltipla de rascunhos → abre a mesa de lote com os docentes marcados.
+  // Delegado ao document porque #pendencias-content é recarregado pelo htmx.
+  function atualizarSelecaoRascunhos() {
+    var edit = document.getElementById('rascunho-sel-edit');
+    if (!edit) return;
+    var marcados = document.querySelectorAll('.rascunho-sel:checked');
+    var ids = [];
+    marcados.forEach(function (c) { if (ids.indexOf(c.value) < 0) ids.push(c.value); });
+    var todos = document.querySelectorAll('.rascunho-sel');
+    var all = document.getElementById('rascunho-sel-all');
+    if (all) {
+      all.checked = todos.length > 0 && marcados.length === todos.length;
+      all.indeterminate = marcados.length > 0 && marcados.length < todos.length;
+    }
+    document.getElementById('rascunho-sel-count').textContent = ids.length
+      ? ids.length + (ids.length === 1 ? ' docente selecionado' : ' docentes selecionados')
+      : 'Nenhum selecionado';
+    edit.classList.toggle('is-disabled', !ids.length);
+    edit.setAttribute('aria-disabled', ids.length ? 'false' : 'true');
+    edit.href = ids.length ? edit.dataset.base + '?ids=' + ids.join(',') : '#';
+  }
+  document.addEventListener('change', function (event) {
+    var t = event.target;
+    if (t.id === 'rascunho-sel-all') {
+      document.querySelectorAll('.rascunho-sel').forEach(function (c) { c.checked = t.checked; });
+    }
+    if (t.id === 'rascunho-sel-all' || t.classList.contains('rascunho-sel')) atualizarSelecaoRascunhos();
+  });
+  document.addEventListener('click', function (event) {
+    var a = event.target.closest('#rascunho-sel-edit');
+    if (a && a.classList.contains('is-disabled')) event.preventDefault();
+  });
+  document.body.addEventListener('htmx:afterSwap', atualizarSelecaoRascunhos);
+</script>
 {% endblock %}

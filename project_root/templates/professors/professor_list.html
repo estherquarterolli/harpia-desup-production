@@ -14,8 +14,8 @@
     <div class="flex flex-wrap items-center gap-2">
       {% if pode_solicitar_cadastro %}
       <a href="{% url 'professors:professor_solicitar_cadastro' %}"
-        class="flex items-center justify-center gap-2 bg-[#ffb800] hover:bg-yellow-400 text-[#025c9f] px-4 py-2.5 rounded-xl text-sm font-black transition-colors shadow-md">
-        <i class="ph ph-paper-plane-tilt"></i> Solicitar Cadastro de Professor
+        class="flex items-center justify-center gap-2 bg-[#ffb800] hover:bg-yellow-400 text-black px-4 py-2.5 rounded-xl text-sm font-black transition-colors shadow-md">
+        <i class="ph ph-plus"></i> Solicitar Cadastro de Professor
       </a>
       {% endif %}
       {% if pode_solicitar_cadastro %}

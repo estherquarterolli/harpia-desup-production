@@ -8,6 +8,7 @@ urlpatterns = [
     path("pendencias/<int:pk>/tcc/salvar/", views.SalvarTCCView.as_view(), name="salvar_tcc"),
     path("pendencias/<int:pk>/extensao/salvar/", views.SalvarExtensaoView.as_view(), name="salvar_extensao"),
     path("pendencias/<int:pk>/reducao/salvar/", views.SalvarReducaoView.as_view(), name="salvar_reducao"),
+    path("pendencias/<int:pk>/licenca/salvar/", views.SalvarLicencaView.as_view(), name="salvar_licenca"),
     path("pendencias/<int:pk>/deletar/<str:tipo>/<int:item_pk>/", views.DeletarItemView.as_view(), name="deletar_item"),
 
     path("pendencias/", views.PendenciaListView.as_view(), name="pendencia_list"),
@@ -18,11 +19,16 @@ urlpatterns = [
     path("pendencias/lote/extensao/salvar/", views.SalvarExtensaoLoteView.as_view(), name="salvar_extensao_lote"),
     path("pendencias/lote/reducao/salvar/", views.SalvarReducaoLoteView.as_view(), name="salvar_reducao_lote"),
 
+    path("pendencias/lote/licenca/salvar/", views.SalvarLicencaLoteView.as_view(), name="salvar_licenca_lote"),
     path("pendencias/lote/deletar/<str:tipo>/<int:item_pk>/", views.DeletarItemLoteView.as_view(), name="deletar_item_lote"),
 
     path("pendencias/<int:pk>/parecer/tcc/<int:item_pk>/", views.ParecerTCCUpdateView.as_view(), name="parecer_tcc"),
     path("pendencias/<int:pk>/parecer/extensao/<int:item_pk>/", views.ParecerExtensaoUpdateView.as_view(), name="parecer_extensao"),
     path("pendencias/<int:pk>/parecer/reducao/<int:item_pk>/", views.ParecerReducaoUpdateView.as_view(), name="parecer_reducao"),
+
+    path("pendencias/<int:pk>/parecer/licenca/<int:item_pk>/", views.ParecerLicencaUpdateView.as_view(), name="parecer_licenca"),
+    path("pendencias/<int:pk>/parecer-rapido/<str:tipo>/<int:item_pk>/", views.ParecerRapidoDesupView.as_view(), name="parecer_rapido"),
+    path("pendencias/<int:pk>/cancelar/<str:tipo>/<int:item_pk>/", views.CancelarExtracurricularDesupView.as_view(), name="cancelar_extracurricular"),
 
     path("pendencias/lote/enviar/", views.EnviarParaDesupLoteView.as_view(), name="enviar_desup_lote"),
     path("pendencias/<int:pk>/avisar/", views.AvisarUnidadeView.as_view(), name="avisar_unidade"),

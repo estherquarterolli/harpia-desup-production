@@ -126,6 +126,21 @@ class Prioridade1UnidadeTests(TestCase):
     # 1. Testes de Modelo e UnitBoundManager (Isolamento Multi-tenant)
     # ------------------------------------------------------------------
 
+    def test_dashboard_da_unidade_lista_somente_professores_da_unidade(self):
+        self.client.force_login(self.coord_a)
+        resp = self.client.get(reverse("dashboard_unidade"))
+        self.assertEqual(resp.status_code, 200)
+        nomes = {p.pk for p in resp.context["professores_unidade"]}
+        self.assertEqual(nomes, {self.prof_a.pk, self.prof_a2.pk})
+        self.assertNotIn(self.prof_b.pk, nomes)
+        # Uma linha expansível por professor, com o detalhamento da alocação.
+        self.assertContains(resp, "<details", count=2)
+        self.assertContains(resp, "Detalhamento da alocação", count=2)
+        self.assertContains(resp, 'class="prof-table-panel"')
+        self.assertContains(resp, 'class="prof-table-head"')
+        for rotulo in ("Cargo", "Vínculo", "Unidades", "Situação", "Carga horária", "Nenhuma alocação ou atividade registrada"):
+            self.assertContains(resp, rotulo)
+
     def test_unit_bound_manager_isola_ocupacoes_e_estagio_por_unidade(self):
         ocup_a = OcupacaoEquipeDiretiva.objects.create(
             unidade=self.unidade_a,
@@ -449,9 +464,8 @@ class Prioridade1UnidadeTests(TestCase):
         self.assertEqual(alertas[0]["horas_sala"], Decimal("4.0"))
         self.assertIn("Engenharia de Software I", alertas[0]["disciplinas"])
 
-        # Verifica acessibilidade e elementos visuais na interface (role="alert", ícone e texto)
-        self.assertContains(resposta, 'role="alert"')
-        self.assertContains(resposta, "alocado(s) em sala de aula")
+        # O aviso geral foi removido; o sinal fica no cartão do cargo e no modal.
+        self.assertNotContains(resposta, "alocado(s) em sala de aula")
         self.assertContains(resposta, "Engenharia de Software I")
         self.assertContains(resposta, "Em sala de aula")
 

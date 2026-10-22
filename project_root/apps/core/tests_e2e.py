@@ -1008,7 +1008,7 @@ class JornadaDashboardsTests(BaseE2ETestCase):
         self.prof_ok = Professor.objects.create(
             id_funcional='IDF-DASH1', rh_matricula='MAT-DASH1', rh_nome='Ana Conforme',
             rh_email='ana@teste.com', unidade_principal=self.unidade_ok,
-            tipo_contrato=contrato, ha=20,
+            tipo_contrato=contrato, ha=20, area_atuacao='Matemática',
         )
         self.prof_pendente = Professor.objects.create(
             id_funcional='IDF-DASH2', rh_matricula='MAT-DASH2', rh_nome='Bruno Pendente',
@@ -1045,12 +1045,27 @@ class JornadaDashboardsTests(BaseE2ETestCase):
         nomes = {item['prof'].rh_nome for item in resp.context['alocacoes_dashboard']}
         self.assertEqual(nomes, {'Ana Conforme', 'Bruno Pendente'})
         self.assertContains(resp, 'Ana Conforme')
+        self.assertContains(resp, 'Visão geral de todas as unidades')
+        self.assertContains(resp, 'Área de atuação')
+        self.assertContains(resp, 'Matemática')
         self.assertNotContains(resp, 'Filtros da alocação geral')
         self.assertContains(resp, 'Cargo')
         self.assertContains(resp, 'Vínculo empregatício')
         self.assertContains(resp, '>CH<')
+        self.assertContains(resp, 'CH Justificada')
+        self.assertContains(resp, 'Total de Horas')
+        self.assertContains(resp, 'Não Alocado')
+        self.assertContains(resp, '% Alocado')
         self.assertContains(resp, 'Efetivo')
         self.assertContains(resp, '40h')
+        ana = next(
+            item['prof'] for item in resp.context['alocacoes_dashboard']
+            if item['prof'].pk == self.prof_ok.pk
+        )
+        self.assertEqual(ana.ch_justificada_total, 0.0)
+        self.assertEqual(ana.soma_horas, 0.0)
+        self.assertEqual(ana.ch_nao_alocada_total, 20.0)
+        self.assertEqual(ana.percentual_alocado_total, 0.0)
 
     def test_dashboard_desup_conta_como_conforme_a_unidade_sem_professor_ativo(self):
         self.prof_ok.status = Professor.StatusChoices.AFASTADO
@@ -1063,6 +1078,22 @@ class JornadaDashboardsTests(BaseE2ETestCase):
 
         self.assertEqual(resp.context['unidades_conformes_count'], 2)
         self.assertEqual(resp.context['conformidade'], '100%')
+
+    def test_visao_geral_desup_pesquisa_professor_por_area(self):
+        self.client.force_login(self.desup)
+
+        resp = self.client.get(
+            reverse('dashboard_professores_partial'),
+            {'q': 'Matemática'},
+            headers={'HX-Request': 'true'},
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Ana Conforme')
+        self.assertContains(resp, 'Matemática')
+        self.assertNotContains(resp, 'Bruno Pendente')
+        self.assertContains(resp, 'CH Justificada')
+        self.assertContains(resp, '% Alocado')
 
     def test_dashboard_unidade_renderiza_para_o_coordenador(self):
         self.client.force_login(self.coord)

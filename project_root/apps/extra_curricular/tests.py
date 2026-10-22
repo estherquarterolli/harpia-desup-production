@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 from django.contrib.messages import get_messages
@@ -7,6 +8,7 @@ from django.urls import reverse
 from apps.extra_curricular.models import (
     OrientacaoTCC,
     AtividadeExtensionista,
+    LicencaDocente,
     ReducaoCargaHoraria,
     ParecerChoices,
     PendenciaExtra,
@@ -127,21 +129,169 @@ class DecisaoDesupTests(TestCase):
         )
 
     # ── Lista: coluna Status somente leitura ────────────────────────
-    def test_lista_desup_sem_form_de_status(self):
-        """A lista para DESUP não deve conter o form de status nem os inputs."""
-        OrientacaoTCC.objects.create(pendencia=self.pendencia, num_orientandos=4)
+    def test_lista_desup_exibe_select_e_justificativa_do_parecer(self):
+        """A DESUP decide cada item diretamente pela lista."""
+        item = OrientacaoTCC.objects.create(pendencia=self.pendencia, num_orientandos=4)
         self.client.force_login(self.desup)
         url = reverse("extra_curricular:pendencia_list")
         resp = self.client.get(url, {"semestre": semestre_atual()})
         self.assertEqual(resp.status_code, 200)
         html = resp.content.decode()
-        # Não deve conter o form de finalização inline nem seus inputs
         self.assertNotIn('name="status"', html)
         self.assertNotIn('name="item_horas_aprovadas"', html)
         self.assertNotIn('name="item_tipo"', html)
-        # Deve exibir o docente (a linha existe) e o badge somente-leitura
+        self.assertIn('name="parecer_desup"', html)
+        self.assertIn('name="motivo_parecer"', html)
+        self.assertIn(
+            reverse(
+                "extra_curricular:parecer_rapido",
+                kwargs={"pk": self.pendencia.pk, "tipo": "tcc", "item_pk": item.pk},
+            ),
+            html,
+        )
         self.assertIn("Docente Decisão", html)
-        self.assertIn("badge-enviado", html)
+
+    def test_lista_desup_exibe_cancelamento_somente_para_item_aprovado(self):
+        aprovado = OrientacaoTCC.objects.create(
+            pendencia=self.pendencia,
+            num_orientandos=4,
+            parecer_desup=ParecerChoices.APROVADO,
+        )
+        pendente = OrientacaoTCC.objects.create(
+            pendencia=self.pendencia,
+            num_orientandos=2,
+            parecer_desup=ParecerChoices.PENDENTE,
+        )
+        self.client.force_login(self.desup)
+
+        resp = self.client.get(
+            reverse("extra_curricular:pendencia_list"),
+            {"semestre": semestre_atual(), "aba": "aprovados"},
+        )
+        html = resp.content.decode()
+
+        self.assertContains(resp, "Cancelar extracurricular aprovado")
+        self.assertIn(
+            reverse(
+                "extra_curricular:cancelar_extracurricular",
+                kwargs={"pk": self.pendencia.pk, "tipo": "tcc", "item_pk": aprovado.pk},
+            ),
+            html,
+        )
+        self.assertNotIn(
+            reverse(
+                "extra_curricular:cancelar_extracurricular",
+                kwargs={"pk": self.pendencia.pk, "tipo": "tcc", "item_pk": pendente.pk},
+            ),
+            html,
+        )
+
+    def test_desup_cancela_somente_o_item_aprovado_e_recalcula_horas(self):
+        tcc = OrientacaoTCC.objects.create(
+            pendencia=self.pendencia,
+            num_orientandos=4,
+            num_orientandos_aprovados=4,
+            parecer_desup=ParecerChoices.APROVADO,
+        )
+        extensao = AtividadeExtensionista.objects.create(
+            pendencia=self.pendencia,
+            num_estudantes=2,
+            num_estudantes_aprovados=2,
+            parecer_desup=ParecerChoices.APROVADO,
+        )
+        sincronizar_status_pendencia(self.pendencia)
+        self.assertEqual(self.pendencia.ch_total_justificada, 3.0)
+        self.client.force_login(self.desup)
+        url = reverse(
+            "extra_curricular:cancelar_extracurricular",
+            kwargs={"pk": self.pendencia.pk, "tipo": "tcc", "item_pk": tcc.pk},
+        )
+
+        resp = self.client.post(url, {"next": "/extracurriculares/pendencias/?aba=aprovados"})
+
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.url, "/extracurriculares/pendencias/?aba=aprovados")
+        tcc.refresh_from_db()
+        extensao.refresh_from_db()
+        self.pendencia.refresh_from_db()
+        self.assertEqual(tcc.parecer_desup, ParecerChoices.INDEFERIDO)
+        self.assertEqual(tcc.num_orientandos_aprovados, 0)
+        self.assertEqual(tcc.ch_aprovada, 0.0)
+        self.assertEqual(tcc.motivo_parecer, "Aprovação cancelada pela DESUP.")
+        self.assertEqual(extensao.parecer_desup, ParecerChoices.APROVADO)
+        self.assertEqual(self.pendencia.status, PendenciaExtra.StatusChoices.PARCIAL)
+        self.assertEqual(self.pendencia.ch_total_justificada, 1.0)
+
+    def test_coordenador_nao_pode_cancelar_e_item_nao_aprovado_nao_muda(self):
+        tcc = OrientacaoTCC.objects.create(
+            pendencia=self.pendencia,
+            num_orientandos=4,
+            parecer_desup=ParecerChoices.PENDENTE,
+        )
+        url = reverse(
+            "extra_curricular:cancelar_extracurricular",
+            kwargs={"pk": self.pendencia.pk, "tipo": "tcc", "item_pk": tcc.pk},
+        )
+
+        self.client.force_login(self.coord)
+        self.assertEqual(self.client.post(url).status_code, 403)
+        self.client.force_login(self.desup)
+        resp = self.client.post(url)
+
+        self.assertEqual(resp.status_code, 302)
+        tcc.refresh_from_db()
+        self.assertEqual(tcc.parecer_desup, ParecerChoices.PENDENTE)
+
+    def test_cancelamento_zera_carga_de_extensao_reducao_e_licenca(self):
+        casos = (
+            (
+                "ext",
+                AtividadeExtensionista.objects.create(
+                    pendencia=self.pendencia,
+                    num_estudantes=4,
+                    num_estudantes_aprovados=4,
+                    parecer_desup=ParecerChoices.APROVADO,
+                ),
+                "num_estudantes_aprovados",
+            ),
+            (
+                "red",
+                ReducaoCargaHoraria.objects.create(
+                    pendencia=self.pendencia,
+                    motivo_reducao="Redução aprovada",
+                    horas_reduzidas=Decimal("2"),
+                    horas_aprovadas=Decimal("2"),
+                    parecer_desup=ParecerChoices.APROVADO,
+                ),
+                "horas_aprovadas",
+            ),
+            (
+                "lic",
+                LicencaDocente.objects.create(
+                    pendencia=self.pendencia,
+                    motivo_licenca="Licença aprovada",
+                    data_inicio=date(2026, 1, 1),
+                    horas_reduzidas=Decimal("2"),
+                    horas_aprovadas=Decimal("2"),
+                    parecer_desup=ParecerChoices.APROVADO,
+                ),
+                "horas_aprovadas",
+            ),
+        )
+        sincronizar_status_pendencia(self.pendencia)
+        self.client.force_login(self.desup)
+
+        for tipo, item, campo_aprovado in casos:
+            with self.subTest(tipo=tipo):
+                url = reverse(
+                    "extra_curricular:cancelar_extracurricular",
+                    kwargs={"pk": self.pendencia.pk, "tipo": tipo, "item_pk": item.pk},
+                )
+                self.assertEqual(self.client.post(url).status_code, 302)
+                item.refresh_from_db()
+                self.assertEqual(item.parecer_desup, ParecerChoices.INDEFERIDO)
+                self.assertEqual(float(getattr(item, campo_aprovado)), 0.0)
+                self.assertEqual(item.ch_aprovada, 0.0)
 
     # ── Finalizar (consolidação) DESUP-only ─────────────────────────
     def test_atualizar_status_finaliza_sem_sobrescrever_pareceres(self):
@@ -573,6 +723,10 @@ class FiltroStatusPendenciaTests(TestCase):
         self.desup = User.objects.create_user(
             email="desup_corr015@teste.com", perfil="DESUP", forcar_troca_senha=False,
         )
+        self.coord = User.objects.create_user(
+            email="coord_corr015@teste.com", perfil="COORDENADOR_UNIDADE",
+            unidade=self.unidade, forcar_troca_senha=False,
+        )
         self.url = reverse("extra_curricular:pendencia_list")
 
     def _professor(self, sufixo):
@@ -597,7 +751,7 @@ class FiltroStatusPendenciaTests(TestCase):
     def _get(self, **params):
         params.setdefault("semestre", semestre_atual())
         params.setdefault("unidade_id", self.unidade.pk)
-        self.client.force_login(self.desup)
+        self.client.force_login(self.coord)
         return self.client.get(self.url, params)
 
     # ── O caso relatado ─────────────────────────────────────────────
@@ -1107,7 +1261,7 @@ class AprovacaoParcialTests(TestCase):
         self.assertEqual(self.pendencia.ch_total_justificada, 0.0)
 
     def test_item_ainda_pendente_mantem_em_analise(self):
-        """Sem todos os itens julgados, não é PARCIAL — a análise não acabou."""
+        """A análise segue aberta, mas o item já aprovado passa a contar."""
         self._tcc(ParecerChoices.APROVADO, num=4, aprovados=4)
         self._reducao(ParecerChoices.INDEFERIDO)
         self._reducao(ParecerChoices.PENDENTE, horas="3.0")
@@ -1117,7 +1271,7 @@ class AprovacaoParcialTests(TestCase):
             PendenciaExtra.StatusChoices.ENVIADO,
         )
         self.pendencia.refresh_from_db()
-        self.assertEqual(self.pendencia.ch_total_justificada, 0.0)
+        self.assertEqual(self.pendencia.ch_total_justificada, 2.0)
 
     # ── Interações com o resto do fluxo ─────────────────────────────
     def test_rascunho_nao_vira_parcial(self):

@@ -483,16 +483,77 @@ class AprovarAlocacaoUnidadeView(LoginRequiredMixin, PerfilRequiredMixin, View):
 
 
 class DesfazerAprovacaoUnidadeView(LoginRequiredMixin, PerfilRequiredMixin, View):
-    """Desfaz a aprovação da DESUP: devolve os consolidados do semestre a Rascunho."""
+    """Libera a unidade para corrigir a alocação sem remover nenhum lançamento."""
     allowed_profiles = ['DESUP']
 
     def post(self, request, unidade_id):
-        revertidas = AlocacaoCurricular.objects.filter(
-            unidade_id=unidade_id,
-            semestre=_semestre_atual(),
-            status=AlocacaoCurricular.StatusChoices.APROVADO,
-        ).update(status=AlocacaoCurricular.StatusChoices.RASCUNHO)
-        messages.success(request, f'Aprovação desfeita para {revertidas} matriz(es). A alocação pode ser alterada novamente.')
+        from datetime import timedelta
+
+        from django.db import transaction
+        from django.utils import timezone
+
+        from apps.core.models import JanelaEntrega, Unidade
+        from apps.core.services import get_delivery_window
+
+        semestre = _semestre_atual()
+        unidade = get_object_or_404(Unidade, pk=unidade_id)
+
+        with transaction.atomic():
+            # Somente o cabeçalho muda de Aprovado para Rascunho. As linhas de
+            # AlocacaoTurmaDocente, docentes, carências, turmas e componentes não
+            # são atualizados nem removidos por este fluxo.
+            consolidados = AlocacaoCurricular.objects.select_for_update().filter(
+                unidade=unidade,
+                semestre=semestre,
+                status=AlocacaoCurricular.StatusChoices.APROVADO,
+            )
+            revertidas = consolidados.update(
+                status=AlocacaoCurricular.StatusChoices.RASCUNHO,
+            )
+
+            if revertidas and get_delivery_window(unidade) is None:
+                hoje = timezone.localdate()
+                # Um fechamento específico vigente tem prioridade sobre qualquer
+                # janela global. Ao desfazer a aprovação, a DESUP está liberando
+                # explicitamente a unidade, então esses bloqueios passam a Reaberto.
+                fechadas_vigentes = JanelaEntrega.objects.select_for_update().filter(
+                    unidade=unidade,
+                    status=JanelaEntrega.StatusChoices.FECHADO,
+                    data_inicio__lte=hoje,
+                    data_fim__gte=hoje,
+                )
+                reabertas = fechadas_vigentes.update(
+                    status=JanelaEntrega.StatusChoices.REABERTO,
+                )
+                if not reabertas:
+                    janela = (
+                        JanelaEntrega.objects.select_for_update()
+                        .filter(unidade=unidade, semestre=semestre)
+                        .order_by('-data_inicio', '-pk')
+                        .first()
+                    )
+                    if janela:
+                        janela.status = JanelaEntrega.StatusChoices.REABERTO
+                        janela.data_inicio = min(janela.data_inicio, hoje)
+                        janela.data_fim = max(janela.data_fim, hoje + timedelta(days=7))
+                        janela.save(update_fields=['status', 'data_inicio', 'data_fim'])
+                    else:
+                        JanelaEntrega.objects.create(
+                            semestre=semestre,
+                            unidade=unidade,
+                            status=JanelaEntrega.StatusChoices.REABERTO,
+                            data_inicio=hoje,
+                            data_fim=hoje + timedelta(days=7),
+                        )
+
+        if revertidas:
+            messages.success(
+                request,
+                f'Aprovação desfeita para {revertidas} matriz(es). '
+                'As alocações foram preservadas e a unidade pode alterá-las novamente.',
+            )
+        else:
+            messages.info(request, 'Não havia alocação aprovada para desfazer nesta unidade.')
         return redirect(f'/alocacao-curricular/?unidade_id={unidade_id}')
 
 

@@ -314,6 +314,83 @@ class RegrasNegocioAdequacaoTests(TestCase):
         estagio.refresh_from_db()
         self.assertIsNotNone(estagio.data_fim)
 
+    def test_semestre_letivo_da_supervisao_e_preenchido_automaticamente(self):
+        """O coordenador não precisa informar o semestre ao cadastrar a atividade."""
+        self.client.force_login(self.coord_a)
+
+        resposta = self.client.post(
+            reverse("extra_curricular:atividade_estagio_create"),
+            {
+                "professor": self.prof_a.pk,
+                "curso": self.course_unit.pk,
+                "tipo": AtividadeEstagioSupervisao.TipoChoices.SUPERVISAO_ESTAGIO,
+                "num_estudantes": 2,
+                "carga_horaria_semanal": "4.00",
+                "data_inicio": date.today().strftime("%Y-%m-%d"),
+            },
+        )
+
+        self.assertEqual(resposta.status_code, 302)
+        atividade = AtividadeEstagioSupervisao.objects.get(
+            tipo=AtividadeEstagioSupervisao.TipoChoices.SUPERVISAO_ESTAGIO,
+        )
+        self.assertEqual(atividade.semestre, semestre_atual())
+
+    def test_semestre_letivo_da_supervisao_nao_pode_ser_adulterado(self):
+        """O backend ignora um semestre enviado manualmente na criação."""
+        self.client.force_login(self.coord_a)
+
+        resposta = self.client.post(
+            reverse("extra_curricular:atividade_estagio_create"),
+            {
+                "professor": self.prof_a.pk,
+                "curso": self.course_unit.pk,
+                "tipo": AtividadeEstagioSupervisao.TipoChoices.ORIENTACAO_ESTAGIO,
+                "semestre": "1999.1",
+                "num_estudantes": 1,
+                "carga_horaria_semanal": "2.00",
+                "data_inicio": date.today().strftime("%Y-%m-%d"),
+            },
+        )
+
+        self.assertEqual(resposta.status_code, 302)
+        atividade = AtividadeEstagioSupervisao.objects.get(
+            tipo=AtividadeEstagioSupervisao.TipoChoices.ORIENTACAO_ESTAGIO,
+        )
+        self.assertEqual(atividade.semestre, semestre_atual())
+
+    def test_edicao_da_supervisao_preserva_semestre_historico(self):
+        """Editar uma atividade antiga não a move para o semestre corrente."""
+        atividade = AtividadeEstagioSupervisao.objects.create(
+            unidade=self.unidade_a,
+            professor=self.prof_a,
+            curso=self.course_unit,
+            tipo=AtividadeEstagioSupervisao.TipoChoices.SUPERVISAO_ESTAGIO,
+            semestre="2025.1",
+            num_estudantes=1,
+            carga_horaria_semanal=Decimal("2.00"),
+            data_inicio=date(2025, 2, 1),
+            criado_por=self.coord_a,
+        )
+        self.client.force_login(self.coord_a)
+
+        resposta = self.client.post(
+            reverse("extra_curricular:atividade_estagio_update", kwargs={"pk": atividade.pk}),
+            {
+                "professor": self.prof_a.pk,
+                "curso": self.course_unit.pk,
+                "tipo": AtividadeEstagioSupervisao.TipoChoices.COORDENACAO_ESTAGIO,
+                "semestre": semestre_atual(),
+                "num_estudantes": 3,
+                "carga_horaria_semanal": "3.00",
+                "data_inicio": "2025-02-01",
+            },
+        )
+
+        self.assertEqual(resposta.status_code, 302)
+        atividade.refresh_from_db()
+        self.assertEqual(atividade.semestre, "2025.1")
+
     # =========================================================================
     # MUDANÇA 3: Restringir Professores por Unidade na Alocação Curricular
     # =========================================================================

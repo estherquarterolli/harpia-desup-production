@@ -97,6 +97,14 @@ class TipoCargoDiretivo(models.Model):
         verbose_name="Ativo",
         help_text="Cargos inativos permanecem no histórico, mas não recebem novos ocupantes.",
     )
+    carga_reducao_horas = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0.00")), MaxValueValidator(Decimal("168.00"))],
+        verbose_name="Carga horária de redução semanal",
+        help_text="Horas semanais de redução de carga que o cargo garante a quem o ocupa. Definida pela DESUP.",
+    )
     ordem = models.PositiveSmallIntegerField(default=100, verbose_name="Ordem de exibição")
     criado_em = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
     atualizado_em = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
@@ -453,6 +461,30 @@ class SolicitacaoProfessorExterno(models.Model):
         blank=True,
         verbose_name="Nome do professor informado",
         help_text="Usado nas solicitações de cadastro.",
+    )
+    professor_id_funcional = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="ID funcional informado",
+        help_text="Usado nas solicitações de cadastro.",
+    )
+    professor_rh_matricula = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="Matrícula RH informada",
+        help_text="Usado nas solicitações de cadastro.",
+    )
+    tipo_contrato_solicitado = models.ForeignKey(
+        "professors.ContractType",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="Tipo de contrato informado",
+    )
+    observacao_cadastro = models.TextField(
+        blank=True,
+        verbose_name="Observações do cadastro",
     )
     semestre = models.CharField(
         max_length=6,

@@ -128,9 +128,10 @@ class JanelaEntregaForm(JanelaEntregaValidacaoMixin, forms.ModelForm):
 class TipoCargoDiretivoForm(forms.ModelForm):
     class Meta:
         model = TipoCargoDiretivo
-        fields = ["nome", "exige_curso", "permite_multiplos", "ativo"]
+        fields = ["nome", "carga_reducao_horas", "exige_curso", "permite_multiplos", "ativo"]
         widgets = {
             "nome": forms.TextInput(attrs={"class": _INPUT_CSS}),
+            "carga_reducao_horas": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": "0", "max": "20", "step": "0.25"}),
             "exige_curso": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
             "permite_multiplos": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
             "ativo": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
@@ -142,13 +143,12 @@ class OcupacaoEquipeDiretivaForm(forms.ModelForm):
 
     class Meta:
         model = OcupacaoEquipeDiretiva
-        fields = ["professor", "curso", "data_inicio", "data_fim", "carga_reducao_horas", "observacoes"]
+        fields = ["professor", "curso", "data_inicio", "data_fim", "observacoes"]
         widgets = {
             "professor": forms.Select(attrs={"class": _SELECT_CSS}),
             "curso": forms.Select(attrs={"class": _SELECT_CSS}),
             "data_inicio": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
             "data_fim": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
-            "carga_reducao_horas": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": "0", "max": "20", "step": "0.25"}),
             "observacoes": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 3}),
         }
 
@@ -270,10 +270,24 @@ class AtividadeEstagioSupervisaoUnidadeForm(forms.ModelForm):
     def __init__(self, *args, unidade, **kwargs):
         super().__init__(*args, **kwargs)
         from django.db.models import Q
+        from apps.allocations.services import semestre_atual
         from apps.courses.models import CourseUnit
         from apps.professors.models import Professor
 
         self.instance.unidade = unidade
+        # O semestre letivo não é uma escolha do usuário. Em novos registros,
+        # ele acompanha automaticamente a data local (jan–jun = ano.1;
+        # jul–dez = ano.2). Em edições, preservamos o semestre histórico do
+        # registro. ``disabled`` também faz o Django ignorar eventual valor
+        # adulterado no POST e usar o valor inicial definido pelo servidor.
+        semestre_do_registro = (
+            self.instance.semestre
+            if self.instance.pk and self.instance.semestre
+            else semestre_atual()
+        )
+        self.initial["semestre"] = semestre_do_registro
+        self.fields["semestre"].disabled = True
+        self.fields["semestre"].help_text = "Definido automaticamente conforme a data atual."
         self.fields["professor"].queryset = Professor.objects.filter(
             Q(unidade_principal=unidade) | Q(unidades=unidade)
         ).distinct().order_by("rh_nome")

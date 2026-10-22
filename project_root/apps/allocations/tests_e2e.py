@@ -435,6 +435,75 @@ class AprovarAlocacaoUnidadeE2ETests(AlocacaoE2EBase):
         # A aprovação de uma unidade não cria consolidado para a outra unidade.
         self.assertFalse(AlocacaoCurricular.objects.filter(unidade=self.unidade_b).exists())
 
+    def test_desfazer_aprovacao_preserva_alocacoes_e_libera_edicao_da_unidade(self):
+        self._completar_alocacao_da_unidade_a()
+        self.comp_algoritmos.quantidade_turmas = 3
+        self.comp_algoritmos.save(update_fields=['quantidade_turmas'])
+        self.client.force_login(self.desup)
+        self.client.post(self.url_aprovar)
+
+        linhas_antes = list(
+            AlocacaoTurmaDocente.objects.filter(
+                alocacao_curricular__unidade=self.unidade_a,
+                alocacao_curricular__semestre=self.semestre_atual,
+            ).order_by('pk').values_list(
+                'pk', 'componente_matriz_id', 'docente_id', 'turma_id',
+                'carga_horaria_contabilizada', 'compartilhado',
+            )
+        )
+        self.assertEqual(len(linhas_antes), 2)
+
+        # Simula o prazo geral encerrado: desfazer deve liberar especificamente a
+        # unidade, sem usar exclusão/recriação das linhas como mecanismo de edição.
+        self.janela.status = JanelaEntrega.StatusChoices.FECHADO
+        self.janela.save(update_fields=['status'])
+
+        resposta = self.client.post(reverse(
+            'desfazer_aprovacao_unidade', kwargs={'unidade_id': self.unidade_a.pk},
+        ))
+
+        linhas_depois = list(
+            AlocacaoTurmaDocente.objects.filter(
+                alocacao_curricular__unidade=self.unidade_a,
+                alocacao_curricular__semestre=self.semestre_atual,
+            ).order_by('pk').values_list(
+                'pk', 'componente_matriz_id', 'docente_id', 'turma_id',
+                'carga_horaria_contabilizada', 'compartilhado',
+            )
+        )
+        self.assertEqual(linhas_depois, linhas_antes)
+        self.comp_algoritmos.refresh_from_db()
+        self.comp_redes.refresh_from_db()
+        self.assertEqual(self.comp_algoritmos.quantidade_turmas, 3)
+        self.assertEqual(self.comp_redes.status, MatrixComponent.StatusChoices.NAO_OFERECIDA)
+        self.assertFalse(AlocacaoCurricular.objects.filter(
+            unidade=self.unidade_a,
+            semestre=self.semestre_atual,
+            status=AlocacaoCurricular.StatusChoices.APROVADO,
+        ).exists())
+        self.assertTrue(any(
+            'alocações foram preservadas' in mensagem.lower()
+            for mensagem in self._mensagens(resposta)
+        ))
+
+        janela_unidade = JanelaEntrega.objects.get(
+            unidade=self.unidade_a,
+            semestre=self.semestre_atual,
+        )
+        self.assertEqual(janela_unidade.status, JanelaEntrega.StatusChoices.REABERTO)
+        self.assertTrue(janela_unidade.is_ativa)
+
+        # A unidade consegue trocar um docente depois da liberação, e as demais
+        # alocações permanecem intactas.
+        self.client.force_login(self.coord_a)
+        alteracao = self.client.post(
+            self._url_alocar(self.comp_algoritmos),
+            {'docente_id': self.prof_a2.pk},
+        )
+        self.assertEqual(alteracao.status_code, 200)
+        self.assertEqual(self._docente(self.comp_algoritmos), self.prof_a2)
+        self.assertEqual(self._docente(self.comp_banco), self.prof_a2)
+
     def test_desup_nao_aprova_com_componente_sem_docente(self):
         self._atribuir(self.comp_algoritmos, self.prof_a1)
         self.client.force_login(self.desup)
