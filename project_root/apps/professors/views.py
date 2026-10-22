@@ -83,6 +83,20 @@ def _bulk_ch_justificada(professor_ids):
                 if item.parecer_desup == ParecerChoices.APROVADO
             )
         mapa[p.professor_id] = mapa.get(p.professor_id, 0.0) + total
+
+    # Orientação/supervisão/coordenação de estágio vigentes no semestre também
+    # entram no somatório (em qualquer unidade onde o professor atue).
+    from apps.core.models import AtividadeEstagioSupervisao
+    from django.utils import timezone
+
+    hoje = timezone.localdate()
+    estagios = AtividadeEstagioSupervisao.objects.filter(
+        professor_id__in=professor_ids,
+        semestre=semestre_atual(),
+        data_inicio__lte=hoje,
+    ).filter(Q(data_fim__isnull=True) | Q(data_fim__gte=hoje))
+    for est in estagios:
+        mapa[est.professor_id] = mapa.get(est.professor_id, 0.0) + float(est.carga_horaria_semanal)
     return mapa
 
 

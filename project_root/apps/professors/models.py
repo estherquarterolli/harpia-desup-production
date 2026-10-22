@@ -324,7 +324,16 @@ class Professor(models.Model):
         try:
             from apps.extra_curricular.utils import semestre_atual
             pendencias = self.pendencias_extra.filter(semestre=semestre_atual())
-            return sum(float(p.ch_total_justificada) for p in pendencias)
+            total = sum(float(p.ch_total_justificada) for p in pendencias)
+            # Estágio (orientação/supervisão/coordenação) vigente no semestre.
+            from django.db.models import Q
+            from django.utils import timezone
+
+            hoje = timezone.localdate()
+            estagios = self.atividades_estagio_supervisao.filter(
+                semestre=semestre_atual(), data_inicio__lte=hoje,
+            ).filter(Q(data_fim__isnull=True) | Q(data_fim__gte=hoje))
+            return total + sum(float(e.carga_horaria_semanal) for e in estagios)
         except Exception:
             return 0.0
 
