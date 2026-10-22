@@ -13,6 +13,7 @@ from django.forms import inlineformset_factory
 
 from apps.extra_curricular.models import (
     AtividadeExtensionista,
+    LicencaDocente,
     OrientacaoTCC,
     ParecerChoices,
     PendenciaExtra,
@@ -62,6 +63,8 @@ class BasePendenciaFormSet(BaseInlineFormSet):
             ch_outros += sum(float(item.ch_aprovada) for item in pendencia.atividades_extensao.all())
         if self.model != ReducaoCargaHoraria:
             ch_outros += sum(float(item.ch_aprovada) for item in pendencia.reducoes_ch.all())
+        if self.model != LicencaDocente:
+            ch_outros += sum(float(item.ch_aprovada) for item in pendencia.licencas.all())
 
         # Calcula a CH deste formset específico (levando em conta deletes e adições)
         ch_deste_formset = 0
@@ -81,7 +84,7 @@ class BasePendenciaFormSet(BaseInlineFormSet):
             elif self.model == AtividadeExtensionista:
                 num = dados.get("num_estudantes", 0)
                 ch_deste_formset += float(num * 0.5)
-            elif self.model == ReducaoCargaHoraria:
+            elif self.model in (ReducaoCargaHoraria, LicencaDocente):
                 ch_deste_formset += float(dados.get("horas_reduzidas", 0))
 
         ch_extra_total = float(ch_outros) + ch_deste_formset
@@ -246,6 +249,54 @@ ReducaoCargaHorariaFormSet = inlineformset_factory(
 
 
 # ════════════════════════════════════════════════════════════════════
+# LicencaDocente (Coordenador)
+# ════════════════════════════════════════════════════════════════════
+class LicencaDocenteForm(forms.ModelForm):
+    class Meta:
+        model  = LicencaDocente
+        fields = ["motivo_licenca", "data_inicio", "data_fim", "horas_reduzidas"]
+        widgets = {
+            "motivo_licenca": forms.Textarea(attrs={
+                "class": _TEXTAREA,
+                "rows": 2,
+                "placeholder": "Tipo e motivo da licença (ex.: licença-saúde, capacitação)...",
+            }),
+            "data_inicio": forms.DateInput(attrs={"class": _INPUT, "type": "date"}, format="%Y-%m-%d"),
+            "data_fim": forms.DateInput(attrs={"class": _INPUT, "type": "date"}, format="%Y-%m-%d"),
+            "horas_reduzidas": forms.NumberInput(attrs={
+                "class": _INPUT + " text-center",
+                "min": "0.5",
+                "step": "0.5",
+                "placeholder": "Horas",
+            }),
+        }
+
+    def clean_horas_reduzidas(self):
+        valor = self.cleaned_data.get("horas_reduzidas")
+        if valor is not None and valor <= 0:
+            raise forms.ValidationError("Informe um valor de horas maior que zero.")
+        return valor
+
+    def clean(self):
+        cleaned = super().clean()
+        inicio, fim = cleaned.get("data_inicio"), cleaned.get("data_fim")
+        if inicio and fim and fim < inicio:
+            self.add_error("data_fim", "O fim da licença não pode ser anterior ao início.")
+        return cleaned
+
+
+LicencaDocenteFormSet = inlineformset_factory(
+    PendenciaExtra,
+    LicencaDocente,
+    form=LicencaDocenteForm,
+    formset=BasePendenciaFormSet,
+    fields=["motivo_licenca", "data_inicio", "data_fim", "horas_reduzidas"],
+    extra=1,
+    can_delete=True,
+)
+
+
+# ════════════════════════════════════════════════════════════════════
 # ParecerForm — Exclusivo DESUP (avalia parecer de cada item)
 # ════════════════════════════════════════════════════════════════════
 class ParecerTCCForm(forms.ModelForm):
@@ -376,3 +427,10 @@ class ParecerReducaoForm(forms.ModelForm):
                 f"Não é possível aprovar {aprovadas}h: foram solicitadas apenas {solicitadas}h.",
             )
         return cleaned
+
+
+class ParecerLicencaForm(ParecerReducaoForm):
+    """Parecer da DESUP sobre uma licença (mesma regra da redução de CH)."""
+
+    class Meta(ParecerReducaoForm.Meta):
+        model = LicencaDocente

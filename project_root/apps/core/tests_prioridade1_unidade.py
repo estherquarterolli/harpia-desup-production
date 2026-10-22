@@ -126,6 +126,21 @@ class Prioridade1UnidadeTests(TestCase):
     # 1. Testes de Modelo e UnitBoundManager (Isolamento Multi-tenant)
     # ------------------------------------------------------------------
 
+    def test_dashboard_da_unidade_lista_somente_professores_da_unidade(self):
+        self.client.force_login(self.coord_a)
+        resp = self.client.get(reverse("dashboard_unidade"))
+        self.assertEqual(resp.status_code, 200)
+        nomes = {p.pk for p in resp.context["professores_unidade"]}
+        self.assertEqual(nomes, {self.prof_a.pk, self.prof_a2.pk})
+        self.assertNotIn(self.prof_b.pk, nomes)
+        # Uma linha expansível por professor, com o detalhamento da alocação.
+        self.assertContains(resp, "<details", count=2)
+        self.assertContains(resp, "Detalhamento da alocação", count=2)
+        self.assertContains(resp, 'class="prof-table-panel"')
+        self.assertContains(resp, 'class="prof-table-head"')
+        for rotulo in ("Cargo", "Vínculo", "Unidades", "Situação", "Carga horária", "Nenhuma alocação ou atividade registrada"):
+            self.assertContains(resp, rotulo)
+
     def test_unit_bound_manager_isola_ocupacoes_e_estagio_por_unidade(self):
         ocup_a = OcupacaoEquipeDiretiva.objects.create(
             unidade=self.unidade_a,
@@ -346,6 +361,7 @@ class Prioridade1UnidadeTests(TestCase):
             professor=self.prof_a,
             data_inicio=self.hoje - timedelta(days=30),
             data_fim=None,
+            carga_reducao_horas=Decimal("8.00"),
             criado_por=self.coord_a,
         )
         self.client.force_login(self.coord_a)
@@ -357,12 +373,213 @@ class Prioridade1UnidadeTests(TestCase):
 
         ocupacao.refresh_from_db()
         self.assertEqual(ocupacao.data_fim, self.hoje)
+        self.assertFalse(ocupacao.vigente)
+        painel = self.client.get(reverse('core:equipe_diretiva_unidade'))
+        self.assertIn(ocupacao, painel.context['historico'])
+        cargo = next(i for i in painel.context['composicao'] if i['cargo'] == self.cargo_direcao)
+        self.assertEqual(cargo['ocupantes'], [])
+        self.assertTrue(cargo['pode_adicionar'])
+        self.assertEqual(self.prof_a.reducao_carga_vigente, 0)
+        nova = OcupacaoEquipeDiretiva(
+            unidade=self.unidade_a, cargo=self.cargo_direcao,
+            professor=self.prof_a2, data_inicio=self.hoje,
+        )
+        nova.full_clean()
+        nova.save()
+        painel = self.client.get(reverse('core:equipe_diretiva_unidade'))
+        self.assertNotIn(nova, painel.context['historico'])
+        self.client.force_login(self.desup)
+        painel_desup = self.client.get(reverse('core:equipe_diretiva_desup'), {'unidade_id': self.unidade_a.pk})
+        self.assertIn(ocupacao, painel_desup.context['historico'])
+        self.assertNotIn(nova, painel_desup.context['historico'])
+        self.client.force_login(self.coord_a)
         self.assertTrue(
             AuditoriaGlobal.objects.filter(
                 usuario=self.coord_a,
                 acao="OCUPACAO_DIRETIVA_UNIDADE_ENCERRADA",
             ).exists()
         )
+
+
+
+    def test_coordenador_remove_ocupante_do_cargo_com_sucesso(self):
+
+        ocupacao = OcupacaoEquipeDiretiva.objects.create(
+
+            unidade=self.unidade_a,
+
+            cargo=self.cargo_direcao,
+
+            professor=self.prof_a,
+
+            data_inicio=self.hoje - timedelta(days=20),
+
+            carga_reducao_horas=Decimal("8.00"),
+
+            criado_por=self.coord_a,
+
+        )
+
+        self.assertEqual(self.prof_a.reducao_carga_vigente, 8.0)
+
+
+
+        self.client.force_login(self.coord_a)
+
+        resp_view_antes = self.client.get(reverse("core:equipe_diretiva_unidade"))
+
+        self.assertEqual(resp_view_antes.status_code, 200)
+
+        self.assertEqual(resp_view_antes.context["reducao_total"], Decimal("8.00"))
+
+
+
+        # Executa a remoção do ocupante
+
+        resposta = self.client.post(
+
+            reverse("core:ocupacao_diretiva_unidade_remover", args=[ocupacao.pk])
+
+        )
+
+        self.assertRedirects(resposta, reverse("core:equipe_diretiva_unidade"))
+
+
+
+        # Ocupação deletada, mas o cadastro do profissional segue intacto
+
+        self.assertFalse(OcupacaoEquipeDiretiva.objects.filter(pk=ocupacao.pk).exists())
+
+        self.assertTrue(Professor.objects.filter(pk=self.prof_a.pk).exists())
+
+
+
+        # Efeitos sobre a redução de carga horária (HR):
+
+        # A redução do professor volta para 0 e a redução total da unidade zera
+
+        self.assertEqual(self.prof_a.reducao_carga_vigente, 0.0)
+
+
+
+        resp_view_depois = self.client.get(reverse("core:equipe_diretiva_unidade"))
+
+        self.assertEqual(resp_view_depois.status_code, 200)
+
+        self.assertEqual(resp_view_depois.context["reducao_total"], Decimal("0.00"))
+        self.assertNotIn(ocupacao, resp_view_depois.context["historico"])
+
+
+
+        # O cargo fica vago e disponível para nova atribuição
+
+        composicao = {item["cargo"].pk: item for item in resp_view_depois.context["composicao"]}
+
+        item_direcao = composicao[self.cargo_direcao.pk]
+
+        self.assertEqual(len(item_direcao["ocupantes"]), 0)
+
+        self.assertTrue(item_direcao["pode_adicionar"])
+
+        self.assertIn("form", item_direcao)
+
+
+
+        # Auditoria registrada
+
+        self.assertTrue(
+
+            AuditoriaGlobal.objects.filter(
+
+                usuario=self.coord_a,
+
+                acao="OCUPACAO_DIRETIVA_UNIDADE_REMOVIDA",
+
+            ).exists()
+
+        )
+
+
+
+    def test_usuario_nao_autorizado_ou_sem_unidade_nao_consegue_remover_ocupante(self):
+
+        ocupacao = OcupacaoEquipeDiretiva.objects.create(
+
+            unidade=self.unidade_a,
+
+            cargo=self.cargo_direcao,
+
+            professor=self.prof_a,
+
+            data_inicio=self.hoje - timedelta(days=5),
+
+            carga_reducao_horas=Decimal("6.00"),
+
+            criado_por=self.coord_a,
+
+        )
+
+        # Usuário anônimo
+
+        resp_anon = self.client.post(
+
+            reverse("core:ocupacao_diretiva_unidade_remover", args=[ocupacao.pk])
+
+        )
+
+        self.assertEqual(resp_anon.status_code, 302)
+
+        self.assertTrue(OcupacaoEquipeDiretiva.objects.filter(pk=ocupacao.pk).exists())
+
+
+
+        # Usuário coordenador sem unidade vinculada
+
+        self.client.force_login(self.coord_sem_unidade)
+
+        resp_sem_unid = self.client.post(
+
+            reverse("core:ocupacao_diretiva_unidade_remover", args=[ocupacao.pk])
+
+        )
+
+        self.assertEqual(resp_sem_unid.status_code, 403)
+
+        self.assertTrue(OcupacaoEquipeDiretiva.objects.filter(pk=ocupacao.pk).exists())
+
+
+
+    def test_remover_ocupante_com_professor_desvinculado_da_unidade_e_negado(self):
+
+        # Docente pertence somente à unidade B, mas ocupação cadastrada para unidade A
+
+        ocupacao = OcupacaoEquipeDiretiva.objects.create(
+
+            unidade=self.unidade_a,
+
+            cargo=self.cargo_direcao,
+
+            professor=self.prof_b,
+
+            data_inicio=self.hoje - timedelta(days=5),
+
+            carga_reducao_horas=Decimal("4.00"),
+
+        )
+
+        self.client.force_login(self.coord_a)
+
+        resp = self.client.post(
+
+            reverse("core:ocupacao_diretiva_unidade_remover", args=[ocupacao.pk])
+
+        )
+
+        self.assertEqual(resp.status_code, 403)
+
+        self.assertTrue(OcupacaoEquipeDiretiva.objects.filter(pk=ocupacao.pk).exists())
+
+
 
     def test_idor_bloqueado_ao_tentar_editar_ou_encerrar_ocupacao_de_outra_unidade(self):
         ocupacao_b = OcupacaoEquipeDiretiva.objects.create(
@@ -389,6 +606,11 @@ class Prioridade1UnidadeTests(TestCase):
             reverse("core:ocupacao_diretiva_unidade_encerrar", args=[ocupacao_b.pk])
         )
         self.assertEqual(resp_encerrar.status_code, 404)
+
+        resp_remover = self.client.post(
+            reverse("core:ocupacao_diretiva_unidade_remover", args=[ocupacao_b.pk])
+        )
+        self.assertEqual(resp_remover.status_code, 404)
 
         ocupacao_b.refresh_from_db()
         self.assertEqual(ocupacao_b.professor, self.prof_b)
@@ -449,9 +671,8 @@ class Prioridade1UnidadeTests(TestCase):
         self.assertEqual(alertas[0]["horas_sala"], Decimal("4.0"))
         self.assertIn("Engenharia de Software I", alertas[0]["disciplinas"])
 
-        # Verifica acessibilidade e elementos visuais na interface (role="alert", ícone e texto)
-        self.assertContains(resposta, 'role="alert"')
-        self.assertContains(resposta, "alocado(s) em sala de aula")
+        # O aviso geral foi removido; o sinal fica no cartão do cargo e no modal.
+        self.assertNotContains(resposta, "alocado(s) em sala de aula")
         self.assertContains(resposta, "Engenharia de Software I")
         self.assertContains(resposta, "Em sala de aula")
 
@@ -564,3 +785,48 @@ class Prioridade1UnidadeTests(TestCase):
         )
         self.assertEqual(resp_estagio.status_code, 200)
         self.assertTemplateUsed(resp_estagio, "extra_curricular/supervisao_estagio_list.html")
+
+    def test_composicao_independe_do_volume_do_historico(self):
+        ativa = OcupacaoEquipeDiretiva.objects.create(
+            unidade=self.unidade_a, cargo=self.cargo_direcao,
+            professor=self.prof_a, data_inicio=self.hoje - timedelta(days=500),
+            carga_reducao_horas=Decimal('8.00'),
+        )
+        OcupacaoEquipeDiretiva.objects.bulk_create([
+            OcupacaoEquipeDiretiva(
+                unidade=self.unidade_a, cargo=self.cargo_coord_curso,
+                curso=self.curso_unid_a, professor=self.prof_a2,
+                data_inicio=self.hoje - timedelta(days=100),
+                data_fim=self.hoje - timedelta(days=90),
+            ) for _ in range(301)
+        ])
+        self.client.force_login(self.coord_a)
+        painel = self.client.get(reverse('core:equipe_diretiva_unidade'))
+        cargo = next(i for i in painel.context['composicao'] if i['cargo'] == self.cargo_direcao)
+        self.assertEqual(cargo['ocupantes'], [ativa])
+        self.assertEqual(painel.context['reducao_total'], Decimal('8.00'))
+        self.client.force_login(self.desup)
+        painel = self.client.get(reverse('core:equipe_diretiva_desup'), {'unidade_id': self.unidade_a.pk})
+        cargo = next(i for i in painel.context['composicao'] if i['cargo'] == self.cargo_direcao)
+        self.assertEqual(cargo['ocupantes'], [ativa])
+
+    def test_futura_nao_e_encerrada_e_encerramento_e_idempotente(self):
+        ocupacao = OcupacaoEquipeDiretiva.objects.create(
+            unidade=self.unidade_a, cargo=self.cargo_direcao,
+            professor=self.prof_a, data_inicio=self.hoje + timedelta(days=2),
+        )
+        self.client.force_login(self.coord_a)
+        url = reverse('core:ocupacao_diretiva_unidade_encerrar', args=[ocupacao.pk])
+        self.client.post(url)
+        ocupacao.refresh_from_db()
+        self.assertIsNone(ocupacao.data_fim)
+        painel = self.client.get(reverse('core:equipe_diretiva_unidade'))
+        self.assertNotIn(ocupacao, painel.context['historico'])
+        ocupacao.data_inicio = self.hoje
+        ocupacao.save()
+        self.client.post(url)
+        self.client.post(url)
+        ocupacao.refresh_from_db()
+        self.assertFalse(ocupacao.vigente)
+        self.assertEqual(AuditoriaGlobal.objects.filter(acao='OCUPACAO_DIRETIVA_UNIDADE_ENCERRADA').count(), 1)
+        self.assertFalse(ocupacao.conflitos_de_vigencia().exists())

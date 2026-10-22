@@ -161,6 +161,7 @@ class OcupacaoEquipeDiretivaForm(forms.ModelForm):
         # Atribuídos antes do full_clean para que o clean() do modelo valide
         # vínculo do servidor, curso da unidade e conflitos de vigência.
         self.instance.unidade = unidade
+        self.fields["data_fim"].help_text = "A partir desta data a ocupacao deixa de estar vigente."
         self.instance.cargo = cargo
         self.fields["professor"].queryset = Professor.objects.filter(
             Q(unidade_principal=unidade) | Q(unidades=unidade)
@@ -216,6 +217,7 @@ class OcupacaoEquipeDiretivaUnidadeForm(forms.ModelForm):
         from apps.professors.models import Professor
 
         self.instance.unidade = unidade
+        self.fields["data_fim"].help_text = "A partir desta data a ocupacao deixa de estar vigente."
         self.instance.cargo = cargo
         self.fields["professor"].queryset = Professor.objects.filter(
             Q(unidade_principal=unidade) | Q(unidades=unidade)
@@ -270,10 +272,24 @@ class AtividadeEstagioSupervisaoUnidadeForm(forms.ModelForm):
     def __init__(self, *args, unidade, **kwargs):
         super().__init__(*args, **kwargs)
         from django.db.models import Q
+        from apps.allocations.services import semestre_atual
         from apps.courses.models import CourseUnit
         from apps.professors.models import Professor
 
         self.instance.unidade = unidade
+        # O semestre letivo não é uma escolha do usuário. Em novos registros,
+        # ele acompanha automaticamente a data local (jan–jun = ano.1;
+        # jul–dez = ano.2). Em edições, preservamos o semestre histórico do
+        # registro. ``disabled`` também faz o Django ignorar eventual valor
+        # adulterado no POST e usar o valor inicial definido pelo servidor.
+        semestre_do_registro = (
+            self.instance.semestre
+            if self.instance.pk and self.instance.semestre
+            else semestre_atual()
+        )
+        self.initial["semestre"] = semestre_do_registro
+        self.fields["semestre"].disabled = True
+        self.fields["semestre"].help_text = "Definido automaticamente conforme a data atual."
         self.fields["professor"].queryset = Professor.objects.filter(
             Q(unidade_principal=unidade) | Q(unidades=unidade)
         ).distinct().order_by("rh_nome")

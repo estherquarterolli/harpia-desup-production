@@ -98,16 +98,27 @@ def delivery_window_context(request):
 
 
 def ajuda_pagina(request):
-    """Conteúdo do tutorial ("?") da página atual, somente para o perfil DESUP."""
+    """Conteúdo do tutorial ("?") adequado ao perfil e à página atual."""
     user = getattr(request, 'user', None)
     match = getattr(request, 'resolver_match', None)
     if not (user and user.is_authenticated and match):
         return {}
-    if getattr(user, 'perfil', None) != 'DESUP':
-        return {}
-    from apps.core.ajuda import AJUDA_PAGINAS, passos_resolvidos
 
-    conteudo = AJUDA_PAGINAS.get(match.view_name)
+    from apps.core.ajuda import (
+        AJUDA_PAGINAS,
+        AJUDA_PAGINAS_COORDENADOR,
+        passos_resolvidos,
+    )
+
+    perfil = getattr(user, 'perfil', None)
+    if perfil == 'DESUP':
+        paginas = AJUDA_PAGINAS
+    elif perfil == 'COORDENADOR_UNIDADE':
+        paginas = AJUDA_PAGINAS_COORDENADOR
+    else:
+        return {}
+
+    conteudo = paginas.get(match.view_name)
     if not conteudo:
         return {}
     return {'ajuda_pagina': {**conteudo, 'passos': passos_resolvidos(conteudo)}}

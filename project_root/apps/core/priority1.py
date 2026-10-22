@@ -37,10 +37,10 @@ def _carga_extracurricular_aprovada(professor_ids, semestre):
             semestre=semestre,
             status__in=PendenciaExtra.STATUS_FINALIZADOS,
         )
-        .prefetch_related("orientacoes_tcc", "atividades_extensao", "reducoes_ch")
+        .prefetch_related("orientacoes_tcc", "atividades_extensao", "reducoes_ch", "licencas")
     )
     for pendencia in pendencias:
-        for related_name in ("orientacoes_tcc", "atividades_extensao", "reducoes_ch"):
+        for related_name in ("orientacoes_tcc", "atividades_extensao", "reducoes_ch", "licencas"):
             for item in getattr(pendencia, related_name).all():
                 if item.parecer_desup == ParecerChoices.APROVADO:
                     totais[pendencia.professor_id] += _decimal(item.ch_aprovada)
@@ -163,7 +163,7 @@ def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, t
     detalhe_disciplinas.sort(key=lambda i: (i["curso"], i["nome"]))
 
     filtro_vigente = Q(data_inicio__lte=hoje) & (Q(data_fim__isnull=True) | Q(data_fim__gte=hoje))
-    ocupacoes = OcupacaoEquipeDiretiva.objects.filter(filtro_vigente)
+    ocupacoes = OcupacaoEquipeDiretiva.objects.filter(OcupacaoEquipeDiretiva.filtro_vigente(hoje))
     readaptacoes = ReadaptacaoProfessor.objects.filter(filtro_vigente)
     if unidade_id:
         ocupacoes = ocupacoes.filter(unidade_id=unidade_id)

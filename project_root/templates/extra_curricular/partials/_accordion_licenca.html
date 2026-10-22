@@ -1,0 +1,260 @@
+{# ── Accordion: Licença do Docente ── #}
+<div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-4 overflow-hidden">
+
+  {# Cabeçalho #}
+  <button type="button" onclick="toggleAccordion('lic')"
+    class="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50/60 transition-colors group">
+    <div class="flex items-center gap-3">
+      <span class="flex items-center justify-center w-9 h-9 rounded-xl bg-sky-50 border border-sky-100 text-sky-600 group-hover:bg-sky-100 transition-colors">
+        <i class="ph ph-airplane-tilt text-lg"></i>
+      </span>
+      <div>
+        <p class="text-sm font-black text-[#025c9f]">Licença do Docente</p>
+        <p class="text-[10px] text-slate-400">
+          Licenças e afastamentos que reduzem a carga horária do docente no semestre
+        </p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="text-xs font-bold text-slate-500">
+        {{ lic_items|length }} item{{ lic_items|length|pluralize }}
+      </span>
+      <i id="acc-chevron-lic" class="ph ph-caret-down text-slate-400 text-lg accordion-chevron"></i>
+    </div>
+  </button>
+
+  {# Corpo #}
+  <div id="acc-body-lic" class="accordion-body">
+    <div class="border-t border-slate-100">
+
+
+      {# Tabela de itens #}
+      {% if lic_items %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-left min-w-[860px] stack-table">
+          <thead>
+            <tr class="bg-slate-50 text-[10px] font-black text-[#025c9f] uppercase tracking-widest border-b border-slate-100">
+              <th class="px-5 py-3">Docente</th>
+              <th class="px-5 py-3 text-center">CH Aprovada (DESUP) (Aprovar)</th>
+              <th class="px-5 py-3 text-center">Horas Abatidas (Solicitado)</th>
+              <th class="px-5 py-3">Motivo da Licença</th>
+              <th class="px-5 py-3">Período</th>
+              <th class="px-5 py-3 text-center">Parecer DESUP</th>
+              <th class="px-5 py-3">Motivo do Parecer</th>
+              <th class="px-5 py-3 text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for item in lic_items %}
+            <tr class="hover:bg-slate-50/50 transition-colors">
+
+              <td class="px-5 py-3">
+                <span class="text-sm font-bold text-[#025c9f]">{{ item.pendencia.professor.nome }}</span>
+              </td>
+
+              {# CH Aprovada #}
+              <td class="px-5 py-3 text-center" data-label="CH Aprovada (DESUP) (Aprovar)">
+                {% if is_desup and object %}
+                {% for par_item, par_form in parecer_lic_forms %}
+                  {% if par_item.pk == item.pk %}
+                  <form id="form-plic-{{ item.pk }}" method="POST" action="{% url 'extra_curricular:parecer_licenca' pk=item.pendencia.pk item_pk=item.pk %}" class="m-0" onsubmit="this.querySelector('button[type=submit], input[type=submit]').disabled=true; return true;">
+                    {% csrf_token %}
+                  </form>
+                  {{ par_form.horas_aprovadas }}
+                  {% endif %}
+                {% endfor %}
+                {% else %}
+                <span class="text-sm font-bold text-slate-700">{{ item.ch_aprovada }}h</span>
+                {% endif %}
+              </td>
+
+              <td class="px-5 py-3 text-center" data-label="Horas Abatidas (Solicitado)">
+                <span class="ch-preview">{{ item.horas_reduzidas }}h</span>
+              </td>
+
+              <td class="px-5 py-3 max-w-xs" data-label="Motivo da Licença">
+                <p class="text-xs text-slate-600 leading-relaxed">{{ item.motivo_licenca }}</p>
+              </td>
+
+              <td class="px-5 py-3 text-xs text-slate-600" data-label="Período">
+                {{ item.data_inicio|date:"d/m/Y" }} – {{ item.data_fim|date:"d/m/Y"|default:"indeterminado" }}
+              </td>
+
+              <td class="px-5 py-3 text-center" data-label="Parecer DESUP">
+                {% if is_desup and object %}
+                {% for par_item, par_form in parecer_lic_forms %}
+                  {% if par_item.pk == item.pk %}
+                    {{ par_form.parecer_desup }}
+                  {% endif %}
+                {% endfor %}
+                {% else %}
+                <span class="inline-block px-2.5 py-1 rounded-full text-[10px] font-black uppercase badge-{{ item.parecer_desup }}">
+                  {{ item.get_parecer_desup_display }}
+                </span>
+                {% endif %}
+              </td>
+
+              <td class="px-5 py-3 max-w-xs" data-label="Motivo do Parecer">
+                {% if is_desup and object %}
+                  {% for par_item, par_form in parecer_lic_forms %}
+                    {% if par_item.pk == item.pk %}
+                    {{ par_form.motivo_parecer }}
+                    <button type="submit" form="form-plic-{{ item.pk }}" class="mt-1 flex items-center gap-1 text-[10px] font-black text-[#025c9f] hover:underline">
+                      <i class="ph ph-floppy-disk"></i> Salvar Parecer
+                    </button>
+                    {% endif %}
+                  {% endfor %}
+                {% else %}
+                  {% if item.motivo_parecer %}
+                  <span class="text-xs text-slate-600">{{ item.motivo_parecer }}</span>
+                  {% else %}
+                  <span class="text-xs text-slate-300 italic">—</span>
+                  {% endif %}
+                {% endif %}
+              </td>
+
+              <td class="px-5 py-3 text-right">
+                {% if item.bloqueado %}
+                <span title="Enviado em definitivo à DESUP — não pode ser alterado" class="inline-flex items-center justify-center w-8 h-8 rounded-full text-slate-400"><i class="ph ph-lock-simple text-base"></i></span>
+                {% elif is_coordenador %}
+                <form method="POST" action="{% if object %}{% url 'extra_curricular:deletar_item' pk=object.pk tipo='lic' item_pk=item.pk %}{% else %}{% url 'extra_curricular:deletar_item_lote' tipo='lic' item_pk=item.pk %}{% endif %}" class="m-0 inline" onsubmit="this.querySelector('button[type=submit], input[type=submit]').disabled=true; return true;">
+                  {% csrf_token %}
+                  {% if not object %}<input type="hidden" name="ids" value="{{ query_string }}">{% endif %}
+                  {% comment %}
+                  `type="submit"` (e não `type=button` + `form.submit()`): o
+                  `HTMLFormElement.submit()` não dispara o evento `submit`; por isso
+                  o interceptador global depende do submit nativo deste botão.
+                  {% endcomment %}
+                  <button type="submit"
+                    onclick="return confirm('Remover este item?')"
+                    class="flex items-center justify-center w-8 h-8 rounded-full text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors">
+                    <i class="ph ph-trash text-base"></i>
+                  </button>
+                </form>
+                {% endif %}
+              </td>
+
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="px-6 py-8 text-center text-slate-400">
+        <i class="ph ph-airplane-tilt text-3xl mb-2"></i>
+        <p class="text-xs font-bold">Nenhuma licença cadastrada.</p>
+      </div>
+      {% endif %}
+
+      {# Formulário de inserção (Coordenador) #}
+      {% if is_coordenador %}
+      <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/30">
+        <p class="text-[10px] font-black text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1">
+          <i class="ph ph-plus-circle"></i> Adicionar Licença
+        </p>
+        <form method="POST" action="{% if object %}{% url 'extra_curricular:salvar_licenca' pk=object.pk %}{% else %}{% url 'extra_curricular:salvar_licenca_lote' %}{% endif %}" onsubmit="this.querySelector('button[type=submit], input[type=submit]').disabled=true; return true;">
+          {% csrf_token %}
+          {% if not object %}<input type="hidden" name="ids" value="{{ query_string }}">{% endif %}
+
+          {% if object %}
+            {{ lic_form.management_form }}
+
+            <div id="lic-formset-body">
+            {% for lic_row in lic_form %}
+            {% if not lic_row.DELETE.value %}
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3 p-4 bg-white rounded-xl border border-slate-100 formset-row-lic">
+              {# Docente #}
+              <div>
+                <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Docente</label>
+                <div class="field-blocked">{{ object.professor.nome }}</div>
+              </div>
+
+              {# Horas Abatidas #}
+              <div>
+                <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">
+                  {{ lic_row.horas_reduzidas.label }}
+                </label>
+                {{ lic_row.horas_reduzidas }}
+                {% if lic_row.horas_reduzidas.errors %}
+                <p class="text-[10px] text-red-600 font-semibold mt-0.5">{{ lic_row.horas_reduzidas.errors.0 }}</p>
+                {% endif %}
+                <p class="text-[9px] text-slate-400 mt-0.5">Incrementos de 0,5h</p>
+              </div>
+
+              {# Motivo da Licença #}
+              <div class="md:col-span-2">
+                <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">
+                  {{ lic_row.motivo_licenca.label }}
+                </label>
+                {{ lic_row.motivo_licenca }}
+                {% if lic_row.motivo_licenca.errors %}
+                <p class="text-[10px] text-red-600 font-semibold mt-0.5">{{ lic_row.motivo_licenca.errors.0 }}</p>
+                {% endif %}
+              </div>
+
+              <div>
+                <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">{{ lic_row.data_inicio.label }}</label>
+                {{ lic_row.data_inicio }}
+                {% if lic_row.data_inicio.errors %}<p class="text-[10px] text-red-600 font-semibold mt-0.5">{{ lic_row.data_inicio.errors.0 }}</p>{% endif %}
+              </div>
+              <div>
+                <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">{{ lic_row.data_fim.label }}</label>
+                {{ lic_row.data_fim }}
+                {% if lic_row.data_fim.errors %}<p class="text-[10px] text-red-600 font-semibold mt-0.5">{{ lic_row.data_fim.errors.0 }}</p>{% endif %}
+              </div>
+
+              {# Delete checkbox oculto #}
+              <div class="hidden">{{ lic_row.DELETE }}</div>
+            </div>
+            {% endif %}
+            {% endfor %}
+            </div>
+          {% else %}
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3 p-4 bg-white rounded-xl border border-slate-100">
+              <div><label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Início</label><input type="date" name="data_inicio" required class="form-field"></div>
+              <div><label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Fim (opcional)</label><input type="date" name="data_fim" class="form-field"></div>
+              {# Docente #}
+              <div>
+                <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Docente</label>
+                <select name="pendencia_id" required class="form-field">
+                  <option value="">Selecione um docente...</option>
+                  {% for p in pendencias %}
+                    <option value="{{ p.id }}">{{ p.professor.nome }} ({{ p.ch_faltante|floatformat:1 }}h faltantes)</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              {# Horas Abatidas #}
+              <div>
+                <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Horas Abatidas</label>
+                <input type="number" name="horas_reduzidas" step="0.5" min="0.5" required class="form-field">
+                <p class="text-[9px] text-slate-400 mt-0.5">Incrementos de 0,5h</p>
+              </div>
+
+              {# Motivo da Licença #}
+              <div class="md:col-span-2">
+                <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Motivo da Licença</label>
+                <input type="text" name="motivo_licenca" required class="form-field">
+              </div>
+            </div>
+          {% endif %}
+
+          <div class="mt-3 flex items-center gap-3">
+            {% if object %}
+            <button type="button" onclick="addFormsetRow('lic', 'formset-row-lic')"
+              {% if window_fechada and not is_desup %}disabled{% endif %}
+              class="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 bg-white text-slate-700 text-xs font-bold rounded-lg hover:bg-slate-50 transition-colors">
+              <i class="ph ph-plus-circle"></i> Adicionar
+            </button>
+            {% endif %}
+            <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 transition-colors">
+              <i class="ph ph-floppy-disk"></i> Salvar
+            </button>
+          </div>
+        </form>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>

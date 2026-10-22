@@ -47,7 +47,7 @@ def _cargos_diretivos_vigentes():
 
     hoje = timezone.localdate()
     ocupacoes = OcupacaoEquipeDiretiva.objects.filter(
-        Q(data_fim__isnull=True) | Q(data_fim__gte=hoje), data_inicio__lte=hoje,
+        OcupacaoEquipeDiretiva.filtro_vigente(hoje),
     ).select_related('cargo', 'unidade')
     cargos = {}
     for o in ocupacoes:

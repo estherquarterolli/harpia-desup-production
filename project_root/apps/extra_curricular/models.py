@@ -121,13 +121,12 @@ class PendenciaExtra(models.Model):
         Itens INDEFERIDOS, que também mantêm `horas_aprovadas` preenchido, ficam
         de fora pelo mesmo motivo.
 
-        CORR-023: `PARCIAL` conta igual a `APROVADO` — o que foi deferido vale, o
-        indeferido só não entra na soma. O gate pelo status do cabeçalho continua
-        existindo porque é ele que faz a CH parar de contar depois de uma
-        REABERTURA (o status volta a ENVIADO enquanto os itens seguem marcados
-        como aprovados).
+        Cada item passa a contar assim que recebe parecer APROVADO, mesmo que
+        existam outros itens ainda em análise. Na reabertura, os pareceres dos
+        itens voltam a PENDENTE e, por isso, deixam naturalmente de entrar na
+        soma.
         """
-        if self.status not in self.STATUS_FINALIZADOS:
+        if self.status == self.StatusChoices.RASCUNHO:
             return 0.0
 
         def _aprovados(queryset):
@@ -140,7 +139,8 @@ class PendenciaExtra(models.Model):
         tcc = _aprovados(self.orientacoes_tcc.all())
         ext = _aprovados(self.atividades_extensao.all())
         red = _aprovados(self.reducoes_ch.all())
-        return tcc + ext + red
+        lic = _aprovados(self.licencas.all())
+        return tcc + ext + red + lic
 
     @property
     def ch_faltante(self):
@@ -159,6 +159,7 @@ class PendenciaExtra(models.Model):
         self.orientacoes_tcc.update(bloqueado=True)
         self.atividades_extensao.update(bloqueado=True)
         self.reducoes_ch.update(bloqueado=True)
+        self.licencas.update(bloqueado=True)
 
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -426,3 +427,81 @@ class ReducaoCargaHoraria(models.Model):
 
     def __str__(self):
         return f"Redução — {self.pendencia.professor.nome} ({self.horas_reduzidas}h)"
+
+
+# ────────────────────────────────────────────────────────────────────────────────
+# LicencaDocente
+# ────────────────────────────────────────────────────────────────────────────────
+class LicencaDocente(models.Model):
+    """
+    Justificativa por licença/afastamento do docente no semestre.
+    Funciona como a redução de CH: a unidade informa as horas semanais abatidas
+    e a DESUP aprova (ou ajusta) as horas.
+    """
+    pendencia = models.ForeignKey(
+        PendenciaExtra,
+        on_delete=models.CASCADE,
+        related_name="licencas",
+        verbose_name="Pendência",
+    )
+    motivo_licenca = models.TextField(
+        verbose_name="Tipo / motivo da licença",
+        help_text="Ex.: licença-saúde, licença-maternidade, capacitação, afastamento para pós-graduação.",
+    )
+    data_inicio = models.DateField(verbose_name="Início da licença")
+    data_fim = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fim da licença",
+        help_text="Deixe em branco se a licença for por prazo indeterminado.",
+    )
+    horas_reduzidas = models.DecimalField(
+        max_digits=5,
+        decimal_places=1,
+        verbose_name="Horas semanais abatidas",
+    )
+    horas_aprovadas = models.DecimalField(
+        max_digits=5,
+        decimal_places=1,
+        null=True,
+        blank=True,
+        verbose_name="Horas Aprovadas (DESUP)",
+        help_text="Valor definido pela DESUP. Se vazio, usa o valor solicitado.",
+    )
+    parecer_desup = models.CharField(
+        max_length=20,
+        choices=ParecerChoices.choices,
+        default=ParecerChoices.PENDENTE,
+        verbose_name="Parecer DESUP",
+    )
+    motivo_parecer = models.TextField(blank=True, verbose_name="Motivo do Parecer")
+    bloqueado = models.BooleanField(
+        default=False,
+        verbose_name="Bloqueado (enviado à DESUP)",
+        help_text="Se True, a unidade não pode mais editar/excluir este item (já enviado em definitivo).",
+    )
+    data_atualizacao = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table            = "harpiadb_extracurricular_licenca"
+        verbose_name        = "Licença"
+        verbose_name_plural = "Licenças"
+
+    @property
+    def ch_aprovada(self):
+        """Horas aprovadas pela DESUP, ou as solicitadas se não definido (sempre float)."""
+        if self.horas_aprovadas is not None:
+            return float(self.horas_aprovadas)
+        return float(self.horas_reduzidas or 0)
+
+    def clean(self):
+        if self.data_inicio and self.data_fim and self.data_fim < self.data_inicio:
+            raise ValidationError({"data_fim": "O fim da licença não pode ser anterior ao início."})
+
+    def save(self, *args, **kwargs):
+        if self.horas_aprovadas is None and self.horas_reduzidas:
+            self.horas_aprovadas = self.horas_reduzidas
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Licença — {self.pendencia.professor.nome} ({self.horas_reduzidas}h)"

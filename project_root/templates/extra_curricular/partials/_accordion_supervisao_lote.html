@@ -1,0 +1,135 @@
+{# ── Accordion: Supervisão de Estágio ── #}
+<div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-4 overflow-hidden">
+
+  <button type="button" onclick="toggleAccordion('sup')"
+    class="group flex w-full items-start justify-between gap-3 px-4 py-4 text-left transition-colors hover:bg-slate-50/60 sm:items-center sm:px-6">
+    <div class="flex min-w-0 items-start gap-3 sm:items-center">
+      <span class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-600 transition-colors group-hover:bg-emerald-100">
+        <i class="ph ph-student text-lg"></i>
+      </span>
+      <div class="min-w-0">
+        <p class="text-sm font-black text-[#025c9f]">Supervisão de Estágio</p>
+        <p class="text-[10px] text-slate-400">
+          Coordenação, supervisão e orientação de estágio no semestre {{ semestre }}
+        </p>
+      </div>
+    </div>
+    <div class="flex flex-shrink-0 items-center gap-2 sm:gap-3">
+      <span class="text-xs font-bold text-slate-500">
+        {{ sup_items|length }} item{{ sup_items|length|pluralize }}
+      </span>
+      <i id="acc-chevron-sup" class="ph ph-caret-down text-slate-400 text-lg accordion-chevron"></i>
+    </div>
+  </button>
+
+  <div id="acc-body-sup" class="accordion-body">
+    <div class="border-t border-slate-100">
+
+      <div class="flex items-start gap-2 border-b border-emerald-100/60 bg-emerald-50/40 px-4 py-3 text-xs text-emerald-700 sm:items-center sm:px-6">
+        <i class="ph ph-lock-key flex-shrink-0"></i>
+        <span>A redução semanal de carga horária é atribuída exclusivamente pela DESUP.</span>
+      </div>
+
+      {% if sup_items %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-left min-w-[760px] stack-table">
+          <thead>
+            <tr class="bg-slate-50 text-[10px] font-black text-[#025c9f] uppercase tracking-widest border-b border-slate-100">
+              <th class="px-5 py-3">Docente</th>
+              <th class="px-5 py-3">Atividade</th>
+              <th class="px-5 py-3 text-center">Estudantes</th>
+              <th class="px-5 py-3 text-center">Dedicação (h/sem)</th>
+              <th class="px-5 py-3 text-center">Redução DESUP</th>
+              <th class="px-5 py-3">Vigência</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for item in sup_items %}
+            <tr class="hover:bg-slate-50/50 transition-colors">
+              <td class="px-5 py-3" data-label="Docente"><span class="text-sm font-bold text-[#025c9f]">{{ item.professor.rh_nome }}</span></td>
+              <td class="px-5 py-3 text-xs text-slate-600" data-label="Atividade">
+                {{ item.get_tipo_display }}{% if item.curso %} · {{ item.curso.sigla }}{% endif %}
+              </td>
+              <td class="px-5 py-3 text-center text-sm font-bold text-slate-700" data-label="Estudantes">{{ item.num_estudantes }}</td>
+              <td class="px-5 py-3 text-center text-sm font-bold text-slate-700" data-label="Dedicação">{{ item.carga_horaria_semanal|floatformat:"-2" }}h</td>
+              <td class="px-5 py-3 text-center text-sm font-bold text-emerald-700" data-label="Redução DESUP">{{ item.carga_reducao_horas|floatformat:"-2" }}h</td>
+              <td class="px-5 py-3 text-xs text-slate-600" data-label="Vigência">
+                {{ item.data_inicio|date:"d/m/Y" }} – {{ item.data_fim|date:"d/m/Y"|default:"atual" }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="px-4 py-2 text-[10px] text-slate-400 sm:px-6">
+        Para editar ou encerrar uma atividade, use a aba <a href="{% url 'extra_curricular:supervisao_estagio' %}" class="font-bold text-[#025c9f] hover:underline">Supervisão de Estágio</a>.
+      </p>
+      {% else %}
+      <div class="px-6 py-8 text-center text-slate-400">
+        <i class="ph ph-student text-3xl mb-2"></i>
+        <p class="text-xs font-bold">Nenhuma atividade de estágio/supervisão para estes docentes em {{ semestre }}.</p>
+      </div>
+      {% endif %}
+
+      {% if is_coordenador %}
+      <div class="border-t border-slate-100 bg-slate-50/30 px-4 py-4 sm:px-6">
+        <p class="text-[10px] font-black text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1">
+          <i class="ph ph-plus-circle"></i> Registrar estágio / supervisão
+        </p>
+        <form method="POST" action="{% url 'extra_curricular:atividade_estagio_create' %}" onsubmit="this.querySelector('button[type=submit], input[type=submit]').disabled=true; return true;">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{% url 'extra_curricular:pendencia_lote' %}?ids={{ query_string }}&amp;open=sup">
+
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Docente</label>
+              <select name="professor" required class="form-field w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f]">
+                <option value="">Selecione...</option>
+                {% for prof in professores %}<option value="{{ prof.pk }}">{{ prof.rh_nome }}</option>{% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Tipo de atividade</label>
+              <select name="tipo" required class="form-field w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f]">
+                {% for valor, rotulo in tipos_estagio %}<option value="{{ valor }}" {% if valor == "SUPERVISAO_ESTAGIO" %}selected{% endif %}>{{ rotulo }}</option>{% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Curso</label>
+              <select name="curso" class="form-field w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f]">
+                <option value="">Todos / não vinculado</option>
+                {% for cu in cursos_unidade %}<option value="{{ cu.pk }}">{{ cu.curso.nome }}</option>{% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Nº de estudantes</label>
+              <input type="number" name="num_estudantes" min="1" max="200" value="1" required class="form-field w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Dedicação (h/semana)</label>
+              <input type="number" name="carga_horaria_semanal" min="0" max="40" step="0.5" value="0" required class="form-field w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Início</label>
+                <input type="date" name="data_inicio" value="{{ hoje|date:'Y-m-d' }}" required class="form-field w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+              </div>
+              <div>
+                <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Fim (opcional)</label>
+                <input type="date" name="data_fim" class="form-field w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <button type="submit" class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#025c9f] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-[#153e70] sm:w-auto">
+              <i class="ph ph-plus-circle"></i> Registrar atividade
+            </button>
+          </div>
+        </form>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>

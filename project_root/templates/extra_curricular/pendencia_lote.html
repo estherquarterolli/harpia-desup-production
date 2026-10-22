@@ -178,7 +178,7 @@
   <div class="mb-4 rounded-xl border border-blue-100 bg-blue-50 p-4 text-xs text-blue-700 flex items-center gap-3">
     <i class="ph ph-info text-xl flex-shrink-0"></i>
     <span>
-      <strong>Processo SEI (Opcional):</strong> Caso utilize processo SEI, informe o identificador para acompanhamento das justificativas previstas abaixo (TCC, Extensão e Redução de CH).
+      <strong>Processo SEI (Opcional):</strong> Caso utilize processo SEI, informe o identificador para acompanhamento das justificativas previstas abaixo (TCC, Extensão, Redução de CH, Licença e Supervisão de Estágio).
     </span>
   </div>
 
@@ -190,6 +190,12 @@
 
 
   {% include 'extra_curricular/partials/_accordion_reducao_lote.html' %}
+
+
+  {% include 'extra_curricular/partials/_accordion_licenca_lote.html' %}
+
+
+  {% include 'extra_curricular/partials/_accordion_supervisao_lote.html' %}
 
 </div>
 {% endblock %}
