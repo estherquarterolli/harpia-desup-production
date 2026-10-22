@@ -161,6 +161,7 @@ class OcupacaoEquipeDiretivaForm(forms.ModelForm):
         # Atribuídos antes do full_clean para que o clean() do modelo valide
         # vínculo do servidor, curso da unidade e conflitos de vigência.
         self.instance.unidade = unidade
+        self.fields["data_fim"].help_text = "A partir desta data a ocupacao deixa de estar vigente."
         self.instance.cargo = cargo
         self.fields["professor"].queryset = Professor.objects.filter(
             Q(unidade_principal=unidade) | Q(unidades=unidade)
@@ -216,6 +217,7 @@ class OcupacaoEquipeDiretivaUnidadeForm(forms.ModelForm):
         from apps.professors.models import Professor
 
         self.instance.unidade = unidade
+        self.fields["data_fim"].help_text = "A partir desta data a ocupacao deixa de estar vigente."
         self.instance.cargo = cargo
         self.fields["professor"].queryset = Professor.objects.filter(
             Q(unidade_principal=unidade) | Q(unidades=unidade)

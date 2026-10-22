@@ -93,14 +93,14 @@
     <div class="flex flex-col gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
       <div>
         <h2 id="sec-historico-titulo" class="text-base font-black text-slate-900 sm:text-lg">Histórico de ocupações da unidade</h2>
-        <p class="text-xs text-slate-500">Consulte ocupações vigentes e encerradas da equipe diretiva de {{ unidade.sigla }}.</p>
+        <p class="text-xs text-slate-500">Consulte ocupações encerradas da equipe diretiva de {{ unidade.sigla }}.</p>
       </div>
 
       <form method="get"
             action="{% url 'core:equipe_diretiva_unidade' %}"
             hx-get="{% url 'core:equipe_diretiva_unidade' %}"
             hx-target="#historico-equipe-unidade-container"
-            hx-trigger="submit, change from:#filtro-situacao-historico, keyup changed delay:300ms from:#filtro-busca-historico"
+            hx-trigger="submit, keyup changed delay:300ms from:#filtro-busca-historico"
             class="flex flex-col gap-2 sm:flex-row sm:items-center">
         <input type="hidden" name="partial" value="historico">
         <div>
@@ -111,16 +111,6 @@
                  value="{{ filtro_q }}"
                  placeholder="Servidor, cargo ou curso..."
                  class="min-h-10 w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-[#025c9f] focus:ring-2 focus:ring-blue-100 sm:w-52">
-        </div>
-        <div>
-          <label for="filtro-situacao-historico" class="sr-only">Filtrar histórico por situação</label>
-          <select id="filtro-situacao-historico"
-                  name="situacao"
-                  class="min-h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-[#025c9f] sm:w-auto">
-            <option value="" {% if not filtro_situacao %}selected{% endif %}>Todas as situações</option>
-            <option value="vigente" {% if filtro_situacao == 'vigente' %}selected{% endif %}>Somente vigentes</option>
-            <option value="encerrada" {% if filtro_situacao == 'encerrada' %}selected{% endif %}>Somente encerradas</option>
-          </select>
         </div>
         <noscript>
           <button type="submit" class="rounded-lg bg-[#025c9f] px-3 py-1.5 text-xs font-bold text-white">Filtrar</button>
@@ -193,8 +183,18 @@
           <form method="post" action="{% url 'core:ocupacao_diretiva_unidade_encerrar' ocupacao.pk %}" class="m-0">
             {% csrf_token %}
             <button type="submit"
-                    class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50/70 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100">
+                    class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100"
+                    title="Definir fim da vigência como hoje">
               <i class="ph ph-stop-circle" aria-hidden="true"></i>Encerrar ocupação
+            </button>
+          </form>
+          <form method="post" action="{% url 'core:ocupacao_diretiva_unidade_remover' ocupacao.pk %}" class="m-0">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ retorno }}">
+            <button type="submit"
+                    class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50/70 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100"
+                    title="Excluir cadastro indevido; não ficará no histórico funcional">
+              <i class="ph ph-user-minus" aria-hidden="true"></i>Excluir cadastro indevido
             </button>
           </form>
         </div>

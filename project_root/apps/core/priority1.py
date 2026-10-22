@@ -163,7 +163,7 @@ def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, t
     detalhe_disciplinas.sort(key=lambda i: (i["curso"], i["nome"]))
 
     filtro_vigente = Q(data_inicio__lte=hoje) & (Q(data_fim__isnull=True) | Q(data_fim__gte=hoje))
-    ocupacoes = OcupacaoEquipeDiretiva.objects.filter(filtro_vigente)
+    ocupacoes = OcupacaoEquipeDiretiva.objects.filter(OcupacaoEquipeDiretiva.filtro_vigente(hoje))
     readaptacoes = ReadaptacaoProfessor.objects.filter(filtro_vigente)
     if unidade_id:
         ocupacoes = ocupacoes.filter(unidade_id=unidade_id)
