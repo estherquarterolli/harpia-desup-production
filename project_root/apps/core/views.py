@@ -42,6 +42,19 @@ def _contexto_atalhos_dashboard(user):
     }
 
 
+def _resposta_atalhos(request):
+    """Redirect normal; em requisição HTMX devolve só o bloco de atalhos atualizado."""
+    if request.headers.get('HX-Request'):
+        # O resultado já aparece no próprio bloco; evita toast atrasado na próxima página.
+        list(messages.get_messages(request))
+        return render(
+            request,
+            'dashboard/partials/_atalhos_bloco.html',
+            _contexto_atalhos_dashboard(request.user),
+        )
+    return redirect(_dashboard_atalhos_url_name(request.user))
+
+
 def _dashboard_atalhos_url_name(user):
     """Dashboard de retorno após adicionar/remover um atalho."""
     eh_desup = (
@@ -182,11 +195,11 @@ class AtalhoAddView(LoginRequiredMixin, PerfilRequiredMixin, View):
         validas = [c for c in chaves if c in catalogo]
         if not validas:
             messages.error(request, 'Selecione ao menos um atalho válido.')
-            return redirect(_dashboard_atalhos_url_name(request.user))
+            return _resposta_atalhos(request)
         for chave in validas:
             AtalhoDashboard.objects.get_or_create(user=request.user, chave=chave)
         messages.success(request, 'Atalho(s) salvo(s).')
-        return redirect(_dashboard_atalhos_url_name(request.user))
+        return _resposta_atalhos(request)
 
 
 class AtalhoRemoveView(LoginRequiredMixin, PerfilRequiredMixin, View):
@@ -208,7 +221,7 @@ class AtalhoRemoveView(LoginRequiredMixin, PerfilRequiredMixin, View):
             messages.success(request, 'Atalho(s) removido(s).')
         else:
             messages.info(request, 'Este atalho já havia sido removido.')
-        return redirect(_dashboard_atalhos_url_name(request.user))
+        return _resposta_atalhos(request)
 
 
 class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):

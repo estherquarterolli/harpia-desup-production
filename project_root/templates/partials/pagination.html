@@ -1,5 +1,7 @@
 {% if is_paginated %}
-<nav class="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm" aria-label="Carregamento da lista">
+<nav class="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm" aria-label="Carregamento da lista"
+     hx-boost="true" hx-target="main.main-content" hx-select="main.main-content"
+     hx-swap="outerHTML show:window:top" hx-push-url="true">
   <p class="text-slate-500">
     Exibindo {{ page_obj.start_index }}–{{ page_obj.end_index }} de {{ paginator.count }}
   </p>
