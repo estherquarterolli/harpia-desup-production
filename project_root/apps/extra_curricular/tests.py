@@ -1378,3 +1378,49 @@ class ListagemPendenciasSemNPlusUmTests(TestCase):
         ids = {d["professor"].pk for d in resp.context["pendencias_data"]}
         self.assertIn(meu.pk, ids)
         self.assertNotIn(alheio.pk, ids)
+
+
+class DashboardOcultaRascunhoTests(TestCase):
+    """Rascunho ainda nao foi enviado a DESUP: nao entra no detalhamento do dashboard."""
+
+    def setUp(self):
+        self.unidade = Unidade.objects.create(nome="Unidade Dashboard", sigla="UDB")
+        self.contrato = ContractType.objects.create(
+            nome="Ensino Superior DB", max_class_hours=20, max_classes=10,
+        )
+        self.professor = Professor.objects.create(
+            rh_nome="Docente Dashboard",
+            rh_email="dashboard.rascunho@teste.com",
+            id_funcional="88888",
+            rh_matricula="M88888",
+            unidade_principal=self.unidade,
+            tipo_contrato=self.contrato,
+        )
+
+    def _detalhe(self):
+        from apps.professors.views import detalhar_alocacoes_professores
+        detalhar_alocacoes_professores([self.professor])
+        return self.professor.detalhe_alocacao
+
+    def test_rascunho_nao_aparece_no_dashboard(self):
+        pendencia = PendenciaExtra.objects.create(
+            professor=self.professor,
+            unidade=self.unidade,
+            semestre=semestre_atual(),
+            status=PendenciaExtra.StatusChoices.RASCUNHO,
+        )
+        OrientacaoTCC.objects.create(pendencia=pendencia, num_orientandos=4)
+        self.assertEqual(self._detalhe(), [])
+
+    def test_pendencia_enviada_aparece_no_dashboard(self):
+        pendencia = PendenciaExtra.objects.create(
+            professor=self.professor,
+            unidade=self.unidade,
+            semestre=semestre_atual(),
+            sei_numero="SEI-123456/123456/2026",
+            status=PendenciaExtra.StatusChoices.ENVIADO,
+        )
+        OrientacaoTCC.objects.create(pendencia=pendencia, num_orientandos=4)
+        detalhe = self._detalhe()
+        self.assertEqual(len(detalhe), 1)
+        self.assertNotEqual(detalhe[0]["situacao"], "Rascunho")
