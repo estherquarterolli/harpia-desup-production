@@ -280,9 +280,15 @@ def detalhar_alocacoes_professores(professores, user=None):
         })
 
     # Atividades extracurriculares do semestre (justificativas e estágio).
+    # Rascunho é estado anterior ao trâmite: a unidade ainda não enviou nada à
+    # DESUP (nem informou o SEI). Ele continua acessível na aba "Rascunhos" do
+    # módulo extracurricular, mas não entra no detalhamento do dashboard - mesma
+    # regra das abas de justificativas enviadas e da listagem da DESUP.
     semestre = semestre_atual()
     pendencias = PendenciaExtra.objects.filter(
         professor_id__in=ids, semestre=semestre,
+    ).exclude(
+        status=PendenciaExtra.StatusChoices.RASCUNHO,
     ).select_related('unidade').prefetch_related(
         'orientacoes_tcc', 'atividades_extensao', 'reducoes_ch', 'licencas',
     )
@@ -291,7 +297,6 @@ def detalhar_alocacoes_professores(professores, user=None):
         ParecerChoices.INDEFERIDO: 'vermelho',
     }
     for pend in pendencias:
-        rascunho = pend.status == PendenciaExtra.StatusChoices.RASCUNHO
         itens = (
             [(f'Orientação de TCC ({i.num_orientandos} orientando{"s" if i.num_orientandos != 1 else ""})', i)
              for i in pend.orientacoes_tcc.all()]
@@ -307,8 +312,8 @@ def detalhar_alocacoes_professores(professores, user=None):
                 'turma': 'Diversas',
                 'manha': None, 'tarde': None, 'noite': None,
                 'ch': round(float(item.ch_aprovada), 1),
-                'situacao': 'Rascunho' if rascunho else item.get_parecer_desup_display(),
-                'tom': 'cinza' if rascunho else tom_parecer.get(item.parecer_desup, 'ambar'),
+                'situacao': item.get_parecer_desup_display(),
+                'tom': tom_parecer.get(item.parecer_desup, 'ambar'),
             })
 
     from apps.core.models import AtividadeEstagioSupervisao
