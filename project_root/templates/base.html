@@ -455,11 +455,12 @@
         }
         
         // Inicialização de recursos opcionais da página
-        document.addEventListener("DOMContentLoaded", function() {
+        // Também é reexecutado após trocas parciais do HTMX (paginação, atalhos).
+        function initRecursosDaPagina() {
             // Date picker pt-BR: exibe dd/mm/aaaa e envia ISO (Y-m-d) num input oculto,
             // garantindo o formato independentemente do idioma do navegador.
             if (window.flatpickr) {
-                document.querySelectorAll('.js-date-ptbr').forEach(function (el) {
+                document.querySelectorAll('.js-date-ptbr:not(.flatpickr-input)').forEach(function (el) {
                     var opts = {
                         altInput: true,
                         altFormat: 'd/m/Y',
@@ -474,7 +475,9 @@
                     flatpickr(el, opts);
                 });
             }
-        });
+        }
+        document.addEventListener("DOMContentLoaded", initRecursosDaPagina);
+        document.addEventListener("htmx:afterSettle", initRecursosDaPagina);
 
         // HTMX: Adicionar CSRF token automaticamente em todas as requisições POST
         document.body.addEventListener('htmx:configRequest', function(event) {
