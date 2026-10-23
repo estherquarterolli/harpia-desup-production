@@ -770,6 +770,21 @@ class AtalhoDashboardTests(TestCase):
         self.assertNotIn('matrix_list', disponiveis)
         self.assertIn('professor_list', disponiveis)
 
+    def test_dashboard_desup_remove_atalho_diretamente_sem_modal(self):
+        from apps.core.models import AtalhoDashboard
+        atalho = AtalhoDashboard.objects.create(user=self.desup, chave='matrix_list')
+        self.client.force_login(self.desup)
+
+        resp = self.client.get(self.reverse('dashboard_desup'))
+
+        self.assertContains(
+            resp,
+            f'action="{self.reverse("core:atalho_remove", kwargs={"pk": atalho.pk})}"',
+        )
+        self.assertContains(resp, 'button type="submit" title="Remover atalho"')
+        self.assertNotContains(resp, 'modalRemoveAtalho')
+        self.assertNotContains(resp, 'abrirRemoverAtalho')
+
     def test_dashboard_unidade_traz_atalhos_filtrados_por_permissao(self):
         from apps.core.models import AtalhoDashboard
         AtalhoDashboard.objects.create(user=self.coord, chave='matrix_list')
@@ -790,6 +805,21 @@ class AtalhoDashboardTests(TestCase):
         self.assertIn('dashboard_unidade', disponiveis)
         self.assertNotIn('janela_list', disponiveis)
         self.assertNotIn('component_create', disponiveis)
+
+    def test_dashboard_unidade_remove_atalho_diretamente_sem_modal(self):
+        from apps.core.models import AtalhoDashboard
+        atalho = AtalhoDashboard.objects.create(user=self.coord, chave='matrix_list')
+        self.client.force_login(self.coord)
+
+        resp = self.client.get(self.reverse('dashboard_unidade'))
+
+        self.assertContains(
+            resp,
+            f'action="{self.reverse("core:atalho_remove", kwargs={"pk": atalho.pk})}"',
+        )
+        self.assertContains(resp, 'button type="submit" title="Remover atalho"')
+        self.assertNotContains(resp, 'modalRemoveAtalho')
+        self.assertNotContains(resp, 'abrirRemoverAtalho')
 
 
 # ══════════════════════════════════════════════════════════════════════════════

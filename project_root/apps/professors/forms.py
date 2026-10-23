@@ -86,6 +86,11 @@ class ProfessorForm(forms.ModelForm):
             unidade_ids = unidades_iniciais
         elif 'unidades' in self.data:
             unidade_ids = [int(pk) for pk in self.data.getlist('unidades') if str(pk).isdigit()]
+        elif self.initial.get('unidades'):
+            valores_iniciais = self.initial['unidades']
+            if not isinstance(valores_iniciais, (list, tuple)):
+                valores_iniciais = [valores_iniciais]
+            unidade_ids = [int(pk) for pk in valores_iniciais if str(pk).isdigit()]
         else:
             unidade_ids = unidades_iniciais
 

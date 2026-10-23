@@ -21,8 +21,18 @@
       </h2>
     </div>
 
-    <form method="post" class="p-6 space-y-6">
+    <form method="post"{% if solicitacao_origem %} action="{% url 'professors:professor_create' %}?solicitacao={{ solicitacao_origem.pk }}"{% endif %} class="p-6 space-y-6">
       {% csrf_token %}
+
+      {% if solicitacao_origem %}
+      <div class="rounded-xl border border-blue-100 bg-blue-50/70 p-4 text-sm text-slate-700">
+        <p class="font-black text-[#025c9f]">Dados preenchidos a partir da solicitação da {{ solicitacao_origem.unidade_solicitante.sigla }}</p>
+        <p class="mt-1 text-xs text-slate-500">Revise os dados antes de salvar. A unidade solicitante já está selecionada.</p>
+        {% if solicitacao_origem.observacao_cadastro %}
+        <p class="mt-3"><strong>Observações do solicitante:</strong> {{ solicitacao_origem.observacao_cadastro }}</p>
+        {% endif %}
+      </div>
+      {% endif %}
 
       {% if form.non_field_errors %}
       <div class="p-3 bg-red-50 border border-red-100 text-red-700 rounded-lg text-sm">{{ form.non_field_errors }}</div>

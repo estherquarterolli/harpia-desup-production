@@ -1,7 +1,7 @@
 import logging
 from decimal import Decimal
 from django import forms
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Q
 from django.db.models import Exists, OuterRef
 from django.db.models.deletion import ProtectedError
 from django.http import Http404
@@ -40,6 +40,19 @@ def _contexto_atalhos_dashboard(user):
             if chave not in usadas
         ],
     }
+
+
+def _resposta_atalhos(request):
+    """Redirect normal; em requisição HTMX devolve só o bloco de atalhos atualizado."""
+    if request.headers.get('HX-Request'):
+        # O resultado já aparece no próprio bloco; evita toast atrasado na próxima página.
+        list(messages.get_messages(request))
+        return render(
+            request,
+            'dashboard/partials/_atalhos_bloco.html',
+            _contexto_atalhos_dashboard(request.user),
+        )
+    return redirect(_dashboard_atalhos_url_name(request.user))
 
 
 def _dashboard_atalhos_url_name(user):
@@ -90,8 +103,11 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         from apps.professors.models import Professor
-        from apps.professors.views import _bulk_ch_alocada, _bulk_ch_justificada
-        from apps.allocations.services import alocacoes_vigentes
+        from apps.professors.views import (
+            _bulk_ch_alocada,
+            _bulk_ch_justificada,
+            enriquecer_professores_com_carga,
+        )
         from apps.core.models import Unidade
         from apps.core.priority1 import obter_resumo_prioridade1
 
@@ -141,18 +157,10 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
             ctx['conformidade'] = '0%'
 
         # Professores para a tabela de consulta
-        componentes_vigentes = alocacoes_vigentes().select_related(
-            'componente_matriz', 'componente_matriz__componente_curricular'
-        )
         professores_qs = Professor.objects.select_related(
             'tipo_contrato', 'unidade_principal'
         ).prefetch_related(
-            'unidades',
-            Prefetch(
-                'alocacoes_turma_docente',
-                queryset=componentes_vigentes,
-                to_attr='alocacoes_vigentes',
-            ),
+            'unidades', 'ocupacoes_diretivas', 'readaptacoes',
         ).order_by('rh_nome')
         ctx['unidades'] = unidades_ativas
         ctx['resumo_p1'] = obter_resumo_prioridade1()
@@ -160,18 +168,14 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
         # Estrutura esperada pelo partial _professor_table.html
         from django.core.paginator import Paginator
         page_obj = Paginator(professores_qs, 20).get_page(1)
+        professores_pagina = enriquecer_professores_com_carga(page_obj.object_list)['professores']
         ctx['alocacoes_dashboard'] = [
             {
                 'prof': prof,
                 'units': prof.unidades_exibicao,
-                'subjects': sorted({
-                    linha.componente_matriz.nome_disciplina
-                    for linha in prof.alocacoes_vigentes
-                    if linha.componente_matriz.nome_disciplina
-                }),
                 'ch': prof.carga_total_efetiva,
             }
-            for prof in page_obj.object_list
+            for prof in professores_pagina
         ]
         ctx['dashboard_page_obj'] = page_obj
 
@@ -191,11 +195,11 @@ class AtalhoAddView(LoginRequiredMixin, PerfilRequiredMixin, View):
         validas = [c for c in chaves if c in catalogo]
         if not validas:
             messages.error(request, 'Selecione ao menos um atalho válido.')
-            return redirect(_dashboard_atalhos_url_name(request.user))
+            return _resposta_atalhos(request)
         for chave in validas:
             AtalhoDashboard.objects.get_or_create(user=request.user, chave=chave)
         messages.success(request, 'Atalho(s) salvo(s).')
-        return redirect(_dashboard_atalhos_url_name(request.user))
+        return _resposta_atalhos(request)
 
 
 class AtalhoRemoveView(LoginRequiredMixin, PerfilRequiredMixin, View):
@@ -217,7 +221,7 @@ class AtalhoRemoveView(LoginRequiredMixin, PerfilRequiredMixin, View):
             messages.success(request, 'Atalho(s) removido(s).')
         else:
             messages.info(request, 'Este atalho já havia sido removido.')
-        return redirect(_dashboard_atalhos_url_name(request.user))
+        return _resposta_atalhos(request)
 
 
 class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
@@ -234,27 +238,22 @@ class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, T
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         from apps.professors.models import Professor
-        from apps.allocations.services import alocacoes_vigentes
-
-        componentes_vigentes = alocacoes_vigentes().select_related(
-            'componente_matriz', 'componente_matriz__componente_curricular'
-        )
+        from apps.professors.views import enriquecer_professores_com_carga
 
         qs = Professor.objects.select_related(
             'tipo_contrato', 'unidade_principal'
         ).prefetch_related(
-            'unidades',
-            Prefetch(
-                'alocacoes_turma_docente',
-                queryset=componentes_vigentes,
-                to_attr='alocacoes_vigentes',
-            ),
+            'unidades', 'ocupacoes_diretivas', 'readaptacoes',
         ).order_by('rh_nome')
 
         q = self.request.GET.get('q', '')
         if q:
             from apps.core.busca import filtrar_contem
-            qs = filtrar_contem(qs, q, ['rh_nome', 'desup_nome'])
+            qs = filtrar_contem(
+                qs,
+                q,
+                ['rh_nome', 'desup_nome', 'id_funcional', 'rh_matricula', 'area_atuacao'],
+            )
         unidade_id = self.request.GET.get('unidade_id')
         if unidade_id:
             qs = qs.filter(
@@ -266,18 +265,14 @@ class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, T
 
         from django.core.paginator import Paginator
         page_obj = Paginator(qs, 20).get_page(self.request.GET.get('page'))
+        professores_pagina = enriquecer_professores_com_carga(page_obj.object_list)['professores']
         ctx['alocacoes_dashboard'] = [
             {
                 'prof': prof,
                 'units': prof.unidades_exibicao,
-                'subjects': sorted({
-                    linha.componente_matriz.nome_disciplina
-                    for linha in prof.alocacoes_vigentes
-                    if linha.componente_matriz.nome_disciplina
-                }),
                 'ch': prof.carga_total_efetiva,
             }
-            for prof in page_obj.object_list
+            for prof in professores_pagina
         ]
         ctx['dashboard_page_obj'] = page_obj
         return ctx
@@ -1008,10 +1003,21 @@ class TipoCargoDiretivoUpdateView(DesupPrioridade1Mixin, RetornoOrigemMixin, Upd
         return ctx
 
     def form_valid(self, form):
+        from django.utils import timezone
+        from .models import OcupacaoEquipeDiretiva
         from .services import registrar_evento_prioridade1
         response = super().form_valid(form)
+        if 'carga_reducao_horas' in form.changed_data:
+            # Ocupantes vigentes acompanham a nova redução do cargo; o histórico não muda.
+            hoje = timezone.localdate()
+            OcupacaoEquipeDiretiva.objects.filter(
+                cargo=self.object, data_inicio__lte=hoje,
+            ).filter(Q(data_fim__isnull=True) | Q(data_fim__gte=hoje)).update(
+                carga_reducao_horas=self.object.carga_reducao_horas,
+            )
         registrar_evento_prioridade1(
-            self.request, 'CARGO_DIRETIVO_ATUALIZADO', f'Cargo {self.object.pk}: {self.object.nome}.',
+            self.request, 'CARGO_DIRETIVO_ATUALIZADO',
+            f'Cargo {self.object.pk}: {self.object.nome}; redução semanal {self.object.carga_reducao_horas} h.',
         )
         messages.success(self.request, 'Tipo de cargo atualizado com sucesso.')
         return response
@@ -1089,6 +1095,8 @@ class OcupacaoEquipeDiretivaCreateView(DesupPrioridade1Mixin, CreateView):
     def form_valid(self, form):
         from .services import registrar_evento_prioridade1
         form.instance.criado_por = self.request.user
+        # A redução pertence ao cargo (definida pela DESUP no cadastro dele).
+        form.instance.carga_reducao_horas = self.cargo.carga_reducao_horas
         response = super().form_valid(form)
         registrar_evento_prioridade1(
             self.request,
@@ -1232,7 +1240,7 @@ class AlertasCargaDesupView(DesupPrioridade1Mixin, TemplateView):
             'resumo_p1': resumo,
             # Quantos pontos de atenção têm ocorrências (exibido no resumo recolhido).
             'pontos_atencao': sum(1 for chave in (
-                'diretivos_em_sala', 'readaptados_em_sala', 'ensino_medio_superior',
+                'diretivos_em_sala', 'diretivos_multiplos_cargos', 'ensino_medio_superior',
             ) if resumo[chave]),
             'readaptacoes_vigentes': sum(1 for item in readaptacoes if item.vigente),
             'form_readaptacao': ReadaptacaoProfessorForm(auto_id='id_novareadap_%s', initial={'data_inicio': hoje}),
@@ -1360,16 +1368,15 @@ class ReadaptacaoProfessorEncerrarView(DesupPrioridade1Mixin, View):
 
         with transaction.atomic():
             readaptacao = get_object_or_404(ReadaptacaoProfessor.objects.select_for_update(), pk=pk)
-            hoje = timezone.localdate()
-            if readaptacao.data_fim and readaptacao.data_fim < hoje:
-                messages.info(request, 'Esta readaptação já estava encerrada.')
+            if not readaptacao.vigente:
+                messages.info(request, 'Esta readaptação já não está vigente.')
                 return redirect('core:alertas_carga_desup')
-            readaptacao.data_fim = max(hoje, readaptacao.data_inicio)
-            readaptacao.save(update_fields=['data_fim', 'atualizado_em'])
+            readaptacao.pausado_em = timezone.now()
+            readaptacao.save(update_fields=['pausado_em', 'atualizado_em'])
             registrar_evento_prioridade1(
-                request, 'READAPTACAO_ENCERRADA', f'Readaptação {readaptacao.pk}.',
+                request, 'READAPTACAO_PAUSADA', f'Readaptação {readaptacao.pk}.',
             )
-        messages.success(request, 'Readaptação encerrada com sucesso.')
+        messages.success(request, 'Readaptação pausada imediatamente.')
         return redirect('core:alertas_carga_desup')
 
 
@@ -1646,8 +1653,8 @@ class OcupacaoEquipeDiretivaUnidadeCreateView(UnidadePrioridade1Mixin, RetornoOr
         form.instance.unidade = self.unidade
         form.instance.cargo = self.cargo
         form.instance.criado_por = self.request.user
-        # Garantia no servidor: a unidade não define redução na criação.
-        form.instance.carga_reducao_horas = Decimal('0.00')
+        # Garantia no servidor: a unidade não define redução; ela vem do cargo (DESUP).
+        form.instance.carga_reducao_horas = self.cargo.carga_reducao_horas
         response = super().form_valid(form)
         registrar_evento_prioridade1(
             self.request,

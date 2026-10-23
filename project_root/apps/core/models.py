@@ -97,6 +97,14 @@ class TipoCargoDiretivo(models.Model):
         verbose_name="Ativo",
         help_text="Cargos inativos permanecem no histórico, mas não recebem novos ocupantes.",
     )
+    carga_reducao_horas = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0.00")), MaxValueValidator(Decimal("168.00"))],
+        verbose_name="Carga horária de redução semanal",
+        help_text="Horas semanais de redução de carga que o cargo garante a quem o ocupa. Definida pela DESUP.",
+    )
     ordem = models.PositiveSmallIntegerField(default=100, verbose_name="Ordem de exibição")
     criado_em = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
     atualizado_em = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
@@ -466,6 +474,30 @@ class SolicitacaoProfessorExterno(models.Model):
         verbose_name="Nome do professor informado",
         help_text="Usado nas solicitações de cadastro.",
     )
+    professor_id_funcional = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="ID funcional informado",
+        help_text="Usado nas solicitações de cadastro.",
+    )
+    professor_rh_matricula = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="Matrícula RH informada",
+        help_text="Usado nas solicitações de cadastro.",
+    )
+    tipo_contrato_solicitado = models.ForeignKey(
+        "professors.ContractType",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="Tipo de contrato informado",
+    )
+    observacao_cadastro = models.TextField(
+        blank=True,
+        verbose_name="Observações do cadastro",
+    )
     semestre = models.CharField(
         max_length=6,
         validators=[
@@ -741,6 +773,7 @@ class ReadaptacaoProfessor(models.Model):
     )
     data_inicio = models.DateField(verbose_name="Início da vigência")
     data_fim = models.DateField(null=True, blank=True, verbose_name="Fim da vigência")
+    pausado_em = models.DateTimeField(null=True, blank=True, verbose_name="Pausada em")
     justificativa_administrativa = models.TextField(
         verbose_name="Justificativa administrativa",
         help_text="Não informe diagnóstico ou dados médicos desnecessários.",
@@ -774,17 +807,26 @@ class ReadaptacaoProfessor(models.Model):
     @property
     def vigente(self):
         hoje = timezone.localdate()
-        return self.data_inicio <= hoje and (self.data_fim is None or self.data_fim >= hoje)
+        return self.pausado_em is None and self.data_inicio <= hoje and (self.data_fim is None or self.data_fim >= hoje)
 
     def conflitos_de_vigencia(self):
         if not self.professor_id or not self.data_inicio:
             return type(self).objects.none()
         conflitos = type(self).objects.filter(professor_id=self.professor_id).exclude(pk=self.pk)
-        if self.data_fim:
-            conflitos = conflitos.filter(data_inicio__lte=self.data_fim)
-        return conflitos.filter(
-            models.Q(data_fim__isnull=True) | models.Q(data_fim__gte=self.data_inicio)
-        )
+        from datetime import timedelta
+
+        fim_novo = self.data_fim
+        if self.pausado_em:
+            ultimo_dia = timezone.localtime(self.pausado_em).date() - timedelta(days=1)
+            fim_novo = min(fim_novo, ultimo_dia) if fim_novo else ultimo_dia
+        for outro in conflitos:
+            fim_outro = outro.data_fim
+            if outro.pausado_em:
+                ultimo_dia = timezone.localtime(outro.pausado_em).date() - timedelta(days=1)
+                fim_outro = min(fim_outro, ultimo_dia) if fim_outro else ultimo_dia
+            if (fim_outro is None or fim_outro >= self.data_inicio) and (fim_novo is None or outro.data_inicio <= fim_novo):
+                return conflitos.filter(pk=outro.pk)
+        return conflitos.none()
 
     def clean(self):
         super().clean()

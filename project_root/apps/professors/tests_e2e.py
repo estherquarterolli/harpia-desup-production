@@ -954,11 +954,14 @@ class SolicitacaoCadastroEMatriculaOpcionalTests(ProfessorE2EBase):
     def test_coordenador_solicita_cadastro_e_a_desup_e_notificada_por_email(self):
         from unittest.mock import patch
 
-        from apps.core.models import Notificacao
+        from apps.core.models import Notificacao, SolicitacaoProfessorExterno
 
         self.client.force_login(self.coord_a)
         url = reverse('professors:professor_solicitar_cadastro')
-        self.assertContains(self.client.get(self.url_lista), 'Solicitar Cadastro de Professor')
+        pagina_lista = self.client.get(self.url_lista)
+        self.assertContains(pagina_lista, 'Solicitar Cadastro de Professor')
+        self.assertContains(pagina_lista, 'text-black')
+        self.assertContains(pagina_lista, '<i class="ph ph-plus"></i>', html=True)
 
         with patch('apps.core.tasks.send_email_task.delay') as delay, \
                 self.captureOnCommitCallbacks(execute=True):
@@ -971,11 +974,50 @@ class SolicitacaoCadastroEMatriculaOpcionalTests(ProfessorE2EBase):
 
         self.assertRedirects(resposta, self.url_lista)
         notificacao = Notificacao.objects.get(titulo__startswith='Solicitação de cadastro')
+        solicitacao = SolicitacaoProfessorExterno.objects.get(
+            tipo=SolicitacaoProfessorExterno.TipoChoices.CADASTRO,
+        )
+        self.assertEqual(solicitacao.professor_nome, 'Professor Novo')
+        self.assertEqual(solicitacao.professor_id_funcional, '999')
+        self.assertEqual(solicitacao.tipo_contrato_solicitado, self.contrato)
+        self.assertEqual(solicitacao.observacao_cadastro, 'Turma de ADS')
         self.assertIsNone(notificacao.destinatario)
         self.assertIn('Professor Novo', notificacao.mensagem)
         self.assertIn(self.unidade_a.sigla, notificacao.mensagem)
         delay.assert_called_once()
         self.assertIn(self.desup.email, delay.call_args.kwargs['recipient_list'])
+
+    def test_desup_abre_cadastro_semipreenchido_a_partir_da_solicitacao(self):
+        from apps.core.models import SolicitacaoProfessorExterno
+
+        solicitacao = SolicitacaoProfessorExterno.objects.create(
+            tipo=SolicitacaoProfessorExterno.TipoChoices.CADASTRO,
+            unidade_solicitante=self.unidade_a,
+            professor_nome='Professor Solicitado',
+            professor_id_funcional='ID-SOL-1',
+            professor_rh_matricula='MAT-SOL-1',
+            tipo_contrato_solicitado=self.contrato,
+            observacao_cadastro='Atuará no curso de ADS.',
+            semestre=self.semestre_atual,
+            solicitado_por=self.coord_a,
+        )
+        self.client.force_login(self.desup)
+
+        lista = self.client.get(reverse('core:solicitacao_professor_list'))
+        url = f'{self.url_criar}?solicitacao={solicitacao.pk}'
+        self.assertContains(lista, url)
+
+        resposta = self.client.get(url)
+        form = resposta.context['form']
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(form.initial['rh_nome'], 'Professor Solicitado')
+        self.assertEqual(form.initial['id_funcional'], 'ID-SOL-1')
+        self.assertEqual(form.initial['rh_matricula'], 'MAT-SOL-1')
+        self.assertEqual(form.initial['tipo_contrato'], self.contrato.pk)
+        self.assertEqual(form.initial['unidades'], [self.unidade_a.pk])
+        self.assertContains(resposta, 'Atuará no curso de ADS.')
+        self.assertContains(resposta, 'A unidade solicitante já está selecionada.')
 
     def test_desup_nao_ve_botao_nem_acessa_solicitacao(self):
         self.client.force_login(self.desup)

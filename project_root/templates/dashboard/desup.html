@@ -47,94 +47,23 @@
             <a href="{% url 'core:alertas_carga_desup' %}" class="dash-pill {% if resumo_p1.componentes_sem_professor %}dash-pill-red{% endif %}">Sem professor <b>{{ resumo_p1.componentes_sem_professor }}</b></a>
             <a href="{% url 'core:alertas_carga_desup' %}" class="dash-pill {% if resumo_p1.professores_com_sobra %}dash-pill-blue{% endif %}">Com sobra de carga <b>{{ resumo_p1.professores_com_sobra }}</b></a>
             <a href="{% url 'core:alertas_carga_desup' %}" class="dash-pill {% if resumo_p1.diretivos_em_sala %}dash-pill-violet{% endif %}">Diretivos em sala <b>{{ resumo_p1.diretivos_em_sala }}</b></a>
-            <a href="{% url 'core:alertas_carga_desup' %}" class="dash-pill {% if resumo_p1.readaptados_em_sala %}dash-pill-red{% endif %}">Readaptados em sala <b>{{ resumo_p1.readaptados_em_sala }}</b></a>
         </div>
     </section>
 
     <!-- Atalhos do dashboard -->
-    <div class="flex flex-wrap items-center gap-3">
+    {% include 'dashboard/partials/_atalhos_bloco.html' %}
 
-        {# Atalhos do usuário (todos azuis, removíveis). Se exceder a largura, quebram para a linha de baixo (flex-wrap). #}
-        {% for atalho in atalhos_user %}
-        <div class="inline-flex items-center rounded-xl bg-[#025c9f] text-white shadow-sm overflow-hidden">
-            <a href="{{ atalho.href }}"
-               class="inline-flex items-center gap-2 px-4 py-3 text-sm font-black transition-colors hover:bg-[#153e70]">
-                <i class="ph {{ atalho.icon }} text-lg"></i>
-                {{ atalho.label }}
-            </a>
-            <form method="post" action="{% url 'core:atalho_remove' atalho.id %}" class="inline m-0 p-0">
-                {% csrf_token %}
-                <button type="submit" title="Remover atalho"
-                        class="px-2.5 py-3 text-white/70 hover:text-white hover:bg-[#153e70] transition-colors">
-                    <i class="ph ph-x"></i>
-                </button>
-            </form>
-        </div>
-        {% endfor %}
-
-        {# Botão adicionar atalho (cinza) — abre o pop-up de seleção #}
-        <button type="button" onclick="abrirAdicionarAtalho()"
-                class="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-600 border border-slate-200 shadow-sm transition-colors hover:bg-slate-200">
-            <i class="ph ph-plus-circle"></i>
-            Adicionar atalho
-        </button>
-    </div>
-
-    {# ── Pop-up: adicionar atalho(s) (multi-seleção) ── #}
-    <div id="modalAddAtalho" class="hidden fixed inset-0 z-[140] flex items-center justify-center p-4 bg-black/40">
-        <div class="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
-            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-                <h3 class="text-base font-black text-[#025c9f]">Adicionar atalhos</h3>
-                <button type="button" onclick="fecharModal('modalAddAtalho')" class="text-slate-400 hover:text-slate-600">
-                    <i class="ph ph-x text-xl"></i>
-                </button>
-            </div>
-            <form method="post" action="{% url 'core:atalho_add' %}">
-                {% csrf_token %}
-                <div class="px-6 py-4 max-h-[55vh] overflow-y-auto">
-                    <p class="text-xs font-semibold text-slate-500 mb-3">Selecione uma ou mais páginas/ações:</p>
-                    {% for op in atalhos_disponiveis %}
-                    <label class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer">
-                        <input type="checkbox" name="chave" value="{{ op.chave }}"
-                               class="rounded text-[#025c9f] focus:ring-[#025c9f]">
-                        <span class="text-sm font-semibold text-slate-700">{{ op.label }}</span>
-                    </label>
-                    {% empty %}
-                    <p class="text-sm text-slate-400 py-6 text-center font-semibold">Todos os atalhos já foram adicionados.</p>
-                    {% endfor %}
-                </div>
-                <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/50">
-                    <button type="button" onclick="fecharModal('modalAddAtalho')"
-                            class="px-4 py-2.5 rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-100 transition-colors">
-                        Cancelar
-                    </button>
-                    <button type="submit"
-                            class="bg-[#025c9f] hover:bg-[#153e70] text-white px-5 py-2.5 rounded-lg text-sm font-black transition-colors shadow-sm">
-                        Salvar
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <script>
-        function abrirModal(id) { document.getElementById(id).classList.remove('hidden'); }
-        function fecharModal(id) { document.getElementById(id).classList.add('hidden'); }
-        function abrirAdicionarAtalho() { abrirModal('modalAddAtalho'); }
-        // Fecha ao clicar no backdrop
-        document.querySelectorAll('#modalAddAtalho').forEach(function (m) {
-            m.addEventListener('click', function (e) { if (e.target === m) m.classList.add('hidden'); });
-        });
-    </script>
-
-    <!-- Tabela de Professores com filtros HTMX -->
+    <!-- Visão geral dos professores de todas as unidades com filtros HTMX -->
     <div>
         <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4">
-            <h2 class="text-sm font-bold text-slate-500 uppercase tracking-widest">Consulta de Professores</h2>
+            <div>
+                <h2 class="text-sm font-bold text-slate-500 uppercase tracking-widest">Visão geral de todas as unidades</h2>
+                <p class="text-xs text-slate-400">{{ total_professores }} professor{{ total_professores|pluralize:",es" }} cadastrado{{ total_professores|pluralize }} na rede</p>
+            </div>
             <div class="flex flex-wrap gap-3 items-end">
                 <div class="relative w-full sm:w-auto">
                     <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                    <input type="text" name="q" placeholder="Buscar..."
+                    <input type="text" name="q" placeholder="Buscar professor ou área..."
                         class="pl-9 pr-4 py-2 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-400 w-full sm:w-48 js-autocomplete"
                         hx-get="{% url 'dashboard_professores_partial' %}"
                         hx-target="#dashboard-professor-table"

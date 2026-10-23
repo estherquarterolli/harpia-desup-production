@@ -1012,8 +1012,8 @@ class ParecerReducaoUpdateView(_BaseParecerView):
     prefix_base = "pred"
 
 
-class ParecerRapidoDesupView(LoginRequiredMixin, PerfilRequiredMixin, View):
-    """Decisão simplificada da DESUP diretamente na listagem."""
+class _AcaoRapidaDesupView(LoginRequiredMixin, PerfilRequiredMixin, View):
+    """Base das ações por item executadas pela DESUP na listagem."""
 
     allowed_profiles = ["DESUP"]
     _modelos = {
@@ -1032,6 +1032,20 @@ class ParecerRapidoDesupView(LoginRequiredMixin, PerfilRequiredMixin, View):
         ):
             return redirect(destino)
         return redirect("extra_curricular:pendencia_list")
+
+
+def _zerar_aprovacao_item(item):
+    """Remove somente a quantidade/CH concedida pela DESUP no item informado."""
+    if isinstance(item, OrientacaoTCC):
+        item.num_orientandos_aprovados = 0
+    elif isinstance(item, AtividadeExtensionista):
+        item.num_estudantes_aprovados = 0
+    else:
+        item.horas_aprovadas = Decimal("0")
+
+
+class ParecerRapidoDesupView(_AcaoRapidaDesupView):
+    """Decisão simplificada da DESUP diretamente na listagem."""
 
     @transaction.atomic
     def post(self, request, pk, tipo, item_pk):
@@ -1084,6 +1098,36 @@ class ParecerRapidoDesupView(LoginRequiredMixin, PerfilRequiredMixin, View):
             "Justificativa aprovada e horas contabilizadas."
             if aprovado
             else "Justificativa reprovada; as horas não foram contabilizadas.",
+        )
+        return self._redirect(request)
+
+
+class CancelarExtracurricularDesupView(_AcaoRapidaDesupView):
+    """Cancela um único extracurricular aprovado, preservando o histórico."""
+
+    @transaction.atomic
+    def post(self, request, pk, tipo, item_pk):
+        model = self._modelos.get(tipo)
+        if model is None:
+            messages.error(request, "Tipo de justificativa inválido.")
+            return self._redirect(request)
+
+        pendencia = get_object_or_404(PendenciaExtra, pk=pk)
+        item = get_object_or_404(model, pk=item_pk, pendencia=pendencia)
+        if item.parecer_desup != ParecerChoices.APROVADO:
+            messages.error(request, "Somente um extracurricular aprovado pode ser cancelado.")
+            return self._redirect(request)
+
+        motivo = request.POST.get("motivo_cancelamento", "").strip()
+        _zerar_aprovacao_item(item)
+        item.parecer_desup = ParecerChoices.INDEFERIDO
+        item.motivo_parecer = motivo or "Aprovação cancelada pela DESUP."
+        item.save()
+        sincronizar_status_pendencia(pendencia)
+
+        messages.success(
+            request,
+            "Extracurricular cancelado. A carga horária deixou de ser contabilizada.",
         )
         return self._redirect(request)
 

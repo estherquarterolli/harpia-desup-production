@@ -128,9 +128,10 @@ class JanelaEntregaForm(JanelaEntregaValidacaoMixin, forms.ModelForm):
 class TipoCargoDiretivoForm(forms.ModelForm):
     class Meta:
         model = TipoCargoDiretivo
-        fields = ["nome", "exige_curso", "permite_multiplos", "ativo"]
+        fields = ["nome", "carga_reducao_horas", "exige_curso", "permite_multiplos", "ativo"]
         widgets = {
             "nome": forms.TextInput(attrs={"class": _INPUT_CSS}),
+            "carga_reducao_horas": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": "0", "max": "20", "step": "0.25"}),
             "exige_curso": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
             "permite_multiplos": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
             "ativo": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
@@ -142,13 +143,12 @@ class OcupacaoEquipeDiretivaForm(forms.ModelForm):
 
     class Meta:
         model = OcupacaoEquipeDiretiva
-        fields = ["professor", "curso", "data_inicio", "data_fim", "carga_reducao_horas", "observacoes"]
+        fields = ["professor", "curso", "data_inicio", "data_fim", "observacoes"]
         widgets = {
             "professor": forms.Select(attrs={"class": _SELECT_CSS}),
             "curso": forms.Select(attrs={"class": _SELECT_CSS}),
             "data_inicio": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
             "data_fim": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
-            "carga_reducao_horas": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": "0", "max": "20", "step": "0.25"}),
             "observacoes": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 3}),
         }
 
@@ -334,9 +334,6 @@ class ReadaptacaoProfessorForm(forms.ModelForm):
             "data_inicio": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
             "data_fim": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
             "justificativa_administrativa": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 4}),
-        }
-        help_texts = {
-            "professor": "Durante a vigência o professor não pode ser alocado em sala; a carga vai para o extracurricular.",
         }
 
     def __init__(self, *args, **kwargs):

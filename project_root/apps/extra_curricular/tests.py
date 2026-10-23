@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 from django.contrib.messages import get_messages
@@ -7,6 +8,7 @@ from django.urls import reverse
 from apps.extra_curricular.models import (
     OrientacaoTCC,
     AtividadeExtensionista,
+    LicencaDocente,
     ReducaoCargaHoraria,
     ParecerChoices,
     PendenciaExtra,
@@ -148,6 +150,148 @@ class DecisaoDesupTests(TestCase):
             html,
         )
         self.assertIn("Docente Decisão", html)
+
+    def test_lista_desup_exibe_cancelamento_somente_para_item_aprovado(self):
+        aprovado = OrientacaoTCC.objects.create(
+            pendencia=self.pendencia,
+            num_orientandos=4,
+            parecer_desup=ParecerChoices.APROVADO,
+        )
+        pendente = OrientacaoTCC.objects.create(
+            pendencia=self.pendencia,
+            num_orientandos=2,
+            parecer_desup=ParecerChoices.PENDENTE,
+        )
+        self.client.force_login(self.desup)
+
+        resp = self.client.get(
+            reverse("extra_curricular:pendencia_list"),
+            {"semestre": semestre_atual(), "aba": "aprovados"},
+        )
+        html = resp.content.decode()
+
+        self.assertContains(resp, "Cancelar extracurricular aprovado")
+        self.assertIn(
+            reverse(
+                "extra_curricular:cancelar_extracurricular",
+                kwargs={"pk": self.pendencia.pk, "tipo": "tcc", "item_pk": aprovado.pk},
+            ),
+            html,
+        )
+        self.assertNotIn(
+            reverse(
+                "extra_curricular:cancelar_extracurricular",
+                kwargs={"pk": self.pendencia.pk, "tipo": "tcc", "item_pk": pendente.pk},
+            ),
+            html,
+        )
+
+    def test_desup_cancela_somente_o_item_aprovado_e_recalcula_horas(self):
+        tcc = OrientacaoTCC.objects.create(
+            pendencia=self.pendencia,
+            num_orientandos=4,
+            num_orientandos_aprovados=4,
+            parecer_desup=ParecerChoices.APROVADO,
+        )
+        extensao = AtividadeExtensionista.objects.create(
+            pendencia=self.pendencia,
+            num_estudantes=2,
+            num_estudantes_aprovados=2,
+            parecer_desup=ParecerChoices.APROVADO,
+        )
+        sincronizar_status_pendencia(self.pendencia)
+        self.assertEqual(self.pendencia.ch_total_justificada, 3.0)
+        self.client.force_login(self.desup)
+        url = reverse(
+            "extra_curricular:cancelar_extracurricular",
+            kwargs={"pk": self.pendencia.pk, "tipo": "tcc", "item_pk": tcc.pk},
+        )
+
+        resp = self.client.post(url, {"next": "/extracurriculares/pendencias/?aba=aprovados"})
+
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.url, "/extracurriculares/pendencias/?aba=aprovados")
+        tcc.refresh_from_db()
+        extensao.refresh_from_db()
+        self.pendencia.refresh_from_db()
+        self.assertEqual(tcc.parecer_desup, ParecerChoices.INDEFERIDO)
+        self.assertEqual(tcc.num_orientandos_aprovados, 0)
+        self.assertEqual(tcc.ch_aprovada, 0.0)
+        self.assertEqual(tcc.motivo_parecer, "Aprovação cancelada pela DESUP.")
+        self.assertEqual(extensao.parecer_desup, ParecerChoices.APROVADO)
+        self.assertEqual(self.pendencia.status, PendenciaExtra.StatusChoices.PARCIAL)
+        self.assertEqual(self.pendencia.ch_total_justificada, 1.0)
+
+    def test_coordenador_nao_pode_cancelar_e_item_nao_aprovado_nao_muda(self):
+        tcc = OrientacaoTCC.objects.create(
+            pendencia=self.pendencia,
+            num_orientandos=4,
+            parecer_desup=ParecerChoices.PENDENTE,
+        )
+        url = reverse(
+            "extra_curricular:cancelar_extracurricular",
+            kwargs={"pk": self.pendencia.pk, "tipo": "tcc", "item_pk": tcc.pk},
+        )
+
+        self.client.force_login(self.coord)
+        self.assertEqual(self.client.post(url).status_code, 403)
+        self.client.force_login(self.desup)
+        resp = self.client.post(url)
+
+        self.assertEqual(resp.status_code, 302)
+        tcc.refresh_from_db()
+        self.assertEqual(tcc.parecer_desup, ParecerChoices.PENDENTE)
+
+    def test_cancelamento_zera_carga_de_extensao_reducao_e_licenca(self):
+        casos = (
+            (
+                "ext",
+                AtividadeExtensionista.objects.create(
+                    pendencia=self.pendencia,
+                    num_estudantes=4,
+                    num_estudantes_aprovados=4,
+                    parecer_desup=ParecerChoices.APROVADO,
+                ),
+                "num_estudantes_aprovados",
+            ),
+            (
+                "red",
+                ReducaoCargaHoraria.objects.create(
+                    pendencia=self.pendencia,
+                    motivo_reducao="Redução aprovada",
+                    horas_reduzidas=Decimal("2"),
+                    horas_aprovadas=Decimal("2"),
+                    parecer_desup=ParecerChoices.APROVADO,
+                ),
+                "horas_aprovadas",
+            ),
+            (
+                "lic",
+                LicencaDocente.objects.create(
+                    pendencia=self.pendencia,
+                    motivo_licenca="Licença aprovada",
+                    data_inicio=date(2026, 1, 1),
+                    horas_reduzidas=Decimal("2"),
+                    horas_aprovadas=Decimal("2"),
+                    parecer_desup=ParecerChoices.APROVADO,
+                ),
+                "horas_aprovadas",
+            ),
+        )
+        sincronizar_status_pendencia(self.pendencia)
+        self.client.force_login(self.desup)
+
+        for tipo, item, campo_aprovado in casos:
+            with self.subTest(tipo=tipo):
+                url = reverse(
+                    "extra_curricular:cancelar_extracurricular",
+                    kwargs={"pk": self.pendencia.pk, "tipo": tipo, "item_pk": item.pk},
+                )
+                self.assertEqual(self.client.post(url).status_code, 302)
+                item.refresh_from_db()
+                self.assertEqual(item.parecer_desup, ParecerChoices.INDEFERIDO)
+                self.assertEqual(float(getattr(item, campo_aprovado)), 0.0)
+                self.assertEqual(item.ch_aprovada, 0.0)
 
     # ── Finalizar (consolidação) DESUP-only ─────────────────────────
     def test_atualizar_status_finaliza_sem_sobrescrever_pareceres(self):
@@ -1234,3 +1378,49 @@ class ListagemPendenciasSemNPlusUmTests(TestCase):
         ids = {d["professor"].pk for d in resp.context["pendencias_data"]}
         self.assertIn(meu.pk, ids)
         self.assertNotIn(alheio.pk, ids)
+
+
+class DashboardOcultaRascunhoTests(TestCase):
+    """Rascunho ainda nao foi enviado a DESUP: nao entra no detalhamento do dashboard."""
+
+    def setUp(self):
+        self.unidade = Unidade.objects.create(nome="Unidade Dashboard", sigla="UDB")
+        self.contrato = ContractType.objects.create(
+            nome="Ensino Superior DB", max_class_hours=20, max_classes=10,
+        )
+        self.professor = Professor.objects.create(
+            rh_nome="Docente Dashboard",
+            rh_email="dashboard.rascunho@teste.com",
+            id_funcional="88888",
+            rh_matricula="M88888",
+            unidade_principal=self.unidade,
+            tipo_contrato=self.contrato,
+        )
+
+    def _detalhe(self):
+        from apps.professors.views import detalhar_alocacoes_professores
+        detalhar_alocacoes_professores([self.professor])
+        return self.professor.detalhe_alocacao
+
+    def test_rascunho_nao_aparece_no_dashboard(self):
+        pendencia = PendenciaExtra.objects.create(
+            professor=self.professor,
+            unidade=self.unidade,
+            semestre=semestre_atual(),
+            status=PendenciaExtra.StatusChoices.RASCUNHO,
+        )
+        OrientacaoTCC.objects.create(pendencia=pendencia, num_orientandos=4)
+        self.assertEqual(self._detalhe(), [])
+
+    def test_pendencia_enviada_aparece_no_dashboard(self):
+        pendencia = PendenciaExtra.objects.create(
+            professor=self.professor,
+            unidade=self.unidade,
+            semestre=semestre_atual(),
+            sei_numero="SEI-123456/123456/2026",
+            status=PendenciaExtra.StatusChoices.ENVIADO,
+        )
+        OrientacaoTCC.objects.create(pendencia=pendencia, num_orientandos=4)
+        detalhe = self._detalhe()
+        self.assertEqual(len(detalhe), 1)
+        self.assertNotEqual(detalhe[0]["situacao"], "Rascunho")

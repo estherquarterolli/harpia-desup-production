@@ -15,14 +15,9 @@ from .models import (
     ExcecaoCargaUnidade,
     LimiteCargaUnidade,
     OcupacaoEquipeDiretiva,
-    ReadaptacaoProfessor,
     SolicitacaoProfessorExterno,
     Unidade,
 )
-
-
-# Quantos itens cada janela de detalhe lista (o total continua nos cartões).
-LIMITE_DETALHE = 100
 
 
 def _decimal(value):
@@ -152,11 +147,13 @@ def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, t
             detalhe_professores[grupo].append({
                 "nome": professor.nome,
                 "unidades": ", ".join(u.sigla for u in professor.unidades_exibicao),
+                "horas_aula": cargas_professor[professor.pk],
+                "horas_extra": extra[professor.pk],
                 "carga": total,
                 "meta": meta,
                 "diferenca": abs(meta - total),
             })
-    # Maiores desvios primeiro; a tela mostra só os primeiros (ver LIMITE_DETALHE).
+    # Maiores desvios primeiro.
     detalhe_professores["sobra"].sort(key=lambda i: i["diferenca"], reverse=True)
     detalhe_professores["acima"].sort(key=lambda i: i["diferenca"], reverse=True)
     detalhe_professores["limite"].sort(key=lambda i: i["nome"])
@@ -164,18 +161,11 @@ def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, t
 
     filtro_vigente = Q(data_inicio__lte=hoje) & (Q(data_fim__isnull=True) | Q(data_fim__gte=hoje))
     ocupacoes = OcupacaoEquipeDiretiva.objects.filter(OcupacaoEquipeDiretiva.filtro_vigente(hoje))
-    readaptacoes = ReadaptacaoProfessor.objects.filter(filtro_vigente)
     if unidade_id:
         ocupacoes = ocupacoes.filter(unidade_id=unidade_id)
-        readaptacoes = readaptacoes.filter(
-            Q(professor__unidades__id=unidade_id) | Q(professor__unidade_principal_id=unidade_id)
-        ).distinct()
 
     ocupacoes_em_sala = list(
         ocupacoes.filter(professor_id__in=professor_ids).select_related("professor", "cargo", "unidade")
-    )
-    readaptacoes_em_sala = list(
-        readaptacoes.filter(professor_id__in=professor_ids).select_related("professor")
     )
     medio_no_superior = list(
         Professor.objects.filter(
@@ -184,8 +174,25 @@ def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, t
         ).prefetch_related("unidades")
     )
     diretivos_em_sala = len({o.professor_id for o in ocupacoes_em_sala})
-    readaptados_em_sala = len({r.professor_id for r in readaptacoes_em_sala})
     ensino_medio_superior = len(medio_no_superior)
+
+    # Professores com mais de um cargo diretivo vigente (independe de dar aula).
+    cargos_por_professor = defaultdict(list)
+    for o in ocupacoes.select_related("professor", "cargo", "unidade"):
+        cargos_por_professor[o.professor_id].append(o)
+    detalhe_multiplos_cargos = sorted(
+        (
+            {
+                "nome": itens[0].professor.nome,
+                "unidades": ", ".join(sorted({o.unidade.sigla for o in itens})),
+                "detalhe": "; ".join(f"{o.cargo.nome} ({o.unidade.sigla})" for o in itens),
+            }
+            for itens in cargos_por_professor.values()
+            if len(itens) > 1
+        ),
+        key=lambda i: i["nome"],
+    )
+    diretivos_multiplos_cargos = len(detalhe_multiplos_cargos)
 
     def _unicos(itens, montar):
         vistos, lista = set(), []
@@ -194,17 +201,12 @@ def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, t
                 continue
             vistos.add(item.professor_id)
             lista.append(montar(item))
-        return sorted(lista, key=lambda i: i["nome"])[:LIMITE_DETALHE]
+        return sorted(lista, key=lambda i: i["nome"])
 
     detalhe_diretivos = _unicos(ocupacoes_em_sala, lambda o: {
         "nome": o.professor.nome,
         "unidades": o.unidade.sigla,
         "detalhe": o.cargo.nome,
-    })
-    detalhe_readaptados = _unicos(readaptacoes_em_sala, lambda r: {
-        "nome": r.professor.nome,
-        "unidades": ", ".join(u.sigla for u in r.professor.unidades_exibicao),
-        "detalhe": "Readaptação vigente",
     })
     detalhe_medio = sorted(
         (
@@ -216,7 +218,7 @@ def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, t
             for p in medio_no_superior
         ),
         key=lambda i: i["nome"],
-    )[:LIMITE_DETALHE]
+    )
 
     limites = LimiteCargaUnidade.objects.filter(filtro_vigente).select_related("unidade")
     if unidade_id:
@@ -267,20 +269,19 @@ def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, t
         "total_unidades_escopo": unidades_escopo.count(),
         "total_componentes": len(componentes),
         "componentes_sem_professor": componentes_sem_professor,
-        "detalhe_disciplinas": detalhe_disciplinas[:LIMITE_DETALHE],
-        "detalhe_sobra": detalhe_professores["sobra"][:LIMITE_DETALHE],
-        "detalhe_limite": detalhe_professores["limite"][:LIMITE_DETALHE],
-        "detalhe_acima": detalhe_professores["acima"][:LIMITE_DETALHE],
-        "limite_detalhe": LIMITE_DETALHE,
+        "detalhe_disciplinas": detalhe_disciplinas,
+        "detalhe_sobra": detalhe_professores["sobra"],
+        "detalhe_limite": detalhe_professores["limite"],
+        "detalhe_acima": detalhe_professores["acima"],
         "professores_alocados": len(professor_ids),
         "professores_no_limite": no_limite,
         "professores_excedidos": excedidos,
         "professores_com_sobra": com_sobra,
         "diretivos_em_sala": diretivos_em_sala,
         "detalhe_diretivos": detalhe_diretivos,
-        "detalhe_readaptados": detalhe_readaptados,
         "detalhe_medio": detalhe_medio,
-        "readaptados_em_sala": readaptados_em_sala,
+        "diretivos_multiplos_cargos": diretivos_multiplos_cargos,
+        "detalhe_multiplos_cargos": detalhe_multiplos_cargos,
         "ensino_medio_superior": ensino_medio_superior,
         "solicitacoes_pendentes": solicitacoes_pendentes.count(),
         "excecoes_pendentes": excecoes_pendentes.count(),

@@ -582,3 +582,23 @@ class Prioridade1DesupTests(TestCase):
             justificativa_administrativa="Readaptação administrativa.", criado_por=self.desup,
         )
         self.assertTrue(Professor.objects.get(pk=self.professor.pk).readaptado_vigente)
+
+    def test_pausar_readaptacao_encerra_vigencia_no_mesmo_dia(self):
+        readaptacao = ReadaptacaoProfessor.objects.create(
+            professor=self.professor, data_inicio=self.hoje,
+            justificativa_administrativa="Restrição funcional.", criado_por=self.desup,
+        )
+        self.client.force_login(self.desup)
+
+        resposta = self.client.post(reverse("core:readaptacao_encerrar", args=[readaptacao.pk]))
+
+        self.assertRedirects(resposta, reverse("core:alertas_carga_desup"))
+        readaptacao.refresh_from_db()
+        self.assertEqual(timezone.localtime(readaptacao.pausado_em).date(), self.hoje)
+        self.assertFalse(readaptacao.vigente)
+        self.assertFalse(Professor.objects.get(pk=self.professor.pk).readaptado_vigente)
+        nova = ReadaptacaoProfessor(
+            professor=self.professor, data_inicio=self.hoje,
+            justificativa_administrativa="Nova readaptação.",
+        )
+        nova.full_clean()

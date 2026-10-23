@@ -1,13 +1,18 @@
 <!-- Partial: _professor_table.html (HTMX target) -->
-<table class="w-full text-left min-w-[900px] stack-table">
+<table class="w-full text-left min-w-[1450px] stack-table">
   <thead class="bg-slate-50 border-b border-slate-100">
     <tr class="text-[10px] font-black text-slate-500 uppercase tracking-wider">
       <th class="px-6 py-4">ID</th>
-      <th class="px-6 py-4">Nome</th>
+      <th class="px-6 py-4">Nome Professor</th>
+      <th class="px-6 py-4">Área de atuação</th>
+      <th class="px-6 py-4 text-center">CH</th>
       <th class="px-6 py-4">Cargo</th>
       <th class="px-6 py-4">Vínculo empregatício</th>
       <th class="px-6 py-4 text-center">Unidades</th>
-      <th class="px-6 py-4 text-center">CH</th>
+      <th class="px-6 py-4 text-center">CH Justificada</th>
+      <th class="px-6 py-4 text-center">Total de Horas</th>
+      <th class="px-6 py-4 text-center">Não Alocado</th>
+      <th class="px-6 py-4 text-center">% Alocado</th>
     </tr>
   </thead>
   <tbody class="text-sm font-semibold text-slate-700 divide-y divide-slate-50">
@@ -29,11 +34,15 @@
                     aria-label="Ver detalhes de {{ item.prof.nome }}">
               {{ item.prof.nome }}
             </button>
-            {% if item.prof.readaptado_vigente %}<span class="ml-1 inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black text-violet-700" title="Professor readaptado: não fica em sala de aula; a alocação é feita no módulo Extracurricular."><i class="ph ph-first-aid-kit text-xs" aria-hidden="true"></i>Readaptado</span>{% endif %}
+            {% if item.prof.readaptado_vigente %}<span class="ml-1 inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black text-violet-700" title="Professor com readaptação vigente."><i class="ph ph-first-aid-kit text-xs" aria-hidden="true"></i>Readaptado</span>{% endif %}
             <p class="text-[10px] text-slate-400">{{ item.prof.rh_matricula|default_if_none:"" }}</p>
           </div>
         </div>
       </td>
+      <td class="px-6 py-4 text-slate-600" data-label="Área de atuação">
+        {{ item.prof.area_atuacao|default:"Não informada" }}
+      </td>
+      <td class="px-6 py-4 text-center font-bold text-slate-900" data-label="CH">{{ item.ch }}h</td>
       <td class="px-6 py-4" data-label="Cargo">
         <span class="inline-block max-w-[16rem] rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700" title="{{ item.prof.tipo_contrato.nome }}">
           {{ item.prof.tipo_contrato.nome|default:"—" }}
@@ -49,11 +58,24 @@
           {% empty %}<span class="text-slate-300">—</span>{% endfor %}
         </div>
       </td>
-      <td class="px-6 py-4 text-center font-bold text-slate-900" data-label="CH">{{ item.ch }}h</td>
+      <td class="px-6 py-4 text-center border-l border-slate-100 font-semibold text-slate-700" data-label="CH Justificada">
+        {{ item.prof.ch_justificada_total|floatformat:0 }}h
+      </td>
+      <td class="px-6 py-4 text-center font-bold text-slate-800" data-label="Total de Horas">
+        {{ item.prof.soma_horas|floatformat:0 }}h
+      </td>
+      <td class="px-6 py-4 text-center font-semibold {% if item.prof.ch_nao_alocada_total > 0 %}text-red-500{% else %}text-emerald-500{% endif %}" data-label="Não Alocado">
+        {{ item.prof.ch_nao_alocada_total|floatformat:0 }}h
+      </td>
+      <td class="px-6 py-4 text-center" data-label="% Alocado">
+        <span class="px-2 py-1 rounded text-[10px] font-black {% if item.prof.percentual_alocado_total >= 100 %}bg-emerald-100 text-emerald-700{% elif item.prof.percentual_alocado_total > 0 %}bg-amber-100 text-amber-700{% else %}bg-slate-100 text-slate-500{% endif %}">
+          {{ item.prof.percentual_alocado_total }}%
+        </span>
+      </td>
     </tr>
     {% empty %}
     <tr>
-      <td colspan="6" class="px-6 py-12 text-center text-slate-400">
+      <td colspan="11" class="px-6 py-12 text-center text-slate-400">
         <i class="ph ph-chalkboard-teacher text-4xl opacity-20 mb-2 block"></i>
         Nenhum professor encontrado com os filtros aplicados.
       </td>

@@ -83,6 +83,20 @@ def _bulk_ch_justificada(professor_ids):
                 if item.parecer_desup == ParecerChoices.APROVADO
             )
         mapa[p.professor_id] = mapa.get(p.professor_id, 0.0) + total
+
+    # Orientação/supervisão/coordenação de estágio vigentes no semestre também
+    # entram no somatório (em qualquer unidade onde o professor atue).
+    from apps.core.models import AtividadeEstagioSupervisao
+    from django.utils import timezone
+
+    hoje = timezone.localdate()
+    estagios = AtividadeEstagioSupervisao.objects.filter(
+        professor_id__in=professor_ids,
+        semestre=semestre_atual(),
+        data_inicio__lte=hoje,
+    ).filter(Q(data_fim__isnull=True) | Q(data_fim__gte=hoje))
+    for est in estagios:
+        mapa[est.professor_id] = mapa.get(est.professor_id, 0.0) + float(est.carga_horaria_semanal)
     return mapa
 
 
@@ -154,10 +168,13 @@ def enriquecer_professores_com_carga(professores, unidade_atual=None):
         # extra_curricular/services.py (get_pendencias_data).
         meta_horas = prof.meta_horas_sala
         prof.ch_nao_alocada_total = max(meta_horas - prof.soma_horas, 0)
-        prof.percentual_alocado_total = (
-            round(min((prof.soma_horas / meta_horas) * 100, 100.0), 2)
-            if meta_horas else 0.0
-        )
+        # Redução da equipe diretiva (definida pela DESUP) conta como alocação:
+        # sem isso, um diretivo cuja redução zera a meta aparecia "Sem alocação".
+        prof.reducao_diretiva = prof.reducao_carga_vigente
+        if meta_horas:
+            prof.percentual_alocado_total = round(min((prof.soma_horas / meta_horas) * 100, 100.0), 2)
+        else:
+            prof.percentual_alocado_total = 100.0 if prof.reducao_diretiva else 0.0
 
     if unidade_atual:
         try:
@@ -260,12 +277,40 @@ def detalhar_alocacoes_professores(professores, user=None):
             'ch': horas,
             'situacao': 'Alocado',
             'tom': 'verde',
+            'grupo': 'curricular',
+        })
+
+    # Equipe diretiva: ocupações vigentes (a redução já compõe a CH total).
+    from apps.core.models import OcupacaoEquipeDiretiva
+    for ocup in OcupacaoEquipeDiretiva.objects.filter(
+        professor_id__in=ids,
+    ).select_related('unidade', 'cargo', 'curso'):
+        if not ocup.vigente:
+            continue
+        rotulo = ocup.cargo.nome
+        if ocup.curso_id:
+            rotulo = f'{rotulo} — {ocup.curso}'
+        por_id[ocup.professor_id].detalhe_alocacao.append({
+            'unidade': ocup.unidade.sigla,
+            'atividade': rotulo,
+            'turma': '—',
+            'manha': None, 'tarde': None, 'noite': None,
+            'ch': round(float(ocup.carga_reducao_horas or 0), 1),
+            'situacao': 'Vigente',
+            'tom': 'verde',
+            'grupo': 'diretiva',
         })
 
     # Atividades extracurriculares do semestre (justificativas e estágio).
+    # Rascunho é estado anterior ao trâmite: a unidade ainda não enviou nada à
+    # DESUP (nem informou o SEI). Ele continua acessível na aba "Rascunhos" do
+    # módulo extracurricular, mas não entra no detalhamento do dashboard - mesma
+    # regra das abas de justificativas enviadas e da listagem da DESUP.
     semestre = semestre_atual()
     pendencias = PendenciaExtra.objects.filter(
         professor_id__in=ids, semestre=semestre,
+    ).exclude(
+        status=PendenciaExtra.StatusChoices.RASCUNHO,
     ).select_related('unidade').prefetch_related(
         'orientacoes_tcc', 'atividades_extensao', 'reducoes_ch', 'licencas',
     )
@@ -274,7 +319,6 @@ def detalhar_alocacoes_professores(professores, user=None):
         ParecerChoices.INDEFERIDO: 'vermelho',
     }
     for pend in pendencias:
-        rascunho = pend.status == PendenciaExtra.StatusChoices.RASCUNHO
         itens = (
             [(f'Orientação de TCC ({i.num_orientandos} orientando{"s" if i.num_orientandos != 1 else ""})', i)
              for i in pend.orientacoes_tcc.all()]
@@ -290,8 +334,9 @@ def detalhar_alocacoes_professores(professores, user=None):
                 'turma': 'Diversas',
                 'manha': None, 'tarde': None, 'noite': None,
                 'ch': round(float(item.ch_aprovada), 1),
-                'situacao': 'Rascunho' if rascunho else item.get_parecer_desup_display(),
-                'tom': 'cinza' if rascunho else tom_parecer.get(item.parecer_desup, 'ambar'),
+                'situacao': item.get_parecer_desup_display(),
+                'tom': tom_parecer.get(item.parecer_desup, 'ambar'),
+                'grupo': 'extracurricular',
             })
 
     from apps.core.models import AtividadeEstagioSupervisao
@@ -311,7 +356,13 @@ def detalhar_alocacoes_professores(professores, user=None):
             'ch': round(float(est.carga_horaria_semanal), 1),
             'situacao': 'Vigente' if est.vigente else 'Encerrada',
             'tom': 'verde' if est.vigente else 'cinza',
+            'grupo': 'extracurricular',
         })
+
+    for prof in professores:
+        prof.detalhe_curricular = [l for l in prof.detalhe_alocacao if l['grupo'] == 'curricular']
+        prof.detalhe_extracurricular = [l for l in prof.detalhe_alocacao if l['grupo'] == 'extracurricular']
+        prof.detalhe_diretiva = [l for l in prof.detalhe_alocacao if l['grupo'] == 'diretiva']
     return professores
 
 
@@ -481,10 +532,45 @@ class ProfessorCreateView(DesupOnlyMixin, CreateView):
     form_class = ProfessorForm
     template_name = 'professors/professor_form.html'
     success_url = reverse_lazy('professors:professor_list')
+
+    def _solicitacao_origem(self):
+        if not hasattr(self, '_solicitacao_origem_cache'):
+            solicitacao_id = self.request.GET.get('solicitacao', '')
+            self._solicitacao_origem_cache = None
+            if solicitacao_id.isdigit():
+                self._solicitacao_origem_cache = (
+                    SolicitacaoProfessorExterno.objects.filter(
+                        pk=solicitacao_id,
+                        tipo=SolicitacaoProfessorExterno.TipoChoices.CADASTRO,
+                        status=SolicitacaoProfessorExterno.StatusChoices.PENDENTE,
+                    )
+                    .select_related('unidade_solicitante', 'tipo_contrato_solicitado')
+                    .first()
+                )
+        return self._solicitacao_origem_cache
+
+    def get_initial(self):
+        initial = super().get_initial()
+        solicitacao = self._solicitacao_origem()
+        if solicitacao:
+            initial.update({
+                'rh_nome': solicitacao.professor_nome,
+                'id_funcional': solicitacao.professor_id_funcional,
+                'rh_matricula': solicitacao.professor_rh_matricula,
+                'tipo_contrato': solicitacao.tipo_contrato_solicitado_id,
+                'unidades': [solicitacao.unidade_solicitante_id],
+            })
+        return initial
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
         return kwargs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['solicitacao_origem'] = self._solicitacao_origem()
+        return ctx
 
     def form_valid(self, form):
         messages.success(self.request, 'Professor cadastrado com sucesso.')
@@ -592,6 +678,10 @@ class ProfessorSolicitarCadastroView(CoordenadorOnlyMixin, View):
                 tipo=SolicitacaoProfessorExterno.TipoChoices.CADASTRO,
                 unidade_solicitante=unidade,
                 professor_nome=dados['nome'],
+                professor_id_funcional=dados['id_funcional'],
+                professor_rh_matricula=dados['rh_matricula'],
+                tipo_contrato_solicitado=dados['tipo_contrato'],
+                observacao_cadastro=dados['observacao'],
                 semestre=semestre_atual(),
                 justificativa=mensagem,
                 solicitado_por=request.user,
@@ -756,10 +846,10 @@ def htmx_tabela_alocacao(request):
         # total do contrato (ch_total/max_total_hours).
         meta_horas = prof.meta_horas_sala
         prof.ch_nao_alocada_total = max(meta_horas - soma, 0)
-        prof.percentual_alocado_total = (
-            round(min((soma / meta_horas) * 100, 100.0), 2)
-            if meta_horas else 0.0
-        )
+        if meta_horas:
+            prof.percentual_alocado_total = round(min((soma / meta_horas) * 100, 100.0), 2)
+        else:
+            prof.percentual_alocado_total = 100.0 if prof.reducao_carga_vigente else 0.0
 
     return render(request, 'professors/partials/_linhas_alocacao.html', {
         'professores': professores,
