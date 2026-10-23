@@ -4,29 +4,29 @@
                 <h2 class="text-sm font-bold uppercase tracking-widest text-slate-500">{% if visao_desup %}Visão geral de todas as unidades{% else %}Visão geral da unidade{% endif %}</h2>
                 <p class="text-xs text-slate-400">{{ total_professores_visao }} professor{{ total_professores_visao|pluralize:",es" }} {% if visao_desup %}encontrado{{ total_professores_visao|pluralize }} na rede{% else %}vinculado{{ total_professores_visao|pluralize }} à unidade{% endif %}</p>
             </div>
-            <form method="get" class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-                <div class="relative min-w-48 flex-1 sm:flex-none">
+            <form method="get" class="flex w-full flex-wrap items-end gap-2 sm:w-auto">
+                <div class="relative min-w-48 flex-1 sm:w-64 sm:flex-none">
                     <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400"></i>
                     <input type="search" name="q" value="{{ filtro_q }}" placeholder="Buscar professor..."
-                           class="w-full rounded-xl border bg-white py-2 pl-9 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-400" autocomplete="off">
+                           class="h-12 w-full rounded-xl border bg-white pl-9 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-400" autocomplete="off">
                 </div>
                 {% if visao_desup %}
                 <div class="flex flex-col gap-1">
                     <label for="dashboard-unidade" class="text-[11px] font-bold text-slate-500">Unidade</label>
-                    <select id="dashboard-unidade" name="unidade_id" class="rounded-xl border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400">
+                    <select id="dashboard-unidade" name="unidade_id" class="h-12 rounded-xl border bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-blue-400">
                         <option value="">Todas as unidades</option>
                         {% for unidade in unidades %}<option value="{{ unidade.pk }}" {% if filtro_unidade_dashboard == unidade.pk|stringformat:"s" %}selected{% endif %}>{{ unidade.sigla }}</option>{% endfor %}
                     </select>
                 </div>
                 <div class="flex flex-col gap-1">
                     <label for="dashboard-vinculo" class="text-[11px] font-bold text-slate-500">Vínculo empregatício</label>
-                    <select id="dashboard-vinculo" name="vinculo" class="rounded-xl border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400">
+                    <select id="dashboard-vinculo" name="vinculo" class="h-12 rounded-xl border bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-blue-400">
                         <option value="">Todos os vínculos</option>
                         {% for valor, nome in vinculos_empregaticios %}<option value="{{ valor }}" {% if filtro_vinculo_dashboard == valor %}selected{% endif %}>{{ nome }}</option>{% endfor %}
                     </select>
                 </div>
                 {% endif %}
-                <button type="submit" class="rounded-xl bg-[#025c9f] px-4 py-2 text-sm font-bold text-white hover:bg-[#014c85]">Filtrar</button>
+                <button type="submit" class="h-12 rounded-xl bg-[#025c9f] px-4 text-sm font-bold text-white hover:bg-[#014c85]">Filtrar</button>
             </form>
         </div>
 

@@ -1047,6 +1047,11 @@ class JornadaDashboardsTests(BaseE2ETestCase):
         self.assertContains(resp, 'Ana Conforme')
         self.assertContains(resp, 'Visão geral de todas as unidades')
         self.assertContains(resp, 'prof-list-shell')
+        self.assertLess(
+            resp.content.index(b'<section data-tour="dash-resumo"'),
+            resp.content.index(b'<section class="prof-list-shell"'),
+        )
+        self.assertNotContains(resp, 'Gerar LOG')
         self.assertContains(resp, 'Detalhamento da alocação')
         self.assertContains(resp, 'Cargo')
         self.assertContains(resp, 'Vínculo empregatício')
