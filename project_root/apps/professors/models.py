@@ -261,7 +261,7 @@ class Professor(models.Model):
 
         hoje = timezone.localdate()
         return any(
-            r.data_inicio <= hoje and (r.data_fim is None or r.data_fim >= hoje)
+            r.pausado_em is None and r.data_inicio <= hoje and (r.data_fim is None or r.data_fim >= hoje)
             for r in self.readaptacoes.all()
         )
 

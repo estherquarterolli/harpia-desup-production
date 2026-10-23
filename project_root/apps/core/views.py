@@ -1240,7 +1240,7 @@ class AlertasCargaDesupView(DesupPrioridade1Mixin, TemplateView):
             'resumo_p1': resumo,
             # Quantos pontos de atenção têm ocorrências (exibido no resumo recolhido).
             'pontos_atencao': sum(1 for chave in (
-                'diretivos_em_sala', 'readaptados_em_sala', 'ensino_medio_superior',
+                'diretivos_em_sala', 'diretivos_multiplos_cargos', 'ensino_medio_superior',
             ) if resumo[chave]),
             'readaptacoes_vigentes': sum(1 for item in readaptacoes if item.vigente),
             'form_readaptacao': ReadaptacaoProfessorForm(auto_id='id_novareadap_%s', initial={'data_inicio': hoje}),
@@ -1368,16 +1368,15 @@ class ReadaptacaoProfessorEncerrarView(DesupPrioridade1Mixin, View):
 
         with transaction.atomic():
             readaptacao = get_object_or_404(ReadaptacaoProfessor.objects.select_for_update(), pk=pk)
-            hoje = timezone.localdate()
-            if readaptacao.data_fim and readaptacao.data_fim < hoje:
-                messages.info(request, 'Esta readaptação já estava encerrada.')
+            if not readaptacao.vigente:
+                messages.info(request, 'Esta readaptação já não está vigente.')
                 return redirect('core:alertas_carga_desup')
-            readaptacao.data_fim = max(hoje, readaptacao.data_inicio)
-            readaptacao.save(update_fields=['data_fim', 'atualizado_em'])
+            readaptacao.pausado_em = timezone.now()
+            readaptacao.save(update_fields=['pausado_em', 'atualizado_em'])
             registrar_evento_prioridade1(
-                request, 'READAPTACAO_ENCERRADA', f'Readaptação {readaptacao.pk}.',
+                request, 'READAPTACAO_PAUSADA', f'Readaptação {readaptacao.pk}.',
             )
-        messages.success(request, 'Readaptação encerrada com sucesso.')
+        messages.success(request, 'Readaptação pausada imediatamente.')
         return redirect('core:alertas_carga_desup')
 
 

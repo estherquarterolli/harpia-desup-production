@@ -277,6 +277,28 @@ def detalhar_alocacoes_professores(professores, user=None):
             'ch': horas,
             'situacao': 'Alocado',
             'tom': 'verde',
+            'grupo': 'curricular',
+        })
+
+    # Equipe diretiva: ocupações vigentes (a redução já compõe a CH total).
+    from apps.core.models import OcupacaoEquipeDiretiva
+    for ocup in OcupacaoEquipeDiretiva.objects.filter(
+        professor_id__in=ids,
+    ).select_related('unidade', 'cargo', 'curso'):
+        if not ocup.vigente:
+            continue
+        rotulo = ocup.cargo.nome
+        if ocup.curso_id:
+            rotulo = f'{rotulo} — {ocup.curso}'
+        por_id[ocup.professor_id].detalhe_alocacao.append({
+            'unidade': ocup.unidade.sigla,
+            'atividade': rotulo,
+            'turma': '—',
+            'manha': None, 'tarde': None, 'noite': None,
+            'ch': round(float(ocup.carga_reducao_horas or 0), 1),
+            'situacao': 'Vigente',
+            'tom': 'verde',
+            'grupo': 'diretiva',
         })
 
     # Atividades extracurriculares do semestre (justificativas e estágio).
@@ -314,6 +336,7 @@ def detalhar_alocacoes_professores(professores, user=None):
                 'ch': round(float(item.ch_aprovada), 1),
                 'situacao': item.get_parecer_desup_display(),
                 'tom': tom_parecer.get(item.parecer_desup, 'ambar'),
+                'grupo': 'extracurricular',
             })
 
     from apps.core.models import AtividadeEstagioSupervisao
@@ -333,7 +356,13 @@ def detalhar_alocacoes_professores(professores, user=None):
             'ch': round(float(est.carga_horaria_semanal), 1),
             'situacao': 'Vigente' if est.vigente else 'Encerrada',
             'tom': 'verde' if est.vigente else 'cinza',
+            'grupo': 'extracurricular',
         })
+
+    for prof in professores:
+        prof.detalhe_curricular = [l for l in prof.detalhe_alocacao if l['grupo'] == 'curricular']
+        prof.detalhe_extracurricular = [l for l in prof.detalhe_alocacao if l['grupo'] == 'extracurricular']
+        prof.detalhe_diretiva = [l for l in prof.detalhe_alocacao if l['grupo'] == 'diretiva']
     return professores
 
 

@@ -973,6 +973,23 @@ class LinhasDeDocenteETurmasE2ETests(AlocacaoE2EBase):
         self.comp_algoritmos.refresh_from_db()
         self.assertEqual(self.comp_algoritmos.status, MatrixComponent.StatusChoices.COMPLETO)
 
+    def test_readaptado_pode_ser_alocado_sem_carencia(self):
+        from apps.core.models import ReadaptacaoProfessor
+
+        ReadaptacaoProfessor.objects.create(
+            professor=self.prof_a1,
+            data_inicio=timezone.localdate(),
+            justificativa_administrativa='Restrição funcional.',
+        )
+        resposta = self._post(self.comp_algoritmos, {'docente_id': self.prof_a1.pk})
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(self._linhas(self.comp_algoritmos).get().docente_id, self.prof_a1.pk)
+        self.assertFalse(Carencia.objects.filter(alocacao_turma_docente__componente_matriz=self.comp_algoritmos).exclude(status=Carencia.StatusChoices.RESOLVIDA).exists())
+        pagina = self.client.get(self.url_tela)
+        self.assertContains(pagina, 'data-current-readaptado="1"')
+        self.assertContains(pagina, 'class="ac-readaptado')
+
     def test_trocar_docente_reaproveita_a_mesma_linha(self):
         self._post(self.comp_algoritmos, {'docente_id': self.prof_a1.pk})
         self._post(self.comp_algoritmos, {'docente_id': self.prof_a2.pk})

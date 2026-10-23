@@ -114,7 +114,7 @@ class AllocCurricularView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView)
         linhas_qs = AlocacaoTurmaDocente.objects.filter(
             alocacao_curricular__unidade_id=unidade_id,
             alocacao_curricular__semestre=_semestre_atual(),
-        ).select_related('docente').order_by('pk')
+        ).select_related('docente').prefetch_related('docente__readaptacoes').order_by('pk')
         componentes_qs = MatrixComponent.objects.select_related(
             'componente_curricular'
         ).prefetch_related(
