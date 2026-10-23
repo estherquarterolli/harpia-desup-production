@@ -583,7 +583,7 @@ class SolicitacaoProfessorExterno(models.Model):
 
     @property
     def nome_professor(self):
-        return self.professor.nome if self.professor_id else self.professor_nome
+        return self.professor.nome if self.professor_id else " ".join((self.professor_nome or "").split()).title()
 
     def __str__(self):
         if self.unidade_origem_id:

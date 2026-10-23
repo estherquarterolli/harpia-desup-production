@@ -73,6 +73,14 @@ class Professor(models.Model):
         SUPERIOR = 'SUPERIOR', 'Ensino Superior'
         AMBOS = 'AMBOS', 'Ensino Médio e Superior'
 
+    class VinculoEmpregaticioChoices(models.TextChoices):
+        EFETIVO = 'EFETIVO', 'Efetivo'
+        CONTR_TEMPORARIO = 'CONTR TEMPORARIO', 'Contrato temporário'
+        CARGO_COMISSAO = 'CARGO COMISSAO', 'Cargo em comissão'
+        REQUISICAO_INTERNA = 'REQUISICAO INTERNA', 'Requisição interna'
+        REQUISICAO_EXTERNA = 'REQUISICAO EXTERNA', 'Requisição externa'
+        TERCEIRIZADO = 'TERCEIRIZADO', 'Terceirizado'
+
     # --- Campos Originais RH (Read-only por Regra de Negócio) ---
     id_funcional = models.CharField(
         max_length=50,
@@ -116,6 +124,24 @@ class Professor(models.Model):
         default='',
         verbose_name="Locais de lotação (não são unidades)",
         help_text="Setores de origem que não correspondem a uma unidade do sistema, separados por ' | '.",
+    )
+
+    setor_origem = models.CharField(
+        max_length=255, blank=True, default='',
+        verbose_name='Setor de origem (PDF/RH)',
+        help_text='Descrição do setor na fonte de pessoal; não altera os vínculos com unidades.',
+    )
+
+    cargo_origem = models.CharField(
+        max_length=100, blank=True, default='',
+        verbose_name='Cargo de origem (PDF/RH)',
+        help_text='Texto original do cargo; o tipo de contrato do sistema define os limites de carga.',
+    )
+
+    vinculo_empregaticio = models.CharField(
+        max_length=30, choices=VinculoEmpregaticioChoices.choices,
+        blank=True, default='', verbose_name='Vínculo empregatício',
+        help_text='Vínculo individual do professor, independente do cargo.',
     )
 
     #  Campos DESUP (Sobrescritas e Ajustes - Regra #3)
@@ -212,7 +238,8 @@ class Professor(models.Model):
 
     @property
     def nome(self):
-        return self.desup_nome if self.desup_nome else self.rh_nome
+        nome = self.desup_nome if self.desup_nome else self.rh_nome
+        return " ".join(nome.split()).title() if nome else ""
 
     @property
     def email(self):
@@ -400,6 +427,22 @@ class Professor(models.Model):
         return "—"
 
     @property
+    def vinculo_empregaticio_codigo(self) -> str:
+        if self.vinculo_empregaticio:
+            return self.vinculo_empregaticio
+        if self.tipo_contrato_id:
+            categoria = self.tipo_contrato.categoria
+            return (self.VinculoEmpregaticioChoices.EFETIVO
+                    if categoria == ContractType.CategoriaChoices.CONCURSADO else categoria)
+        return ''
+
+    @property
+    def vinculo_empregaticio_exibicao(self) -> str:
+        return dict(self.VinculoEmpregaticioChoices.choices).get(
+            self.vinculo_empregaticio_codigo, '—'
+        )
+
+    @property
     def dias_presenca_obrigatorios(self) -> int:
         if self.tipo_contrato:
             return self.tipo_contrato.dias_presenca_obrigatorios
@@ -491,3 +534,18 @@ class AbsenceRecord(models.Model):
 
     def __str__(self):
         return f"Ausência: {self.professor.nome} ({self.data_inicio} a {self.data_fim})"
+
+
+def filtro_vinculo_empregaticio(valor, prefixo=''):
+    """Filtra o vínculo individual, usando a categoria antiga enquanto ele não foi importado."""
+    if valor not in dict(Professor.VinculoEmpregaticioChoices.choices):
+        return models.Q()
+    campo = f'{prefixo}vinculo_empregaticio'
+    categoria = f'{prefixo}tipo_contrato__categoria__in'
+    categorias_legadas = (
+        [ContractType.CategoriaChoices.EFETIVO, ContractType.CategoriaChoices.CONCURSADO]
+        if valor == Professor.VinculoEmpregaticioChoices.EFETIVO else [valor]
+    )
+    return models.Q(**{campo: valor}) | (
+        models.Q(**{campo: ''}) & models.Q(**{categoria: categorias_legadas})
+    )

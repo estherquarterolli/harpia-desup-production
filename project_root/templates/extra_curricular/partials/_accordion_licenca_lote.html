@@ -49,7 +49,7 @@
             <tr class="hover:bg-slate-50/50 transition-colors">
 
               <td class="px-5 py-3">
-                <span class="text-sm font-bold text-[#025c9f]">{{ item.pendencia.professor.rh_nome }}</span>
+                <span class="text-sm font-bold text-[#025c9f]">{{ item.pendencia.professor.nome }}</span>
               </td>
 
               {# CH Aprovada #}
@@ -175,7 +175,7 @@
                     <select name="pendencia_id" id="select-docente-lic" required class="form-field w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f]">
                       <option value="">Selecione...</option>
                       {% for p in pendencias %}
-                      <option value="{{ p.pk }}">{{ p.professor.rh_nome }}</option>
+                      <option value="{{ p.pk }}">{{ p.professor.nome }}</option>
                       {% endfor %}
                     </select>
                   </td>

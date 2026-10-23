@@ -159,7 +159,7 @@ class AlocacaoTurmaDocente(models.Model):
         ]
 
     def __str__(self):
-        docente = self.docente.rh_nome if self.docente_id else 'Sem professor'
+        docente = self.docente.nome if self.docente_id else 'Sem professor'
         return f"{self.componente_matriz} - {docente}"
 
 

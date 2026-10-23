@@ -1042,30 +1042,81 @@ class JornadaDashboardsTests(BaseE2ETestCase):
         nao_conformes = {u['nome'] for u in resp.context['unidades_nao_conformes']}
         self.assertEqual(nao_conformes, {'Unidade Conforme', 'Unidade Pendente'})
         self.assertEqual(resp.context['conformidade'], '0%')
-        nomes = {item['prof'].rh_nome for item in resp.context['alocacoes_dashboard']}
+        nomes = {prof.nome for prof in resp.context['professores_visao']}
         self.assertEqual(nomes, {'Ana Conforme', 'Bruno Pendente'})
         self.assertContains(resp, 'Ana Conforme')
         self.assertContains(resp, 'Visão geral de todas as unidades')
-        self.assertContains(resp, 'Área de atuação')
-        self.assertContains(resp, 'Matemática')
-        self.assertNotContains(resp, 'Filtros da alocação geral')
+        self.assertContains(resp, 'prof-list-shell')
+        self.assertContains(resp, 'Detalhamento da alocação')
         self.assertContains(resp, 'Cargo')
         self.assertContains(resp, 'Vínculo empregatício')
-        self.assertContains(resp, '>CH<')
-        self.assertContains(resp, 'CH Justificada')
-        self.assertContains(resp, 'Total de Horas')
-        self.assertContains(resp, 'Não Alocado')
-        self.assertContains(resp, '% Alocado')
+        self.assertContains(resp, 'Todas as unidades')
         self.assertContains(resp, 'Efetivo')
         self.assertContains(resp, '40h')
         ana = next(
-            item['prof'] for item in resp.context['alocacoes_dashboard']
-            if item['prof'].pk == self.prof_ok.pk
+            prof for prof in resp.context['professores_visao']
+            if prof.pk == self.prof_ok.pk
         )
         self.assertEqual(ana.ch_justificada_total, 0.0)
         self.assertEqual(ana.soma_horas, 0.0)
         self.assertEqual(ana.ch_nao_alocada_total, 20.0)
         self.assertEqual(ana.percentual_alocado_total, 0.0)
+
+    def test_dashboard_desup_filtra_unidade_e_vinculo_em_todas_as_unidades(self):
+        self.prof_ok.rh_nome = 'ESTHER QUARTEROLLI DOS SANTOS'
+        self.prof_ok.save(update_fields=['rh_nome'])
+        self.prof_pendente.tipo_contrato.categoria = ContractType.CategoriaChoices.TERCEIRIZADO
+        self.prof_pendente.tipo_contrato.save(update_fields=['categoria'])
+        contrato_efetivo = ContractType.objects.create(
+            nome='Efetivo 20h', categoria=ContractType.CategoriaChoices.EFETIVO,
+            max_class_hours=10, max_total_hours=20, max_classes=2,
+        )
+        self.prof_ok.tipo_contrato = contrato_efetivo
+        self.prof_ok.save(update_fields=['tipo_contrato'])
+        self.client.force_login(self.desup)
+
+        resposta = self.client.get(reverse('dashboard_desup'), {'vinculo': 'EFETIVO'})
+        self.assertEqual(resposta.context['total_professores_visao'], 1)
+        self.assertContains(resposta, 'Esther Quarterolli Dos Santos')
+        self.assertNotContains(resposta, 'Bruno Pendente')
+        self.assertContains(resposta, '<option value="EFETIVO" selected>', html=False)
+
+        resposta = self.client.get(reverse('dashboard_desup'), {'unidade_id': self.unidade_ruim.pk})
+        self.assertEqual(resposta.context['total_professores_visao'], 1)
+        self.assertContains(resposta, 'Bruno Pendente')
+        self.assertNotContains(resposta, 'Esther Quarterolli Dos Santos')
+
+        self.prof_ok.vinculo_empregaticio = Professor.VinculoEmpregaticioChoices.CONTR_TEMPORARIO
+        self.prof_ok.save(update_fields=['vinculo_empregaticio'])
+        efetivos = self.client.get(reverse('dashboard_desup'), {'vinculo': 'EFETIVO'})
+        temporarios = self.client.get(reverse('dashboard_desup'), {'vinculo': 'CONTR TEMPORARIO'})
+        self.assertEqual(efetivos.context['total_professores_visao'], 0)
+        self.assertEqual(temporarios.context['total_professores_visao'], 1)
+        self.assertContains(temporarios, 'Contrato temporário')
+
+    def test_filtro_vinculo_nas_listagens_desup(self):
+        contrato_terceirizado = ContractType.objects.create(
+            nome='Terceirizado 20h', categoria=ContractType.CategoriaChoices.TERCEIRIZADO,
+            max_class_hours=10, max_total_hours=20, max_classes=2,
+        )
+        self.prof_pendente.tipo_contrato = contrato_terceirizado
+        self.prof_pendente.save(update_fields=['tipo_contrato'])
+        self.client.force_login(self.desup)
+
+        professores = self.client.get(reverse('professors:professor_list'), {'vinculo': 'EFETIVO'})
+        self.assertEqual(professores.context['total_filtrados'], 1)
+        self.assertContains(professores, 'Ana Conforme')
+        self.assertNotContains(professores, 'Bruno Pendente')
+
+        alertas = self.client.get(reverse('core:alertas_carga_desup'), {'vinculo': 'TERCEIRIZADO'})
+        nomes_alertas = {item['nome'] for item in alertas.context['resumo_p1']['detalhe_sobra']}
+        self.assertEqual(nomes_alertas, {'Bruno Pendente'})
+
+        for url in ('core:solicitacao_professor_list', 'extra_curricular:pendencia_list'):
+            with self.subTest(url=url):
+                resposta = self.client.get(reverse(url), {'vinculo': 'TERCEIRIZADO'})
+                self.assertEqual(resposta.status_code, 200)
+                self.assertContains(resposta, 'Vínculo empregatício')
 
     def test_dashboard_desup_conta_como_conforme_a_unidade_sem_professor_ativo(self):
         self.prof_ok.status = Professor.StatusChoices.AFASTADO

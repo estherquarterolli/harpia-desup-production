@@ -1,4 +1,4 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
 {% load static %}
 
 {% block title %}Nova Justificativa Extracurricular — Harpia-DESUP{% endblock %}
@@ -55,7 +55,7 @@
               <input type="checkbox" name="professor_id" value="{{ prof.pk }}" class="prof-checkbox rounded border-slate-300 text-[#025c9f] focus:ring-[#025c9f] cursor-pointer">
             </td>
             <td class="px-3 py-3 sm:px-5">
-              <span class="text-sm font-bold text-[#025c9f]">{{ prof.rh_nome }}</span>
+              <span class="text-sm font-bold text-[#025c9f]">{{ prof.nome }}</span>
             </td>
             <td class="px-3 py-3 text-center sm:px-5" data-label="ID">
               <span class="text-xs text-slate-500">ID: {{ prof.id_funcional }}</span>

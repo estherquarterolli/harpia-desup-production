@@ -9,7 +9,7 @@ from django.utils import timezone
 from apps.allocations.models import AlocacaoTurmaDocente
 from apps.courses.models import MatrixComponent
 from apps.extra_curricular.models import PendenciaExtra, ParecerChoices
-from apps.professors.models import Professor
+from apps.professors.models import Professor, filtro_vinculo_empregaticio
 
 from .models import (
     ExcecaoCargaUnidade,
@@ -42,7 +42,7 @@ def _carga_extracurricular_aprovada(professor_ids, semestre):
     return totais
 
 
-def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, turno=None, status=None):
+def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, turno=None, status=None, vinculo=None):
     """Retorna indicadores consolidados, com filtros aplicados no servidor."""
     hoje = timezone.localdate()
     semestre = semestre or f"{hoje.year}.{'1' if hoje.month <= 6 else '2'}"
@@ -121,10 +121,13 @@ def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, t
         professores_escopo = professores_escopo.filter(
             Q(unidades__id=unidade_id) | Q(unidade_principal_id=unidade_id)
         ).distinct()
+    if vinculo in dict(Professor.VinculoEmpregaticioChoices.choices):
+        professores_escopo = professores_escopo.filter(filtro_vinculo_empregaticio(vinculo))
     professores = list(
         professores_escopo.select_related("tipo_contrato").prefetch_related("unidades", "ocupacoes_diretivas")
     )
     professores_escopo_ids = {professor.pk for professor in professores}
+    professor_ids_filtrados = professor_ids & professores_escopo_ids if vinculo else professor_ids
     extra = _carga_extracurricular_aprovada(professores_escopo_ids, semestre)
     no_limite = 0
     excedidos = 0
@@ -163,13 +166,15 @@ def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, t
     ocupacoes = OcupacaoEquipeDiretiva.objects.filter(OcupacaoEquipeDiretiva.filtro_vigente(hoje))
     if unidade_id:
         ocupacoes = ocupacoes.filter(unidade_id=unidade_id)
+    if vinculo in dict(Professor.VinculoEmpregaticioChoices.choices):
+        ocupacoes = ocupacoes.filter(filtro_vinculo_empregaticio(vinculo, 'professor__'))
 
     ocupacoes_em_sala = list(
-        ocupacoes.filter(professor_id__in=professor_ids).select_related("professor", "cargo", "unidade")
+        ocupacoes.filter(professor_id__in=professor_ids_filtrados).select_related("professor", "cargo", "unidade")
     )
     medio_no_superior = list(
         Professor.objects.filter(
-            pk__in=professor_ids,
+            pk__in=professor_ids_filtrados,
             nivel_ensino_origem=Professor.NivelEnsinoOrigemChoices.MEDIO,
         ).prefetch_related("unidades")
     )
@@ -259,6 +264,9 @@ def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, t
     if unidade_id:
         solicitacoes_pendentes = solicitacoes_pendentes.filter(unidade_solicitante_id=unidade_id)
         excecoes_pendentes = excecoes_pendentes.filter(unidade_id=unidade_id)
+    if vinculo in dict(Professor.VinculoEmpregaticioChoices.choices):
+        solicitacoes_pendentes = solicitacoes_pendentes.filter(filtro_vinculo_empregaticio(vinculo, 'professor__'))
+        excecoes_pendentes = excecoes_pendentes.filter(filtro_vinculo_empregaticio(vinculo, 'professor__'))
 
     unidades_escopo = Unidade.objects.filter(status=True)
     if unidade_id:
@@ -273,7 +281,7 @@ def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, t
         "detalhe_sobra": detalhe_professores["sobra"],
         "detalhe_limite": detalhe_professores["limite"],
         "detalhe_acima": detalhe_professores["acima"],
-        "professores_alocados": len(professor_ids),
+        "professores_alocados": len(professor_ids_filtrados),
         "professores_no_limite": no_limite,
         "professores_excedidos": excedidos,
         "professores_com_sobra": com_sobra,

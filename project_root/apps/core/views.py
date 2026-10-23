@@ -102,10 +102,11 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        from apps.professors.models import Professor
+        from apps.professors.models import Professor, filtro_vinculo_empregaticio
         from apps.professors.views import (
             _bulk_ch_alocada,
             _bulk_ch_justificada,
+            detalhar_alocacoes_professores,
             enriquecer_professores_com_carga,
         )
         from apps.core.models import Unidade
@@ -156,28 +157,50 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
         else:
             ctx['conformidade'] = '0%'
 
-        # Professores para a tabela de consulta
+        # A DESUP usa a mesma visão detalhada da unidade, com escopo global por padrão.
         professores_qs = Professor.objects.select_related(
             'tipo_contrato', 'unidade_principal'
         ).prefetch_related(
             'unidades', 'ocupacoes_diretivas', 'readaptacoes',
-        ).order_by('rh_nome')
+        ).order_by('rh_nome', 'pk')
+        q = self.request.GET.get('q', '').strip()
+        if q:
+            from apps.core.busca import filtrar_contem
+            professores_qs = filtrar_contem(
+                professores_qs, q, ['rh_nome', 'desup_nome', 'id_funcional', 'rh_matricula'],
+            )
+        unidade_id = self.request.GET.get('unidade_id', '')
+        if unidade_id.isdigit():
+            professores_qs = professores_qs.filter(
+                Q(unidades__id=unidade_id) | Q(unidade_principal_id=unidade_id)
+            ).distinct()
+        vinculo = self.request.GET.get('vinculo', '')
+        vinculos_validos = dict(Professor.VinculoEmpregaticioChoices.choices)
+        if vinculo in vinculos_validos:
+            professores_qs = professores_qs.filter(filtro_vinculo_empregaticio(vinculo))
         ctx['unidades'] = unidades_ativas
         ctx['resumo_p1'] = obter_resumo_prioridade1()
 
-        # Estrutura esperada pelo partial _professor_table.html
         from django.core.paginator import Paginator
-        page_obj = Paginator(professores_qs, 20).get_page(1)
-        professores_pagina = enriquecer_professores_com_carga(page_obj.object_list)['professores']
-        ctx['alocacoes_dashboard'] = [
-            {
-                'prof': prof,
-                'units': prof.unidades_exibicao,
-                'ch': prof.carga_total_efetiva,
-            }
-            for prof in professores_pagina
-        ]
-        ctx['dashboard_page_obj'] = page_obj
+        paginator = Paginator(professores_qs, 20)
+        page_obj = paginator.get_page(self.request.GET.get('page'))
+        dados = enriquecer_professores_com_carga(page_obj.object_list)
+        detalhar_alocacoes_professores(dados['professores'], self.request.user)
+        params = self.request.GET.copy()
+        params.pop('page', None)
+        ctx.update({
+            'professores_visao': dados['professores'],
+            'total_professores_visao': paginator.count,
+            'page_obj': page_obj,
+            'paginator': paginator,
+            'is_paginated': page_obj.has_other_pages(),
+            'querystring': params.urlencode(),
+            'filtro_q': q,
+            'filtro_unidade_dashboard': unidade_id,
+            'filtro_vinculo_dashboard': vinculo,
+            'vinculos_empregaticios': Professor.VinculoEmpregaticioChoices.choices,
+            'visao_desup': True,
+        })
 
         ctx.update(_contexto_atalhos_dashboard(self.request.user))
         return ctx
@@ -237,7 +260,7 @@ class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, T
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        from apps.professors.models import Professor
+        from apps.professors.models import Professor, filtro_vinculo_empregaticio
         from apps.professors.views import enriquecer_professores_com_carga
 
         qs = Professor.objects.select_related(
@@ -255,10 +278,13 @@ class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, T
                 ['rh_nome', 'desup_nome', 'id_funcional', 'rh_matricula', 'area_atuacao'],
             )
         unidade_id = self.request.GET.get('unidade_id')
-        if unidade_id:
+        if unidade_id and unidade_id.isdigit():
             qs = qs.filter(
                 Q(unidades__id=unidade_id) | Q(unidade_principal_id=unidade_id)
             ).distinct()
+        vinculo = self.request.GET.get('vinculo', '')
+        if vinculo in dict(Professor.VinculoEmpregaticioChoices.choices):
+            qs = qs.filter(filtro_vinculo_empregaticio(vinculo))
         turno = self.request.GET.get('turno')
         if turno:
             qs = qs.filter(disponibilidades__turno=turno).distinct()
@@ -317,6 +343,7 @@ class DashboardUnidadeView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView
         params = self.request.GET.copy()
         params.pop('page', None)
         ctx.update({
+            'professores_visao': dados['professores'],
             'professores_unidade': dados['professores'],
             'colunas_cursos': dados['colunas_cursos'],
             'page_obj': page_obj,
@@ -324,6 +351,7 @@ class DashboardUnidadeView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView
             'is_paginated': page_obj.has_other_pages(),
             'querystring': params.urlencode(),
             'filtro_q': q,
+            'total_professores_visao': paginator.count,
             'total_professores_unidade': paginator.count,
         })
         return ctx
@@ -1140,11 +1168,13 @@ class SolicitacaoProfessorExternoDesupView(DesupPrioridade1Mixin, TemplateView):
     def get_context_data(self, **kwargs):
         from django.core.paginator import Paginator
         from .models import SolicitacaoProfessorExterno, Unidade
+        from apps.professors.models import Professor, filtro_vinculo_empregaticio
 
         ctx = super().get_context_data(**kwargs)
         status = self.request.GET.get('status', SolicitacaoProfessorExterno.StatusChoices.PENDENTE)
         unidade_id = self.request.GET.get('unidade_id', '')
         tipo = self.request.GET.get('tipo', '')
+        vinculo = self.request.GET.get('vinculo', '')
         qs = SolicitacaoProfessorExterno.objects.select_related(
             'professor', 'unidade_solicitante', 'unidade_origem', 'solicitado_por', 'decidido_por'
         )
@@ -1154,6 +1184,8 @@ class SolicitacaoProfessorExternoDesupView(DesupPrioridade1Mixin, TemplateView):
             qs = qs.filter(tipo=tipo)
         if unidade_id.isdigit():
             qs = qs.filter(unidade_solicitante_id=unidade_id)
+        if vinculo in dict(Professor.VinculoEmpregaticioChoices.choices):
+            qs = qs.filter(filtro_vinculo_empregaticio(vinculo, 'professor__'))
         totais = dict(
             SolicitacaoProfessorExterno.objects.values_list('status').annotate(n=Count('pk'))
         )
@@ -1171,6 +1203,8 @@ class SolicitacaoProfessorExternoDesupView(DesupPrioridade1Mixin, TemplateView):
             'filtro_status': status,
             'filtro_tipo': tipo,
             'filtro_unidade': unidade_id,
+            'vinculos_empregaticios': Professor.VinculoEmpregaticioChoices.choices,
+            'filtro_vinculo': vinculo,
         })
         return ctx
 
@@ -1209,10 +1243,14 @@ class AlertasCargaDesupView(DesupPrioridade1Mixin, TemplateView):
         from .models import ExcecaoCargaUnidade, ReadaptacaoProfessor, Unidade
         from .forms import ReadaptacaoProfessorEdicaoForm, ReadaptacaoProfessorForm
         from .priority1 import obter_resumo_prioridade1
+        from apps.professors.models import Professor, filtro_vinculo_empregaticio
 
         ctx = super().get_context_data(**kwargs)
         hoje = timezone.localdate()
         unidade_id = self.request.GET.get('unidade_id', '')
+        vinculo = self.request.GET.get('vinculo', '')
+        if vinculo not in dict(Professor.VinculoEmpregaticioChoices.choices):
+            vinculo = ''
         curso_id = self.request.GET.get('curso_id', '')
         curso_id = curso_id if curso_id.isdigit() else ''
         from apps.courses.models import Course
@@ -1225,6 +1263,7 @@ class AlertasCargaDesupView(DesupPrioridade1Mixin, TemplateView):
             curso_id=curso_id or None,
             turno=self.request.GET.get('turno') or None,
             status=self.request.GET.get('status') or None,
+            vinculo=vinculo or None,
         )
         readaptacoes = ReadaptacaoProfessor.objects.select_related('professor').order_by('-data_inicio')
         excecoes = ExcecaoCargaUnidade.objects.filter(
@@ -1235,6 +1274,9 @@ class AlertasCargaDesupView(DesupPrioridade1Mixin, TemplateView):
                 Q(professor__unidades__id=unidade_id) | Q(professor__unidade_principal_id=unidade_id)
             ).distinct()
             excecoes = excecoes.filter(unidade_id=unidade_id)
+        if vinculo:
+            readaptacoes = readaptacoes.filter(filtro_vinculo_empregaticio(vinculo, 'professor__'))
+            excecoes = excecoes.filter(filtro_vinculo_empregaticio(vinculo, 'professor__'))
         readaptacoes = list(readaptacoes[:100])
         ctx.update({
             'resumo_p1': resumo,
@@ -1253,6 +1295,8 @@ class AlertasCargaDesupView(DesupPrioridade1Mixin, TemplateView):
             'unidades': Unidade.objects.filter(status=True).order_by('nome'),
             'cursos': cursos_filtro,
             'filtro_unidade': unidade_id,
+            'filtro_vinculo': vinculo,
+            'vinculos_empregaticios': Professor.VinculoEmpregaticioChoices.choices,
             'filtro_curso': curso_id,
             'hoje': hoje,
         })

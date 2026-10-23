@@ -13,7 +13,7 @@ from apps.core.busca import filtrar_contem
 from apps.allocations.services import semestre_atual
 from apps.core.models import Notificacao, SolicitacaoProfessorExterno, Unidade
 from .forms import ProfessorForm, SolicitacaoCadastroProfessorForm, SolicitacaoCessaoProfessorForm
-from .models import ContractType, Professor
+from .models import ContractType, Professor, filtro_vinculo_empregaticio
 
 
 ALLOCATION_TABLE_PAGE_SIZE = 20
@@ -407,6 +407,9 @@ class ProfessorListView(LoginRequiredMixin, ListView):
         cargo = self.request.GET.get('cargo') or self.request.GET.get('tipo')
         if cargo and cargo.isdigit():
             qs = qs.filter(tipo_contrato_id=cargo)
+        vinculo = self.request.GET.get('vinculo', '')
+        if (user.perfil == 'DESUP' or user.is_superuser) and vinculo in dict(Professor.VinculoEmpregaticioChoices.choices):
+            qs = qs.filter(filtro_vinculo_empregaticio(vinculo))
         unidade_id = self.request.GET.get('unidade_id')
         if unidade_id:
             qs = qs.filter(
@@ -447,6 +450,8 @@ class ProfessorListView(LoginRequiredMixin, ListView):
             for pk, nome in ContractType.objects.permitidos().order_by('nome').values_list('pk', 'nome')
         ]
         ctx['cargos'] = cargos
+        ctx['vinculos_empregaticios'] = Professor.VinculoEmpregaticioChoices.choices
+        ctx['vinculo_atual'] = self.request.GET.get('vinculo', '')
         ctx['tipos'] = cargos  # compatibilidade com integrações e testes existentes
         ctx['total_filtrados'] = ctx['paginator'].count if ctx.get('paginator') else len(ctx['professores'])
         params = self.request.GET.copy()
@@ -454,7 +459,7 @@ class ProfessorListView(LoginRequiredMixin, ListView):
         ctx['querystring'] = params.urlencode()
         ctx['filtros_ativos'] = any(
             self.request.GET.get(k)
-            for k in ('q', 'ch', 'cargo', 'regime', 'tipo', 'unidade_id')
+            for k in ('q', 'ch', 'cargo', 'regime', 'tipo', 'unidade_id', 'vinculo')
         )
         visao_unidade = user.perfil == 'COORDENADOR_UNIDADE' and not user.is_superuser
         if visao_unidade:

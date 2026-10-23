@@ -341,7 +341,7 @@ class AlocarDocenteComponenteView(LoginRequiredMixin, PerfilRequiredMixin, View)
                 'reload': reload,
                 'linha_id': linha.pk if linha else None,
                 'docente_id': linha.docente_id if linha else None,
-                'docente_nome': linha.docente.rh_nome if linha and linha.docente_id else '',
+                'docente_nome': linha.docente.nome if linha and linha.docente_id else '',
                 'outra_unidade': outra_unidade,
                 'cargo_diretivo': (
                     _cargos_diretivos_vigentes().get(linha.docente_id, '')
