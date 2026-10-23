@@ -15,6 +15,8 @@ class ProfessorForm(forms.ModelForm):
             'rh_matricula',
             'rh_nome',
             'tipo_contrato',
+            'vinculo_empregaticio',
+            'setor_origem',
             'carga_diferenciada',
             'carga_horaria_personalizada',
             'unidades',
@@ -28,6 +30,8 @@ class ProfessorForm(forms.ModelForm):
             'rh_matricula': forms.TextInput(attrs={'class': _INPUT_CSS, 'placeholder': 'Matrícula RH (se houver)'}),
             'rh_nome': forms.TextInput(attrs={'class': _INPUT_CSS, 'placeholder': 'Nome completo'}),
             'tipo_contrato': forms.Select(attrs={'class': _SELECT_CSS}),
+            'vinculo_empregaticio': forms.Select(attrs={'class': _SELECT_CSS}),
+            'setor_origem': forms.TextInput(attrs={'class': _INPUT_CSS, 'maxlength': 255}),
             'unidades': forms.CheckboxSelectMultiple(attrs={
                 'hx-get': '/professores/htmx/cursos-unidade/',
                 'hx-target': '#cursos-container',
@@ -47,6 +51,8 @@ class ProfessorForm(forms.ModelForm):
             'rh_matricula': 'Matrícula RH (opcional)',
             'rh_nome': 'Nome',
             'tipo_contrato': 'Cargo',
+            'vinculo_empregaticio': 'Vínculo empregatício',
+            'setor_origem': 'Setor de origem',
             'unidades': 'Unidades',
             'cursos': 'Cursos (Checklist)',
             'status': 'Status',
@@ -57,6 +63,8 @@ class ProfessorForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
+        if self.instance.pk and not self.is_bound:
+            self.initial['rh_nome'] = " ".join((self.instance.rh_nome or "").split()).title()
         self.fields['tipo_contrato'].queryset = ContractType.objects.permitidos().order_by('nome')
         # Cadastros e integrações anteriores a este campo podem omiti-lo. O
         # valor institucional seguro nesses casos é "Não informado".

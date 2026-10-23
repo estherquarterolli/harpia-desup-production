@@ -46,7 +46,7 @@
           <tbody class="divide-y divide-slate-100">
             {% for item in sup_items %}
             <tr class="hover:bg-slate-50/50 transition-colors">
-              <td class="px-5 py-3" data-label="Docente"><span class="text-sm font-bold text-[#025c9f]">{{ item.professor.rh_nome }}</span></td>
+              <td class="px-5 py-3" data-label="Docente"><span class="text-sm font-bold text-[#025c9f]">{{ item.professor.nome }}</span></td>
               <td class="px-5 py-3 text-xs text-slate-600" data-label="Atividade">
                 {{ item.get_tipo_display }}{% if item.curso %} · {{ item.curso.sigla }}{% endif %}
               </td>
@@ -85,7 +85,7 @@
               <label class="block text-[10px] font-black text-[#025c9f] uppercase tracking-wide mb-1">Docente</label>
               <select name="professor" required class="form-field w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#025c9f]">
                 <option value="">Selecione...</option>
-                {% for prof in professores %}<option value="{{ prof.pk }}">{{ prof.rh_nome }}</option>{% endfor %}
+                {% for prof in professores %}<option value="{{ prof.pk }}">{{ prof.nome }}</option>{% endfor %}
               </select>
             </div>
             <div>

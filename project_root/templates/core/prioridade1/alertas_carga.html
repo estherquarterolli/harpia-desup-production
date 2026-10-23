@@ -8,7 +8,7 @@
 <div class="space-y-6">
   {# Cabeçalho + filtros #}
   <section>
-    <form id="alertaFiltros" method="get" class="grid w-full grid-cols-1 gap-3 rounded-2xl border border-white bg-white/80 p-4 shadow-[0_8px_30px_rgba(2,92,159,0.08)] sm:grid-cols-2 lg:grid-cols-4 lg:gap-0 lg:divide-x lg:divide-slate-100 lg:p-3">
+    <form id="alertaFiltros" method="get" class="grid w-full grid-cols-1 gap-3 rounded-2xl border border-white bg-white/80 p-4 shadow-[0_8px_30px_rgba(2,92,159,0.08)] sm:grid-cols-2 lg:grid-cols-5 lg:gap-0 lg:divide-x lg:divide-slate-100 lg:p-3">
       <div class="lg:px-4">
         <label for="alerta-unidade" class="mb-1.5 flex items-center gap-2 text-sm font-bold text-slate-600"><i class="ph ph-buildings text-lg text-[#025c9f]" aria-hidden="true"></i>Unidade</label>
         <select id="alerta-unidade" name="unidade_id" onchange="this.form.submit()" class="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm font-semibold text-slate-700"><option value="">Todas as unidades</option>{% for unidade in unidades %}<option value="{{ unidade.pk }}" {% if filtro_unidade == unidade.pk|stringformat:'s' %}selected{% endif %}>{{ unidade.sigla }} - {{ unidade.nome }}</option>{% endfor %}</select>
@@ -25,8 +25,13 @@
         <label for="alerta-turno" class="mb-1.5 flex items-center gap-2 text-sm font-bold text-slate-600"><i class="ph ph-sun text-lg text-[#025c9f]" aria-hidden="true"></i>Turno</label>
         <select id="alerta-turno" name="turno" onchange="this.form.submit()" class="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm font-semibold text-slate-700"><option value="">Todos os turnos</option><option value="M" {% if request.GET.turno == 'M' %}selected{% endif %}>Manhã</option><option value="T" {% if request.GET.turno == 'T' %}selected{% endif %}>Tarde</option><option value="N" {% if request.GET.turno == 'N' %}selected{% endif %}>Noite</option></select>
       </div>
-      <noscript><button class="min-h-11 rounded-xl bg-slate-800 px-4 text-sm font-black text-white sm:col-span-2 lg:col-span-4">Filtrar</button></noscript>
+      <div class="lg:px-4">
+        <label for="alerta-vinculo" class="mb-1.5 flex items-center gap-2 text-sm font-bold text-slate-600"><i class="ph ph-identification-card text-lg text-[#025c9f]" aria-hidden="true"></i>Vínculo empregatício</label>
+        <select id="alerta-vinculo" name="vinculo" onchange="this.form.submit()" class="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm font-semibold text-slate-700"><option value="">Todos os vínculos</option>{% for valor, rotulo in vinculos_empregaticios %}<option value="{{ valor }}" {% if filtro_vinculo == valor %}selected{% endif %}>{{ rotulo }}</option>{% endfor %}</select>
+      </div>
+      <noscript><button class="min-h-11 rounded-xl bg-slate-800 px-4 text-sm font-black text-white sm:col-span-2 lg:col-span-5">Filtrar</button></noscript>
     </form>
+    {% if filtro_vinculo %}<p class="mt-2 px-1 text-xs text-slate-500">O vínculo filtra indicadores e registros de professores. Disciplinas e limites das unidades continuam no escopo de unidade, curso e turno.</p>{% endif %}
   </section>
 
   <nav class="flex gap-1 overflow-x-auto rounded-2xl border border-white bg-white/80 p-1 shadow-[0_8px_30px_rgba(2,92,159,0.08)]" role="tablist" aria-label="Seções">
