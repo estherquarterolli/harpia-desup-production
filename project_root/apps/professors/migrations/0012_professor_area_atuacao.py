@@ -3,16 +3,44 @@
 from django.db import migrations, models
 
 
+def add_area_if_missing(apps, schema_editor):
+    connection = schema_editor.connection
+    table_name = 'harpiadb_professores_professor'
+    with connection.cursor() as cursor:
+        columns = {
+            column.name for column in connection.introspection.get_table_description(cursor, table_name)
+        }
+    if 'area_atuacao' not in columns:
+        schema_editor.execute(
+            f"ALTER TABLE {schema_editor.quote_name(table_name)} "
+            "ADD COLUMN area_atuacao varchar(150) NOT NULL DEFAULT ''"
+        )
+
+
+def remove_area(apps, schema_editor):
+    connection = schema_editor.connection
+    table_name = 'harpiadb_professores_professor'
+    with connection.cursor() as cursor:
+        columns = {
+            column.name for column in connection.introspection.get_table_description(cursor, table_name)
+        }
+    if 'area_atuacao' in columns:
+        schema_editor.execute(
+            f"ALTER TABLE {schema_editor.quote_name(table_name)} DROP COLUMN area_atuacao"
+        )
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
         ('professors', '0011_professor_nivel_ensino_origem'),
     ]
 
-    operations = [
-        migrations.AddField(
+    operations = [migrations.SeparateDatabaseAndState(
+        database_operations=[migrations.RunPython(add_area_if_missing, remove_area)],
+        state_operations=[migrations.AddField(
             model_name='professor',
             name='area_atuacao',
             field=models.CharField(blank=True, default='', help_text='Área de conhecimento em que o professor atua (ex.: Matemática, Computação).', max_length=150, verbose_name='Área de atuação'),
-        ),
-    ]
+        )],
+    )]

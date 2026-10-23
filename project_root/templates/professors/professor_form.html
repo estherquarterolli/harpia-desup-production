@@ -104,6 +104,18 @@
             {% if form.tipo_contrato.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.tipo_contrato.errors.0 }}</p>{% endif %}
           </div>
 
+          <div>
+            <label for="{{ form.vinculo_empregaticio.id_for_label }}" class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Vínculo empregatício</label>
+            {{ form.vinculo_empregaticio }}
+            {% if form.vinculo_empregaticio.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.vinculo_empregaticio.errors.0 }}</p>{% endif %}
+          </div>
+
+          <div class="md:col-span-2">
+            <label for="{{ form.setor_origem.id_for_label }}" class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Setor de origem</label>
+            {{ form.setor_origem }}
+            {% if form.setor_origem.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.setor_origem.errors.0 }}</p>{% endif %}
+          </div>
+
           <div class="md:col-span-2">
             <label class="flex items-center gap-2 text-sm font-semibold text-slate-700">
               {{ form.carga_diferenciada }} Professor com carga diferente

@@ -1,4 +1,4 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
 {% load static %}
 
 {% block title %}Dashboard DESUP - Harpia{% endblock %}
@@ -6,9 +6,20 @@
 {% block header_title %}Dashboard DESUP{% endblock %}
 
 {% block content %}
-<div class="space-y-8">
+<div class="space-y-6">
 
-    <!-- Painel único: indicadores + pontos de atenção -->
+    <section class="dash-panel dash-hero" aria-label="Todas as unidades">
+        <span class="dash-stat-icon dash-tone-indigo dash-hero-icon"><i class="ph ph-buildings"></i></span>
+        <div class="min-w-0">
+            <p class="dash-label">Abrangência da DESUP</p>
+            <h2 class="dash-hero-title">Todas as unidades</h2>
+            <p class="dash-hero-sub">{{ request.user.get_perfil_display }} · {{ request.user.email }} · {{ total_unidades }} unidades</p>
+        </div>
+    </section>
+
+    {% include 'dashboard/partials/_atalhos_unidade.html' %}
+    {% include 'dashboard/partials/_professor_visao.html' %}
+
     <section data-tour="dash-resumo" class="dash-panel" aria-label="Resumo geral">
         <div class="dash-stats">
             <div class="dash-stat">
@@ -47,50 +58,8 @@
             <a href="{% url 'core:alertas_carga_desup' %}" class="dash-pill {% if resumo_p1.componentes_sem_professor %}dash-pill-red{% endif %}">Sem professor <b>{{ resumo_p1.componentes_sem_professor }}</b></a>
             <a href="{% url 'core:alertas_carga_desup' %}" class="dash-pill {% if resumo_p1.professores_com_sobra %}dash-pill-blue{% endif %}">Com sobra de carga <b>{{ resumo_p1.professores_com_sobra }}</b></a>
             <a href="{% url 'core:alertas_carga_desup' %}" class="dash-pill {% if resumo_p1.diretivos_em_sala %}dash-pill-violet{% endif %}">Diretivos em sala <b>{{ resumo_p1.diretivos_em_sala }}</b></a>
-            <a href="{% url 'core:alertas_carga_desup' %}" class="dash-pill {% if resumo_p1.readaptados_em_sala %}dash-pill-red{% endif %}">Readaptados em sala <b>{{ resumo_p1.readaptados_em_sala }}</b></a>
         </div>
     </section>
-
-    <!-- Atalhos do dashboard -->
-    {% include 'dashboard/partials/_atalhos_bloco.html' %}
-
-    <!-- Visão geral dos professores de todas as unidades com filtros HTMX -->
-    <div>
-        <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4">
-            <div>
-                <h2 class="text-sm font-bold text-slate-500 uppercase tracking-widest">Visão geral de todas as unidades</h2>
-                <p class="text-xs text-slate-400">{{ total_professores }} professor{{ total_professores|pluralize:",es" }} cadastrado{{ total_professores|pluralize }} na rede</p>
-            </div>
-            <div class="flex flex-wrap gap-3 items-end">
-                <div class="relative w-full sm:w-auto">
-                    <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                    <input type="text" name="q" placeholder="Buscar professor ou área..."
-                        class="pl-9 pr-4 py-2 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-400 w-full sm:w-48 js-autocomplete"
-                        hx-get="{% url 'dashboard_professores_partial' %}"
-                        hx-target="#dashboard-professor-table"
-                        hx-trigger="keyup changed delay:400ms"
-                        hx-include="[name='unidade_id']"
-                        autocomplete="off">
-                </div>
-                <select name="unidade_id"
-                    class="w-full sm:w-auto px-3 py-2 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-                    hx-get="{% url 'dashboard_professores_partial' %}"
-                    hx-target="#dashboard-professor-table"
-                    hx-trigger="change"
-                    hx-include="[name='q']">
-                    <option value="">Todas Unidades</option>
-                    {% for u in unidades %}
-                    <option value="{{ u.id }}">{{ u.sigla }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-        </div>
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-x-auto">
-            <div id="dashboard-professor-table">
-                {% include 'dashboard/partials/_professor_table.html' %}
-            </div>
-        </div>
-    </div>
 
     <a href="{% url 'core:exportar_logs' %}" class="inline-flex items-center bg-[#ffb800] text-[#025c9f] font-black py-3 px-8 rounded-xl shadow-sm uppercase text-xs hover:bg-yellow-400 transition-colors text-center">
         <i class="ph ph-file-csv mr-2 text-lg"></i>Gerar LOG

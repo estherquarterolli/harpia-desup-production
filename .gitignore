@@ -1,5 +1,6 @@
 # Byte-compiled / optimized / DLL files
 node_modules/
+project_root/sql/local/
 project_root/staticfiles/
 supabase/.temp/
 __pycache__/

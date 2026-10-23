@@ -335,9 +335,6 @@ class ReadaptacaoProfessorForm(forms.ModelForm):
             "data_fim": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": _DATE_CSS}),
             "justificativa_administrativa": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 4}),
         }
-        help_texts = {
-            "professor": "Durante a vigência o professor não pode ser alocado em sala; a carga vai para o extracurricular.",
-        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -59,7 +59,62 @@ class AlertasDetalhesTests(TestCase):
         self.client.force_login(self.coord)
         self.assertEqual(self.client.get(self.url).status_code, 403)
 
-    def test_pontos_de_atencao_mostram_quem_sao_os_professores(self):
+    def test_acima_do_limite_explica_a_conta_e_a_origem_das_horas(self):
+        from apps.allocations.services import atribuir_docente
+
+        professor = Professor.objects.get(rh_nome='Ana Teste')
+        professor.tipo_contrato.max_class_hours = 2
+        professor.tipo_contrato.save(update_fields=['max_class_hours'])
+        atribuir_docente(MatrixComponent.objects.get(), professor)
+        self.client.force_login(self.desup)
+
+        resposta = self.client.get(self.url)
+        detalhe = resposta.context['resumo_p1']['detalhe_acima'][0]
+
+        self.assertEqual(detalhe['horas_aula'], 4)
+        self.assertEqual(detalhe['horas_extra'], 0)
+        self.assertEqual(detalhe['meta'], 2)
+        self.assertEqual(detalhe['diferenca'], 2)
+        self.assertContains(resposta, '4 h contabilizadas − 2 h de limite = 2 h de excesso')
+        self.assertContains(resposta, '0 h em outras horas aprovadas')
+
+    def test_lista_acima_do_limite_mostra_mais_de_cem_professores(self):
+        from django.utils import timezone
+
+        from apps.allocations.models import AlocacaoCurricular, AlocacaoTurmaDocente
+
+        contrato = Professor.objects.get(rh_nome='Ana Teste').tipo_contrato
+        contrato.max_class_hours = 2
+        contrato.save(update_fields=['max_class_hours'])
+        professores = Professor.objects.bulk_create([
+            Professor(
+                id_funcional=f'excesso-{numero}', rh_nome=f'Professor {numero:03d}',
+                tipo_contrato=contrato, unidade_principal=self.unidade,
+            )
+            for numero in range(101)
+        ])
+        hoje = timezone.localdate()
+        semestre = f"{hoje.year}.{'1' if hoje.month <= 6 else '2'}"
+        alocacao = AlocacaoCurricular.objects.create(
+            unidade=self.unidade, curso=CourseUnit.objects.get(), semestre=semestre, turno='M',
+        )
+        AlocacaoTurmaDocente.objects.bulk_create([
+            AlocacaoTurmaDocente(
+                alocacao_curricular=alocacao, componente_matriz=MatrixComponent.objects.get(),
+                docente=professor,
+            )
+            for professor in professores
+        ])
+        self.client.force_login(self.desup)
+
+        resposta = self.client.get(self.url)
+
+        self.assertEqual(resposta.context['resumo_p1']['professores_excedidos'], 101)
+        self.assertEqual(len(resposta.context['resumo_p1']['detalhe_acima']), 101)
+        self.assertContains(resposta, 'Professor 100')
+        self.assertNotContains(resposta, 'Mostrando os primeiros')
+
+    def test_readaptado_em_sala_nao_gera_ponto_de_atencao(self):
         from datetime import timedelta
 
         from django.utils import timezone
@@ -79,9 +134,8 @@ class AlertasDetalhesTests(TestCase):
         resposta = self.client.get(self.url)
 
         resumo = resposta.context['resumo_p1']
-        self.assertEqual(resumo['readaptados_em_sala'], 1)
-        self.assertEqual([i['nome'] for i in resumo['detalhe_readaptados']], ['Ana Teste'])
-        self.assertContains(resposta, 'modalPontoReadaptados')
-        self.assertContains(resposta, "abrirModal('modalPontoReadaptados')")
+        self.assertNotIn('readaptados_em_sala', resumo)
+        self.assertNotContains(resposta, 'modalPontoReadaptados')
+        self.assertContains(resposta, 'Professor <strong>readaptado</strong> é aquele com restrição funcional para dar aula.')
         # Sem ocorrência não há botão para abrir a lista.
         self.assertNotContains(resposta, "abrirModal('modalPontoDiretivos')")

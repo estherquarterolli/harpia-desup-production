@@ -43,7 +43,7 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
             hx-select="#pendencias-content"
             hx-push-url="false"
             hx-trigger="input changed delay:500ms, search"
-            hx-include="#filter-aba,#filter-semestre,#filter-unidade,#search-extracurricular,#filter-status,#filter-justificativa"
+            hx-include="#filter-aba,#filter-semestre,#filter-unidade,#filter-vinculo,#search-extracurricular,#filter-status,#filter-justificativa"
             class="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm font-semibold text-[#025c9f] shadow-sm outline-none transition focus:border-[#025c9f] focus:ring-2 focus:ring-blue-100"
             autocomplete="off">
           <i class="ph ph-magnifying-glass pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-lg text-slate-400"></i>
@@ -57,7 +57,7 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
           class="extra-filter-button" aria-haspopup="dialog" aria-controls="modalFiltrosExtracurriculares">
           <i class="ph ph-funnel text-lg" aria-hidden="true"></i>
           <span>Filtros</span>
-          {% if status_filtro or justificativa_filtro or unidade_selecionada and is_desup %}
+          {% if status_filtro or justificativa_filtro or vinculo_atual or unidade_selecionada and is_desup %}
           <span class="extra-filter-dot" aria-label="Há filtros ativos"></span>
           {% endif %}
         </button>
@@ -148,6 +148,16 @@ janela_fechada e window_fechada ficam verdadeiros para exatamente o mesmo públi
               </div>
               {% endif %}
             </div>
+            {% if is_desup %}
+            <div>
+              <label for="filter-vinculo" class="mb-1.5 block text-xs font-black uppercase tracking-wide text-[#025c9f]">Vínculo empregatício</label>
+              <select id="filter-vinculo" name="vinculo"
+                class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-[#025c9f] outline-none focus:ring-2 focus:ring-blue-100">
+                <option value="">Todos os vínculos</option>
+                {% for valor, rotulo in vinculos_empregaticios %}<option value="{{ valor }}" {% if vinculo_atual == valor %}selected{% endif %}>{{ rotulo }}</option>{% endfor %}
+              </select>
+            </div>
+            {% endif %}
           </div>
 
           <div class="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50/70 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">

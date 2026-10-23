@@ -583,7 +583,7 @@ class SolicitacaoProfessorExterno(models.Model):
 
     @property
     def nome_professor(self):
-        return self.professor.nome if self.professor_id else self.professor_nome
+        return self.professor.nome if self.professor_id else " ".join((self.professor_nome or "").split()).title()
 
     def __str__(self):
         if self.unidade_origem_id:
@@ -773,6 +773,7 @@ class ReadaptacaoProfessor(models.Model):
     )
     data_inicio = models.DateField(verbose_name="Início da vigência")
     data_fim = models.DateField(null=True, blank=True, verbose_name="Fim da vigência")
+    pausado_em = models.DateTimeField(null=True, blank=True, verbose_name="Pausada em")
     justificativa_administrativa = models.TextField(
         verbose_name="Justificativa administrativa",
         help_text="Não informe diagnóstico ou dados médicos desnecessários.",
@@ -806,17 +807,26 @@ class ReadaptacaoProfessor(models.Model):
     @property
     def vigente(self):
         hoje = timezone.localdate()
-        return self.data_inicio <= hoje and (self.data_fim is None or self.data_fim >= hoje)
+        return self.pausado_em is None and self.data_inicio <= hoje and (self.data_fim is None or self.data_fim >= hoje)
 
     def conflitos_de_vigencia(self):
         if not self.professor_id or not self.data_inicio:
             return type(self).objects.none()
         conflitos = type(self).objects.filter(professor_id=self.professor_id).exclude(pk=self.pk)
-        if self.data_fim:
-            conflitos = conflitos.filter(data_inicio__lte=self.data_fim)
-        return conflitos.filter(
-            models.Q(data_fim__isnull=True) | models.Q(data_fim__gte=self.data_inicio)
-        )
+        from datetime import timedelta
+
+        fim_novo = self.data_fim
+        if self.pausado_em:
+            ultimo_dia = timezone.localtime(self.pausado_em).date() - timedelta(days=1)
+            fim_novo = min(fim_novo, ultimo_dia) if fim_novo else ultimo_dia
+        for outro in conflitos:
+            fim_outro = outro.data_fim
+            if outro.pausado_em:
+                ultimo_dia = timezone.localtime(outro.pausado_em).date() - timedelta(days=1)
+                fim_outro = min(fim_outro, ultimo_dia) if fim_outro else ultimo_dia
+            if (fim_outro is None or fim_outro >= self.data_inicio) and (fim_novo is None or outro.data_inicio <= fim_novo):
+                return conflitos.filter(pk=outro.pk)
+        return conflitos.none()
 
     def clean(self):
         super().clean()

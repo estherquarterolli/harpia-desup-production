@@ -149,6 +149,8 @@ class PendenciaListView(LoginRequiredMixin, PerfilRequiredMixin, View):
         justificativa_filtro = request.GET.get("justificativa", "").strip().lower()
         aba_ativa = request.GET.get("aba", "pendencias").strip().lower()
         is_desup = perfil == "DESUP" or user.is_superuser
+        from apps.professors.models import Professor
+        vinculo = request.GET.get('vinculo', '') if is_desup else ''
         if is_desup:
             # Para a DESUP, o estado é definido exclusivamente pelas três abas.
             # Ignora URLs antigas com ?status= para não cruzar filtros incompatíveis.
@@ -170,6 +172,11 @@ class PendenciaListView(LoginRequiredMixin, PerfilRequiredMixin, View):
         # todos os dados exibidos (docente, ID, SEI, justificativa, status e CH),
         # não somente o nome do professor.
         raw_data = get_pendencias_data(unidade_id_to_filter, semestre)
+        if vinculo in dict(Professor.VinculoEmpregaticioChoices.choices):
+            raw_data = [
+                item for item in raw_data
+                if item['professor'].vinculo_empregaticio_codigo == vinculo
+            ]
 
         nav_context = _extracurricular_navigation_context(
             user,
@@ -299,6 +306,8 @@ class PendenciaListView(LoginRequiredMixin, PerfilRequiredMixin, View):
             "total_pendencias": paginator.count,
             "q": q,
             "is_desup": is_desup,
+            "vinculos_empregaticios": Professor.VinculoEmpregaticioChoices.choices,
+            "vinculo_atual": vinculo,
             "status_filtro": status_filtro,
             "justificativa_filtro": justificativa_filtro,
             "aba_ativa": aba_ativa,

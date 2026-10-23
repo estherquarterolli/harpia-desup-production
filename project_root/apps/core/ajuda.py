@@ -161,7 +161,7 @@ AJUDA_PAGINAS = {
                    '#modalDetalheDisciplinas > div', abrir='button[aria-labelledby="kpi-disciplinas"]', fechar='#modalDetalheDisciplinas'),
             _passo('Veja os pontos de atenção', 'Situações irregulares, como equipe diretiva dando aula. Clique no número para ver quem são.',
                    '#pontosLista', abrir='#pontosToggle', fechar='alternar:#pontosToggle'),
-            _passo('Use a aba Readaptações', 'Lista os professores readaptados e permite editar ou encerrar a readaptação vigente.',
+            _passo('Use a aba Readaptações', 'Lista os professores readaptados e permite editar ou pausar imediatamente a readaptação vigente.',
                    '[data-painel="readaptacoes"]', abrir='.aba-btn[data-aba="readaptacoes"]', fechar=_ABA_VISAO),
             _passo('Registre uma readaptação', 'Clique em "Registrar" para cadastrar um professor com restrição funcional.',
                    '#modalNovaReadaptacao > div',

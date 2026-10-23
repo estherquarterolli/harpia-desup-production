@@ -351,6 +351,7 @@
       this.currentNome = root.dataset.currentNome;
       this.currentCargo = root.dataset.currentCargo || '';
       this.currentOutra = root.dataset.currentOutra === '1';
+      this.currentReadaptado = root.dataset.currentReadaptado === '1';
       this.isLocked  = root.dataset.windowLock === 'true';
 
       if (this.input.disabled) return;
@@ -533,7 +534,7 @@
             this._triggerWindowLock();
             return;
           }
-          this._selectValue(el.dataset.id, el.dataset.nome, el.dataset.cargo || '', el.dataset.outra === '1');
+          this._selectValue(el.dataset.id, el.dataset.nome, el.dataset.cargo || '', el.dataset.outra === '1', el.dataset.readaptado === '1');
         });
       });
 
@@ -542,7 +543,7 @@
       this._position();
     }
 
-    async _selectValue(value, label, cargo, outra) {
+    async _selectValue(value, label, cargo, outra, readaptado = false) {
       this._close();
 
       // Escolheu o que já está salvo: nada a enviar.
@@ -554,9 +555,9 @@
 
       // Salvamento automático: a linha é atualizada na hora e o envio roda em
       // segundo plano, sem recarregar a página nem travar o campo.
-      const prev = { id: this.currentId, nome: this.currentNome, cargo: this.currentCargo, outra: this.currentOutra };
+      const prev = { id: this.currentId, nome: this.currentNome, cargo: this.currentCargo, outra: this.currentOutra, readaptado: this.currentReadaptado };
       const nome = value === 'SEM_PROFESSOR' ? '' : value === 'NAO_OFERECIDA' ? 'Não oferecido' : label;
-      this._applyState(value, nome, cargo || '', !!outra);
+      this._applyState(value, nome, cargo || '', !!outra, readaptado);
       this.wrap.classList.add('opacity-60');
 
       try {
@@ -596,7 +597,7 @@
         const cargoDiretivo = data.cargo_diretivo || '';
         const outraUnidade = !!data.outra_unidade;
         if (cargoDiretivo !== this.currentCargo || outraUnidade !== this.currentOutra) {
-          this._applyState(value, nome, cargoDiretivo, outraUnidade);
+          this._applyState(value, nome, cargoDiretivo, outraUnidade, readaptado);
         }
         if (cargoDiretivo) {
           showAllocToast(`Atenção: ${nome} integra a equipe diretiva (${cargoDiretivo}) e foi alocado em sala.`, 'warn');
@@ -609,7 +610,7 @@
         }
       } catch (err) {
         this.wrap.classList.remove('opacity-60');
-        this._applyState(prev.id, prev.nome, prev.cargo, prev.outra);
+        this._applyState(prev.id, prev.nome, prev.cargo, prev.outra, prev.readaptado);
         refreshAllocSummary();
         showAllocToast(err.fromServer ? err.message : 'Erro ao salvar a alocação. Tente novamente.', true);
       }
@@ -657,7 +658,7 @@
 
     // Reflete na linha o estado (docente / sem professor / não oferecido),
     // espelhando as classes que o template renderiza no carregamento.
-    _applyState(id, nome, cargo, outra) {
+    _applyState(id, nome, cargo, outra, readaptado = false) {
       const isNone = id === 'SEM_PROFESSOR';
       const isNao = id === 'NAO_OFERECIDA';
       const hasDoc = !isNone && !isNao;
@@ -668,12 +669,23 @@
       this.currentNome = nome || '';
       this.currentCargo = diretivo ? cargo : '';
       this.currentOutra = hasDoc && !!outra;
+      this.currentReadaptado = hasDoc && !!readaptado;
       this.root.dataset.currentOutra = this.currentOutra ? '1' : '';
       this.root.dataset.currentId = this.currentId;
       this.root.dataset.currentNome = this.currentNome;
       this.root.dataset.currentCargo = this.currentCargo;
+      this.root.dataset.currentReadaptado = this.currentReadaptado ? '1' : '';
 
       this.input.value = this.currentNome;
+      let badge = this.wrap.querySelector('.ac-readaptado');
+      if (this.currentReadaptado && !badge) {
+        badge = document.createElement('span');
+        badge.className = 'ac-readaptado rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-700 flex-shrink-0';
+        badge.textContent = 'Readaptado';
+        this.input.after(badge);
+      } else if (!this.currentReadaptado && badge) {
+        badge.remove();
+      }
       this.input.placeholder = isNao ? 'Não oferecido' : 'Sem professor';
       // Amarelo = equipe diretiva em sala; vermelho = carência; verde = docente.
       this.input.className = 'ac-input flex-1 min-w-0 bg-transparent outline-none ' +
