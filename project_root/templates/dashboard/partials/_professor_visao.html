@@ -1,8 +1,8 @@
     <section class="prof-list-shell" aria-label="Visão geral dos professores{% if visao_desup %} de todas as unidades{% else %} da unidade{% endif %}">
         <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-                <h2 class="text-sm font-bold uppercase tracking-widest text-slate-500">{% if visao_desup %}Visão geral de todas as unidades{% else %}Visão geral da unidade{% endif %}</h2>
-                <p class="text-xs text-slate-400">{{ total_professores_visao }} professor{{ total_professores_visao|pluralize:",es" }} {% if visao_desup %}encontrado{{ total_professores_visao|pluralize }} na rede{% else %}vinculado{{ total_professores_visao|pluralize }} à unidade{% endif %}</p>
+                <h2 class="text-sm font-bold uppercase tracking-widest text-black">{% if visao_desup %}Visão geral de todas as unidades{% else %}Visão geral da unidade{% endif %}</h2>
+                <p class="text-xs text-black">{{ total_professores_visao }} professor{{ total_professores_visao|pluralize:",es" }} {% if visao_desup %}encontrado{{ total_professores_visao|pluralize }} na rede{% else %}vinculado{{ total_professores_visao|pluralize }} à unidade{% endif %}</p>
             </div>
             <form method="get" class="flex w-full flex-wrap items-end gap-2 sm:w-auto">
                 <div class="relative min-w-48 flex-1 sm:w-64 sm:flex-none">
