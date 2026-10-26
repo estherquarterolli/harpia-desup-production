@@ -306,13 +306,17 @@ class Prioridade1DesupTests(TestCase):
         cargo = TipoCargoDiretivo.objects.create(nome="Direção", codigo="DIRECAO", ordem=10)
         self.client.force_login(self.desup)
         retorno = f"{reverse('core:equipe_diretiva_desup')}?unidade_id={self.origem.pk}"
+        self.client.post(
+            reverse('core:cargo_diretivo_unidade_reducao', args=[self.origem.pk, cargo.pk]),
+            {'carga_reducao_horas': '12.00'},
+        )
 
         resposta = self.client.post(
             reverse("core:ocupacao_diretiva_create", args=[self.origem.pk, cargo.pk]),
             {
                 "professor": self.professor.pk,
                 "data_inicio": self.hoje.isoformat(),
-                "carga_reducao_horas": "12.00",
+                "carga_reducao_horas": "99.00",  # Ignorado: usa o padrão da unidade.
                 "observacoes": "",
                 "next": retorno,
             },

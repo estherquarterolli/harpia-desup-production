@@ -1,8 +1,10 @@
 import re
 
 from django import forms
+from django.utils.functional import cached_property
 from .models import (
     AtividadeEstagioSupervisao,
+    ConfiguracaoCargoDiretivoUnidade,
     ExcecaoCargaUnidade,
     JanelaEntrega,
     LimiteCargaUnidade,
@@ -138,6 +140,72 @@ class TipoCargoDiretivoForm(forms.ModelForm):
         }
 
 
+class TipoCargoDiretivoUpdateForm(TipoCargoDiretivoForm):
+    """A edição do catálogo não recebe a redução específica da unidade."""
+
+    class Meta(TipoCargoDiretivoForm.Meta):
+        fields = ["nome", "exige_curso", "permite_multiplos", "ativo"]
+
+
+class TipoCargoDiretivoUnidadeForm(TipoCargoDiretivoUpdateForm):
+    # Nome diferente do campo global: o ModelForm só grava metadados no cargo.
+    carga_reducao_unidade = ConfiguracaoCargoDiretivoUnidade._meta.get_field(
+        'carga_reducao_horas',
+    ).formfield(
+        # Campo adicional ao ModelForm: precisa dos validadores do modelo local.
+        validators=ConfiguracaoCargoDiretivoUnidade._meta.get_field('carga_reducao_horas').validators,
+        widget=forms.NumberInput(attrs={
+            'class': _INPUT_CSS, 'min': '0', 'max': '20', 'step': '0.25',
+        }),
+    )
+
+    def __init__(self, *args, unidade, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['carga_reducao_unidade'].label = f'Redução semanal em {unidade.sigla}'
+        self.fields['carga_reducao_unidade'].help_text = (
+            'Esta redução vale somente para a unidade selecionada. '
+            'Reduções individuais são preservadas.'
+        )
+        self.order_fields(['nome', 'carga_reducao_unidade', 'exige_curso', 'permite_multiplos', 'ativo'])
+
+
+class OpcoesOcupacaoEquipeDiretiva:
+    """Listas de seleção compartilhadas apenas durante uma requisição da unidade."""
+
+    def __init__(self, unidade):
+        self.unidade = unidade
+
+    @cached_property
+    def professores(self):
+        from django.db.models import Q
+        from apps.professors.models import Professor
+
+        professores = Professor.objects.filter(
+            Q(unidade_principal=self.unidade) | Q(unidades=self.unidade),
+        ).only('pk', 'rh_nome', 'desup_nome', 'id_funcional', 'rh_matricula').distinct().order_by('rh_nome')
+        return [(prof.pk, str(prof)) for prof in professores]
+
+    @cached_property
+    def cursos(self):
+        from apps.courses.models import CourseUnit
+
+        cursos = CourseUnit.objects.filter(unidade=self.unidade, ativo=True).select_related(
+            'curso', 'unidade',
+        ).order_by('curso__nome')
+        return [(curso.pk, str(curso)) for curso in cursos]
+
+
+class ConfiguracaoCargoDiretivoUnidadeForm(forms.ModelForm):
+    class Meta:
+        model = ConfiguracaoCargoDiretivoUnidade
+        fields = ["carga_reducao_horas"]
+        widgets = {
+            "carga_reducao_horas": forms.NumberInput(attrs={
+                "class": _INPUT_CSS, "min": "0", "max": "20", "step": "0.25",
+            }),
+        }
+
+
 class OcupacaoEquipeDiretivaForm(forms.ModelForm):
     """Preenche um cargo da equipe diretiva de uma unidade já escolhida na tela."""
 
@@ -152,7 +220,7 @@ class OcupacaoEquipeDiretivaForm(forms.ModelForm):
             "observacoes": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 3}),
         }
 
-    def __init__(self, *args, unidade, cargo, **kwargs):
+    def __init__(self, *args, unidade, cargo, opcoes=None, **kwargs):
         super().__init__(*args, **kwargs)
         from django.db.models import Q
         from apps.courses.models import CourseUnit
@@ -166,16 +234,20 @@ class OcupacaoEquipeDiretivaForm(forms.ModelForm):
         self.fields["professor"].queryset = Professor.objects.filter(
             Q(unidade_principal=unidade) | Q(unidades=unidade)
         ).distinct().order_by("rh_nome")
+        if opcoes is not None:
+            self.fields['professor'].choices = [('', self.fields['professor'].empty_label), *opcoes.professores]
         if cargo.exige_curso:
             self.fields["curso"].required = True
             cursos_unidade = CourseUnit.objects.filter(
                 unidade=unidade, ativo=True,
             ).select_related("curso", "unidade").order_by("curso__nome")
             self.fields["curso"].queryset = cursos_unidade
+            if opcoes is not None:
+                self.fields['curso'].choices = [('', self.fields['curso'].empty_label), *opcoes.cursos]
             self.fields["curso"].label = "Curso"
             self.fields["curso"].help_text = (
                 "Selecione um curso ativo desta unidade."
-                if cursos_unidade.exists()
+                if (bool(opcoes.cursos) if opcoes is not None else cursos_unidade.exists())
                 else "Nenhum curso ativo cadastrado nesta unidade. Cadastre ou ative um curso antes de preencher este cargo."
             )
         else:
@@ -210,7 +282,7 @@ class OcupacaoEquipeDiretivaUnidadeForm(forms.ModelForm):
             "observacoes": forms.Textarea(attrs={"class": _INPUT_CSS, "rows": 3}),
         }
 
-    def __init__(self, *args, unidade, cargo, **kwargs):
+    def __init__(self, *args, unidade, cargo, opcoes=None, **kwargs):
         super().__init__(*args, **kwargs)
         from django.db.models import Q
         from apps.courses.models import CourseUnit
@@ -222,16 +294,20 @@ class OcupacaoEquipeDiretivaUnidadeForm(forms.ModelForm):
         self.fields["professor"].queryset = Professor.objects.filter(
             Q(unidade_principal=unidade) | Q(unidades=unidade)
         ).distinct().order_by("rh_nome")
+        if opcoes is not None:
+            self.fields['professor'].choices = [('', self.fields['professor'].empty_label), *opcoes.professores]
         if cargo.exige_curso:
             self.fields["curso"].required = True
             cursos_unidade = CourseUnit.objects.filter(
                 unidade=unidade, ativo=True,
             ).select_related("curso", "unidade").order_by("curso__nome")
             self.fields["curso"].queryset = cursos_unidade
+            if opcoes is not None:
+                self.fields['curso'].choices = [('', self.fields['curso'].empty_label), *opcoes.cursos]
             self.fields["curso"].label = "Curso"
             self.fields["curso"].help_text = (
                 "Selecione um curso ativo desta unidade."
-                if cursos_unidade.exists()
+                if (bool(opcoes.cursos) if opcoes is not None else cursos_unidade.exists())
                 else "Nenhum curso ativo cadastrado nesta unidade. Cadastre ou ative um curso antes de preencher este cargo."
             )
         else:
