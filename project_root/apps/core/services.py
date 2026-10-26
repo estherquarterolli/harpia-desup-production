@@ -25,6 +25,37 @@ ACTIVE_WINDOW_STATUSES = (
 )
 
 
+def obter_reducao_cargo_unidade(cargo, unidade):
+    from .models import ConfiguracaoCargoDiretivoUnidade
+
+    valor = ConfiguracaoCargoDiretivoUnidade.objects.filter(
+        cargo=cargo, unidade=unidade,
+    ).values_list('carga_reducao_horas', flat=True).first()
+    return cargo.carga_reducao_horas if valor is None else valor
+
+
+@transaction.atomic
+def configurar_reducao_cargo_unidade(cargo, unidade, carga_reducao_horas):
+    from .models import ConfiguracaoCargoDiretivoUnidade, OcupacaoEquipeDiretiva
+
+    configuracao = ConfiguracaoCargoDiretivoUnidade(
+        cargo=cargo, unidade=unidade, carga_reducao_horas=carga_reducao_horas,
+    )
+    # Valida o valor também para chamadas fora do formulário; o upsert trata o par.
+    configuracao.full_clean(validate_unique=False, validate_constraints=False)
+    configuracao, _ = ConfiguracaoCargoDiretivoUnidade.objects.update_or_create(
+        cargo=cargo, unidade=unidade,
+        defaults={'carga_reducao_horas': configuracao.carga_reducao_horas},
+    )
+    # Mantém a regra de acompanhar o padrão apenas para ocupações vigentes
+    # herdadas. Histórico, agendamentos e reduções individuais são preservados.
+    OcupacaoEquipeDiretiva.objects.filter(
+        OcupacaoEquipeDiretiva.filtro_vigente(),
+        cargo=cargo, unidade=unidade, reducao_personalizada=False,
+    ).update(carga_reducao_horas=configuracao.carga_reducao_horas)
+    return configuracao
+
+
 def user_can_bypass_window(user):
     return bool(user and user.is_authenticated and (user.is_superuser or user.perfil == "DESUP"))
 
