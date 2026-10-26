@@ -8,17 +8,16 @@
 {% block content %}
 <div class="space-y-6">
 
-    <section class="dash-panel dash-hero" aria-label="Todas as unidades">
+    <section class="dash-panel dash-hero" aria-label="Coordenador Desup">
         <span class="dash-stat-icon dash-tone-indigo dash-hero-icon"><i class="ph ph-buildings"></i></span>
         <div class="min-w-0">
             <p class="dash-label">Abrangência da DESUP</p>
-            <h2 class="dash-hero-title">Todas as unidades</h2>
-            <p class="dash-hero-sub">{{ request.user.get_perfil_display }} · {{ request.user.email }} · {{ total_unidades }} unidades</p>
+            <h2 class="dash-hero-title">Coordenador Desup</h2>
+            <p class="dash-hero-sub">{{ request.user.email }} · {{ total_unidades }} unidades</p>
         </div>
     </section>
 
     {% include 'dashboard/partials/_atalhos_unidade.html' %}
-    {% include 'dashboard/partials/_professor_visao.html' %}
 
     <section data-tour="dash-resumo" class="dash-panel" aria-label="Resumo geral">
         <div class="dash-stats">
@@ -61,9 +60,7 @@
         </div>
     </section>
 
-    <a href="{% url 'core:exportar_logs' %}" class="inline-flex items-center bg-[#ffb800] text-[#025c9f] font-black py-3 px-8 rounded-xl shadow-sm uppercase text-xs hover:bg-yellow-400 transition-colors text-center">
-        <i class="ph ph-file-csv mr-2 text-lg"></i>Gerar LOG
-    </a>
+    {% include 'dashboard/partials/_professor_visao.html' %}
 
 </div>
 {% endblock %}
