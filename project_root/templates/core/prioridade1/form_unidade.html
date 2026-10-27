@@ -25,7 +25,7 @@
           <p class="font-bold text-slate-800">Carga horária de redução semanal (exclusiva da DESUP)</p>
           <p class="mt-0.5 text-slate-600">
             {% if reducao_somente_leitura is not None %}
-              Valor atual definido pela DESUP: <strong>{{ reducao_somente_leitura|floatformat:"-2" }} h/semana</strong> (somente leitura).
+              Valor atual definido pela DESUP: <strong>{{ reducao_somente_leitura|hhmm }}/semana</strong> (somente leitura).
             {% else %}
               A carga horária de redução semanal será definida exclusivamente pela DESUP após o registro.
             {% endif %}

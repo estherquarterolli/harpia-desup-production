@@ -61,7 +61,7 @@
               <span class="text-xs text-slate-500">ID: {{ prof.id_funcional }}</span>
             </td>
             <td class="px-3 py-3 text-center sm:px-5" data-label="CH Alocada / Meta">
-              <span class="text-xs font-bold text-amber-600">{{ prof.ch_alocada }}h</span>
+              <span class="text-xs font-bold text-amber-600">{{ prof.ch_alocada|hhmm }}</span>
               <span class="text-xs text-slate-400 mx-1">/</span>
               <span class="text-xs font-bold text-slate-700">{{ prof.meta_horas_sala|default:20 }}h</span>
             </td>

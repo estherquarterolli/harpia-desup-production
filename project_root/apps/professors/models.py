@@ -329,7 +329,13 @@ class Professor(models.Model):
 
     @property
     def meta_horas_sala(self):
-        """Limite de horas em sala já descontada a redução vigente determinada pela DESUP."""
+        """Limite de horas em sala já descontada a redução vigente determinada pela DESUP.
+
+        Professor readaptado não tem cobrança de carga horária: a meta é zero e
+        o que estiver alocado conta como alocação completa.
+        """
+        if self.readaptado_vigente:
+            return 0.0
         base = self.meta_horas_base_sala
         reducao = self.reducao_carga_vigente
         if not reducao:
@@ -423,6 +429,8 @@ class Professor(models.Model):
     def percentual_alocado(self) -> float:
         """Retorna a porcentagem alocada (incluindo horas justificadas), limitada a 100%."""
         try:
+            if self.readaptado_vigente:
+                return 100.0
             if self.ch_total == 0:
                 return 0.0
             total_alocado = self.ch_alocada + self.ch_justificada + self.reducao_carga_vigente

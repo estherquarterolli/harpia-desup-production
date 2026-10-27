@@ -1133,8 +1133,7 @@ class LinhasDeDocenteETurmasE2ETests(AlocacaoE2EBase):
         resposta = self.client.get(self.url_tela)
 
         self.assertContains(resposta, 'Turmas</th>')
-        self.assertContains(resposta, 'class="ac-turmas-input')
-        self.assertContains(resposta, 'value="4"')
+        self.assertContains(resposta, 'class="ac-turmas-valor text-sm font-bold text-slate-700">4</span>')
         self.assertContains(resposta, 'ac-add')
         self.assertContains(resposta, 'id="acSlotTemplate"')
 

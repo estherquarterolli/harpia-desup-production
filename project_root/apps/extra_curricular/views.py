@@ -7,7 +7,7 @@ Perfis e permissões:
   DESUP               → vê todas as unidades; edita apenas parecer e motivo via
                         ParecerUpdateView (HTMX inline).
 """
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -1079,12 +1079,35 @@ class ParecerRapidoDesupView(_AcaoRapidaDesupView):
             return self._redirect(request)
 
         aprovado = parecer == ParecerChoices.APROVADO
-        if isinstance(item, OrientacaoTCC):
-            item.num_orientandos_aprovados = item.num_orientandos if aprovado else 0
-        elif isinstance(item, AtividadeExtensionista):
-            item.num_estudantes_aprovados = item.num_estudantes if aprovado else 0
+        solicitada = (
+            item.carga_horaria
+            if isinstance(item, (OrientacaoTCC, AtividadeExtensionista))
+            else item.horas_reduzidas
+        )
+        horas_txt = request.POST.get("horas_aprovadas", "").strip().replace(",", ".")
+        horas = Decimal(str(solicitada or 0))
+        if aprovado and horas_txt:
+            try:
+                horas = Decimal(horas_txt)
+            except InvalidOperation:
+                messages.error(request, "Informe um total de horas válido.")
+                return self._redirect(request)
+            if horas <= 0 or horas > Decimal(str(solicitada or 0)):
+                messages.error(
+                    request,
+                    f"O total de horas a aprovar deve ser maior que zero e no máximo {solicitada}h.",
+                )
+                return self._redirect(request)
+
+        if isinstance(item, (OrientacaoTCC, AtividadeExtensionista)):
+            # TCC/extensão: 0,5h por orientando/estudante.
+            qtd = int((horas / Decimal("0.5")).to_integral_value()) if aprovado else 0
+            if isinstance(item, OrientacaoTCC):
+                item.num_orientandos_aprovados = qtd
+            else:
+                item.num_estudantes_aprovados = qtd
         else:
-            item.horas_aprovadas = item.horas_reduzidas if aprovado else Decimal("0")
+            item.horas_aprovadas = horas if aprovado else Decimal("0")
 
         item.parecer_desup = parecer
         item.motivo_parecer = motivo
@@ -1138,6 +1161,44 @@ class CancelarExtracurricularDesupView(_AcaoRapidaDesupView):
             request,
             "Extracurricular cancelado. A carga horária deixou de ser contabilizada.",
         )
+        return self._redirect(request)
+
+
+class ExcluirExtracurricularDesupView(_AcaoRapidaDesupView):
+    """Exclui definitivamente um extracurricular (qualquer parecer); só a DESUP."""
+
+    @transaction.atomic
+    def post(self, request, pk, tipo, item_pk):
+        model = self._modelos.get(tipo)
+        if model is None:
+            messages.error(request, "Tipo de justificativa inválido.")
+            return self._redirect(request)
+
+        pendencia = get_object_or_404(PendenciaExtra, pk=pk)
+        item = get_object_or_404(model, pk=item_pk, pendencia=pendencia)
+        descricao = str(item)
+        item.delete()
+
+        restantes = any(
+            rel.exists()
+            for rel in (
+                pendencia.orientacoes_tcc,
+                pendencia.atividades_extensao,
+                pendencia.reducoes_ch,
+                pendencia.licencas,
+            )
+        )
+        if restantes:
+            sincronizar_status_pendencia(pendencia)
+        else:
+            # Sem nenhum item, a pendência vazia não tem mais o que analisar.
+            pendencia.delete()
+
+        from apps.core.services import registrar_evento_prioridade1
+        registrar_evento_prioridade1(
+            request, "EXTRACURRICULAR_EXCLUIDO", f"{descricao}; pendência {pk}; item {tipo}:{item_pk}.",
+        )
+        messages.success(request, "Extracurricular excluído.")
         return self._redirect(request)
 
 

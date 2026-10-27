@@ -94,7 +94,7 @@ def enriquecer_professores_com_carga(professores, unidade_atual=None):
         if meta_horas:
             prof.percentual_alocado_total = round(min((prof.soma_horas / meta_horas) * 100, 100.0), 2)
         else:
-            prof.percentual_alocado_total = 100.0 if prof.reducao_diretiva else 0.0
+            prof.percentual_alocado_total = 100.0 if (prof.reducao_diretiva or prof.readaptado_vigente) else 0.0
 
     if unidade_atual:
         try:
@@ -450,7 +450,7 @@ class ProfessorDetailView(DesupOnlyMixin, DetailView):
     def get_queryset(self):
         return Professor.objects.select_related(
             'tipo_contrato', 'unidade_principal'
-        ).prefetch_related('cursos', 'unidades', 'ocupacoes_diretivas')
+        ).prefetch_related('cursos', 'unidades', 'ocupacoes_diretivas', 'readaptacoes')
 
 class ProfessorCreateView(DesupOnlyMixin, CreateView):
     model = Professor
@@ -498,8 +498,18 @@ class ProfessorCreateView(DesupOnlyMixin, CreateView):
         return ctx
 
     def form_valid(self, form):
+        resposta = super().form_valid(form)
+        solicitacao = self._solicitacao_origem()
+        if solicitacao:
+            from apps.core.services import decidir_solicitacao_professor_externo
+            decidir_solicitacao_professor_externo(
+                request=self.request,
+                solicitacao_id=solicitacao.pk,
+                decisao=SolicitacaoProfessorExterno.StatusChoices.APROVADA,
+            )
+            SolicitacaoProfessorExterno.objects.filter(pk=solicitacao.pk).update(professor=self.object)
         messages.success(self.request, 'Professor cadastrado com sucesso.')
-        return super().form_valid(form)
+        return resposta
 
 
 class ProfessorUpdateView(ProfessorEditDeleteMixin, UpdateView):
@@ -738,13 +748,13 @@ def htmx_tabela_alocacao(request):
         if user.unidade_id:
             from apps.allocations.services import professores_autorizados_unidade_qs
             queryset = professores_autorizados_unidade_qs(user.unidade_id).select_related('tipo_contrato').prefetch_related(
-                'unidades', 'ocupacoes_diretivas'
+                'unidades', 'ocupacoes_diretivas', 'readaptacoes'
             ).order_by('rh_nome')
         else:
             queryset = Professor.objects.none()
     else:
         queryset = Professor.objects.select_related('tipo_contrato').prefetch_related(
-            'unidades', 'ocupacoes_diretivas'
+            'unidades', 'ocupacoes_diretivas', 'readaptacoes'
         ).order_by('rh_nome')
 
     # Esta tela legada era o Ãºltimo ponto que ainda materializava todos os
@@ -774,7 +784,7 @@ def htmx_tabela_alocacao(request):
         if meta_horas:
             prof.percentual_alocado_total = round(min((soma / meta_horas) * 100, 100.0), 2)
         else:
-            prof.percentual_alocado_total = 100.0 if prof.reducao_carga_vigente else 0.0
+            prof.percentual_alocado_total = 100.0 if (prof.reducao_carga_vigente or prof.readaptado_vigente) else 0.0
 
     return render(request, 'professors/partials/_linhas_alocacao.html', {
         'professores': professores,

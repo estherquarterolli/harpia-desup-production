@@ -179,7 +179,7 @@ def _professores_pendentes_com_ch(unidade_id, q: str = ""):
     queries de professores e fixo, independente de N.
     """
     professores = Professor.objects.select_related("tipo_contrato", "unidade_principal").prefetch_related(
-        "ocupacoes_diretivas"
+        "ocupacoes_diretivas", "readaptacoes"
     )
     if unidade_id:
         professores = professores.filter(unidade_principal_id=unidade_id)
@@ -313,6 +313,7 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                         "item_tipo": "tcc",
                         "item_pk": item.pk,
                         "item_horas_aprovadas": item.horas_aprovadas,
+                        "item_ch_solicitada": item.carga_horaria,
                         "item_motivo_parecer": item.motivo_parecer,
                     })
                 for item in ext_items:
@@ -339,6 +340,7 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                         "item_tipo": "ext",
                         "item_pk": item.pk,
                         "item_horas_aprovadas": item.horas_aprovadas,
+                        "item_ch_solicitada": item.carga_horaria,
                         "item_motivo_parecer": item.motivo_parecer,
                     })
                 for item in red_items:
@@ -365,6 +367,7 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                         "item_tipo": "red",
                         "item_pk": item.pk,
                         "item_horas_aprovadas": item.horas_aprovadas,
+                        "item_ch_solicitada": item.horas_reduzidas,
                         "item_motivo_parecer": item.motivo_parecer,
                     })
                 for item in lic_items:
@@ -391,6 +394,7 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                         "item_tipo": "lic",
                         "item_pk": item.pk,
                         "item_horas_aprovadas": item.horas_aprovadas,
+                        "item_ch_solicitada": item.horas_reduzidas,
                         "item_motivo_parecer": item.motivo_parecer,
                     })
             else:
