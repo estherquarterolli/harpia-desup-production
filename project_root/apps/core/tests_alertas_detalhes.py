@@ -75,8 +75,8 @@ class AlertasDetalhesTests(TestCase):
         self.assertEqual(detalhe['horas_extra'], 0)
         self.assertEqual(detalhe['meta'], 2)
         self.assertEqual(detalhe['diferenca'], 2)
-        self.assertContains(resposta, '4 h contabilizadas − 2 h de limite = 2 h de excesso')
-        self.assertContains(resposta, '0 h em outras horas aprovadas')
+        self.assertContains(resposta, '4h contabilizadas − 2h de limite = 2h de excesso')
+        self.assertContains(resposta, '0h em outras horas aprovadas')
 
     def test_lista_acima_do_limite_mostra_mais_de_cem_professores(self):
         from django.utils import timezone

@@ -11,14 +11,14 @@
 
     <!-- Uso das propriedades matemáticas dinâmicas do models.py (pré-calculadas em
          lote na view — ver _bulk_ch_alocada/_bulk_ch_justificada) -->
-    <td class="p-3 border-r border-slate-200 text-center" data-label="CH Justificada">{{ prof.ch_justificada_total }}h</td>
-    <td class="p-3 border-r border-slate-200 text-center font-bold text-[#025c9f]" data-label="Total">{{ prof.ch_total }}h</td>
+    <td class="p-3 border-r border-slate-200 text-center" data-label="CH Justificada">{{ prof.ch_justificada_total|hhmm }}</td>
+    <td class="p-3 border-r border-slate-200 text-center font-bold text-[#025c9f]" data-label="Total">{{ prof.ch_total|hhmm }}</td>
 
     <!-- Lógica visual: Se sobrou hora, fica vermelhinho pra chamar atenção -->
     <td
         class="p-3 border-r border-slate-200 text-center {% if prof.ch_nao_alocada_total > 0 %}text-red-500 font-medium{% endif %}"
         data-label="Não alocado">
-        {{ prof.ch_nao_alocada_total }}h
+        {{ prof.ch_nao_alocada_total|hhmm }}
     </td>
 
     <!-- Lógica visual da Porcentagem -->

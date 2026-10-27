@@ -113,7 +113,7 @@
               </td>
               <td class="px-4 py-3" data-label="Crédito">{{ comp.creditos }}</td>
               <td class="px-4 py-3" data-label="HA">{{ comp.carga_horaria }}h</td>
-              <td class="px-4 py-3" data-label="HR">{{ comp.hr_total|floatformat:2 }}h</td>
+              <td class="px-4 py-3" data-label="HR">{{ comp.hr_total|hhmm }}</td>
             </tr>
             {% empty %}
             <tr>
@@ -128,7 +128,7 @@
               <td class="px-4 py-3 uppercase text-xs tracking-wider" colspan="3">Total da matriz ({{ componentes|length }} componente{{ componentes|length|pluralize }})</td>
               <td class="px-4 py-3" data-label="Crédito">{{ total_creditos }}</td>
               <td class="px-4 py-3" data-label="HA">{{ total_ha }}h</td>
-              <td class="px-4 py-3" data-label="HR">{{ total_hr|floatformat:2 }}h</td>
+              <td class="px-4 py-3" data-label="HR">{{ total_hr|hhmm }}</td>
             </tr>
           </tfoot>
           {% endif %}

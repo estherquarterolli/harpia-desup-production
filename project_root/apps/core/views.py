@@ -1219,6 +1219,23 @@ class SolicitacaoProfessorExternoDecidirView(DesupPrioridade1Mixin, View):
         if not form.is_valid():
             messages.error(request, 'Revise a decisão e informe o motivo quando necessário.')
             return redirect('core:solicitacao_professor_list')
+        from django.urls import reverse
+        from .models import SolicitacaoProfessorExterno
+        Status = SolicitacaoProfessorExterno.StatusChoices
+        pendente = SolicitacaoProfessorExterno.objects.filter(pk=pk, status=Status.PENDENTE).first()
+        if (
+            pendente
+            and form.cleaned_data['decisao'] == Status.APROVADA
+            and pendente.tipo == SolicitacaoProfessorExterno.TipoChoices.CADASTRO
+            and not pendente.professor_id
+        ):
+            # A aprovação de um cadastro só se conclui ao salvar o professor: abre o
+            # formulário já preenchido com os dados informados pela unidade.
+            messages.info(
+                request,
+                'Revise os dados e salve o professor para concluir a aprovação da solicitação.',
+            )
+            return redirect(f"{reverse('professors:professor_create')}?solicitacao={pendente.pk}")
         try:
             solicitacao = decidir_solicitacao_professor_externo(
                 request=request,
@@ -1232,6 +1249,9 @@ class SolicitacaoProfessorExternoDecidirView(DesupPrioridade1Mixin, View):
             messages.success(
                 request, f'Solicitação {solicitacao.get_status_display().lower()} com sucesso.',
             )
+            if solicitacao.status == Status.APROVADA and solicitacao.professor_id:
+                # Cessão aprovada: abre o cadastro do professor.
+                return redirect('professors:professor_update', pk=solicitacao.professor_id)
         return redirect('core:solicitacao_professor_list')
 
 

@@ -411,6 +411,31 @@ class Prioridade1DesupTests(TestCase):
         self.assertEqual(resumo["professores_alocados"], 0)
         self.assertEqual(resumo["professores_com_sobra"], 1)
 
+    def test_aprovar_cadastro_abre_formulario_preenchido(self):
+        solicitacao = SolicitacaoProfessorExterno.objects.create(
+            tipo=SolicitacaoProfessorExterno.TipoChoices.CADASTRO,
+            unidade_solicitante=self.destino,
+            professor_nome="Novo Docente",
+            professor_id_funcional="NV-1",
+            professor_rh_matricula="NV-M1",
+            semestre=f"{self.hoje.year}.1",
+            justificativa="Cadastro novo.",
+            solicitado_por=self.coordenador,
+        )
+        self.client.force_login(self.desup)
+        resposta = self.client.post(
+            reverse("core:solicitacao_professor_decidir", args=[solicitacao.pk]),
+            {"decisao": "APROVADA", "motivo_decisao": ""},
+        )
+        url_form = f"{reverse('professors:professor_create')}?solicitacao={solicitacao.pk}"
+        self.assertRedirects(resposta, url_form, fetch_redirect_response=False)
+        solicitacao.refresh_from_db()
+        self.assertEqual(solicitacao.status, SolicitacaoProfessorExterno.StatusChoices.PENDENTE)
+
+        form = self.client.get(url_form)
+        self.assertEqual(form.status_code, 200)
+        self.assertEqual(form.context["form"].initial["rh_nome"], "Novo Docente")
+
     @patch("apps.core.services.send_email_task.delay")
     def test_aprovacao_vincula_professor_notifica_e_audita(self, email_delay):
         solicitacao = SolicitacaoProfessorExterno.objects.create(
@@ -429,7 +454,10 @@ class Prioridade1DesupTests(TestCase):
                 {"decisao": "APROVADA", "motivo_decisao": ""},
             )
 
-        self.assertRedirects(resposta, reverse("core:solicitacao_professor_list"))
+        self.assertRedirects(
+            resposta, reverse("professors:professor_update", args=[self.professor.pk]),
+            fetch_redirect_response=False,
+        )
         solicitacao.refresh_from_db()
         self.assertEqual(solicitacao.status, SolicitacaoProfessorExterno.StatusChoices.APROVADA)
         self.assertTrue(self.professor.unidades.filter(pk=self.destino.pk).exists())

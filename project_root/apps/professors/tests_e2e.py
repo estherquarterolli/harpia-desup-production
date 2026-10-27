@@ -717,7 +717,7 @@ class HtmxProfessorE2ETests(ProfessorE2EBase):
         # cálculo de sobra/percentual muda de base.
         # A localização pt-BR usa vírgula decimal no HTML.
         self.assertContains(resposta, '40h')
-        self.assertContains(resposta, '16,0h')
+        self.assertContains(resposta, '16h')
         self.assertContains(resposta, '20,0%')
 
     def test_tabela_alocacao_da_desup_deveria_trazer_todas_as_unidades(self):

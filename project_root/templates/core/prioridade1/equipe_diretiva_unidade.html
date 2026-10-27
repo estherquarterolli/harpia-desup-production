@@ -22,7 +22,7 @@
       <i class="ph ph-clock text-2xl shrink-0" aria-hidden="true"></i>
       <div>
         <p class="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Redução da equipe</p>
-        <p><span class="text-xl font-black text-emerald-950">{{ reducao_total|floatformat:"-2" }} h</span><span class="text-xs font-semibold">/semana</span></p>
+        <p><span class="text-xl font-black text-emerald-950">{{ reducao_total|hhmm }}</span><span class="text-xs font-semibold">/semana</span></p>
       </div>
     </div>
   </section>
@@ -159,14 +159,14 @@
           </div>
           <span class="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700"
                 title="Carga horária de redução definida exclusivamente pela DESUP">
-            <i class="ph ph-lock-key text-slate-400" aria-hidden="true"></i>Redução DESUP: {{ ocupacao.carga_reducao_horas|floatformat:"-2" }} h
+            <i class="ph ph-lock-key text-slate-400" aria-hidden="true"></i>Redução DESUP: {{ ocupacao.carga_reducao_horas|hhmm }}
           </span>
         </div>
 
         {% if ocupacao.em_sala %}
         <div class="flex items-start gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900" role="status">
           <i class="ph-fill ph-warning-circle mt-0.5 shrink-0 text-amber-600" aria-hidden="true"></i>
-          <span>Docente também alocado em sala de aula ({{ ocupacao.horas_sala|floatformat:"-2" }} h/sem): {{ ocupacao.disciplinas_sala|join:", " }}</span>
+          <span>Docente também alocado em sala de aula ({{ ocupacao.horas_sala|hhmm }}/sem): {{ ocupacao.disciplinas_sala|join:", " }}</span>
         </div>
         {% endif %}
 
@@ -300,7 +300,7 @@
       <div class="max-h-[62vh] space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
         <div class="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-700">
           <span class="font-bold">Redução semanal (definida pela DESUP):</span>
-          <span class="font-black text-emerald-800">{{ ocupacao.carga_reducao_horas|floatformat:"-2" }} h/semana</span>
+          <span class="font-black text-emerald-800">{{ ocupacao.carga_reducao_horas|hhmm }}/semana</span>
         </div>
         {% include 'core/prioridade1/_campos_form.html' with form=ocupacao.edit_form %}
       </div>
