@@ -1,8 +1,9 @@
 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
   {% for field in form %}
-  <div class="min-w-0 {% if field.name == 'observacoes' or field.name == 'justificativa_administrativa' or field.name == 'nome' or field.name == 'professor' or field.name == 'curso' or field.name == 'carga_reducao_horas' or field.field.widget.input_type == 'checkbox' %}sm:col-span-2{% endif %}">
-    {% if field.name == 'carga_reducao_horas' %}
-    {% include 'core/prioridade1/_reducao_controle.html' with ctl_id=field.id_for_label ctl_name=field.html_name ctl_valor=field.value ctl_label='Horas semanais de redução' ctl_required=field.field.required %}
+  <div class="min-w-0 {% if field.name == 'observacoes' or field.name == 'justificativa_administrativa' or field.name == 'nome' or field.name == 'professor' or field.name == 'curso' or field.name == 'carga_reducao_horas' or field.name == 'carga_reducao_unidade' or field.field.widget.input_type == 'checkbox' %}sm:col-span-2{% endif %}">
+    {% if field.name == 'carga_reducao_horas' or field.name == 'carga_reducao_unidade' %}
+    {% include 'core/prioridade1/_reducao_controle.html' with ctl_id=field.id_for_label ctl_name=field.html_name ctl_valor=field.value ctl_label=field.label ctl_required=field.field.required %}
+    {% if field.help_text %}<p class="mt-1 text-xs text-slate-500">{{ field.help_text }}</p>{% endif %}
     {% elif field.field.widget.input_type == 'checkbox' %}
     <label class="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
       <span class="mt-0.5">{{ field }}</span>
