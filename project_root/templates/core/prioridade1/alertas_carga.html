@@ -37,7 +37,7 @@
   <nav class="flex gap-1 overflow-x-auto rounded-2xl border border-white bg-white/80 p-1 shadow-[0_8px_30px_rgba(2,92,159,0.08)]" role="tablist" aria-label="Seções">
     <button type="button" role="tab" data-aba="visao" class="aba-btn flex min-h-11 min-w-max flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-black"><i class="ph ph-chart-bar text-lg"></i>Visão geral</button>
     <button type="button" role="tab" data-aba="readaptacoes" class="aba-btn flex min-h-11 min-w-max flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-black"><i class="ph ph-user-focus text-lg"></i>Readaptações{% if readaptacoes_vigentes %}<span class="rounded-full bg-slate-200 px-1.5 text-[10px] text-slate-700">{{ readaptacoes_vigentes }}</span>{% endif %}</button>
-    <button type="button" role="tab" data-aba="excecoes" class="aba-btn flex min-h-11 min-w-max flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-black"><i class="ph ph-seal-question text-lg"></i>Exceções{% if excecoes_pendentes %}<span class="rounded-full bg-amber-500 px-1.5 text-[10px] text-white">{{ excecoes_pendentes|length }}</span>{% endif %}</button>
+    <button type="button" role="tab" data-aba="excecoes" class="aba-btn flex min-h-11 min-w-max flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-black"><i class="ph ph-seal-question text-lg"></i>RAT{% if excecoes_pendentes %}<span class="rounded-full bg-amber-500 px-1.5 text-[10px] text-white">{{ excecoes_pendentes|length }}</span>{% endif %}</button>
   </nav>
 
   {# ── Visão geral ── #}
@@ -124,7 +124,7 @@
     </div>
   </section>
 
-  {# ── Exceções ── #}
+  {# ── RAT ── #}
   <section data-painel="excecoes" class="aba-painel hidden space-y-4">
     <p class="flex gap-2 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900"><i class="ph ph-info mt-0.5 text-lg"></i><span>Pedidos das unidades para ultrapassar temporariamente o limite de carga. Aprovar libera as horas adicionais durante a vigência; recusar exige motivo.</span></p>
     <div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -138,7 +138,7 @@
           <button type="button" onclick="abrirModal('modalExcecao{{ excecao.pk }}')" class="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-slate-200 px-3 text-sm font-black text-[#025c9f] hover:bg-blue-50"><i class="ph ph-gavel text-lg"></i>Analisar</button>
         </li>
         {% empty %}
-        <li class="px-4 py-10 text-center text-sm text-slate-500"><i class="ph ph-check-circle mb-1 block text-3xl text-emerald-400"></i>Nenhuma exceção aguardando análise.</li>
+        <li class="px-4 py-10 text-center text-sm text-slate-500"><i class="ph ph-check-circle mb-1 block text-3xl text-emerald-400"></i>Nenhuma solicitação de RAT aguardando análise.</li>
         {% endfor %}
       </ul>
     </div>
@@ -341,13 +341,16 @@
 <div id="modalExcecao{{ excecao.pk }}" class="modal-p1 hidden fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
   <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
     <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+
       <div><h3 class="text-base font-black text-[#025c9f]">Exceção de carga</h3><p class="text-xs text-slate-500">{{ excecao.unidade.sigla }} · +{{ excecao.horas_adicionais|hhmm }} · {{ excecao.data_inicio|date:'d/m/Y' }} – {{ excecao.data_fim|date:'d/m/Y' }}</p></div>
+
+      <div><h3 class="text-base font-black text-[#025c9f]">Solicitação de RAT</h3><p class="text-xs text-slate-500">{{ excecao.unidade.sigla }} · +{{ excecao.horas_adicionais|floatformat:"-2" }} h · {{ excecao.data_inicio|date:'d/m/Y' }} – {{ excecao.data_fim|date:'d/m/Y' }}</p></div>
       <button type="button" onclick="fecharModal('modalExcecao{{ excecao.pk }}')" aria-label="Fechar" class="text-slate-400 hover:text-slate-600"><i class="ph ph-x text-xl"></i></button>
     </div>
     <form method="post" action="{% url 'core:excecao_carga_decidir' excecao.pk %}">
       {% csrf_token %}
       <div class="space-y-4 px-6 py-4">
-        {% if excecao.professor %}<p class="text-sm"><span class="font-bold text-slate-700">Professor:</span> {{ excecao.professor.nome }}</p>{% endif %}
+        {% if excecao.professor %}<p class="text-sm"><span class="font-bold text-slate-700">Professor:</span> {{ excecao.professor.nome }} · {{ excecao.professor.id_funcional }}</p>{% endif %}
         <div class="rounded-xl bg-slate-50 p-3 text-sm text-slate-700"><p class="mb-1 text-xs font-black uppercase text-slate-400">Justificativa da unidade</p>{{ excecao.justificativa }}</div>
         <fieldset class="grid grid-cols-2 gap-2">
           <legend class="sr-only">Decisão</legend>

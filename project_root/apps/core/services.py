@@ -25,6 +25,37 @@ ACTIVE_WINDOW_STATUSES = (
 )
 
 
+def obter_reducao_cargo_unidade(cargo, unidade):
+    from .models import ConfiguracaoCargoDiretivoUnidade
+
+    valor = ConfiguracaoCargoDiretivoUnidade.objects.filter(
+        cargo=cargo, unidade=unidade,
+    ).values_list('carga_reducao_horas', flat=True).first()
+    return cargo.carga_reducao_horas if valor is None else valor
+
+
+@transaction.atomic
+def configurar_reducao_cargo_unidade(cargo, unidade, carga_reducao_horas):
+    from .models import ConfiguracaoCargoDiretivoUnidade, OcupacaoEquipeDiretiva
+
+    configuracao = ConfiguracaoCargoDiretivoUnidade(
+        cargo=cargo, unidade=unidade, carga_reducao_horas=carga_reducao_horas,
+    )
+    # Valida o valor também para chamadas fora do formulário; o upsert trata o par.
+    configuracao.full_clean(validate_unique=False, validate_constraints=False)
+    configuracao, _ = ConfiguracaoCargoDiretivoUnidade.objects.update_or_create(
+        cargo=cargo, unidade=unidade,
+        defaults={'carga_reducao_horas': configuracao.carga_reducao_horas},
+    )
+    # Mantém a regra de acompanhar o padrão apenas para ocupações vigentes
+    # herdadas. Histórico, agendamentos e reduções individuais são preservados.
+    OcupacaoEquipeDiretiva.objects.filter(
+        OcupacaoEquipeDiretiva.filtro_vigente(),
+        cargo=cargo, unidade=unidade, reducao_personalizada=False,
+    ).update(carga_reducao_horas=configuracao.carga_reducao_horas)
+    return configuracao
+
+
 def user_can_bypass_window(user):
     return bool(user and user.is_authenticated and (user.is_superuser or user.perfil == "DESUP"))
 
@@ -354,6 +385,45 @@ def decidir_solicitacao_professor_externo(*, request, solicitacao_id, decisao, m
 
 
 @transaction.atomic
+def solicitar_rat(*, request, professor_id, horas_adicionais, data_inicio, data_fim, justificativa):
+    from apps.professors.models import Professor
+    from apps.professors.services import (
+        obter_cargas_rat, MENSAGEM_CARGA_RAT_INCOMPLETA, MENSAGEM_ID_RAT_OBRIGATORIO,
+    )
+
+    user = request.user
+    unidade = getattr(user, 'unidade', None)
+    if not user.is_authenticated or user.perfil != 'COORDENADOR_UNIDADE' or not unidade or not unidade.status:
+        raise PermissionDenied('Solicitação restrita ao coordenador de uma unidade ativa.')
+    professor = Professor.objects.select_for_update(of=('self',)).get(pk=professor_id)
+    if not (
+        professor.unidade_principal_id == unidade.pk
+        or professor.unidades.filter(pk=unidade.pk).exists()
+    ):
+        raise PermissionDenied('Professor não vinculado à sua unidade.')
+    if not (professor.id_funcional or '').strip():
+        raise ValidationError(MENSAGEM_ID_RAT_OBRIGATORIO)
+    if not obter_cargas_rat([professor])[str(professor.pk)]['completa']:
+        raise ValidationError(MENSAGEM_CARGA_RAT_INCOMPLETA)
+    solicitacao = ExcecaoCargaUnidade(
+        unidade=unidade, professor=professor, solicitado_por=user,
+        horas_adicionais=horas_adicionais, data_inicio=data_inicio, data_fim=data_fim,
+        justificativa=justificativa, status=ExcecaoCargaUnidade.StatusChoices.PENDENTE,
+    )
+    solicitacao.full_clean()
+    solicitacao.save()
+    Notificacao.objects.create(
+        titulo='Solicitação de RAT',
+        mensagem=f'{unidade.sigla} solicitou +{horas_adicionais} h semanais para {professor.nome}.',
+        url_acao=reverse('core:alertas_carga_desup') + '#excecoes',
+    )
+    registrar_evento_prioridade1(
+        request, 'RAT_SOLICITADO', f'Solicitação {solicitacao.pk}; unidade {unidade.pk}; professor {professor.pk}.',
+    )
+    return solicitacao
+
+
+@transaction.atomic
 def decidir_excecao_carga(*, request, excecao_id, decisao, motivo=""):
     """Aprova ou recusa exceção de carga, impedindo decisões concorrentes."""
     _exigir_desup(request.user)
@@ -382,19 +452,19 @@ def decidir_excecao_carga(*, request, excecao_id, decisao, motivo=""):
 
     alvo = excecao.professor.nome if excecao.professor_id else excecao.unidade.sigla
     mensagem = (
-        f"A exceção de carga para {alvo} foi {excecao.get_status_display().lower()} pela DESUP."
+        f"A solicitação de RAT para {alvo} foi {excecao.get_status_display().lower()} pela DESUP."
     )
     if motivo.strip():
         mensagem = f"{mensagem} Motivo: {motivo.strip()}"
     Notificacao.objects.create(
         unidade_destino=excecao.unidade,
-        titulo=f"Exceção de carga {excecao.get_status_display().lower()}",
+        titulo=f"RAT: solicitação {excecao.get_status_display().lower()}",
         mensagem=mensagem,
-        url_acao=reverse("dashboard_unidade"),
+        url_acao=reverse("core:rat_unidade"),
     )
     _enviar_email_unidade_apos_commit(
         excecao.unidade,
-        f"[Harpia] Exceção de carga {excecao.get_status_display().lower()}",
+        f"[Harpia] RAT: solicitação {excecao.get_status_display().lower()}",
         f"{mensagem}\n\nNotificação automática do sistema Harpia.",
     )
     registrar_evento_prioridade1(

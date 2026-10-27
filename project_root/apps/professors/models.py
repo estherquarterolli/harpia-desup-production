@@ -223,6 +223,7 @@ class Professor(models.Model):
 
     def clean(self):
         super().clean()
+        self.normalizar_nomes()
         if self.carga_diferenciada and not self.carga_horaria_personalizada:
             raise ValidationError({
                 "carga_horaria_personalizada": "Informe a carga horária deste professor.",
@@ -234,12 +235,22 @@ class Professor(models.Model):
                 "rh_matricula": "A matrícula deve ser diferente do ID Funcional.",
             })
 
+    def normalizar_nomes(self):
+        for campo in ('rh_nome', 'desup_nome'):
+            valor = getattr(self, campo)
+            if valor is not None:
+                setattr(self, campo, valor.upper())
+
+    def save(self, *args, **kwargs):
+        self.normalizar_nomes()
+        return super().save(*args, **kwargs)
+
     # --- Getters com Lógica de Sobrescrita (Regra #3) ---
 
     @property
     def nome(self):
         nome = self.desup_nome if self.desup_nome else self.rh_nome
-        return " ".join(nome.split()).title() if nome else ""
+        return " ".join(nome.split()).upper() if nome else ""
 
     @property
     def email(self):

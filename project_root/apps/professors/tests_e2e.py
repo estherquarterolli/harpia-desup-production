@@ -181,6 +181,69 @@ class ProfessorE2EBase(TestCase):
         return pendencia
 
 
+class NomesMaiusculosProfessorTests(ProfessorE2EBase):
+    def test_cadastro_e_edicao_persistem_acentos_em_maiusculas(self):
+        self.client.force_login(self.desup)
+        resposta = self.client.post(self.url_criar, self._dados_professor(rh_nome='João da Silva'))
+        self.assertEqual(resposta.status_code, 302)
+        professor = Professor.objects.get(id_funcional='IDF-NOVO')
+        self.assertEqual(professor.rh_nome, 'JOÃO DA SILVA')
+
+        resposta = self.client.post(
+            reverse('professors:professor_update', args=[professor.pk]),
+            self._dados_professor(rh_nome='Maria José dos Santos'),
+        )
+        self.assertEqual(resposta.status_code, 302)
+        professor.refresh_from_db()
+        self.assertEqual(professor.rh_nome, 'MARIA JOSÉ DOS SANTOS')
+        self.assertEqual(professor.id_funcional, 'IDF-NOVO')
+        self.assertEqual(professor.rh_matricula, 'MAT-NOVO')
+        self.assertIn(self.unidade_a, professor.unidades.all())
+
+    def test_modelo_normaliza_rh_e_ajuste_desup_sem_formulario(self):
+        self.prof_a1.rh_nome = 'João da Silva'
+        self.prof_a1.desup_nome = 'José de Sá'
+        self.prof_a1.save(update_fields=['rh_nome', 'desup_nome'])
+        self.prof_a1.refresh_from_db()
+        self.assertEqual(self.prof_a1.rh_nome, 'JOÃO DA SILVA')
+        self.assertEqual(self.prof_a1.desup_nome, 'JOSÉ DE SÁ')
+        self.assertEqual(self.prof_a1.nome, 'JOSÉ DE SÁ')
+
+    def test_listagem_busca_e_formulario_exibem_nome_em_maiusculas(self):
+        self.prof_a1.rh_nome = 'João da Silva'
+        self.prof_a1.save()
+        self.client.force_login(self.desup)
+        resposta = self.client.get(self.url_lista, {'q': 'da silva'})
+        self.assertContains(resposta, 'JOÃO DA SILVA')
+        self.assertEqual([p.pk for p in resposta.context['professores']], [self.prof_a1.pk])
+        formulario = self.client.get(reverse('professors:professor_update', args=[self.prof_a1.pk]))
+        self.assertEqual(formulario.context['form'].initial['rh_nome'], 'JOÃO DA SILVA')
+
+    def test_migracao_normaliza_somente_nomes_e_pode_ser_reexecutada(self):
+        from importlib import import_module
+        from types import SimpleNamespace
+        from django.apps import apps
+        from django.db import connection
+
+        # Simula dados legados sem passar pelo save do modelo atual.
+        Professor.objects.filter(pk=self.prof_a1.pk).update(
+            rh_nome='João da Silva', desup_nome='Maria José dos Santos',
+        )
+        normalizar = import_module(
+            'apps.professors.migrations.0014_normalizar_nomes_maiusculos'
+        ).normalizar_nomes
+        for _ in range(2):
+            normalizar(apps, SimpleNamespace(connection=connection))
+        self.prof_a1.refresh_from_db()
+        self.assertEqual(self.prof_a1.rh_nome, 'JOÃO DA SILVA')
+        self.assertEqual(self.prof_a1.desup_nome, 'MARIA JOSÉ DOS SANTOS')
+        self.assertEqual(self.prof_a1.id_funcional, 'IDF-A1')
+        self.assertEqual(self.prof_a1.rh_email, 'a1@harpia.test')
+        self.assertIn(self.unidade_a, self.prof_a1.unidades.all())
+        self.prof_b1.refresh_from_db()
+        self.assertIsNone(self.prof_b1.desup_nome)
+
+
 class CrudProfessorE2ETests(ProfessorE2EBase):
     """Cenário 9: jornada de CRUD completo com as permissões de cada perfil."""
 
@@ -217,7 +280,7 @@ class CrudProfessorE2ETests(ProfessorE2EBase):
         self.assertEqual(resposta['Location'], self.url_lista)
 
         novo = Professor.objects.get(id_funcional='IDF-NOVO')
-        self.assertEqual(novo.rh_nome, 'Daniel Dias')
+        self.assertEqual(novo.rh_nome, 'DANIEL DIAS')
         self.assertEqual(novo.unidade_principal, self.unidade_a)
         self.assertEqual(list(novo.unidades.all()), [self.unidade_a])
         self.assertEqual(list(novo.cursos.all()), [self.curso_ads])
@@ -232,7 +295,7 @@ class CrudProfessorE2ETests(ProfessorE2EBase):
 
         resposta = self.client.get(url_editar)
         self.assertEqual(resposta.status_code, 200)
-        self.assertContains(resposta, 'Daniel Dias')
+        self.assertContains(resposta, 'DANIEL DIAS')
 
         resposta = self.client.post(
             url_editar,
@@ -243,7 +306,7 @@ class CrudProfessorE2ETests(ProfessorE2EBase):
         )
         self.assertEqual(resposta.status_code, 302)
         novo.refresh_from_db()
-        self.assertEqual(novo.rh_nome, 'Daniel Dias da Silva')
+        self.assertEqual(novo.rh_nome, 'DANIEL DIAS DA SILVA')
         self.assertEqual(novo.status, Professor.StatusChoices.AFASTADO)
         self.assertEqual(novo.unidade_principal, self.unidade_a)
         self.assertTrue(
@@ -262,13 +325,13 @@ class CrudProfessorE2ETests(ProfessorE2EBase):
             reverse('professors:professor_update', kwargs={'pk': copia.pk}),
         )
         self.assertEqual(copia.rh_matricula, 'COPIA-MAT-NOVO')
-        self.assertEqual(copia.rh_nome, '[Cópia] Daniel Dias da Silva')
+        self.assertEqual(copia.rh_nome, '[CÓPIA] DANIEL DIAS DA SILVA')
         self.assertEqual(copia.unidade_principal, self.unidade_a)
         self.assertEqual(list(copia.unidades.all()), [self.unidade_a])
         self.assertEqual(list(copia.cursos.all()), [self.curso_ads])
         # O original continua intacto.
         novo.refresh_from_db()
-        self.assertEqual(novo.rh_nome, 'Daniel Dias da Silva')
+        self.assertEqual(novo.rh_nome, 'DANIEL DIAS DA SILVA')
         self.assertEqual(Professor.objects.filter(unidade_principal=self.unidade_a).count(), 3)
 
         # 4) O coordenador exclui a cópia.
@@ -434,7 +497,7 @@ class CrudProfessorE2ETests(ProfessorE2EBase):
 
         self.assertEqual(resposta.status_code, 302)
         self.assertEqual(
-            Professor.objects.filter(rh_nome__startswith='[Cópia]').count(), 2
+            Professor.objects.filter(rh_nome__startswith='[CÓPIA]').count(), 2
         )
 
     def test_excluir_professor_alocado_deve_avisar_em_vez_de_estourar(self):
@@ -492,11 +555,11 @@ class OverrideDesupProfessorE2ETests(ProfessorE2EBase):
         resposta = self.client.get(self.url_lista)
 
         self.assertEqual(resposta.status_code, 200)
-        self.assertEqual(self.prof_a1.nome, 'Ana Alves Ajustada')
+        self.assertEqual(self.prof_a1.nome, 'ANA ALVES AJUSTADA')
         self.assertEqual(self.prof_a1.email, 'ana.ajustada@harpia.test')
         # A tela usa `prof.nome` (override) mas preserva a matrícula do RH.
-        self.assertContains(resposta, 'Ana Alves Ajustada')
-        self.assertNotContains(resposta, '>Ana Alves<')
+        self.assertContains(resposta, 'ANA ALVES AJUSTADA')
+        self.assertNotContains(resposta, '>ANA ALVES<')
         self.assertContains(resposta, 'MAT-A1')
 
     def test_dados_de_rh_permanecem_intactos_apos_override(self):
@@ -505,7 +568,7 @@ class OverrideDesupProfessorE2ETests(ProfessorE2EBase):
         self.prof_a1.save()
         self.prof_a1.refresh_from_db()
 
-        self.assertEqual(self.prof_a1.rh_nome, 'Ana Alves')
+        self.assertEqual(self.prof_a1.rh_nome, 'ANA ALVES')
         self.assertEqual(self.prof_a1.rh_email, 'a1@harpia.test')
 
     def test_override_vazio_cai_de_volta_para_o_rh(self):
@@ -513,7 +576,7 @@ class OverrideDesupProfessorE2ETests(ProfessorE2EBase):
         self.prof_a1.desup_email = ''
         self.prof_a1.save()
 
-        self.assertEqual(self.prof_a1.nome, 'Ana Alves')
+        self.assertEqual(self.prof_a1.nome, 'ANA ALVES')
         self.assertEqual(self.prof_a1.email, 'a1@harpia.test')
 
     def test_edicao_pela_tela_nao_apaga_o_override_da_desup(self):
@@ -534,8 +597,8 @@ class OverrideDesupProfessorE2ETests(ProfessorE2EBase):
 
         self.assertEqual(resposta.status_code, 302)
         self.prof_a1.refresh_from_db()
-        self.assertEqual(self.prof_a1.rh_nome, 'Ana Alves (RH corrigido)')
-        self.assertEqual(self.prof_a1.nome, 'Ana Alves Ajustada')
+        self.assertEqual(self.prof_a1.rh_nome, 'ANA ALVES (RH CORRIGIDO)')
+        self.assertEqual(self.prof_a1.nome, 'ANA ALVES AJUSTADA')
 
 
 class IsolamentoUnidadeProfessorE2ETests(ProfessorE2EBase):
@@ -548,8 +611,8 @@ class IsolamentoUnidadeProfessorE2ETests(ProfessorE2EBase):
 
         self.assertEqual(resposta.status_code, 200)
         self.assertEqual([p.pk for p in resposta.context['professores']], [self.prof_a1.pk])
-        self.assertContains(resposta, 'Ana Alves')
-        self.assertNotContains(resposta, 'Carla Costa')
+        self.assertContains(resposta, 'ANA ALVES')
+        self.assertNotContains(resposta, 'CARLA COSTA')
         self.assertFalse(resposta.context['is_desup'])
         self.assertEqual(resposta.context['unidade_atual'], self.unidade_a)
 
@@ -675,8 +738,8 @@ class HtmxProfessorE2ETests(ProfessorE2EBase):
 
         self.assertEqual(resposta.status_code, 200)
         self.assertTemplateUsed(resposta, 'professors/partials/_linhas_alocacao.html')
-        self.assertContains(resposta, 'Ana Alves')
-        self.assertContains(resposta, 'Carla Costa')
+        self.assertContains(resposta, 'ANA ALVES')
+        self.assertContains(resposta, 'CARLA COSTA')
         self.assertCountEqual(
             [p.pk for p in resposta.context['professores']],
             [self.prof_a1.pk, self.prof_b1.pk],
@@ -1011,7 +1074,7 @@ class SolicitacaoCadastroEMatriculaOpcionalTests(ProfessorE2EBase):
         form = resposta.context['form']
 
         self.assertEqual(resposta.status_code, 200)
-        self.assertEqual(form.initial['rh_nome'], 'Professor Solicitado')
+        self.assertEqual(form.initial['rh_nome'], 'PROFESSOR SOLICITADO')
         self.assertEqual(form.initial['id_funcional'], 'ID-SOL-1')
         self.assertEqual(form.initial['rh_matricula'], 'MAT-SOL-1')
         self.assertEqual(form.initial['tipo_contrato'], self.contrato.pk)
@@ -1087,7 +1150,7 @@ class SolicitacaoCadastroEMatriculaOpcionalTests(ProfessorE2EBase):
         )
         self.assertContains(resposta, 'Cargo')
         self.assertContains(resposta, 'Vínculo empregatício')
-        self.assertContains(resposta, 'Professor Vinte Horas')
+        self.assertContains(resposta, 'PROFESSOR VINTE HORAS')
         self.assertContains(resposta, 'Terceirizado')
         self.assertContains(resposta, '20h')
 

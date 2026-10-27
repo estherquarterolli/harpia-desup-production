@@ -306,13 +306,17 @@ class Prioridade1DesupTests(TestCase):
         cargo = TipoCargoDiretivo.objects.create(nome="Direção", codigo="DIRECAO", ordem=10)
         self.client.force_login(self.desup)
         retorno = f"{reverse('core:equipe_diretiva_desup')}?unidade_id={self.origem.pk}"
+        self.client.post(
+            reverse('core:cargo_diretivo_unidade_reducao', args=[self.origem.pk, cargo.pk]),
+            {'carga_reducao_horas': '12.00'},
+        )
 
         resposta = self.client.post(
             reverse("core:ocupacao_diretiva_create", args=[self.origem.pk, cargo.pk]),
             {
                 "professor": self.professor.pk,
                 "data_inicio": self.hoje.isoformat(),
-                "carga_reducao_horas": "12.00",
+                "carga_reducao_horas": "99.00",  # Ignorado: usa o padrão da unidade.
                 "observacoes": "",
                 "next": retorno,
             },
@@ -584,11 +588,11 @@ class Prioridade1DesupTests(TestCase):
     def test_unidade_ve_na_lista_so_professores_da_propria_unidade(self):
         self.client.force_login(self.coordenador)
         resposta = self.client.get(reverse("professors:professor_list"))
-        self.assertNotContains(resposta, "Professor de Teste")
+        self.assertNotContains(resposta, "PROFESSOR DE TESTE")
 
         self.client.force_login(self.desup)
         resposta = self.client.get(reverse("professors:professor_list"))
-        self.assertContains(resposta, "Professor de Teste")
+        self.assertContains(resposta, "PROFESSOR DE TESTE")
 
     def test_busca_marca_professor_de_outra_unidade(self):
         self.client.force_login(self.coordenador)
