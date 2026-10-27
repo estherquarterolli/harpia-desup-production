@@ -63,8 +63,8 @@ class ProfessorForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        if self.instance.pk and not self.is_bound:
-            self.initial['rh_nome'] = " ".join((self.instance.rh_nome or "").split()).title()
+        if not self.is_bound and self.initial.get('rh_nome'):
+            self.initial['rh_nome'] = " ".join(self.initial['rh_nome'].split()).upper()
         self.fields['tipo_contrato'].queryset = ContractType.objects.permitidos().order_by('nome')
         # Cadastros e integrações anteriores a este campo podem omiti-lo. O
         # valor institucional seguro nesses casos é "Não informado".

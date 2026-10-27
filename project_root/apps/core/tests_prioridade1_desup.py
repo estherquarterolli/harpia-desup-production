@@ -560,11 +560,11 @@ class Prioridade1DesupTests(TestCase):
     def test_unidade_ve_na_lista_so_professores_da_propria_unidade(self):
         self.client.force_login(self.coordenador)
         resposta = self.client.get(reverse("professors:professor_list"))
-        self.assertNotContains(resposta, "Professor de Teste")
+        self.assertNotContains(resposta, "PROFESSOR DE TESTE")
 
         self.client.force_login(self.desup)
         resposta = self.client.get(reverse("professors:professor_list"))
-        self.assertContains(resposta, "Professor de Teste")
+        self.assertContains(resposta, "PROFESSOR DE TESTE")
 
     def test_busca_marca_professor_de_outra_unidade(self):
         self.client.force_login(self.coordenador)

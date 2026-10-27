@@ -1521,7 +1521,7 @@ class ExcecaoCargaDecidirView(DesupPrioridade1Mixin, View):
         except ValidationError as exc:
             messages.error(request, ' '.join(exc.messages))
         else:
-            messages.success(request, f'Exceção {excecao.get_status_display().lower()} com sucesso.')
+            messages.success(request, f'Solicitação de RAT {excecao.get_status_display().lower()} com sucesso.')
         return redirect('core:alertas_carga_desup')
 
 
@@ -1590,6 +1590,52 @@ class UnidadePrioridade1Mixin(LoginRequiredMixin, PerfilRequiredMixin):
         if not unidade or not unidade.status:
             raise PermissionDenied('Sua conta não está vinculada a uma unidade ativa.')
         return unidade
+
+
+class RatUnidadeView(UnidadePrioridade1Mixin, FormView):
+    from .forms import SolicitacaoRatUnidadeForm
+
+    form_class = SolicitacaoRatUnidadeForm
+    template_name = 'core/prioridade1/rat_unidade.html'
+    success_url = reverse_lazy('core:rat_unidade')
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['unidade'] = self.get_unidade()
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        from django.core.paginator import Paginator
+        from .models import ExcecaoCargaUnidade
+        from apps.professors.services import obter_cargas_rat, MENSAGEM_CARGA_RAT_INCOMPLETA
+
+        ctx = super().get_context_data(**kwargs)
+        unidade = self.get_unidade()
+        solicitacoes = ExcecaoCargaUnidade.objects.filter(unidade=unidade).select_related('professor')
+        ctx.update({
+            'unidade': unidade,
+            'cargas_rat': obter_cargas_rat(ctx['form'].fields['professor'].queryset),
+            'mensagem_carga_incompleta': MENSAGEM_CARGA_RAT_INCOMPLETA,
+            'solicitacoes': Paginator(solicitacoes, 20).get_page(self.request.GET.get('page')),
+        })
+        return ctx
+
+    def form_valid(self, form):
+        from django.core.exceptions import ValidationError
+        from .services import solicitar_rat
+
+        dados = form.cleaned_data
+        try:
+            solicitar_rat(
+                request=self.request, professor_id=dados['professor'].pk,
+                horas_adicionais=dados['horas_adicionais'], data_inicio=dados['data_inicio'],
+                data_fim=dados['data_fim'], justificativa=dados['justificativa'],
+            )
+        except ValidationError as exc:
+            form.add_error(None, ' '.join(exc.messages))
+            return self.form_invalid(form)
+        messages.success(self.request, 'Solicitação de RAT enviada para análise da DESUP.')
+        return super().form_valid(form)
 
 
 class EquipeDiretivaUnidadeView(UnidadePrioridade1Mixin, TemplateView):
