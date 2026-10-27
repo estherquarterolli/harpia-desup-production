@@ -451,6 +451,44 @@ class DecisaoSolicitacaoProfessorForm(forms.Form):
         return cleaned
 
 
+class SolicitacaoRatUnidadeForm(forms.ModelForm):
+    class Meta:
+        model = ExcecaoCargaUnidade
+        fields = ['professor', 'horas_adicionais', 'data_inicio', 'data_fim', 'justificativa']
+        labels = {'horas_adicionais': 'Horas adicionais semanais solicitadas'}
+        widgets = {
+            'professor': forms.Select(attrs={'class': _SELECT_CSS}),
+            'horas_adicionais': forms.NumberInput(attrs={'class': _INPUT_CSS, 'min': '0.01', 'step': '0.01'}),
+            'data_inicio': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'class': _DATE_CSS}),
+            'data_fim': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'class': _DATE_CSS}),
+            'justificativa': forms.Textarea(attrs={'class': _INPUT_CSS, 'rows': 3}),
+        }
+
+    def __init__(self, *args, unidade, **kwargs):
+        from django.db.models import Q
+        from apps.professors.models import Professor
+
+        super().__init__(*args, **kwargs)
+        self.instance.unidade = unidade
+        self.fields['professor'].required = True
+        self.fields['professor'].help_text = 'Selecione um professor vinculado à sua unidade.'
+        self.fields['professor'].queryset = Professor.objects.filter(
+            Q(unidade_principal=unidade) | Q(unidades=unidade),
+        ).select_related('tipo_contrato').prefetch_related('ocupacoes_diretivas').distinct()
+
+    def clean_professor(self):
+        from apps.professors.services import (
+            obter_cargas_rat, MENSAGEM_CARGA_RAT_INCOMPLETA, MENSAGEM_ID_RAT_OBRIGATORIO,
+        )
+
+        professor = self.cleaned_data['professor']
+        if not (professor.id_funcional or '').strip():
+            raise forms.ValidationError(MENSAGEM_ID_RAT_OBRIGATORIO)
+        if not obter_cargas_rat([professor])[str(professor.pk)]['completa']:
+            raise forms.ValidationError(MENSAGEM_CARGA_RAT_INCOMPLETA)
+        return professor
+
+
 class DecisaoExcecaoCargaForm(forms.Form):
     decisao = forms.ChoiceField(
         label="Decisão",

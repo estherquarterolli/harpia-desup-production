@@ -76,6 +76,9 @@
             {% elif user.perfil == 'COORDENADOR_UNIDADE' %}
             <div class="sb-block">
                 <p class="sb-title">Gestão</p>
+                <a href="{% url 'core:rat_unidade' %}" class="sb-link {% if '/core/unidade/rat/' in request.path %}is-active{% endif %}">
+                    <i class="ph ph-seal-question"></i><span class="sb-label">RAT</span>
+                </a>
                 <a href="{% url 'core:equipe_diretiva_unidade' %}" class="sb-link {% if '/core/unidade/equipe-diretiva' in request.path %}is-active{% endif %}">
                     <i class="ph ph-identification-card"></i><span class="sb-label">Equipe diretiva</span>
                 </a>

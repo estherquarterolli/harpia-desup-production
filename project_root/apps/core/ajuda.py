@@ -168,7 +168,7 @@ AJUDA_PAGINAS = {
                    '#modalNovaReadaptacao > div',
                    abrir=['.aba-btn[data-aba="readaptacoes"]', 'button[onclick="abrirModal(\'modalNovaReadaptacao\')"]'],
                    fechar=['#modalNovaReadaptacao', _ABA_VISAO]),
-            _passo('Use a aba Exceções', 'Pedidos das unidades para ultrapassar temporariamente o limite de carga.',
+            _passo('Use a aba RAT', 'Solicitações de Regime Adicional de Trabalho feitas pelas unidades.',
                    '[data-painel="excecoes"]', abrir='.aba-btn[data-aba="excecoes"]', fechar=_ABA_VISAO),
             _passo('Analise um pedido', 'Aprovar libera as horas adicionais durante a vigência; recusar exige motivo.',
                    ['div[id^="modalExcecao"]' + _MODAL_ABERTO, '[data-painel="excecoes"]'],
