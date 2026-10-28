@@ -36,8 +36,11 @@ def _ids_de_outra_unidade(professor_ids, unidade_id):
     return ids - vinculados
 
 
-def _cargos_diretivos_vigentes():
+def _cargos_diretivos_vigentes(professor_ids=None):
     """{professor_id: 'Cargo (SIGLA)'} dos ocupantes vigentes da equipe diretiva.
+
+    `professor_ids` restringe a consulta a alguns professores (evita carregar a
+    equipe diretiva inteira quando só um docente interessa).
 
     Usado para avisar (amarelo) quando alguém da equipe diretiva é alocado em sala.
     """
@@ -49,6 +52,8 @@ def _cargos_diretivos_vigentes():
     ocupacoes = OcupacaoEquipeDiretiva.objects.filter(
         OcupacaoEquipeDiretiva.filtro_vigente(hoje),
     ).select_related('cargo', 'unidade')
+    if professor_ids is not None:
+        ocupacoes = ocupacoes.filter(professor_id__in=professor_ids)
     cargos = {}
     for o in ocupacoes:
         cargos.setdefault(o.professor_id, []).append(f'{o.cargo.nome} ({o.unidade.sigla})')
@@ -304,15 +309,7 @@ class AlocarDocenteComponenteView(LoginRequiredMixin, PerfilRequiredMixin, View)
         reload = False
         docente_id_param = request.POST.get('docente_id')
         user = request.user
-        if user.perfil == 'COORDENADOR_UNIDADE' and not user.is_superuser:
-            if docente_id_param not in (None, '', services.SEM_PROFESSOR, services.NAO_OFERECIDA):
-                unidade_alvo_id = unidade.pk if unidade else user.unidade_id
-                if not services.professor_autorizado_para_unidade(docente_id_param, unidade_alvo_id):
-                    erro = services.AlocacaoError(
-                        'Acesso negado: docente não vinculado a esta unidade e sem cessão autorizada.',
-                        status=403,
-                    )
-                    return _resposta_erro(request, erro)
+        # A autorização do coordenador sobre o docente é feita em `definir_escolha`.
         try:
             if request.POST.get('acao') == 'remover':
                 msg = services.remover_linha(comp, unidade, linha_id)
@@ -344,7 +341,7 @@ class AlocarDocenteComponenteView(LoginRequiredMixin, PerfilRequiredMixin, View)
                 'docente_nome': linha.docente.nome if linha and linha.docente_id else '',
                 'outra_unidade': outra_unidade,
                 'cargo_diretivo': (
-                    _cargos_diretivos_vigentes().get(linha.docente_id, '')
+                    _cargos_diretivos_vigentes([linha.docente_id]).get(linha.docente_id, '')
                     if linha and linha.docente_id else ''
                 ),
             })
@@ -603,8 +600,9 @@ class BuscarProfessoresView(LoginRequiredMixin, PerfilRequiredMixin, View):
 
         qs = qs.prefetch_related('unidades', 'readaptacoes').order_by('nome_exibicao')[:20]
 
-        cargos_diretivos = _cargos_diretivos_vigentes()
-        outras = _ids_de_outra_unidade({p.id for p in qs}, unidade_alocacao)
+        ids_busca = {p.id for p in qs}
+        cargos_diretivos = _cargos_diretivos_vigentes(ids_busca)
+        outras = _ids_de_outra_unidade(ids_busca, unidade_alocacao)
         results = [
             {
                 'id': p.id,

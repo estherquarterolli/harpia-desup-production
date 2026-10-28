@@ -30,8 +30,8 @@ if database_url:
         'default': configure_for_transaction_pooler(
             dj_database_url.config(
                 default=database_url,
-                conn_max_age=0,
-                conn_health_checks=False,
+                conn_max_age=60,
+                conn_health_checks=True,
             )
         )
     }

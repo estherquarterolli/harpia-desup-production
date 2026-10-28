@@ -207,17 +207,19 @@ def definir_escolha(componente, unidade, valor, linha_id=None, usuario=None):
 
     docente = None
     if valor not in (SEM_PROFESSOR, '', None):
+        # Coordenador só aloca docente da própria unidade (ou com cessão). A
+        # checagem vem antes de buscar o professor: um id inexistente também é 403.
+        if usuario and getattr(usuario, 'perfil', None) == 'COORDENADOR_UNIDADE' and not usuario.is_superuser:
+            unidade_alvo = unidade.pk if unidade else getattr(usuario, 'unidade_id', None)
+            if not professor_autorizado_para_unidade(valor, unidade_alvo):
+                raise AlocacaoError(
+                    'Acesso negado: docente não vinculado a esta unidade e sem cessão autorizada.',
+                    status=403,
+                )
         try:
             docente = Professor.objects.get(pk=int(valor))
         except (ValueError, TypeError, Professor.DoesNotExist):
             raise AlocacaoError('Professor não encontrado.', status=404)
-        if usuario and getattr(usuario, 'perfil', None) == 'COORDENADOR_UNIDADE' and not usuario.is_superuser:
-            unidade_alvo = unidade.pk if unidade else getattr(usuario, 'unidade_id', None)
-            if not professor_autorizado_para_unidade(docente.pk, unidade_alvo):
-                raise AlocacaoError(
-                    f'O docente {docente.nome} não pertence a esta unidade e não possui cessão autorizada.',
-                    status=403,
-                )
         if linhas.filter(docente=docente).exclude(pk=linha_id if str(linha_id).isdigit() else None).exists():
             raise AlocacaoError(
                 f'{docente.nome} já está alocado neste componente. Escolha outro docente.',

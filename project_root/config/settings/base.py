@@ -145,7 +145,7 @@ EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=False, cast=bool)
 EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="no-reply@harpia.local")
-EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=15, cast=int)
+EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=5, cast=int)
 
 # Recuperação de senha por e-mail: token de uso único e cooldown anti-spam.
 PASSWORD_RESET_TOKEN_TTL_SECONDS = config(

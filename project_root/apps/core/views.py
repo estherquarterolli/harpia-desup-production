@@ -805,11 +805,11 @@ class MarcarNotificacaoLidaView(LoginRequiredMixin, View):
             if user.is_superuser or user.perfil == 'DESUP':
                 count = base_qs.filter(
                     Q(destinatario=user) | Q(destinatario__isnull=True, unidade_destino__isnull=True)
-                ).distinct().count()
+                ).count()
             elif user.perfil == 'COORDENADOR_UNIDADE' and user.unidade:
                 count = base_qs.filter(
                     Q(destinatario=user) | Q(unidade_destino=user.unidade)
-                ).distinct().count()
+                ).count()
             else:
                 count = base_qs.filter(destinatario=user).count()
             response['HX-Trigger'] = f'{{"notifCountUpdate": {count}}}'
