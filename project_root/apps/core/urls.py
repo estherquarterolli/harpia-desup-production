@@ -34,7 +34,9 @@ urlpatterns = [
     path('desup/equipe-diretiva/', views.EquipeDiretivaDesupView.as_view(), name='equipe_diretiva_desup'),
     path('desup/equipe-diretiva/cargos/novo/', views.TipoCargoDiretivoCreateView.as_view(), name='cargo_diretivo_create'),
     path('desup/equipe-diretiva/cargos/<int:pk>/editar/', views.TipoCargoDiretivoUpdateView.as_view(), name='cargo_diretivo_update'),
+    path('desup/equipe-diretiva/unidades/<int:unidade_pk>/cargos/<int:pk>/editar/', views.TipoCargoDiretivoUpdateView.as_view(), name='cargo_diretivo_unidade_update'),
     path('desup/equipe-diretiva/cargos/<int:pk>/excluir/', views.TipoCargoDiretivoDeleteView.as_view(), name='cargo_diretivo_delete'),
+    path('desup/equipe-diretiva/unidades/<int:unidade_pk>/cargos/<int:cargo_pk>/reducao/', views.ConfiguracaoCargoDiretivoUnidadeView.as_view(), name='cargo_diretivo_unidade_reducao'),
     path('desup/equipe-diretiva/unidades/<int:unidade_pk>/cargos/<int:cargo_pk>/preencher/', views.OcupacaoEquipeDiretivaCreateView.as_view(), name='ocupacao_diretiva_create'),
     path('desup/equipe-diretiva/ocupacoes/<int:pk>/editar/', views.OcupacaoEquipeDiretivaUpdateView.as_view(), name='ocupacao_diretiva_update'),
     path('desup/solicitacoes-professor/', views.SolicitacaoProfessorExternoDesupView.as_view(), name='solicitacao_professor_list'),
@@ -48,6 +50,7 @@ urlpatterns = [
     path('desup/alertas-carga/excecoes/<int:pk>/decidir/', views.ExcecaoCargaDecidirView.as_view(), name='excecao_carga_decidir'),
 
     # Prioridade 1.1 - equipe diretiva, coordenações e estágio/supervisão da unidade
+    path('unidade/rat/', views.RatUnidadeView.as_view(), name='rat_unidade'),
     path('unidade/equipe-diretiva/', views.EquipeDiretivaUnidadeView.as_view(), name='equipe_diretiva_unidade'),
     path('unidade/equipe-diretiva/cargos/<int:cargo_pk>/preencher/', views.OcupacaoEquipeDiretivaUnidadeCreateView.as_view(), name='ocupacao_diretiva_unidade_create'),
     path('unidade/equipe-diretiva/ocupacoes/<int:pk>/editar/', views.OcupacaoEquipeDiretivaUnidadeUpdateView.as_view(), name='ocupacao_diretiva_unidade_update'),

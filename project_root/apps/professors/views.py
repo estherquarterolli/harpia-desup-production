@@ -14,90 +14,10 @@ from apps.allocations.services import semestre_atual
 from apps.core.models import Notificacao, SolicitacaoProfessorExterno, Unidade
 from .forms import ProfessorForm, SolicitacaoCadastroProfessorForm, SolicitacaoCessaoProfessorForm
 from .models import ContractType, Professor, filtro_vinculo_empregaticio
+from .services import _bulk_ch_alocada, _bulk_ch_justificada
 
 
 ALLOCATION_TABLE_PAGE_SIZE = 20
-
-
-def _bulk_ch_alocada(professor_ids):
-    """
-    `Professor.ch_alocada` pra vários professores numa query só, em vez de N.
-
-    ch_alocada é @property (soma de MatrixComponent com dedup por
-    "compartilhado"); chamá-la por professor num loop de listagem abre uma
-    query por professor — com ~190 professores isso sozinho já estourava os
-    30s de timeout do Vercel. Mesma lógica de dedup, calculada em lote.
-    """
-    from apps.allocations.services import alocacoes_vigentes
-
-    componentes = alocacoes_vigentes().filter(
-        docente_id__in=professor_ids,
-    ).values(
-        "docente_id",
-        "componente_matriz__componente_curricular_id",
-        "componente_matriz__compartilhado",
-        "componente_matriz__carga_horaria",
-        "componente_matriz_id",
-    )
-
-    mapa = {}
-    vistos = {}
-    for comp in componentes:
-        pid = comp["docente_id"]
-        vistos.setdefault(pid, set())
-        chave = (
-            comp["componente_matriz__componente_curricular_id"]
-            if comp["componente_matriz__compartilhado"]
-            else comp["componente_matriz_id"]
-        )
-        if chave in vistos[pid]:
-            continue
-        vistos[pid].add(chave)
-        ha_semanal = (comp["componente_matriz__carga_horaria"] or 0) / 20.0
-        mapa[pid] = mapa.get(pid, 0) + ha_semanal
-    return mapa
-
-
-def _bulk_ch_justificada(professor_ids):
-    """
-    `Professor.ch_justificada` (via `PendenciaExtra.ch_total_justificada`) pra
-    vários professores numa query só, em vez de N + N*3 (cada pendência abria
-    3 queries pra somar TCC/extensão/redução aprovados).
-    """
-    from apps.extra_curricular.models import ParecerChoices, PendenciaExtra
-    from apps.extra_curricular.utils import semestre_atual
-
-    pendencias = PendenciaExtra.objects.filter(
-        professor_id__in=professor_ids,
-        semestre=semestre_atual(),
-    ).prefetch_related("orientacoes_tcc", "atividades_extensao", "reducoes_ch", "licencas")
-
-    mapa = {}
-    for p in pendencias:
-        if p.status not in PendenciaExtra.STATUS_FINALIZADOS:
-            continue
-        total = 0.0
-        for itens in (p.orientacoes_tcc.all(), p.atividades_extensao.all(), p.reducoes_ch.all(), p.licencas.all()):
-            total += sum(
-                float(item.ch_aprovada) for item in itens
-                if item.parecer_desup == ParecerChoices.APROVADO
-            )
-        mapa[p.professor_id] = mapa.get(p.professor_id, 0.0) + total
-
-    # Orientação/supervisão/coordenação de estágio vigentes no semestre também
-    # entram no somatório (em qualquer unidade onde o professor atue).
-    from apps.core.models import AtividadeEstagioSupervisao
-    from django.utils import timezone
-
-    hoje = timezone.localdate()
-    estagios = AtividadeEstagioSupervisao.objects.filter(
-        professor_id__in=professor_ids,
-        semestre=semestre_atual(),
-        data_inicio__lte=hoje,
-    ).filter(Q(data_fim__isnull=True) | Q(data_fim__gte=hoje))
-    for est in estagios:
-        mapa[est.professor_id] = mapa.get(est.professor_id, 0.0) + float(est.carga_horaria_semanal)
-    return mapa
 
 
 def _perfil_desup(user):
@@ -174,7 +94,7 @@ def enriquecer_professores_com_carga(professores, unidade_atual=None):
         if meta_horas:
             prof.percentual_alocado_total = round(min((prof.soma_horas / meta_horas) * 100, 100.0), 2)
         else:
-            prof.percentual_alocado_total = 100.0 if prof.reducao_diretiva else 0.0
+            prof.percentual_alocado_total = 100.0 if (prof.reducao_diretiva or prof.readaptado_vigente) else 0.0
 
     if unidade_atual:
         try:
@@ -530,7 +450,7 @@ class ProfessorDetailView(DesupOnlyMixin, DetailView):
     def get_queryset(self):
         return Professor.objects.select_related(
             'tipo_contrato', 'unidade_principal'
-        ).prefetch_related('cursos', 'unidades', 'ocupacoes_diretivas')
+        ).prefetch_related('cursos', 'unidades', 'ocupacoes_diretivas', 'readaptacoes')
 
 class ProfessorCreateView(DesupOnlyMixin, CreateView):
     model = Professor
@@ -578,8 +498,18 @@ class ProfessorCreateView(DesupOnlyMixin, CreateView):
         return ctx
 
     def form_valid(self, form):
+        resposta = super().form_valid(form)
+        solicitacao = self._solicitacao_origem()
+        if solicitacao:
+            from apps.core.services import decidir_solicitacao_professor_externo
+            decidir_solicitacao_professor_externo(
+                request=self.request,
+                solicitacao_id=solicitacao.pk,
+                decisao=SolicitacaoProfessorExterno.StatusChoices.APROVADA,
+            )
+            SolicitacaoProfessorExterno.objects.filter(pk=solicitacao.pk).update(professor=self.object)
         messages.success(self.request, 'Professor cadastrado com sucesso.')
-        return super().form_valid(form)
+        return resposta
 
 
 class ProfessorUpdateView(ProfessorEditDeleteMixin, UpdateView):
@@ -818,13 +748,13 @@ def htmx_tabela_alocacao(request):
         if user.unidade_id:
             from apps.allocations.services import professores_autorizados_unidade_qs
             queryset = professores_autorizados_unidade_qs(user.unidade_id).select_related('tipo_contrato').prefetch_related(
-                'unidades', 'ocupacoes_diretivas'
+                'unidades', 'ocupacoes_diretivas', 'readaptacoes'
             ).order_by('rh_nome')
         else:
             queryset = Professor.objects.none()
     else:
         queryset = Professor.objects.select_related('tipo_contrato').prefetch_related(
-            'unidades', 'ocupacoes_diretivas'
+            'unidades', 'ocupacoes_diretivas', 'readaptacoes'
         ).order_by('rh_nome')
 
     # Esta tela legada era o Ãºltimo ponto que ainda materializava todos os
@@ -854,7 +784,7 @@ def htmx_tabela_alocacao(request):
         if meta_horas:
             prof.percentual_alocado_total = round(min((soma / meta_horas) * 100, 100.0), 2)
         else:
-            prof.percentual_alocado_total = 100.0 if prof.reducao_carga_vigente else 0.0
+            prof.percentual_alocado_total = 100.0 if (prof.reducao_carga_vigente or prof.readaptado_vigente) else 0.0
 
     return render(request, 'professors/partials/_linhas_alocacao.html', {
         'professores': professores,

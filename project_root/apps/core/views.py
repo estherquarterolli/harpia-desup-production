@@ -9,7 +9,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
-from django.views.generic import TemplateView
+from django.views.generic import FormView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from apps.accounts.mixins import PerfilRequiredMixin
@@ -918,34 +918,40 @@ class EquipeDiretivaDesupView(DesupPrioridade1Mixin, TemplateView):
     template_name = 'core/prioridade1/equipe_diretiva.html'
 
     def get_context_data(self, **kwargs):
+        from django.core.paginator import Paginator
         from django.utils import timezone
-        from .forms import OcupacaoEquipeDiretivaForm, TipoCargoDiretivoForm
-        from .models import OcupacaoEquipeDiretiva, TipoCargoDiretivo, Unidade
+        from .forms import (
+            OcupacaoEquipeDiretivaForm, OpcoesOcupacaoEquipeDiretiva,
+            TipoCargoDiretivoForm, TipoCargoDiretivoUnidadeForm,
+        )
+        from .models import ConfiguracaoCargoDiretivoUnidade, OcupacaoEquipeDiretiva, TipoCargoDiretivo, Unidade
 
         ctx = super().get_context_data(**kwargs)
         unidade_id = self.request.GET.get('unidade_id', '')
         hoje = timezone.localdate()
-        cargos = list(
-            TipoCargoDiretivo.objects.annotate(
-                tem_ocupacoes=Exists(
-                    OcupacaoEquipeDiretiva.objects.filter(cargo_id=OuterRef('pk'))
-                )
-            ).order_by('ordem', 'nome')
-        )
         unidade_selecionada = None
         if unidade_id.isdigit():
             unidade_selecionada = Unidade.objects.filter(pk=unidade_id, status=True).first()
 
         composicao = []
         historico = []
+        historico_page_obj = None
         reducao_total = Decimal('0.00')
         if unidade_selecionada:
+            cargos = list(TipoCargoDiretivo.objects.order_by('ordem', 'nome'))
+            opcoes = OpcoesOcupacaoEquipeDiretiva(unidade_selecionada)
+            reducoes = dict(ConfiguracaoCargoDiretivoUnidade.objects.filter(
+                unidade=unidade_selecionada,
+            ).values_list('cargo_id', 'carga_reducao_horas'))
             ocupacoes = (
                 OcupacaoEquipeDiretiva.objects.filter(unidade=unidade_selecionada)
                 .select_related('cargo', 'professor', 'curso', 'curso__curso')
-                .order_by('-data_inicio')
+                .order_by('-data_inicio', '-pk')
             )
-            historico = ocupacoes.filter(data_fim__lte=hoje)
+            historico_page_obj = Paginator(ocupacoes.filter(data_fim__lte=hoje), 15).get_page(
+                self.request.GET.get('historico_page'),
+            )
+            historico = historico_page_obj.object_list
             por_cargo = {}
             for ocupacao in ocupacoes.filter(OcupacaoEquipeDiretiva.filtro_vigente(hoje)):
                 if ocupacao.vigente:
@@ -955,15 +961,22 @@ class EquipeDiretivaDesupView(DesupPrioridade1Mixin, TemplateView):
                 ocupantes = por_cargo.get(cargo.pk, [])
                 item = {
                     'cargo': cargo,
+                    'carga_reducao_horas': reducoes.get(cargo.pk, cargo.carga_reducao_horas),
                     'ocupantes': ocupantes,
                     'pode_adicionar': cargo.ativo and (
                         not ocupantes or cargo.permite_multiplos
                     ),
                 }
+                item['form_cargo'] = TipoCargoDiretivoUnidadeForm(
+                    instance=cargo, unidade=unidade_selecionada,
+                    initial={'carga_reducao_unidade': item['carga_reducao_horas']},
+                    auto_id=f'id_cargo{cargo.pk}_%s',
+                )
                 if item['pode_adicionar']:
                     item['form'] = OcupacaoEquipeDiretivaForm(
                         unidade=unidade_selecionada,
                         cargo=cargo,
+                        opcoes=opcoes,
                         auto_id=f'id_ocup{cargo.pk}_%s',
                         initial={'data_inicio': hoje},
                     )
@@ -972,14 +985,11 @@ class EquipeDiretivaDesupView(DesupPrioridade1Mixin, TemplateView):
             composicao.sort(key=lambda item: not item['cargo'].ativo)
 
         ctx.update({
-            'cargos_forms': [
-                (cargo, TipoCargoDiretivoForm(instance=cargo, auto_id=f'id_cargo{cargo.pk}_%s'))
-                for cargo in cargos
-            ],
             'form_novo_cargo': TipoCargoDiretivoForm(auto_id='id_novocargo_%s'),
             'unidade_selecionada': unidade_selecionada,
             'composicao': composicao,
             'historico': historico,
+            'historico_page_obj': historico_page_obj,
             'reducao_total': reducao_total,
             'unidades': Unidade.objects.filter(status=True).order_by('nome'),
             'filtro_unidade': unidade_id,
@@ -1017,38 +1027,102 @@ class TipoCargoDiretivoCreateView(DesupPrioridade1Mixin, RetornoOrigemMixin, Cre
 
 
 class TipoCargoDiretivoUpdateView(DesupPrioridade1Mixin, RetornoOrigemMixin, UpdateView):
-    from .forms import TipoCargoDiretivoForm
+    from .forms import TipoCargoDiretivoUpdateForm
     from .models import TipoCargoDiretivo
 
     model = TipoCargoDiretivo
-    form_class = TipoCargoDiretivoForm
+    form_class = TipoCargoDiretivoUpdateForm
     template_name = 'core/prioridade1/form.html'
     success_url = reverse_lazy('core:equipe_diretiva_desup')
 
+    def get_form_class(self):
+        if 'unidade_pk' in self.kwargs:
+            from .forms import TipoCargoDiretivoUnidadeForm
+            return TipoCargoDiretivoUnidadeForm
+        return super().get_form_class()
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        if 'unidade_pk' in self.kwargs:
+            from .services import obter_reducao_cargo_unidade
+            self.unidade = get_object_or_404(Unidade, pk=self.kwargs['unidade_pk'], status=True)
+            kwargs['unidade'] = self.unidade
+            kwargs['initial']['carga_reducao_unidade'] = obter_reducao_cargo_unidade(self.object, self.unidade)
+        return kwargs
+
+    def get_success_url(self):
+        if 'unidade_pk' in self.kwargs:
+            return f"{self.success_url}?unidade_id={self.kwargs['unidade_pk']}"
+        return super().get_success_url()
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx.update({'titulo': 'Editar tipo de cargo', 'cancel_url': self.success_url})
+        ctx.update({'titulo': 'Editar cargo', 'cancel_url': self.get_success_url()})
         return ctx
 
     def form_valid(self, form):
-        from django.utils import timezone
-        from .models import OcupacaoEquipeDiretiva
-        from .services import registrar_evento_prioridade1
-        response = super().form_valid(form)
-        if 'carga_reducao_horas' in form.changed_data:
-            # Ocupantes vigentes acompanham a nova redução do cargo; o histórico não muda.
-            hoje = timezone.localdate()
-            OcupacaoEquipeDiretiva.objects.filter(
-                cargo=self.object, data_inicio__lte=hoje,
-            ).filter(Q(data_fim__isnull=True) | Q(data_fim__gte=hoje)).update(
-                carga_reducao_horas=self.object.carga_reducao_horas,
+        from django.db import transaction
+        from .services import configurar_reducao_cargo_unidade, registrar_evento_prioridade1
+        with transaction.atomic():
+            response = super().form_valid(form)
+            if 'unidade_pk' in self.kwargs:
+                configuracao = configurar_reducao_cargo_unidade(
+                    self.object, self.unidade, form.cleaned_data['carga_reducao_unidade'],
+                )
+                registrar_evento_prioridade1(
+                    self.request, 'REDUCAO_CARGO_UNIDADE_ATUALIZADA',
+                    f'Unidade {self.unidade.pk}; cargo {self.object.pk}; '
+                    f'redução semanal {configuracao.carga_reducao_horas} h.',
+                )
+            registrar_evento_prioridade1(
+                self.request, 'CARGO_DIRETIVO_ATUALIZADO',
+                f'Cargo {self.object.pk}: {self.object.nome}.',
             )
-        registrar_evento_prioridade1(
-            self.request, 'CARGO_DIRETIVO_ATUALIZADO',
-            f'Cargo {self.object.pk}: {self.object.nome}; redução semanal {self.object.carga_reducao_horas} h.',
-        )
         messages.success(self.request, 'Tipo de cargo atualizado com sucesso.')
         return response
+
+
+class ConfiguracaoCargoDiretivoUnidadeView(DesupPrioridade1Mixin, FormView):
+    from .forms import ConfiguracaoCargoDiretivoUnidadeForm
+
+    form_class = ConfiguracaoCargoDiretivoUnidadeForm
+    template_name = 'core/prioridade1/form.html'
+
+    def get_form_kwargs(self):
+        from .models import TipoCargoDiretivo
+        self.unidade = get_object_or_404(Unidade, pk=self.kwargs['unidade_pk'], status=True)
+        self.cargo = get_object_or_404(TipoCargoDiretivo, pk=self.kwargs['cargo_pk'])
+        return super().get_form_kwargs()
+
+    def get_initial(self):
+        from .services import obter_reducao_cargo_unidade
+        return {'carga_reducao_horas': obter_reducao_cargo_unidade(self.cargo, self.unidade)}
+
+    def get_success_url(self):
+        return f"{reverse_lazy('core:equipe_diretiva_desup')}?unidade_id={self.unidade.pk}"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update({
+            'titulo': f'Redução de {self.cargo.nome} — {self.unidade.sigla}',
+            'cancel_url': self.get_success_url(),
+        })
+        return ctx
+
+    def form_valid(self, form):
+        from django.db import transaction
+        from .services import configurar_reducao_cargo_unidade, registrar_evento_prioridade1
+        with transaction.atomic():
+            configuracao = configurar_reducao_cargo_unidade(
+                self.cargo, self.unidade, form.cleaned_data['carga_reducao_horas'],
+            )
+            registrar_evento_prioridade1(
+                self.request, 'REDUCAO_CARGO_UNIDADE_ATUALIZADA',
+                f'Unidade {self.unidade.pk}; cargo {self.cargo.pk}; '
+                f'redução semanal {configuracao.carga_reducao_horas} h.',
+            )
+        messages.success(self.request, 'Redução do cargo nesta unidade atualizada com sucesso.')
+        return super().form_valid(form)
 
 
 class TipoCargoDiretivoDeleteView(DesupPrioridade1Mixin, View):
@@ -1121,10 +1195,10 @@ class OcupacaoEquipeDiretivaCreateView(DesupPrioridade1Mixin, CreateView):
         return ctx
 
     def form_valid(self, form):
-        from .services import registrar_evento_prioridade1
+        from .services import obter_reducao_cargo_unidade, registrar_evento_prioridade1
         form.instance.criado_por = self.request.user
-        # A redução pertence ao cargo (definida pela DESUP no cadastro dele).
-        form.instance.carga_reducao_horas = self.cargo.carga_reducao_horas
+        form.instance.carga_reducao_horas = obter_reducao_cargo_unidade(self.cargo, self.unidade)
+        form.instance.reducao_personalizada = False
         response = super().form_valid(form)
         registrar_evento_prioridade1(
             self.request,
@@ -1152,6 +1226,9 @@ class OcupacaoEquipeDiretivaUpdateView(DesupPrioridade1Mixin, RetornoOrigemMixin
 
     def form_valid(self, form):
         from .services import registrar_evento_prioridade1
+        # Mesmo valor igual ao padrão pode ser uma escolha individual explícita.
+        if 'carga_reducao_horas' in form.data:
+            form.instance.reducao_personalizada = True
         response = super().form_valid(form)
         registrar_evento_prioridade1(
             self.request,
@@ -1219,6 +1296,23 @@ class SolicitacaoProfessorExternoDecidirView(DesupPrioridade1Mixin, View):
         if not form.is_valid():
             messages.error(request, 'Revise a decisão e informe o motivo quando necessário.')
             return redirect('core:solicitacao_professor_list')
+        from django.urls import reverse
+        from .models import SolicitacaoProfessorExterno
+        Status = SolicitacaoProfessorExterno.StatusChoices
+        pendente = SolicitacaoProfessorExterno.objects.filter(pk=pk, status=Status.PENDENTE).first()
+        if (
+            pendente
+            and form.cleaned_data['decisao'] == Status.APROVADA
+            and pendente.tipo == SolicitacaoProfessorExterno.TipoChoices.CADASTRO
+            and not pendente.professor_id
+        ):
+            # A aprovação de um cadastro só se conclui ao salvar o professor: abre o
+            # formulário já preenchido com os dados informados pela unidade.
+            messages.info(
+                request,
+                'Revise os dados e salve o professor para concluir a aprovação da solicitação.',
+            )
+            return redirect(f"{reverse('professors:professor_create')}?solicitacao={pendente.pk}")
         try:
             solicitacao = decidir_solicitacao_professor_externo(
                 request=request,
@@ -1232,6 +1326,9 @@ class SolicitacaoProfessorExternoDecidirView(DesupPrioridade1Mixin, View):
             messages.success(
                 request, f'Solicitação {solicitacao.get_status_display().lower()} com sucesso.',
             )
+            if solicitacao.status == Status.APROVADA and solicitacao.professor_id:
+                # Cessão aprovada: abre o cadastro do professor.
+                return redirect('professors:professor_update', pk=solicitacao.professor_id)
         return redirect('core:solicitacao_professor_list')
 
 
@@ -1444,7 +1541,7 @@ class ExcecaoCargaDecidirView(DesupPrioridade1Mixin, View):
         except ValidationError as exc:
             messages.error(request, ' '.join(exc.messages))
         else:
-            messages.success(request, f'Exceção {excecao.get_status_display().lower()} com sucesso.')
+            messages.success(request, f'Solicitação de RAT {excecao.get_status_display().lower()} com sucesso.')
         return redirect('core:alertas_carga_desup')
 
 
@@ -1515,6 +1612,52 @@ class UnidadePrioridade1Mixin(LoginRequiredMixin, PerfilRequiredMixin):
         return unidade
 
 
+class RatUnidadeView(UnidadePrioridade1Mixin, FormView):
+    from .forms import SolicitacaoRatUnidadeForm
+
+    form_class = SolicitacaoRatUnidadeForm
+    template_name = 'core/prioridade1/rat_unidade.html'
+    success_url = reverse_lazy('core:rat_unidade')
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['unidade'] = self.get_unidade()
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        from django.core.paginator import Paginator
+        from .models import ExcecaoCargaUnidade
+        from apps.professors.services import obter_cargas_rat, MENSAGEM_CARGA_RAT_INCOMPLETA
+
+        ctx = super().get_context_data(**kwargs)
+        unidade = self.get_unidade()
+        solicitacoes = ExcecaoCargaUnidade.objects.filter(unidade=unidade).select_related('professor')
+        ctx.update({
+            'unidade': unidade,
+            'cargas_rat': obter_cargas_rat(ctx['form'].fields['professor'].queryset),
+            'mensagem_carga_incompleta': MENSAGEM_CARGA_RAT_INCOMPLETA,
+            'solicitacoes': Paginator(solicitacoes, 20).get_page(self.request.GET.get('page')),
+        })
+        return ctx
+
+    def form_valid(self, form):
+        from django.core.exceptions import ValidationError
+        from .services import solicitar_rat
+
+        dados = form.cleaned_data
+        try:
+            solicitar_rat(
+                request=self.request, professor_id=dados['professor'].pk,
+                horas_adicionais=dados['horas_adicionais'], data_inicio=dados['data_inicio'],
+                data_fim=dados['data_fim'], justificativa=dados['justificativa'],
+            )
+        except ValidationError as exc:
+            form.add_error(None, ' '.join(exc.messages))
+            return self.form_invalid(form)
+        messages.success(self.request, 'Solicitação de RAT enviada para análise da DESUP.')
+        return super().form_valid(form)
+
+
 class EquipeDiretivaUnidadeView(UnidadePrioridade1Mixin, TemplateView):
     """
     Painel do Coordenador de Unidade para cadastro e atualização dos ocupantes
@@ -1536,7 +1679,7 @@ class EquipeDiretivaUnidadeView(UnidadePrioridade1Mixin, TemplateView):
         from apps.allocations.services import semestre_atual
         from apps.core.busca import filtrar_contem
         from .forms import (
-            OcupacaoEquipeDiretivaUnidadeForm,
+            OcupacaoEquipeDiretivaUnidadeForm, OpcoesOcupacaoEquipeDiretiva,
         )
         from .models import (
             OcupacaoEquipeDiretiva,
@@ -1546,7 +1689,6 @@ class EquipeDiretivaUnidadeView(UnidadePrioridade1Mixin, TemplateView):
         ctx = super().get_context_data(**kwargs)
         unidade = self.get_unidade()
         hoje = timezone.localdate()
-        semestre_corrente = semestre_atual()
 
         # Todas as consultas filtram estritamente pela unidade do usuário via UnitBoundManager.
         ocupacoes_qs = (
@@ -1555,11 +1697,48 @@ class EquipeDiretivaUnidadeView(UnidadePrioridade1Mixin, TemplateView):
             .select_related('cargo', 'professor', 'curso', 'curso__curso')
             .order_by('-data_inicio', '-pk')
         )
-        todas_ocupacoes = list(ocupacoes_qs.filter(OcupacaoEquipeDiretiva.filtro_vigente(hoje)))
+        # Paginação/busca HTMX do histórico não precisa reconstruir equipe e modais.
+        filtro_q = self.request.GET.get('q', '').strip()
+        historico_qs = ocupacoes_qs.filter(data_fim__lte=hoje)
+        if filtro_q:
+            historico_qs = filtrar_contem(
+                historico_qs, filtro_q,
+                ['professor__rh_nome', 'professor__desup_nome', 'cargo__nome', 'curso__curso__sigla'],
+            )
+        historico_page_obj = Paginator(historico_qs, 15).get_page(self.request.GET.get('page'))
+        historico = list(historico_page_obj.object_list)
+        somente_historico = (
+            self.request.headers.get('HX-Request')
+            and self.request.GET.get('partial') == 'historico'
+        )
+        todas_ocupacoes = [] if somente_historico else list(
+            ocupacoes_qs.filter(OcupacaoEquipeDiretiva.filtro_vigente(hoje)),
+        )
 
         # Coleta IDs de professores para verificar alocações vigentes em sala de aula.
         prof_ids = {o.professor_id for o in todas_ocupacoes}
+        if somente_historico and historico:
+            # Mantém o mesmo critério do painel completo para os alertas do
+            # histórico, consultando somente IDs dos ocupantes ainda vigentes.
+            prof_ids = set(ocupacoes_qs.filter(
+                OcupacaoEquipeDiretiva.filtro_vigente(hoje),
+                professor_id__in={o.professor_id for o in historico},
+            ).order_by().values_list('professor_id', flat=True))
         mapa_sala = _mapa_alocacoes_sala_por_professor(prof_ids)
+        for item_hist in historico:
+            info_sala = mapa_sala.get(item_hist.professor_id)
+            item_hist.em_sala = bool(info_sala)
+            item_hist.disciplinas_sala = info_sala['disciplinas'] if info_sala else []
+            item_hist.horas_sala = info_sala['horas_sala'] if info_sala else Decimal('0.00')
+        ctx.update({
+            'unidade': unidade, 'hoje': hoje,
+            'historico': historico, 'historico_page_obj': historico_page_obj,
+            'filtro_q': filtro_q, 'filtro_situacao': 'encerrada',
+        })
+        if somente_historico:
+            return ctx
+        semestre_corrente = semestre_atual()
+        opcoes = OpcoesOcupacaoEquipeDiretiva(unidade)
 
         por_cargo = {}
         reducao_total = Decimal('0.00')
@@ -1579,6 +1758,7 @@ class EquipeDiretivaUnidadeView(UnidadePrioridade1Mixin, TemplateView):
                     instance=ocupacao,
                     unidade=unidade,
                     cargo=ocupacao.cargo,
+                    opcoes=opcoes,
                     auto_id=f'id_editocup{ocupacao.pk}_%s',
                 )
                 if ocupacao.em_sala:
@@ -1619,27 +1799,11 @@ class EquipeDiretivaUnidadeView(UnidadePrioridade1Mixin, TemplateView):
                 item['form'] = OcupacaoEquipeDiretivaUnidadeForm(
                     unidade=unidade,
                     cargo=cargo,
+                    opcoes=opcoes,
                     auto_id=f'id_unidocup{cargo.pk}_%s',
                     initial={'data_inicio': hoje},
                 )
             composicao.append(item)
-
-        # Histórico funcional: somente períodos encerrados, com busca por servidor/cargo/curso.
-        filtro_q = self.request.GET.get('q', '').strip()
-        filtro_situacao = 'encerrada'
-        historico_qs = ocupacoes_qs.filter(data_fim__lte=hoje)
-        if filtro_q:
-            historico_qs = filtrar_contem(
-                historico_qs,
-                filtro_q,
-                ['professor__rh_nome', 'professor__desup_nome', 'cargo__nome', 'curso__curso__sigla'],
-            )
-        historico_page_obj = Paginator(historico_qs, 15).get_page(self.request.GET.get('page'))
-        for item_hist in historico_page_obj.object_list:
-            info_sala = mapa_sala.get(item_hist.professor_id)
-            item_hist.em_sala = bool(info_sala)
-            item_hist.disciplinas_sala = info_sala['disciplinas'] if info_sala else []
-            item_hist.horas_sala = info_sala['horas_sala'] if info_sala else Decimal('0.00')
 
         ctx.update({
             'unidade': unidade,
@@ -1648,10 +1812,6 @@ class EquipeDiretivaUnidadeView(UnidadePrioridade1Mixin, TemplateView):
             'composicao': composicao,
             'reducao_total': reducao_total,
             'alertas_em_sala': alertas_em_sala,
-            'historico': historico_page_obj.object_list,
-            'historico_page_obj': historico_page_obj,
-            'filtro_q': filtro_q,
-            'filtro_situacao': filtro_situacao,
             'retorno': reverse_lazy('core:equipe_diretiva_unidade'),
         })
         return ctx
@@ -1697,8 +1857,10 @@ class OcupacaoEquipeDiretivaUnidadeCreateView(UnidadePrioridade1Mixin, RetornoOr
         form.instance.unidade = self.unidade
         form.instance.cargo = self.cargo
         form.instance.criado_por = self.request.user
-        # Garantia no servidor: a unidade não define redução; ela vem do cargo (DESUP).
-        form.instance.carga_reducao_horas = self.cargo.carga_reducao_horas
+        from .services import obter_reducao_cargo_unidade
+        # Garantia no servidor: a unidade recebe o padrão definido pela DESUP.
+        form.instance.carga_reducao_horas = obter_reducao_cargo_unidade(self.cargo, self.unidade)
+        form.instance.reducao_personalizada = False
         response = super().form_valid(form)
         registrar_evento_prioridade1(
             self.request,

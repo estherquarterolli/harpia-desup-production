@@ -72,7 +72,7 @@ class UnitBoundManager(models.Manager):
 
 
 class TipoCargoDiretivo(models.Model):
-    """Cargo configurável que pode compor a equipe diretiva de uma unidade."""
+    """Catálogo compartilhado; a redução é o padrão inicial para unidades sem configuração."""
 
     nome = models.CharField(max_length=120, unique=True, verbose_name="Nome do cargo")
     codigo = models.CharField(
@@ -138,6 +138,30 @@ class TipoCargoDiretivo(models.Model):
         return self.nome
 
 
+class ConfiguracaoCargoDiretivoUnidade(models.Model):
+    """Redução padrão do cargo nesta unidade; não altera o catálogo global."""
+
+    unidade = models.ForeignKey(Unidade, on_delete=models.CASCADE, related_name="configuracoes_cargos_diretivos")
+    cargo = models.ForeignKey(TipoCargoDiretivo, on_delete=models.CASCADE, related_name="configuracoes_unidades")
+    carga_reducao_horas = models.DecimalField(
+        max_digits=5, decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.00")), MaxValueValidator(Decimal("168.00"))],
+        verbose_name="Carga horária de redução semanal na unidade",
+    )
+
+    objects = UnitBoundManager()
+
+    class Meta:
+        db_table = "harpiadb_nucleo_cargo_diretivo_unidade"
+        constraints = [
+            models.UniqueConstraint(fields=["unidade", "cargo"], name="harpia_cargo_unidade_uniq"),
+            models.CheckConstraint(
+                condition=models.Q(carga_reducao_horas__gte=0) & models.Q(carga_reducao_horas__lte=168),
+                name="harpia_cargo_unid_carga_valida",
+            ),
+        ]
+
+
 class OcupacaoEquipeDiretiva(models.Model):
     """Ocupação histórica de um cargo diretivo por um professor/servidor."""
 
@@ -179,6 +203,13 @@ class OcupacaoEquipeDiretiva(models.Model):
         help_text="Informe o total de horas semanais de redução associado à ocupação.",
     )
     observacoes = models.TextField(blank=True, verbose_name="Observações")
+    reducao_personalizada = models.BooleanField(
+        # Registros anteriores e inclusões diretas/admin são conservadoramente
+        # individuais. Só os fluxos de preenchimento marcam herança explícita.
+        default=True,
+        verbose_name="Redução individual",
+        help_text="Preserva a redução da ocupação quando o padrão do cargo na unidade muda.",
+    )
     criado_por = models.ForeignKey(
         "accounts.User",
         on_delete=models.SET_NULL,

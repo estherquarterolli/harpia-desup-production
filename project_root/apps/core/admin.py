@@ -88,6 +88,11 @@ class OcupacaoEquipeDiretivaAdmin(HarpiaModelAdmin):
     search_fields = ('professor__rh_nome', 'unidade__nome', 'cargo__nome')
     readonly_fields = ('criado_em', 'atualizado_em')
 
+    def save_model(self, request, obj, form, change):
+        if 'carga_reducao_horas' in form.changed_data:
+            obj.reducao_personalizada = True
+        super().save_model(request, obj, form, change)
+
 
 class AtividadeEstagioSupervisaoAdmin(HarpiaModelAdmin):
     list_display = (

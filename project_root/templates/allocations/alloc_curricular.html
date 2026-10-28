@@ -151,20 +151,10 @@
                    data-saved="{{ comp.quantidade_turmas }}"
                    data-comp-nome="{{ comp.nome_disciplina }}"
                    {% if window_fechada and user.perfil != 'DESUP' %}data-window-lock="true" data-window-area="{{ window_area_label }}" data-window-action="{{ window_action_label }}" data-window-target="{{ comp.nome_disciplina }}" data-window-message="{{ window_message }}"{% endif %}>
-                <label class="sr-only" for="turmas-{{ comp.id }}">Quantidade de turmas de {{ comp.nome_disciplina }}</label>
-                <div class="flex items-center gap-2">
-                  <input id="turmas-{{ comp.id }}" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="off"
-                         value="{{ comp.quantidade_turmas }}"
-                         class="ac-turmas-input w-14 rounded border border-slate-300 bg-white px-2 py-1.5 text-center text-sm font-bold text-slate-700 outline-none focus:border-[#025c9f] focus:ring-1 focus:ring-[#025c9f]"
-                         {% if user.perfil != 'DESUP' and user.perfil != 'COORDENADOR_UNIDADE' %}disabled{% endif %}>
-                  <span class="ac-turmas-extenso text-xs font-semibold text-slate-500" aria-live="polite"></span>
-                </div>
-                <div class="ac-turmas-confirm hidden mt-1.5 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900" role="group" aria-label="Confirmar quantidade de turmas">
-                  <p class="ac-turmas-confirm-text font-semibold"></p>
-                  <div class="mt-1.5 flex gap-1.5">
-                    <button type="button" class="ac-turmas-ok rounded bg-[#025c9f] px-2.5 py-1 font-bold text-white hover:bg-[#153e70]">Confirmar</button>
-                    <button type="button" class="ac-turmas-cancel rounded border border-slate-300 bg-white px-2.5 py-1 font-bold text-slate-600 hover:bg-slate-50">Cancelar</button>
-                  </div>
+                <div class="flex items-center gap-2" aria-live="polite">
+                  <span class="sr-only">Quantidade de turmas de {{ comp.nome_disciplina }}:</span>
+                  <span class="ac-turmas-valor text-sm font-bold text-slate-700">{{ comp.quantidade_turmas }}</span>
+                  <span class="ac-turmas-extenso text-xs font-semibold text-slate-500"></span>
                 </div>
                 <p class="ac-turmas-erro hidden mt-1 text-xs font-semibold text-red-600" role="alert"></p>
               </div>
@@ -591,6 +581,8 @@
         if (value === 'NAO_OFERECIDA') {
           const proprio = this.root.closest('.ac-slot');
           this.slots.querySelectorAll('.ac-slot').forEach(el => { if (el !== proprio) el.remove(); });
+          const trNo = this.root.closest('tr');
+          if (trNo) trNo.dispatchEvent(new CustomEvent('ac:slots-changed'));
         }
         this.wrap.classList.remove('opacity-60');
         markAllocationChanged();
@@ -628,8 +620,10 @@
       const linha = this.root.dataset.linhaId;
       // Linha ainda não salva: basta descartá-la da tela.
       if (!linha || linha === 'novo') {
+        const tr = slotEl.closest('tr');
         slotEl.remove();
         markAllocationChanged();
+        if (tr) tr.dispatchEvent(new CustomEvent('ac:slots-changed'));
         return;
       }
       const params = new URLSearchParams({ acao: 'remover', linha_id: linha });
@@ -648,8 +642,10 @@
         if (resp.status === 403 || resp.redirected) { window.location.reload(); return; }
         const data = await resp.json();
         if (!resp.ok || !data.ok) throw new Error(data.message || 'remove failed');
+        const tr = slotEl.closest('tr');
         slotEl.remove();
         markAllocationChanged();
+        if (tr) tr.dispatchEvent(new CustomEvent('ac:slots-changed'));
         showAllocToast(data.message || 'Linha removida.', false);
       } catch (err) {
         showAllocToast(err.message && err.message !== 'remove failed' ? err.message : 'Erro ao remover a linha.', true);
@@ -753,50 +749,20 @@
   class QuantidadeTurmas {
     constructor(root) {
       this.root = root;
-      this.input = root.querySelector('.ac-turmas-input');
+      this.valorEl = root.querySelector('.ac-turmas-valor');
       this.extensoEl = root.querySelector('.ac-turmas-extenso');
-      this.confirmEl = root.querySelector('.ac-turmas-confirm');
-      this.confirmText = root.querySelector('.ac-turmas-confirm-text');
       this.erroEl = root.querySelector('.ac-turmas-erro');
       this.tr = root.closest('tr');
       this.isLocked = root.dataset.windowLock === 'true';
       this.saved = parseInt(root.dataset.saved || '1', 10);
-      this._renderExtenso(this.saved);
-      if (this.input.disabled) return;
-
-      this.input.addEventListener('input', () => this._onInput());
-      this.input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); if (!this.confirmEl.classList.contains('hidden')) this._confirm(); }
-        if (e.key === 'Escape') this._cancel();
-      });
-      root.querySelector('.ac-turmas-ok').addEventListener('click', () => this._confirm());
-      root.querySelector('.ac-turmas-cancel').addEventListener('click', () => this._cancel());
+      this._render(this.saved);
+      // A quantidade acompanha o número de linhas de docente da disciplina.
+      this.tr.addEventListener('ac:slots-changed', () => this.sync());
     }
 
-    _valor() {
-      const txt = this.input.value;
-      return /^\d{1,2}$/.test(txt) ? parseInt(txt, 10) : NaN;
-    }
-
-    _renderExtenso(n) {
+    _render(n) {
+      this.valorEl.textContent = String(n);
       this.extensoEl.textContent = (n >= 1 && n <= MAX_TURMAS) ? `(${extenso(n)})` : '';
-    }
-
-    _onInput() {
-      // Aceita somente números.
-      const limpo = this.input.value.replace(/\D/g, '');
-      if (limpo !== this.input.value) this.input.value = limpo;
-      this.erroEl.classList.add('hidden');
-      const n = this._valor();
-      this._renderExtenso(n);
-      if (Number.isNaN(n) || n < 1 || n > MAX_TURMAS) {
-        this.confirmEl.classList.add('hidden');
-        if (this.input.value !== '') this._erro(`Informe um número de 1 a ${MAX_TURMAS}.`);
-        return;
-      }
-      if (n === this.saved) { this.confirmEl.classList.add('hidden'); return; }
-      this.confirmText.textContent = `Confirmar ${n} (${extenso(n)}) ${turmasTexto(n)}?`;
-      this.confirmEl.classList.remove('hidden');
     }
 
     _erro(texto) {
@@ -804,20 +770,13 @@
       this.erroEl.classList.remove('hidden');
     }
 
-    _cancel() {
-      this.input.value = String(this.saved);
-      this.confirmEl.classList.add('hidden');
-      this.erroEl.classList.add('hidden');
-      this._renderExtenso(this.saved);
-    }
-
-    async _confirm() {
-      if (this.isLocked) { this._triggerWindowLock(); return; }
-      const n = this._valor();
-      if (Number.isNaN(n) || n < 1 || n > MAX_TURMAS) return;
+    async sync() {
+      if (this.isLocked) return;
+      const n = Math.min(Math.max(this.tr.querySelectorAll('.ac-docente').length, 1), MAX_TURMAS);
+      this._render(n);
+      if (n === this.saved) return;
       const params = new URLSearchParams({ quantidade_turmas: String(n) });
       if (UNIDADE_ID) params.set('unidade_id', UNIDADE_ID);
-      this.root.classList.add('opacity-60');
       try {
         const resp = await fetch(this.root.dataset.turmasUrl, {
           method: 'POST',
@@ -835,22 +794,12 @@
         this.saved = data.quantidade_turmas;
         this.root.dataset.saved = String(this.saved);
         this.tr.dataset.qtd = String(this.saved);
-        this.input.value = String(this.saved);
-        this._renderExtenso(this.saved);
-        this.confirmEl.classList.add('hidden');
+        this._render(this.saved);
+        this.erroEl.classList.add('hidden');
         markAllocationChanged();
-        showAllocToast(data.message || 'Quantidade de turmas salva.', false);
       } catch (err) {
-        this._cancel();
-        showAllocToast(err.message && err.message !== 'turmas failed' ? err.message : 'Erro ao salvar a quantidade de turmas.', true);
-      } finally {
-        this.root.classList.remove('opacity-60');
-      }
-    }
-
-    _triggerWindowLock() {
-      if (typeof openWindowLockModal === 'function' && typeof getWindowLockPayload === 'function') {
-        openWindowLockModal(getWindowLockPayload(this.root));
+        this._render(this.saved);
+        this._erro(err.message && err.message !== 'turmas failed' ? err.message : 'Erro ao salvar a quantidade de turmas.');
       }
     }
   }
@@ -894,6 +843,7 @@
         slots.appendChild(modelo);
         instances.push(new AutocompleteDocente(raiz));
         markAllocationChanged();
+        tr.dispatchEvent(new CustomEvent('ac:slots-changed'));
         raiz.querySelector('.ac-input').focus();
       });
     });

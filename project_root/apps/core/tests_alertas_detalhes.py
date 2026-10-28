@@ -48,10 +48,10 @@ class AlertasDetalhesTests(TestCase):
 
         resumo = resposta.context['resumo_p1']
         self.assertEqual(resumo['detalhe_disciplinas'][0]['turmas_sem_docente'], 2)
-        self.assertEqual(resumo['detalhe_sobra'][0]['nome'], 'Ana Teste')
+        self.assertEqual(resumo['detalhe_sobra'][0]['nome'], 'ANA TESTE')
         for texto in (
             'modalDetalheDisciplinas', 'modalDetalheSobra', 'modalDetalheLimite',
-            'modalDetalheAcima', 'Cálculo', 'Ana Teste',
+            'modalDetalheAcima', 'Cálculo', 'ANA TESTE',
         ):
             self.assertContains(resposta, texto)
 
@@ -62,7 +62,7 @@ class AlertasDetalhesTests(TestCase):
     def test_acima_do_limite_explica_a_conta_e_a_origem_das_horas(self):
         from apps.allocations.services import atribuir_docente
 
-        professor = Professor.objects.get(rh_nome='Ana Teste')
+        professor = Professor.objects.get(rh_nome='ANA TESTE')
         professor.tipo_contrato.max_class_hours = 2
         professor.tipo_contrato.save(update_fields=['max_class_hours'])
         atribuir_docente(MatrixComponent.objects.get(), professor)
@@ -75,15 +75,15 @@ class AlertasDetalhesTests(TestCase):
         self.assertEqual(detalhe['horas_extra'], 0)
         self.assertEqual(detalhe['meta'], 2)
         self.assertEqual(detalhe['diferenca'], 2)
-        self.assertContains(resposta, '4 h contabilizadas − 2 h de limite = 2 h de excesso')
-        self.assertContains(resposta, '0 h em outras horas aprovadas')
+        self.assertContains(resposta, '4h contabilizadas − 2h de limite = 2h de excesso')
+        self.assertContains(resposta, '0h em outras horas aprovadas')
 
     def test_lista_acima_do_limite_mostra_mais_de_cem_professores(self):
         from django.utils import timezone
 
         from apps.allocations.models import AlocacaoCurricular, AlocacaoTurmaDocente
 
-        contrato = Professor.objects.get(rh_nome='Ana Teste').tipo_contrato
+        contrato = Professor.objects.get(rh_nome='ANA TESTE').tipo_contrato
         contrato.max_class_hours = 2
         contrato.save(update_fields=['max_class_hours'])
         professores = Professor.objects.bulk_create([
@@ -111,7 +111,7 @@ class AlertasDetalhesTests(TestCase):
 
         self.assertEqual(resposta.context['resumo_p1']['professores_excedidos'], 101)
         self.assertEqual(len(resposta.context['resumo_p1']['detalhe_acima']), 101)
-        self.assertContains(resposta, 'Professor 100')
+        self.assertContains(resposta, 'PROFESSOR 100')
         self.assertNotContains(resposta, 'Mostrando os primeiros')
 
     def test_readaptado_em_sala_nao_gera_ponto_de_atencao(self):
@@ -123,7 +123,7 @@ class AlertasDetalhesTests(TestCase):
         from apps.core.models import ReadaptacaoProfessor
         from apps.courses.models import MatrixComponent
 
-        professor = Professor.objects.get(rh_nome='Ana Teste')
+        professor = Professor.objects.get(rh_nome='ANA TESTE')
         componente = MatrixComponent.objects.get()
         atribuir_docente(componente, professor)
         ReadaptacaoProfessor.objects.create(

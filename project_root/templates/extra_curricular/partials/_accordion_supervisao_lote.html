@@ -51,8 +51,8 @@
                 {{ item.get_tipo_display }}{% if item.curso %} · {{ item.curso.sigla }}{% endif %}
               </td>
               <td class="px-5 py-3 text-center text-sm font-bold text-slate-700" data-label="Estudantes">{{ item.num_estudantes }}</td>
-              <td class="px-5 py-3 text-center text-sm font-bold text-slate-700" data-label="Dedicação">{{ item.carga_horaria_semanal|floatformat:"-2" }}h</td>
-              <td class="px-5 py-3 text-center text-sm font-bold text-emerald-700" data-label="Redução DESUP">{{ item.carga_reducao_horas|floatformat:"-2" }}h</td>
+              <td class="px-5 py-3 text-center text-sm font-bold text-slate-700" data-label="Dedicação">{{ item.carga_horaria_semanal|hhmm }}</td>
+              <td class="px-5 py-3 text-center text-sm font-bold text-emerald-700" data-label="Redução DESUP">{{ item.carga_reducao_horas|hhmm }}</td>
               <td class="px-5 py-3 text-xs text-slate-600" data-label="Vigência">
                 {{ item.data_inicio|date:"d/m/Y" }} – {{ item.data_fim|date:"d/m/Y"|default:"atual" }}
               </td>

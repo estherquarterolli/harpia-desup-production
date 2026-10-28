@@ -79,15 +79,15 @@
 
             <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
               <span><i class="ph ph-users" aria-hidden="true"></i> {{ atividade.num_estudantes }} supervisionado(s)</span>
-              <span><i class="ph ph-clock" aria-hidden="true"></i> Dedicação: {{ atividade.carga_horaria_semanal|floatformat:"-2" }} h/sem</span>
-              <span title="Redução semanal definida exclusivamente pela DESUP"><i class="ph ph-lock-key" aria-hidden="true"></i> Redução DESUP: {{ atividade.carga_reducao_horas|floatformat:"-2" }} h/sem</span>
+              <span><i class="ph ph-clock" aria-hidden="true"></i> Dedicação: {{ atividade.carga_horaria_semanal|hhmm }}/sem</span>
+              <span title="Redução semanal definida exclusivamente pela DESUP"><i class="ph ph-lock-key" aria-hidden="true"></i> Redução DESUP: {{ atividade.carga_reducao_horas|hhmm }}/sem</span>
               <span><i class="ph ph-calendar-blank" aria-hidden="true"></i> {{ atividade.data_inicio|date:"d/m/Y" }} – {{ atividade.data_fim|date:"d/m/Y"|default:"atual" }}</span>
             </div>
 
             {% if atividade.em_sala %}
             <div class="mt-1.5 inline-flex flex-wrap items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-900" role="status">
               <i class="ph-fill ph-warning-circle text-amber-600" aria-hidden="true"></i>
-              <span>Alerta: docente também alocado em sala de aula ({{ atividade.horas_sala|floatformat:"-2" }} h/sem — {{ atividade.disciplinas_sala|join:", " }})</span>
+              <span>Alerta: docente também alocado em sala de aula ({{ atividade.horas_sala|hhmm }}/sem — {{ atividade.disciplinas_sala|join:", " }})</span>
             </div>
             {% endif %}
 
@@ -202,7 +202,7 @@
       <div class="estagio-modal-body space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
         <div class="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-700">
           <span class="font-bold">Redução semanal (definida pela DESUP):</span>
-          <span class="font-black text-emerald-800">{{ atividade.carga_reducao_horas|floatformat:"-2" }} h/semana</span>
+          <span class="font-black text-emerald-800">{{ atividade.carga_reducao_horas|hhmm }}/semana</span>
         </div>
         {% include 'core/prioridade1/_campos_form.html' with form=atividade.edit_form %}
       </div>
