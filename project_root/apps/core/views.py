@@ -164,11 +164,6 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
             'unidades', 'ocupacoes_diretivas', 'readaptacoes',
         ).order_by('rh_nome', 'pk')
         q = self.request.GET.get('q', '').strip()
-        if q:
-            from apps.core.busca import filtrar_contem
-            professores_qs = filtrar_contem(
-                professores_qs, q, ['rh_nome', 'desup_nome', 'id_funcional', 'rh_matricula'],
-            )
         unidade_id = self.request.GET.get('unidade_id', '')
         if unidade_id.isdigit():
             professores_qs = professores_qs.filter(
@@ -178,6 +173,11 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
         vinculos_validos = dict(Professor.VinculoEmpregaticioChoices.choices)
         if vinculo in vinculos_validos:
             professores_qs = professores_qs.filter(filtro_vinculo_empregaticio(vinculo))
+        if q:
+            from apps.core.busca import filtrar_contem
+            professores_qs = filtrar_contem(
+                professores_qs, q, ['rh_nome', 'desup_nome', 'id_funcional', 'rh_matricula'],
+            )
         ctx['unidades'] = unidades_ativas
         ctx['resumo_p1'] = obter_resumo_prioridade1()
 
@@ -270,13 +270,6 @@ class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, T
         ).order_by('rh_nome')
 
         q = self.request.GET.get('q', '')
-        if q:
-            from apps.core.busca import filtrar_contem
-            qs = filtrar_contem(
-                qs,
-                q,
-                ['rh_nome', 'desup_nome', 'id_funcional', 'rh_matricula', 'area_atuacao'],
-            )
         unidade_id = self.request.GET.get('unidade_id')
         if unidade_id and unidade_id.isdigit():
             qs = qs.filter(
@@ -288,6 +281,12 @@ class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, T
         turno = self.request.GET.get('turno')
         if turno:
             qs = qs.filter(disponibilidades__turno=turno).distinct()
+        if q:
+            from apps.core.busca import filtrar_contem
+            qs = filtrar_contem(
+                qs, q,
+                ['rh_nome', 'desup_nome', 'id_funcional', 'rh_matricula', 'area_atuacao'],
+            )
 
         from django.core.paginator import Paginator
         page_obj = Paginator(qs, 20).get_page(self.request.GET.get('page'))
@@ -1632,11 +1631,15 @@ class RatUnidadeView(UnidadePrioridade1Mixin, FormView):
         ctx = super().get_context_data(**kwargs)
         unidade = self.get_unidade()
         solicitacoes = ExcecaoCargaUnidade.objects.filter(unidade=unidade).select_related('professor')
+        page_obj = Paginator(solicitacoes.order_by('-criado_em', '-pk'), 20).get_page(self.request.GET.get('page'))
         ctx.update({
             'unidade': unidade,
             'cargas_rat': obter_cargas_rat(ctx['form'].fields['professor'].queryset),
             'mensagem_carga_incompleta': MENSAGEM_CARGA_RAT_INCOMPLETA,
-            'solicitacoes': Paginator(solicitacoes, 20).get_page(self.request.GET.get('page')),
+            'solicitacoes': page_obj,
+            'page_obj': page_obj,
+            'paginator': page_obj.paginator,
+            'is_paginated': page_obj.has_other_pages(),
         })
         return ctx
 

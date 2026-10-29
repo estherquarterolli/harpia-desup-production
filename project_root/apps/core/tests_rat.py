@@ -36,6 +36,18 @@ class RatUnidadeTests(ProfessorE2EBase):
             matriz, 'Carga regular', 'REGULAR', carga_horaria=horas * 20, docente=self.prof_a1,
         )
 
+    def test_tutorial_rat_reutiliza_componente_e_aponta_para_campos_reais(self):
+        resposta = self.client.get(self.url)
+        self.assertContains(resposta, 'data-ajuda-abrir')
+        self.assertContains(resposta, 'id="tourRoot"')
+        self.assertContains(resposta, 'id="ajuda-dados"')
+        ajuda = resposta.context['ajuda_pagina']
+        self.assertIn('carga horária regular completa', ' '.join(ajuda['funcionalidades']))
+        for passo in ajuda['passos']:
+            for alvo in passo['alvo']:
+                self.assertTrue(alvo.startswith('#'))
+                self.assertContains(resposta, f'id="{alvo[1:]}"')
+
     def request(self, user=None):
         request = RequestFactory().post(self.url)
         request.user = user or self.coord_a
@@ -160,6 +172,102 @@ class RatUnidadeTests(ProfessorE2EBase):
         pagina = self.client.get(self.url)
         self.assertContains(pagina, 'Aprovada')
         self.assertContains(pagina, 'Autorizado para a vigência.')
+
+    def test_envio_e_aprovacao_sem_fim_da_vigencia(self):
+        self.completar_carga()
+        pagina = self.client.get(self.url)
+        self.assertFalse(pagina.context['form'].fields['data_fim'].required)
+        self.assertRedirects(self.client.post(self.url, self.dados(data_fim='')), self.url)
+        pedido = ExcecaoCargaUnidade.objects.get()
+        self.assertIsNone(pedido.data_fim)
+        self.client.force_login(self.desup)
+        pagina = self.client.get(reverse('core:alertas_carga_desup'))
+        self.assertContains(pagina, 'Sem fim definido')
+        self.client.post(reverse('core:excecao_carga_decidir', args=[pedido.pk]), {'decisao': 'APROVADA'})
+        pedido.refresh_from_db()
+        self.assertEqual(pedido.status, 'APROVADA')
+        self.assertIsNone(pedido.data_fim)
+        self.client.force_login(self.coord_a)
+        self.assertContains(self.client.get(self.url), 'Sem fim definido')
+
+    def test_paginacao_padrao_isola_unidade_e_nao_repete_solicitacoes(self):
+        for unidade, professor, user, total in (
+            (self.unidade_a, self.prof_a1, self.coord_a, 21),
+            (self.unidade_b, self.prof_b1, self.coord_b, 1),
+        ):
+            ExcecaoCargaUnidade.objects.bulk_create([
+                ExcecaoCargaUnidade(
+                    unidade=unidade, professor=professor, solicitado_por=user,
+                    horas_adicionais=2, data_inicio=self.hoje,
+                    justificativa=f'Pedido {unidade.sigla} {i}',
+                ) for i in range(total)
+            ])
+        primeira = self.client.get(self.url)
+        segunda = self.client.get(self.url, {'page': 2, 'unidade_id': self.unidade_b.pk}, HTTP_HX_REQUEST='true')
+        self.assertContains(primeira, 'Exibindo 1–20 de 21')
+        self.assertContains(primeira, 'Ver mais')
+        self.assertContains(segunda, 'Exibindo 21–21 de 21')
+        self.assertContains(segunda, 'Anteriores')
+        self.assertTemplateUsed(segunda, 'partials/pagination.html')
+        ids_primeira = {s.pk for s in primeira.context['solicitacoes']}
+        ids_segunda = {s.pk for s in segunda.context['solicitacoes']}
+        self.assertEqual(len(ids_primeira), 20)
+        self.assertEqual(len(ids_segunda), 1)
+        self.assertFalse(ids_primeira & ids_segunda)
+        self.assertEqual(segunda.context['solicitacoes'][0].unidade_id, self.unidade_a.pk)
+
+    def test_rat_aprovado_sem_fim_entra_no_limite_somente_apos_inicio(self):
+        from .models import LimiteCargaUnidade
+        from .priority1 import obter_resumo_prioridade1
+
+        self.completar_carga()
+        LimiteCargaUnidade.objects.create(
+            unidade=self.unidade_a, limite_horas_semanais=20,
+            data_inicio=self.hoje, criado_por=self.desup,
+        )
+        pedido = self.solicitar_pelo_servico(data_fim=None)
+
+        def no_limite():
+            return obter_resumo_prioridade1(unidade_id=self.unidade_a.pk)['unidades_no_limite_count']
+
+        self.assertEqual(no_limite(), 1)
+        pedido.status = 'APROVADA'
+        pedido.save(update_fields=['status'])
+        self.assertEqual(no_limite(), 0)
+        pedido.data_inicio = self.hoje + timedelta(days=1)
+        pedido.save(update_fields=['data_inicio'])
+        self.assertEqual(no_limite(), 1)
+        pedido.data_inicio = self.hoje - timedelta(days=2)
+        pedido.data_fim = self.hoje - timedelta(days=1)
+        pedido.save(update_fields=['data_inicio', 'data_fim'])
+        self.assertEqual(no_limite(), 1)
+
+    def test_status_tem_as_cores_solicitadas(self):
+        from html.parser import HTMLParser
+
+        class StatusParser(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.classes = ''
+                self.status = {}
+
+            def handle_starttag(self, tag, attrs):
+                if tag == 'span':
+                    self.classes = dict(attrs).get('class', '')
+
+            def handle_data(self, data):
+                if data in ('Pendente', 'Recusada', 'Aprovada'):
+                    self.status[data] = self.classes
+
+        for status in ('PENDENTE', 'RECUSADA', 'APROVADA'):
+            ExcecaoCargaUnidade.objects.create(
+                unidade=self.unidade_a, professor=self.prof_a1, solicitado_por=self.coord_a,
+                horas_adicionais=2, data_inicio=self.hoje, justificativa='Cor do status', status=status,
+            )
+        parser = StatusParser()
+        parser.feed(self.client.get(self.url).content.decode())
+        for status, cor in (('Pendente', 'bg-blue-50'), ('Recusada', 'bg-red-50'), ('Aprovada', 'bg-green-50')):
+            self.assertIn(cor, parser.status[status])
 
     def test_rat_existente_nao_completa_carga_regular(self):
         self.completar_carga(horas=16)

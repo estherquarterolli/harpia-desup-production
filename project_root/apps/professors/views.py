@@ -301,10 +301,6 @@ class ProfessorListView(LoginRequiredMixin, ListView):
         user = self.request.user
 
         q = self.request.GET.get('q', '')
-        if q:
-            qs = filtrar_contem(
-                qs, q, ['rh_nome', 'desup_nome', 'id_funcional', 'rh_matricula', 'area_atuacao'],
-            )
         carga = self.request.GET.get('ch', '')
         if carga.isdigit():
             carga = int(carga)
@@ -350,6 +346,12 @@ class ProfessorListView(LoginRequiredMixin, ListView):
             qs = qs.filter(
                 Q(unidade_principal_id=user.unidade_id) | Q(unidades__id=user.unidade_id)
             ).distinct().order_by('rh_nome', 'pk')
+        # A busca tolerante percorre os candidatos em Python. Reduza primeiro
+        # pelos filtros SQL e pelo escopo autorizado, antes de materializá-los.
+        if q:
+            qs = filtrar_contem(
+                qs, q, ['rh_nome', 'desup_nome', 'id_funcional', 'rh_matricula', 'area_atuacao'],
+            )
         return qs
 
     def get_context_data(self, **kwargs):

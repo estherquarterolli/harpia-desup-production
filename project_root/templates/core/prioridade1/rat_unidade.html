@@ -38,28 +38,22 @@
       </div>
     </form>
   </section>
-  <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+  <section id="ratSolicitacoes" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
     <h2 class="border-b border-slate-100 p-4 text-base font-black text-[#025c9f]">Solicitações da unidade</h2>
     <ul class="divide-y divide-slate-100">
       {% for solicitacao in solicitacoes %}
       <li class="space-y-2 p-4">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <p class="font-bold text-slate-800">{% if solicitacao.professor %}{{ solicitacao.professor.nome }} · {{ solicitacao.professor.id_funcional }}{% else %}{{ unidade.sigla }}{% endif %}</p>
-          <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-[#025c9f]">{{ solicitacao.get_status_display }}</span>
+          <span class="rounded-full px-3 py-1 text-xs font-bold {% if solicitacao.status == 'APROVADA' %}bg-green-50 text-green-700{% elif solicitacao.status == 'RECUSADA' %}bg-red-50 text-red-700{% elif solicitacao.status == 'PENDENTE' %}bg-blue-50 text-[#025c9f]{% else %}bg-slate-100 text-slate-600{% endif %}">{{ solicitacao.get_status_display }}</span>
         </div>
-        <p class="text-sm text-slate-600">+{{ solicitacao.horas_adicionais|floatformat:'-2' }} h/semana · {{ solicitacao.data_inicio|date:'d/m/Y' }} – {{ solicitacao.data_fim|date:'d/m/Y' }}</p>
+        <p class="text-sm text-slate-600">+{{ solicitacao.horas_adicionais|floatformat:'-2' }} h/semana · {{ solicitacao.data_inicio|date:'d/m/Y' }} – {{ solicitacao.data_fim|date:'d/m/Y'|default:'Sem fim definido' }}</p>
         <p class="whitespace-pre-line text-sm text-slate-600">{{ solicitacao.justificativa }}</p>
         {% if solicitacao.motivo_decisao %}<p class="text-sm text-slate-700"><strong>Motivo da decisão:</strong> {{ solicitacao.motivo_decisao }}</p>{% endif %}
       </li>
       {% empty %}<li class="p-8 text-center text-sm text-slate-500">Nenhuma solicitação de RAT registrada.</li>{% endfor %}
     </ul>
-    {% if solicitacoes.has_other_pages %}
-    <nav class="flex items-center justify-between border-t border-slate-100 p-4 text-sm" aria-label="Paginação">
-      {% if solicitacoes.has_previous %}<a href="?page={{ solicitacoes.previous_page_number }}">Anterior</a>{% endif %}
-      <span>{{ solicitacoes.number }} / {{ solicitacoes.paginator.num_pages }}</span>
-      {% if solicitacoes.has_next %}<a href="?page={{ solicitacoes.next_page_number }}">Próxima</a>{% endif %}
-    </nav>
-    {% endif %}
+    {% if is_paginated %}<div class="border-t border-slate-100 p-4">{% include 'partials/pagination.html' %}</div>{% endif %}
   </section>
 </div>
 {{ cargas_rat|json_script:'ratCargas' }}

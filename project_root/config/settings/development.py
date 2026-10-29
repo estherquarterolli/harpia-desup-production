@@ -1,7 +1,7 @@
 from .base import *
 import dj_database_url
 
-from .database_options import configure_for_transaction_pooler
+from .database_options import configure_for_transaction_pooler, resolve_sqlite_database_path
 
 # Configurações de Desenvolvimento
 DEBUG = True
@@ -39,5 +39,5 @@ else:
     }
 
 DATABASES = {
-    'default': default_db,
+    'default': resolve_sqlite_database_path(default_db, BASE_DIR),
 }

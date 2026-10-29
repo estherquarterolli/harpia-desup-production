@@ -11,7 +11,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # Quick-start development settings
 SECRET_KEY = config("SECRET_KEY")
-DEBUG = config("DEBUG", default=False, cast=bool)
+# DEBUG também pode ser exportada pelo sistema (ex.: DEBUG=release no Nobara).
+# Use uma variável própria para não colidir com o ambiente do terminal.
+DEBUG = config("DJANGO_DEBUG", default=False, cast=bool)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1").split(",")
 LANGUAGE_CODE = "pt-br"
 TIME_ZONE = config("TIME_ZONE", default="America/Sao_Paulo")
