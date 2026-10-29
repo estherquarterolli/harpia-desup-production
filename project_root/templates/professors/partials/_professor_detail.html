@@ -42,7 +42,7 @@
                     <p class="mt-1 text-xs text-amber-700">Cargo informado no PDF: {{ professor.cargo_origem }}</p>
                 {% endif %}
                 <p class="mt-1 text-xs text-slate-500">
-                    Vínculo {{ professor.vinculo_empregaticio_exibicao }} · CH {{ professor.carga_total_efetiva }}h
+                    Vínculo {{ professor.vinculo_empregaticio_exibicao }} · CH {{ professor.carga_total_efetiva|hhmm }}
                 </p>
             </div>
             <div class="rounded-xl bg-slate-50 p-4 sm:col-span-2">
@@ -73,19 +73,19 @@
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div class="rounded-xl border border-slate-100 p-3 text-center">
                 <p class="text-[10px] font-black uppercase text-slate-400">HA informada</p>
-                <p class="mt-1 text-lg font-black text-slate-800">{{ professor.ha }}h</p>
+                <p class="mt-1 text-lg font-black text-slate-800">{{ professor.ha|hhmm }}</p>
             </div>
             <div class="rounded-xl border border-slate-100 p-3 text-center">
                 <p class="text-[10px] font-black uppercase text-slate-400">CH alocada</p>
-                <p class="mt-1 text-lg font-black text-[#025c9f]">{{ professor.ch_alocada|floatformat:1 }}h</p>
+                <p class="mt-1 text-lg font-black text-[#025c9f]">{{ professor.ch_alocada|hhmm }}</p>
             </div>
             <div class="rounded-xl border border-slate-100 p-3 text-center">
                 <p class="text-[10px] font-black uppercase text-slate-400">CH justificada</p>
-                <p class="mt-1 text-lg font-black text-indigo-700">{{ professor.ch_justificada|floatformat:1 }}h</p>
+                <p class="mt-1 text-lg font-black text-indigo-700">{{ professor.ch_justificada|hhmm }}</p>
             </div>
             <div class="rounded-xl border border-slate-100 p-3 text-center">
                 <p class="text-[10px] font-black uppercase text-slate-400">Não alocada</p>
-                <p class="mt-1 text-lg font-black text-amber-700">{{ professor.ch_nao_alocada|floatformat:1 }}h</p>
+                <p class="mt-1 text-lg font-black text-amber-700">{{ professor.ch_nao_alocada|hhmm }}</p>
             </div>
         </div>
     </div>

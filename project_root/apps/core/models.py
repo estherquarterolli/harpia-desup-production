@@ -730,7 +730,7 @@ class ExcecaoCargaUnidade(models.Model):
         verbose_name="Horas adicionais autorizadas",
     )
     data_inicio = models.DateField(verbose_name="Início da vigência")
-    data_fim = models.DateField(verbose_name="Fim da vigência")
+    data_fim = models.DateField(null=True, blank=True, verbose_name="Fim da vigência")
     justificativa = models.TextField(verbose_name="Justificativa")
     status = models.CharField(
         max_length=12,
@@ -904,6 +904,10 @@ class JanelaEntrega(models.Model):
         verbose_name = "Janela de Entrega"
         verbose_name_plural = "Janelas de Entrega"
         ordering = ['-semestre', '-data_fim']
+        indexes = [
+            models.Index(fields=['status', 'data_inicio', 'data_fim'], name='harpia_janela_vig_idx'),
+            models.Index(fields=['unidade', 'status'], name='harpia_janela_unid_idx'),
+        ]
 
     def __str__(self):
         scope = self.unidade.sigla if self.unidade else "Global"
@@ -951,6 +955,24 @@ class Notificacao(models.Model):
         verbose_name = "Notificação"
         verbose_name_plural = "Notificações"
         ordering = ['-data_criacao']
+        # O context processor consulta as não lidas em toda página.
+        indexes = [
+            models.Index(
+                fields=['destinatario', '-data_criacao'],
+                condition=models.Q(lida=False),
+                name='harpia_notif_dest_nl_idx',
+            ),
+            models.Index(
+                fields=['unidade_destino', '-data_criacao'],
+                condition=models.Q(lida=False),
+                name='harpia_notif_unid_nl_idx',
+            ),
+            models.Index(
+                fields=['-data_criacao'],
+                condition=models.Q(lida=False, destinatario__isnull=True, unidade_destino__isnull=True),
+                name='harpia_notif_desup_nl_idx',
+            ),
+        ]
 
     def __str__(self):
         return f"[{'LIDA' if self.lida else 'NOVA'}] {self.titulo}"

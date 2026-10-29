@@ -46,6 +46,9 @@ class AlocacaoCurricular(models.Model):
         verbose_name_plural = "Alocações Curriculares"
         unique_together = ('curso', 'semestre', 'turno')
         ordering = ['-semestre', 'curso']
+        indexes = [
+            models.Index(fields=['unidade', 'semestre'], name='harpia_alocc_unid_sem_idx'),
+        ]
 
     objects = UnitBoundManager()
 

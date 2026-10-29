@@ -471,10 +471,11 @@ class SolicitacaoRatUnidadeForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.instance.unidade = unidade
         self.fields['professor'].required = True
+        self.fields['data_fim'].help_text = 'Opcional. Deixe em branco quando não houver fim definido para a vigência.'
         self.fields['professor'].help_text = 'Selecione um professor vinculado à sua unidade.'
         self.fields['professor'].queryset = Professor.objects.filter(
             Q(unidade_principal=unidade) | Q(unidades=unidade),
-        ).select_related('tipo_contrato').prefetch_related('ocupacoes_diretivas').distinct()
+        ).select_related('tipo_contrato').prefetch_related('ocupacoes_diretivas', 'readaptacoes').distinct()
 
     def clean_professor(self):
         from apps.professors.services import (

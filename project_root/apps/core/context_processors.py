@@ -31,7 +31,6 @@ def notificacoes(request):
         else:
             qs = base_qs.filter(destinatario=user)
 
-        qs = qs.distinct()
         notifs = list(qs[:10])
         return {
             'notificacoes_nao_lidas': notifs,

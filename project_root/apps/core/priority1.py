@@ -124,7 +124,7 @@ def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, t
     if vinculo in dict(Professor.VinculoEmpregaticioChoices.choices):
         professores_escopo = professores_escopo.filter(filtro_vinculo_empregaticio(vinculo))
     professores = list(
-        professores_escopo.select_related("tipo_contrato").prefetch_related("unidades", "ocupacoes_diretivas")
+        professores_escopo.select_related("tipo_contrato").prefetch_related("unidades", "ocupacoes_diretivas", "readaptacoes")
     )
     professores_escopo_ids = {professor.pk for professor in professores}
     professor_ids_filtrados = professor_ids & professores_escopo_ids if vinculo else professor_ids
@@ -231,8 +231,7 @@ def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, t
     excecoes = ExcecaoCargaUnidade.objects.filter(
         status=ExcecaoCargaUnidade.StatusChoices.APROVADA,
         data_inicio__lte=hoje,
-        data_fim__gte=hoje,
-    )
+    ).filter(Q(data_fim__isnull=True) | Q(data_fim__gte=hoje))
     if unidade_id:
         excecoes = excecoes.filter(unidade_id=unidade_id)
     adicionais = defaultdict(Decimal)

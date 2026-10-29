@@ -219,8 +219,8 @@ AJUDA_PAGINAS = {
                    requisito='Escolha uma unidade para ver as disciplinas.'),
             _passo('Acrescente docentes', 'Clique em "+" para outra linha de docente ou carência na mesma disciplina.',
                    ['.ac-add', 'select[name="unidade_id"]'], requisito='Escolha uma unidade para ver as disciplinas.'),
-            _passo('Informe as turmas', 'Na coluna "Turmas", digite só números (o padrão é 1) e confirme; o número por extenso aparece ao lado.',
-                   ['.ac-turmas-input', 'select[name="unidade_id"]'], requisito='Escolha uma unidade para ver as disciplinas.'),
+            _passo('Informe as turmas', 'Na coluna "Turmas", a quantidade acompanha o botão "Adicionar": cada linha de docente adicionada conta uma turma, sem precisar confirmar.',
+                   ['.ac-turmas-valor', 'select[name="unidade_id"]'], requisito='Escolha uma unidade para ver as disciplinas.'),
             _passo('Aprove', 'Quando não houver pendências, clique em "Aprovar Alocação". "Desfazer aprovação" volta a permitir edição.',
                    ['#approveAllocBtn', 'select[name="unidade_id"]'], requisito='Escolha uma unidade para ver o botão de aprovação.'),
         ],
@@ -307,6 +307,22 @@ AJUDA_PAGINAS = {
 # usar botões que ela não possui (por exemplo, criar professor ou aprovar a
 # alocação em nome da DESUP).
 AJUDA_PAGINAS_COORDENADOR = {
+    'core:rat_unidade': {
+        'titulo': 'Regime Adicional de Trabalho (RAT)',
+        'resumo': 'Solicitação de horas semanais adicionais para um professor da unidade, sujeita à análise da DESUP e limitada ao período de vigência aprovado.',
+        'funcionalidades': [
+            'Solicitar RAT para professor vinculado à unidade, com ID funcional cadastrado e carga horária regular completa.',
+            'Conferir a identidade e a carga do professor antes de enviar.',
+            'Acompanhar as solicitações da unidade e o motivo da decisão da DESUP.',
+        ],
+        'passos': [
+            _passo('Selecione o professor', 'Escolha um professor vinculado à sua unidade. O ID funcional e o nome completo são preenchidos pelo cadastro; confira esses dados antes de continuar.', '#id_professor'),
+            _passo('Confira a carga regular', 'O professor precisa estar com a carga horária regular completa. A validação considera as alocações e justificativas contabilizadas pelo sistema e a meta ajustada pelas regras vigentes. Pedidos de RAT não completam essa carga. Sem ID funcional cadastrado ou com carga incompleta, o envio é bloqueado.', ['#ratCarga', '#ratNome']),
+            _passo('Informe horas e vigência', 'Informe a quantidade positiva de horas adicionais semanais e a data de início da vigência. O fim da vigência é opcional; quando informado, deve ser igual ou posterior ao início.', ['#id_horas_adicionais', '#ratForm']),
+            _passo('Justifique e envie', 'Preencha a justificativa e clique em Enviar solicitação. O pedido é registrado como Pendente para análise da DESUP.', '#id_justificativa'),
+            _passo('Acompanhe a decisão', 'Consulte Solicitações da unidade: Pendente aguarda análise; Aprovada autoriza as horas adicionais durante a vigência; Recusada não autoriza e exige motivo da DESUP. A lista exibe o motivo registrado. Cancelada também é uma situação prevista no cadastro; esta tela não oferece ação de cancelamento. A aprovação ou recusa gera uma notificação para a unidade.', '#ratSolicitacoes'),
+        ],
+    },
     'dashboard_unidade': {
         'titulo': 'Dashboard da Unidade',
         'resumo': 'Página inicial da unidade, com identificação do vínculo e atalhos personalizados.',
@@ -388,8 +404,8 @@ AJUDA_PAGINAS_COORDENADOR = {
                    requisito='Este passo aparece quando há disciplinas para alocar.'),
             _passo('Acrescente docentes', 'Use o botão "+" para adicionar outro docente à mesma disciplina.',
                    ['.ac-add', 'table'], requisito='Este botão aparece nas linhas de disciplinas.'),
-            _passo('Informe as turmas', 'Na coluna "Turmas", informe a quantidade ofertada para calcular corretamente a carga.',
-                   ['.ac-turmas-input', 'table'], requisito='Este campo aparece nas linhas de disciplinas.'),
+            _passo('Informe as turmas', 'Na coluna "Turmas", a quantidade é atualizada sozinha ao adicionar ou remover linhas de docente.',
+                   ['.ac-turmas-valor', 'table'], requisito='Este campo aparece nas linhas de disciplinas.'),
             _passo('Salve a alocação', 'Depois de revisar as linhas, clique em "Salvar Alocações".',
                    ['#saveAllocBtn', 'table'], requisito='O botão fica disponível durante uma janela de entrega aberta.'),
         ],

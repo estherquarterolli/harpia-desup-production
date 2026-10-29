@@ -164,11 +164,6 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
             'unidades', 'ocupacoes_diretivas', 'readaptacoes',
         ).order_by('rh_nome', 'pk')
         q = self.request.GET.get('q', '').strip()
-        if q:
-            from apps.core.busca import filtrar_contem
-            professores_qs = filtrar_contem(
-                professores_qs, q, ['rh_nome', 'desup_nome', 'id_funcional', 'rh_matricula'],
-            )
         unidade_id = self.request.GET.get('unidade_id', '')
         if unidade_id.isdigit():
             professores_qs = professores_qs.filter(
@@ -178,6 +173,11 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
         vinculos_validos = dict(Professor.VinculoEmpregaticioChoices.choices)
         if vinculo in vinculos_validos:
             professores_qs = professores_qs.filter(filtro_vinculo_empregaticio(vinculo))
+        if q:
+            from apps.core.busca import filtrar_contem
+            professores_qs = filtrar_contem(
+                professores_qs, q, ['rh_nome', 'desup_nome', 'id_funcional', 'rh_matricula'],
+            )
         ctx['unidades'] = unidades_ativas
         ctx['resumo_p1'] = obter_resumo_prioridade1()
 
@@ -270,13 +270,6 @@ class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, T
         ).order_by('rh_nome')
 
         q = self.request.GET.get('q', '')
-        if q:
-            from apps.core.busca import filtrar_contem
-            qs = filtrar_contem(
-                qs,
-                q,
-                ['rh_nome', 'desup_nome', 'id_funcional', 'rh_matricula', 'area_atuacao'],
-            )
         unidade_id = self.request.GET.get('unidade_id')
         if unidade_id and unidade_id.isdigit():
             qs = qs.filter(
@@ -288,6 +281,12 @@ class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, T
         turno = self.request.GET.get('turno')
         if turno:
             qs = qs.filter(disponibilidades__turno=turno).distinct()
+        if q:
+            from apps.core.busca import filtrar_contem
+            qs = filtrar_contem(
+                qs, q,
+                ['rh_nome', 'desup_nome', 'id_funcional', 'rh_matricula', 'area_atuacao'],
+            )
 
         from django.core.paginator import Paginator
         page_obj = Paginator(qs, 20).get_page(self.request.GET.get('page'))
@@ -805,11 +804,11 @@ class MarcarNotificacaoLidaView(LoginRequiredMixin, View):
             if user.is_superuser or user.perfil == 'DESUP':
                 count = base_qs.filter(
                     Q(destinatario=user) | Q(destinatario__isnull=True, unidade_destino__isnull=True)
-                ).distinct().count()
+                ).count()
             elif user.perfil == 'COORDENADOR_UNIDADE' and user.unidade:
                 count = base_qs.filter(
                     Q(destinatario=user) | Q(unidade_destino=user.unidade)
-                ).distinct().count()
+                ).count()
             else:
                 count = base_qs.filter(destinatario=user).count()
             response['HX-Trigger'] = f'{{"notifCountUpdate": {count}}}'
@@ -1296,6 +1295,23 @@ class SolicitacaoProfessorExternoDecidirView(DesupPrioridade1Mixin, View):
         if not form.is_valid():
             messages.error(request, 'Revise a decisão e informe o motivo quando necessário.')
             return redirect('core:solicitacao_professor_list')
+        from django.urls import reverse
+        from .models import SolicitacaoProfessorExterno
+        Status = SolicitacaoProfessorExterno.StatusChoices
+        pendente = SolicitacaoProfessorExterno.objects.filter(pk=pk, status=Status.PENDENTE).first()
+        if (
+            pendente
+            and form.cleaned_data['decisao'] == Status.APROVADA
+            and pendente.tipo == SolicitacaoProfessorExterno.TipoChoices.CADASTRO
+            and not pendente.professor_id
+        ):
+            # A aprovação de um cadastro só se conclui ao salvar o professor: abre o
+            # formulário já preenchido com os dados informados pela unidade.
+            messages.info(
+                request,
+                'Revise os dados e salve o professor para concluir a aprovação da solicitação.',
+            )
+            return redirect(f"{reverse('professors:professor_create')}?solicitacao={pendente.pk}")
         try:
             solicitacao = decidir_solicitacao_professor_externo(
                 request=request,
@@ -1309,6 +1325,9 @@ class SolicitacaoProfessorExternoDecidirView(DesupPrioridade1Mixin, View):
             messages.success(
                 request, f'Solicitação {solicitacao.get_status_display().lower()} com sucesso.',
             )
+            if solicitacao.status == Status.APROVADA and solicitacao.professor_id:
+                # Cessão aprovada: abre o cadastro do professor.
+                return redirect('professors:professor_update', pk=solicitacao.professor_id)
         return redirect('core:solicitacao_professor_list')
 
 
@@ -1612,11 +1631,15 @@ class RatUnidadeView(UnidadePrioridade1Mixin, FormView):
         ctx = super().get_context_data(**kwargs)
         unidade = self.get_unidade()
         solicitacoes = ExcecaoCargaUnidade.objects.filter(unidade=unidade).select_related('professor')
+        page_obj = Paginator(solicitacoes.order_by('-criado_em', '-pk'), 20).get_page(self.request.GET.get('page'))
         ctx.update({
             'unidade': unidade,
             'cargas_rat': obter_cargas_rat(ctx['form'].fields['professor'].queryset),
             'mensagem_carga_incompleta': MENSAGEM_CARGA_RAT_INCOMPLETA,
-            'solicitacoes': Paginator(solicitacoes, 20).get_page(self.request.GET.get('page')),
+            'solicitacoes': page_obj,
+            'page_obj': page_obj,
+            'paginator': page_obj.paginator,
+            'is_paginated': page_obj.has_other_pages(),
         })
         return ctx
 

@@ -28,6 +28,7 @@ urlpatterns = [
 
     path("pendencias/<int:pk>/parecer/licenca/<int:item_pk>/", views.ParecerLicencaUpdateView.as_view(), name="parecer_licenca"),
     path("pendencias/<int:pk>/parecer-rapido/<str:tipo>/<int:item_pk>/", views.ParecerRapidoDesupView.as_view(), name="parecer_rapido"),
+    path("pendencias/<int:pk>/excluir/<str:tipo>/<int:item_pk>/", views.ExcluirExtracurricularDesupView.as_view(), name="excluir_extracurricular"),
     path("pendencias/<int:pk>/cancelar/<str:tipo>/<int:item_pk>/", views.CancelarExtracurricularDesupView.as_view(), name="cancelar_extracurricular"),
 
     path("pendencias/lote/enviar/", views.EnviarParaDesupLoteView.as_view(), name="enviar_desup_lote"),

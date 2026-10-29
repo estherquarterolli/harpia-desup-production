@@ -52,7 +52,7 @@
                         <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#e8f0fb] text-base font-black text-[#025c9f]" aria-hidden="true">{{ prof.nome|slice:":1"|upper }}</div>
                         <div class="min-w-0">
                             <h3 class="break-words text-sm font-black leading-snug text-slate-900 sm:text-base">{{ prof.nome }}{% if prof.readaptado_vigente %}<span class="ml-2 inline-flex align-middle items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black text-violet-700"><i class="ph ph-first-aid-kit text-xs" aria-hidden="true"></i>Readaptado</span>{% endif %}</h3>
-                            <p class="text-[11px] text-slate-400">ID: {{ prof.id_funcional }} <span class="mx-1">|</span> CH: {{ prof.carga_total_efetiva }}h
+                            <p class="text-[11px] text-slate-400">ID: {{ prof.id_funcional }} <span class="mx-1">|</span> CH: {{ prof.carga_total_efetiva|hhmm }}
                             </p>
                         </div>
                     </div>
@@ -85,7 +85,7 @@
 
                     {# Horas #}
                     <div class="prof-horas text-center" title="Horas totais (sala + justificadas)">
-                        <p class="text-lg font-black text-slate-900">{{ prof.soma_horas|floatformat:0 }}h</p>
+                        <p class="text-lg font-black text-slate-900">{{ prof.soma_horas|hhmm }}</p>
                     </div>
 
                     <i class="ph ph-caret-down prof-caret" aria-hidden="true"></i>

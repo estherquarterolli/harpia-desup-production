@@ -63,7 +63,7 @@
                   {% endif %}
                 {% endfor %}
                 {% else %}
-                <span class="text-sm font-bold text-slate-700">{{ item.ch_aprovada }}h</span>
+                <span class="text-sm font-bold text-slate-700">{{ item.ch_aprovada|hhmm }}</span>
                 {% endif %}
               </td>
 
@@ -201,7 +201,7 @@
                 <select name="pendencia_id" required class="form-field">
                   <option value="">Selecione um docente...</option>
                   {% for p in pendencias %}
-                    <option value="{{ p.id }}">{{ p.professor.nome }} ({{ p.ch_faltante|floatformat:1 }}h faltantes)</option>
+                    <option value="{{ p.id }}">{{ p.professor.nome }} ({{ p.ch_faltante|hhmm }} faltantes)</option>
                   {% endfor %}
                 </select>
               </div>

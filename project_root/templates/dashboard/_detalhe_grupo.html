@@ -20,10 +20,10 @@
                                     <td class="px-4 py-3 font-black text-slate-700" data-label="Unidade">{{ linha.unidade }}</td>
                                     <td class="px-4 py-3 text-slate-700" data-label="Disciplina/Atividade">{{ linha.atividade }}</td>
                                     <td class="px-4 py-3 text-slate-600" data-label="Turma">{{ linha.turma }}</td>
-                                    <td class="px-4 py-3 text-center font-semibold text-slate-700" data-label="Manhã">{% if linha.manha %}{{ linha.manha|floatformat:"-1" }}h{% else %}<span class="text-slate-300">-</span>{% endif %}</td>
-                                    <td class="px-4 py-3 text-center font-semibold text-slate-700" data-label="Tarde">{% if linha.tarde %}{{ linha.tarde|floatformat:"-1" }}h{% else %}<span class="text-slate-300">-</span>{% endif %}</td>
-                                    <td class="px-4 py-3 text-center font-semibold text-slate-700" data-label="Noite">{% if linha.noite %}{{ linha.noite|floatformat:"-1" }}h{% else %}<span class="text-slate-300">-</span>{% endif %}</td>
-                                    <td class="px-4 py-3 text-center font-black text-slate-800" data-label="CH">{{ linha.ch|floatformat:"-1" }}h</td>
+                                    <td class="px-4 py-3 text-center font-semibold text-slate-700" data-label="Manhã">{% if linha.manha %}{{ linha.manha|hhmm }}{% else %}<span class="text-slate-300">-</span>{% endif %}</td>
+                                    <td class="px-4 py-3 text-center font-semibold text-slate-700" data-label="Tarde">{% if linha.tarde %}{{ linha.tarde|hhmm }}{% else %}<span class="text-slate-300">-</span>{% endif %}</td>
+                                    <td class="px-4 py-3 text-center font-semibold text-slate-700" data-label="Noite">{% if linha.noite %}{{ linha.noite|hhmm }}{% else %}<span class="text-slate-300">-</span>{% endif %}</td>
+                                    <td class="px-4 py-3 text-center font-black text-slate-800" data-label="CH">{{ linha.ch|hhmm }}</td>
                                     <td class="px-4 py-3" data-label="Situação">
                                         <span class="inline-flex items-center rounded-md px-2 py-1 text-[11px] font-black
                                             {% if linha.tom == 'verde' %}bg-emerald-100 text-emerald-700{% elif linha.tom == 'vermelho' %}bg-red-100 text-red-700{% elif linha.tom == 'ambar' %}bg-amber-100 text-amber-700{% else %}bg-slate-100 text-slate-600{% endif %}">{{ linha.situacao }}</span>

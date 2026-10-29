@@ -50,6 +50,7 @@ class AjudaPaginasDesupTests(TestCase):
             'dashboard_unidade', 'core:equipe_diretiva_unidade', 'professors:professor_list',
             'alloc_curricular', 'extra_curricular:pendencia_list',
             'extra_curricular:supervisao_estagio', 'courses:matrix_list',
+            'core:rat_unidade',
         }
         self.assertEqual(esperadas, set(AJUDA_PAGINAS_COORDENADOR))
 

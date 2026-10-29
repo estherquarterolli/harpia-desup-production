@@ -42,7 +42,7 @@
       <td class="px-6 py-4 text-slate-600" data-label="Área de atuação">
         {{ item.prof.area_atuacao|default:"Não informada" }}
       </td>
-      <td class="px-6 py-4 text-center font-bold text-slate-900" data-label="CH">{{ item.ch }}h</td>
+      <td class="px-6 py-4 text-center font-bold text-slate-900" data-label="CH">{{ item.ch|hhmm }}</td>
       <td class="px-6 py-4" data-label="Cargo">
         <span class="inline-block max-w-[16rem] rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700" title="{{ item.prof.tipo_contrato.nome }}">
           {{ item.prof.tipo_contrato.nome|default:"—" }}
@@ -59,13 +59,13 @@
         </div>
       </td>
       <td class="px-6 py-4 text-center border-l border-slate-100 font-semibold text-slate-700" data-label="CH Justificada">
-        {{ item.prof.ch_justificada_total|floatformat:0 }}h
+        {{ item.prof.ch_justificada_total|hhmm }}
       </td>
       <td class="px-6 py-4 text-center font-bold text-slate-800" data-label="Total de Horas">
-        {{ item.prof.soma_horas|floatformat:0 }}h
+        {{ item.prof.soma_horas|hhmm }}
       </td>
       <td class="px-6 py-4 text-center font-semibold {% if item.prof.ch_nao_alocada_total > 0 %}text-red-500{% else %}text-emerald-500{% endif %}" data-label="Não Alocado">
-        {{ item.prof.ch_nao_alocada_total|floatformat:0 }}h
+        {{ item.prof.ch_nao_alocada_total|hhmm }}
       </td>
       <td class="px-6 py-4 text-center" data-label="% Alocado">
         <span class="px-2 py-1 rounded text-[10px] font-black {% if item.prof.percentual_alocado_total >= 100 %}bg-emerald-100 text-emerald-700{% elif item.prof.percentual_alocado_total > 0 %}bg-amber-100 text-amber-700{% else %}bg-slate-100 text-slate-500{% endif %}">

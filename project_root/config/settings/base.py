@@ -11,7 +11,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # Quick-start development settings
 SECRET_KEY = config("SECRET_KEY")
-DEBUG = config("DEBUG", default=False, cast=bool)
+# DEBUG também pode ser exportada pelo sistema (ex.: DEBUG=release no Nobara).
+# Use uma variável própria para não colidir com o ambiente do terminal.
+DEBUG = config("DJANGO_DEBUG", default=False, cast=bool)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1").split(",")
 LANGUAGE_CODE = "pt-br"
 TIME_ZONE = config("TIME_ZONE", default="America/Sao_Paulo")
@@ -73,6 +75,7 @@ TEMPLATES = [
         "DIRS": [BASE_DIR / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
+            'builtins': ['apps.core.templatetags.horas'],
             'context_processors': [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
@@ -145,7 +148,7 @@ EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=False, cast=bool)
 EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="no-reply@harpia.local")
-EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=15, cast=int)
+EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=5, cast=int)
 
 # Recuperação de senha por e-mail: token de uso único e cooldown anti-spam.
 PASSWORD_RESET_TOKEN_TTL_SECONDS = config(
