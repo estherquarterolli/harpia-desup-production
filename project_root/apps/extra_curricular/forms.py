@@ -33,6 +33,11 @@ _READONLY = "w-full rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 tex
 # de negócio (a extensão não tem teto de alunos), é o limite físico do campo.
 MAX_ESTUDANTES_EXTENSAO = 199_999
 
+# Idem para orientandos de TCC: `carga_horaria` é DecimalField(max_digits=6), então
+# o teto abaixo é só o limite físico do campo, não uma regra de negócio (TCC não
+# tem máximo de orientandos).
+MAX_ORIENTANDOS_TCC = 199_999
+
 # ════════════════════════════════════════════════════════════════════
 # Base FormSet com Validações Globais (40h Máximas / BTT)
 # ════════════════════════════════════════════════════════════════════
@@ -80,7 +85,7 @@ class BasePendenciaFormSet(BaseInlineFormSet):
                 
             if self.model == OrientacaoTCC:
                 num = dados.get("num_orientandos", 0)
-                ch_deste_formset += float(min(num * 0.5, 4.0)) # Limite max 4h TCC
+                ch_deste_formset += float(num * 0.5)
             elif self.model == AtividadeExtensionista:
                 num = dados.get("num_estudantes", 0)
                 ch_deste_formset += float(num * 0.5)
@@ -146,16 +151,17 @@ class OrientacaoTCCForm(forms.ModelForm):
             "num_orientandos": forms.NumberInput(attrs={
                 "class": _INPUT + " text-center",
                 "min": 1,
-                "max": 8,
-                "placeholder": "1–8",
+                "placeholder": "Nº de orientandos",
                 "data-ch-tcc": "1",
             }),
         }
 
     def clean_num_orientandos(self):
         valor = self.cleaned_data.get("num_orientandos")
-        if valor and valor > 8:
-            raise forms.ValidationError("O máximo é 8 orientandos por professor.")
+        if valor and valor > MAX_ORIENTANDOS_TCC:
+            raise forms.ValidationError(
+                f"Valor acima do suportado: informe no máximo {MAX_ORIENTANDOS_TCC} orientandos."
+            )
         return valor
 
 
@@ -308,8 +314,7 @@ class ParecerTCCForm(forms.ModelForm):
             "num_orientandos_aprovados": forms.NumberInput(attrs={
                 "class": _INPUT + " text-center",
                 "min": 0,
-                "max": 8,
-                "placeholder": "0–8",
+                "placeholder": "Nº aprovado",
             }),
             "horas_aprovadas": forms.NumberInput(attrs={
                 "class": _READONLY,

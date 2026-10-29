@@ -57,13 +57,13 @@ def justificativa_token(row: dict) -> str:
 
 def calcular_ch_tcc(num_orientandos: int) -> Decimal:
     """
-    0,5h por orientando, limitado a 4h (8 orientandos máx.).
+    0,5h por orientando, sem limite de orientandos.
 
     Piso em 0: quantidade negativa não existe como pedido real (vem de um `n`
     manipulado na querystring da API de prévia) e não pode virar CH negativa —
     isso apareceria na tela como prévia e, pior, abateria o total do docente.
     """
-    return Decimal(min(max(num_orientandos, 0) * 0.5, 4.0)).quantize(Decimal("0.1"))
+    return Decimal(max(num_orientandos, 0) * 0.5).quantize(Decimal("0.1"))
 
 
 def calcular_ch_extensao(num_estudantes: int) -> Decimal:
@@ -144,10 +144,27 @@ def sincronizar_status_pendencia(pendencia: PendenciaExtra) -> str:
 # Consulta de professores com pendência
 # ──────────────────────────────────────────────────────────────
 
-def get_professores_com_pendencia(unidade_id: int, semestre: str, q: str = "") -> QuerySet:
+def meta_horas_extracurricular(prof: Professor) -> float:
     """
-    Retorna os professores da unidade (ou de todas se unidade_id for None) que ainda têm horas pendentes
-    (ch_alocada < max_class_hours do contrato).
+    Meta de CH em sala cobrada do professor no módulo extracurricular.
+
+    É `Professor.meta_horas_sala`: já desconta a redução vigente da equipe
+    diretiva e zera para readaptado.
+    """
+    return float(prof.meta_horas_sala)
+
+
+def get_professores_com_pendencia(unidade_id: int, semestre: str, q: str = "") -> list:
+    """
+    Retorna TODOS os professores da unidade (ou de todas se unidade_id for None),
+    com os que realmente têm horas pendentes no topo. A pendência segue o mesmo
+    critério de "carga completa" do RAT e do dashboard: CH alocada + CH
+    justificada (aprovada pela DESUP + estágio) abaixo da meta, que já vem
+    descontada da redução da equipe diretiva. Readaptados e docentes com a CH
+    completa também aparecem — só não são cobrados.
+
+    Cada professor recebe `ch_alocada_lote`, `ch_justificada_lote`, `meta_lote`
+    e `tem_pendencia_ch` (a listagem não precisa reabrir a query por professor).
 
     A verificação é feita em Python porque ch_alocada é uma @property
     calculada a partir de agregações relacionadas — mas usando `_bulk_ch_alocada`
@@ -155,22 +172,20 @@ def get_professores_com_pendencia(unidade_id: int, semestre: str, q: str = "") -
     professor, que abria uma query por professor (N+1 — chegava a travar/dar
     timeout no Vercel com o banco remoto).
     """
-    pendentes, _ = _professores_pendentes_com_ch(unidade_id, q)
-    return (
-        Professor.objects.filter(pk__in=[p.pk for p in pendentes])
-        .select_related("tipo_contrato", "unidade_principal")
-        .prefetch_related("ocupacoes_diretivas")
-    )
+    professores, _ = _professores_pendentes_com_ch(unidade_id, q)
+    return professores
 
 
 def _professores_pendentes_com_ch(unidade_id, q: str = ""):
     """
-    Nucleo compartilhado: devolve `(professores_pendentes, ch_map)`.
+    Nucleo compartilhado: devolve `(professores, ch_map)`.
 
-    `professores_pendentes` e a lista de objetos `Professor` ja carregados (com
-    `tipo_contrato` e `ocupacoes_diretivas` em prefetch) cuja CH alocada em sala
-    esta abaixo da meta; `ch_map` e o mapa `{professor_id: ch_alocada}` calculado
-    em lote. Mesmo criterio e mesma ordenacao (`Meta.ordering`) de antes.
+    `professores` e a lista de objetos `Professor` ja carregados (com
+    `tipo_contrato`, `ocupacoes_diretivas` e `readaptacoes` em prefetch), TODOS os
+    da unidade: primeiro os que estao com a CH alocada em sala abaixo da meta
+    (`tem_pendencia_ch`), depois os demais, mantendo a ordenacao (`Meta.ordering`)
+    dentro de cada grupo. `ch_map` e o mapa `{professor_id: ch_alocada}` calculado
+    em lote.
 
     Por que existe: `meta_horas_sala` le `ocupacoes_diretivas.all()` (reducao de
     carga vigente). Sem prefetch isso abria 1 query por professor, e o calculo
@@ -191,12 +206,19 @@ def _professores_pendentes_com_ch(unidade_id, q: str = ""):
     professores = list(professores)
     ch_map = _bulk_ch_alocada([p.pk for p in professores])
 
-    pendentes = []
+    from apps.professors.services import _bulk_ch_justificada
+
+    justificada_map = _bulk_ch_justificada([p.pk for p in professores])
     for prof in professores:
-        meta = prof.meta_horas_sala if prof.tipo_contrato else 20
-        if ch_map.get(prof.pk, 0) < meta:
-            pendentes.append(prof)
-    return pendentes, ch_map
+        prof.meta_lote = meta_horas_extracurricular(prof)
+        prof.ch_alocada_lote = ch_map.get(prof.pk, 0)
+        prof.ch_justificada_lote = justificada_map.get(prof.pk, 0.0)
+        prof.tem_pendencia_ch = (
+            prof.ch_alocada_lote + prof.ch_justificada_lote < prof.meta_lote
+        )
+    # sort estavel: pendentes primeiro, ordem original preservada em cada grupo.
+    professores.sort(key=lambda p: not p.tem_pendencia_ch)
+    return professores, ch_map
 
 
 def _bulk_ch_alocada(professor_ids):
@@ -242,7 +264,8 @@ def _bulk_ch_alocada(professor_ids):
 def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
     """
     Retorna lista de dicts com dados completos para a listagem:
-    professores com pendência + seus registros de PendenciaExtra (se existirem).
+    todos os professores (pendentes no topo, readaptados inclusos) + seus
+    registros de PendenciaExtra (se existirem).
     Se um professor tiver múltiplas justificativas, elas retornam como linhas separadas.
     """
     # Reaproveita professores (com prefetch) e o ch_map ja calculados - antes
@@ -268,14 +291,15 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
 
     result = []
     for prof in professores_pendentes:
-        meta = prof.meta_horas_sala if prof.tipo_contrato else 20
+        meta = prof.meta_lote
         ch_alocada = ch_alocada_map.get(prof.pk, 0)
         ch_pendente = max(meta - ch_alocada, 0)
         pendencia = pendencias_existentes.get(prof.pk)
 
+        # Mesmo total justificado do RAT e do dashboard (itens aprovados + estágio).
+        ch_faltante = max(ch_pendente - prof.ch_justificada_lote, 0)
+
         if pendencia:
-            ch_justificada = pendencia.ch_total_justificada
-            ch_faltante = max(ch_pendente - ch_justificada, 0)
             # Enquanto a pendência não for enviada, o estado exibido e
             # filtrado é RASCUNHO. Os itens nascem com parecer PENDENTE, mas
             # esse parecer só representa o trâmite depois do envio à DESUP.
@@ -430,6 +454,16 @@ def get_pendencias_data(unidade_id: int, semestre: str, q: str = ""):
                 "justificativa_tipo": "",
                 "sei_numero": "",
             })
+
+    # Quem ainda tem CH faltando fica no topo; depois quem teve pendência e já a
+    # cobriu; por fim os docentes sem pendência (inclui readaptados). Sort estável:
+    # as linhas de um mesmo professor continuam juntas, na ordem original.
+    def _prioridade(row):
+        if row["ch_faltante"] > 0:
+            return 0
+        return 1 if row["ch_pendente"] > 0 else 2
+
+    result.sort(key=_prioridade)
 
     # CORR-015 — anexa os tokens canônicos de filtro em cada linha.
     for row in result:

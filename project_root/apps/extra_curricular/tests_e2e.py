@@ -1350,21 +1350,21 @@ class ValidacoesDeEntradaTests(_BaseFluxoE2E):
         self.assertFalse(OrientacaoTCC.objects.filter(pendencia=self.pendencia).exists())
         self.assertTrue(any("Prazo de 5 dias" in m for m in self._mensagens(resp)))
 
-    # ── Teto de 8 orientandos ───────────────────────────────────────
-    def test_tcc_com_mais_de_oito_orientandos_e_recusado_no_detalhe(self):
+    # ── Sem teto de orientandos ─────────────────────────────────────
+    def test_tcc_com_mais_de_oito_orientandos_e_aceito_no_detalhe(self):
         self._login(self.coord_a)
-        resp = self._post_tcc(self.pendencia, [9])
-        self.assertEqual(resp.status_code, 302)
-        self.assertFalse(OrientacaoTCC.objects.filter(pendencia=self.pendencia).exists())
-
-    def test_tcc_com_exatamente_oito_orientandos_e_aceito_e_teto_de_4h(self):
-        self._login(self.coord_a)
-        self._post_tcc(self.pendencia, [8])
+        self._post_tcc(self.pendencia, [9])
         tcc = OrientacaoTCC.objects.get(pendencia=self.pendencia)
-        self.assertEqual(float(tcc.carga_horaria), 4.0)
-        self.assertEqual(tcc.ch_aprovada, 4.0)
+        self.assertEqual(float(tcc.carga_horaria), 4.5)
 
-    def test_tcc_com_mais_de_oito_orientandos_e_recusado_no_lote(self):
+    def test_tcc_calcula_meia_hora_por_orientando_sem_teto_de_4h(self):
+        self._login(self.coord_a)
+        self._post_tcc(self.pendencia, [20])
+        tcc = OrientacaoTCC.objects.get(pendencia=self.pendencia)
+        self.assertEqual(float(tcc.carga_horaria), 10.0)
+        self.assertEqual(tcc.ch_aprovada, 10.0)
+
+    def test_tcc_com_mais_de_oito_orientandos_e_aceito_no_lote(self):
         # CORRIGIDO: `SalvarTCCLoteView.post` fazia
         # `OrientacaoTCC.objects.create(..., num_orientandos=int(num_orientandos))`
         # sem `full_clean()` e sem form — o `MaxValueValidator(8)`
@@ -1383,7 +1383,7 @@ class ValidacoesDeEntradaTests(_BaseFluxoE2E):
                 "num_orientandos": "9",
             },
         )
-        self.assertFalse(OrientacaoTCC.objects.filter(pendencia=self.pendencia).exists())
+        self.assertTrue(OrientacaoTCC.objects.filter(pendencia=self.pendencia, num_orientandos=9).exists())
 
     def test_orientandos_nao_numerico_no_lote_nao_pode_dar_500(self):
         # CORRIGIDO: `SalvarTCCLoteView.post` fazia `int(num_orientandos)` direto
@@ -1759,7 +1759,7 @@ class CalcularCHEndpointTests(_BaseFluxoE2E):
         return resp.json()["ch"]
 
     def test_tcc_valores_de_borda(self):
-        for n, esperado in ((0, 0.0), (1, 0.5), (7, 3.5), (8, 4.0), (9, 4.0), (100, 4.0)):
+        for n, esperado in ((0, 0.0), (1, 0.5), (7, 3.5), (8, 4.0), (9, 4.5), (100, 50.0)):
             with self.subTest(n=n):
                 self.assertEqual(self._ch(tipo="tcc", n=n), esperado)
 

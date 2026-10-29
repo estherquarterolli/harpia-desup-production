@@ -62,12 +62,11 @@ class ExtraCurricularApprovedTests(TestCase):
         self.assertEqual(tcc.horas_aprovadas, 1.0)
         self.assertEqual(tcc.ch_aprovada, 1.0)
 
-        # 3. Max limit (8 students -> 4h)
-        tcc.num_orientandos_aprovados = 10 # Should be capped at 8 if we use logic, but field has validator.
-        # Logic in plan says: min(round(num_orientandos_aprovados * 0.5, 1), 4.0)
+        # 3. Sem teto: 0,5h por orientando, qualquer quantidade
+        tcc.num_orientandos_aprovados = 10
         tcc.save()
-        self.assertEqual(tcc.horas_aprovadas, 4.0)
-        self.assertEqual(tcc.ch_aprovada, 4.0)
+        self.assertEqual(tcc.horas_aprovadas, 5.0)
+        self.assertEqual(tcc.ch_aprovada, 5.0)
 
     def test_atividade_extensionista_approved_calculation(self):
         """Test calculation of approved hours for Extension based on approved students."""

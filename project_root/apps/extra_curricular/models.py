@@ -3,7 +3,7 @@ Models para Alocação Extra-Curricular.
 
 Estrutura:
     PendenciaExtra  ← agrupa as justificativas de 1 professor num semestre
-        OrientacaoTCC           (0.5h/orientando, máx 8 alunos / 4h)
+        OrientacaoTCC           (0.5h/orientando, sem limite de alunos)
         AtividadeExtensionista  (0.5h/estudante, sem limite)
         ReducaoCargaHoraria     (horas reduzidas por lei/aprovação)
 """
@@ -168,7 +168,7 @@ class PendenciaExtra(models.Model):
 class OrientacaoTCC(models.Model):
     """
     Justificativa por orientação de TCC.
-    Regra: 0,5h por orientando | máx 8 orientandos (≤ 4h).
+    Regra: 0,5h por orientando | sem limite de orientandos.
     Somente para TCCs previstos no PPC fora da matriz curricular.
     """
     pendencia = models.ForeignKey(
@@ -179,25 +179,23 @@ class OrientacaoTCC(models.Model):
     )
     num_orientandos = models.PositiveSmallIntegerField(
         verbose_name="Nº de Orientandos",
-        validators=[MaxValueValidator(8)],
-        help_text="Máximo de 8 orientandos por professor.",
+        help_text="Cada orientando equivale a 0,5h; não há limite de orientandos.",
     )
     num_orientandos_aprovados = models.PositiveSmallIntegerField(
         null=True,
         blank=True,
         verbose_name="Orientandos Aprovados",
-        validators=[MaxValueValidator(8)],
         help_text="Nº de orientandos aprovados pela DESUP. Se vazio, usa o total solicitado.",
     )
     carga_horaria = models.DecimalField(
-        max_digits=4,
+        max_digits=6,
         decimal_places=1,
         editable=False,
         verbose_name="Carga Horária (h)",
-        help_text="Calculado automaticamente: orientandos × 0,5 (máx 4h).",
+        help_text="Calculado automaticamente: orientandos × 0,5.",
     )
     horas_aprovadas = models.DecimalField(
-        max_digits=4,
+        max_digits=6,
         decimal_places=1,
         null=True,
         blank=True,
@@ -235,27 +233,21 @@ class OrientacaoTCC(models.Model):
         (ex.: soma em BasePendenciaFormSet.clean e ch_total_justificada).
         """
         if self.num_orientandos_aprovados is not None:
-            return min(round(self.num_orientandos_aprovados * 0.5, 1), 4.0)
+            return round(self.num_orientandos_aprovados * 0.5, 1)
         if self.horas_aprovadas is not None:
             return float(self.horas_aprovadas)
         return float(self.carga_horaria or 0)
 
-    def clean(self):
-        if self.num_orientandos and self.num_orientandos > 8:
-            raise ValidationError(
-                {"num_orientandos": "O máximo permitido é 8 orientandos por professor."}
-            )
-
     def save(self, *args, **kwargs):
-        # Calcular CH automaticamente (0.5h por orientando, máx 4h)
+        # Calcular CH automaticamente (0.5h por orientando, sem teto)
         if self.num_orientandos:
-            self.carga_horaria = min(round(self.num_orientandos * 0.5, 1), 4.0)
+            self.carga_horaria = round(self.num_orientandos * 0.5, 1)
         else:
             self.carga_horaria = 0.0
         
         # Atualizar horas_aprovadas com base no num_orientandos_aprovados ou carga_horaria
         if self.num_orientandos_aprovados is not None:
-            self.horas_aprovadas = min(round(self.num_orientandos_aprovados * 0.5, 1), 4.0)
+            self.horas_aprovadas = round(self.num_orientandos_aprovados * 0.5, 1)
         elif self.horas_aprovadas is None:
             self.horas_aprovadas = self.carga_horaria
             

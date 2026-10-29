@@ -106,6 +106,7 @@ def ajuda_pagina(request):
     from apps.core.ajuda import (
         AJUDA_PAGINAS,
         AJUDA_PAGINAS_COORDENADOR,
+        ajuda_generica,
         passos_resolvidos,
     )
 
@@ -115,9 +116,8 @@ def ajuda_pagina(request):
     elif perfil == 'COORDENADOR_UNIDADE':
         paginas = AJUDA_PAGINAS_COORDENADOR
     else:
-        return {}
+        paginas = {}
 
-    conteudo = paginas.get(match.view_name)
-    if not conteudo:
-        return {}
+    # Telas sem tutorial guiado próprio recebem a ajuda genérica: o "?" aparece em todas.
+    conteudo = paginas.get(match.view_name) or ajuda_generica(match.view_name)
     return {'ajuda_pagina': {**conteudo, 'passos': passos_resolvidos(conteudo)}}

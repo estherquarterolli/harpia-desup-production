@@ -905,3 +905,26 @@ class CadeiaTakeoverResetSenhaTests(TestCase):
             .values_list('destinatario__email', flat=True)
         )
         self.assertNotIn(self.coord_a.email, destinatarios)
+
+
+class EmailNovoUsuarioTests(TestCase):
+    """Todo usuário novo com a senha padrão recebe e-mail com o login e a senha."""
+
+    def test_usuario_novo_recebe_email_com_login_e_senha_padrao(self):
+        from django.core import mail
+
+        with self.captureOnCommitCallbacks(execute=True):
+            User.objects.create_user(email="novo.usuario@teste.com", perfil="DESUP")
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["novo.usuario@teste.com"])
+        self.assertIn("novo.usuario@teste.com", mail.outbox[0].body)
+        self.assertIn("Faetec@123", mail.outbox[0].body)
+
+    def test_usuario_com_senha_propria_nao_recebe_senha_padrao(self):
+        from django.core import mail
+
+        with self.captureOnCommitCallbacks(execute=True):
+            User.objects.create_user(email="propria@teste.com", password="OutraSenha#1", perfil="DESUP")
+
+        self.assertEqual(mail.outbox, [])
