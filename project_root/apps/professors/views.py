@@ -92,6 +92,7 @@ def enriquecer_professores_com_carga(professores, unidade_atual=None):
         # extra_curricular/services.py (get_pendencias_data).
         meta_horas = 0.0 if prof.readaptado_vigente else prof.meta_horas_base_sala
         prof.ch_nao_alocada_total = max(meta_horas - prof.soma_horas, 0)
+        prof.acima_ch = meta_horas > 0 and prof.soma_horas > meta_horas
         if meta_horas:
             prof.percentual_alocado_total = round(min((prof.soma_horas / meta_horas) * 100, 100.0), 2)
         else:
@@ -136,7 +137,7 @@ def enriquecer_professores_com_carga(professores, unidade_atual=None):
                     chave = (
                         comp.componente_curricular_id
                         if comp.compartilhado
-                        else f'{comp.matriz_id}-{comp.pk}'
+                        else f'{comp.matriz_id}-{comp.pk}-{linha.pk}'
                     )
                     if chave in vistos_por_prof[prof_id]:
                         continue
@@ -173,6 +174,16 @@ def detalhar_alocacoes_professores(professores, user=None):
     if not ids:
         return professores
 
+    # Numeração das turmas: ordem de criação das linhas de cada componente
+    # (considera todos os docentes, não só os listados).
+    numero_turma = {}
+    contador = {}
+    for lid, cid in alocacoes_vigentes().filter(
+        componente_matriz_id__in=alocacoes_vigentes().filter(docente_id__in=ids).values('componente_matriz_id'),
+    ).order_by('pk').values_list('pk', 'componente_matriz_id'):
+        contador[cid] = contador.get(cid, 0) + 1
+        numero_turma[lid] = contador[cid]
+
     vistos = {}
     linhas = alocacoes_vigentes().filter(docente_id__in=ids).select_related(
         'alocacao_curricular__unidade',
@@ -181,7 +192,7 @@ def detalhar_alocacoes_professores(professores, user=None):
     ).order_by('alocacao_curricular__unidade__sigla', 'componente_matriz__periodo')
     for linha in linhas:
         comp = linha.componente_matriz
-        chave = comp.componente_curricular_id if comp.compartilhado else comp.pk
+        chave = comp.componente_curricular_id if comp.compartilhado else ('linha', linha.pk)
         vistos.setdefault(linha.docente_id, set())
         if chave in vistos[linha.docente_id]:
             continue
@@ -191,7 +202,10 @@ def detalhar_alocacoes_professores(professores, user=None):
         por_id[linha.docente_id].detalhe_alocacao.append({
             'unidade': linha.alocacao_curricular.unidade.sigla,
             'atividade': comp.nome_disciplina or '—',
-            'turma': linha.turma.identificador if linha.turma_id else '—',
+            'turma': (
+                linha.turma.identificador if linha.turma_id
+                else f'Turma {numero_turma.get(linha.pk, 1)}'
+            ),
             'manha': horas if turno == 'M' else None,
             'tarde': horas if turno == 'T' else None,
             'noite': horas if turno == 'N' else None,

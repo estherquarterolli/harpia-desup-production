@@ -218,6 +218,7 @@ def _bulk_ch_alocada(professor_ids):
         "componente_matriz__compartilhado",
         "componente_matriz__carga_horaria",
         "componente_matriz_id",
+        "id",
     )
 
     mapa = {}
@@ -228,7 +229,7 @@ def _bulk_ch_alocada(professor_ids):
         chave = (
             comp["componente_matriz__componente_curricular_id"]
             if comp["componente_matriz__compartilhado"]
-            else comp["componente_matriz_id"]
+            else ("linha", comp["id"])
         )
         if chave in vistos[pid]:
             continue

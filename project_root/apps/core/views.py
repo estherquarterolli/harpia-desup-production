@@ -1581,7 +1581,7 @@ def _mapa_alocacoes_sala_por_professor(professor_ids):
         chave = (
             f"catalogo:{comp.componente_curricular_id}"
             if comp.compartilhado and comp.componente_curricular_id
-            else f"linha:{comp.pk}"
+            else f"linha:{linha.pk}"
         )
         vistos = vistos_por_prof.setdefault(pid, set())
         if chave not in vistos:
