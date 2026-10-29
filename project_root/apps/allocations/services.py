@@ -220,11 +220,6 @@ def definir_escolha(componente, unidade, valor, linha_id=None, usuario=None):
             docente = Professor.objects.get(pk=int(valor))
         except (ValueError, TypeError, Professor.DoesNotExist):
             raise AlocacaoError('Professor não encontrado.', status=404)
-        if linhas.filter(docente=docente).exclude(pk=linha_id if str(linha_id).isdigit() else None).exists():
-            raise AlocacaoError(
-                f'{docente.nome} já está alocado neste componente. Escolha outro docente.',
-                status=409,
-            )
 
     if linha_id == NOVA_LINHA:
         linha = AlocacaoTurmaDocente(
