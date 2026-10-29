@@ -231,8 +231,7 @@ def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, t
     excecoes = ExcecaoCargaUnidade.objects.filter(
         status=ExcecaoCargaUnidade.StatusChoices.APROVADA,
         data_inicio__lte=hoje,
-        data_fim__gte=hoje,
-    )
+    ).filter(Q(data_fim__isnull=True) | Q(data_fim__gte=hoje))
     if unidade_id:
         excecoes = excecoes.filter(unidade_id=unidade_id)
     adicionais = defaultdict(Decimal)

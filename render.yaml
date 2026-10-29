@@ -28,7 +28,7 @@ services:
         value: django.db.backends.mysql
       - key: DB_PORT
         value: "3306"
-      - key: DEBUG
+      - key: DJANGO_DEBUG
         value: "False"
       - key: DISABLE_COLLECTSTATIC
         value: "1"

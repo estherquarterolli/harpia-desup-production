@@ -598,7 +598,9 @@ class BuscarProfessoresView(LoginRequiredMixin, PerfilRequiredMixin, View):
             from apps.core.busca import filtrar_contem
             qs = filtrar_contem(qs, q, ['desup_nome', 'rh_nome'])
 
-        qs = qs.prefetch_related('unidades', 'readaptacoes').order_by('nome_exibicao')[:20]
+        qs = qs.select_related('unidade_principal').prefetch_related(
+            'unidades', 'readaptacoes',
+        ).order_by('nome_exibicao')[:20]
 
         ids_busca = {p.id for p in qs}
         cargos_diretivos = _cargos_diretivos_vigentes(ids_busca)

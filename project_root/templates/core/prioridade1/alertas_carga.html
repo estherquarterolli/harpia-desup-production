@@ -133,7 +133,7 @@
         <li class="flex items-center justify-between gap-3 p-4">
           <div class="min-w-0">
             <p class="font-bold text-slate-800">{{ excecao.unidade.sigla }} · <span class="text-amber-700">+{{ excecao.horas_adicionais|hhmm }}</span>{% if excecao.professor %} · {{ excecao.professor.nome }}{% endif %}</p>
-            <p class="text-xs text-slate-500">{{ excecao.data_inicio|date:'d/m/Y' }} – {{ excecao.data_fim|date:'d/m/Y' }}</p>
+            <p class="text-xs text-slate-500">{{ excecao.data_inicio|date:'d/m/Y' }} – {{ excecao.data_fim|date:'d/m/Y'|default:'Sem fim definido' }}</p>
           </div>
           <button type="button" onclick="abrirModal('modalExcecao{{ excecao.pk }}')" class="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-slate-200 px-3 text-sm font-black text-[#025c9f] hover:bg-blue-50"><i class="ph ph-gavel text-lg"></i>Analisar</button>
         </li>
@@ -342,9 +342,9 @@
   <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
     <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
 
-      <div><h3 class="text-base font-black text-[#025c9f]">Exceção de carga</h3><p class="text-xs text-slate-500">{{ excecao.unidade.sigla }} · +{{ excecao.horas_adicionais|hhmm }} · {{ excecao.data_inicio|date:'d/m/Y' }} – {{ excecao.data_fim|date:'d/m/Y' }}</p></div>
+      <div><h3 class="text-base font-black text-[#025c9f]">Exceção de carga</h3><p class="text-xs text-slate-500">{{ excecao.unidade.sigla }} · +{{ excecao.horas_adicionais|hhmm }} · {{ excecao.data_inicio|date:'d/m/Y' }} – {{ excecao.data_fim|date:'d/m/Y'|default:'Sem fim definido' }}</p></div>
 
-      <div><h3 class="text-base font-black text-[#025c9f]">Solicitação de RAT</h3><p class="text-xs text-slate-500">{{ excecao.unidade.sigla }} · +{{ excecao.horas_adicionais|floatformat:"-2" }} h · {{ excecao.data_inicio|date:'d/m/Y' }} – {{ excecao.data_fim|date:'d/m/Y' }}</p></div>
+      <div><h3 class="text-base font-black text-[#025c9f]">Solicitação de RAT</h3><p class="text-xs text-slate-500">{{ excecao.unidade.sigla }} · +{{ excecao.horas_adicionais|floatformat:"-2" }} h · {{ excecao.data_inicio|date:'d/m/Y' }} – {{ excecao.data_fim|date:'d/m/Y'|default:'Sem fim definido' }}</p></div>
       <button type="button" onclick="fecharModal('modalExcecao{{ excecao.pk }}')" aria-label="Fechar" class="text-slate-400 hover:text-slate-600"><i class="ph ph-x text-xl"></i></button>
     </div>
     <form method="post" action="{% url 'core:excecao_carga_decidir' excecao.pk %}">

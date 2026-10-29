@@ -661,14 +661,18 @@
                 input.after(dropdown);
                 
                 let timeout = null;
+                let controller = null;
+                let version = 0;
                 
                 input.addEventListener('input', function() {
                     clearTimeout(timeout);
+                    if (controller) controller.abort();
+                    const currentVersion = ++version;
                     const query = input.value.trim();
+                    dropdown.innerHTML = '';
+                    dropdown.classList.add('hidden');
                     
                     if (query.length < 2) {
-                        dropdown.innerHTML = '';
-                        dropdown.classList.add('hidden');
                         return;
                     }
                     
@@ -679,9 +683,11 @@
                             url += `&unidade_id=${unitFilter.value}`;
                         }
                         
-                        fetch(url)
+                        controller = new AbortController();
+                        fetch(url, { signal: controller.signal })
                             .then(response => response.json())
                             .then(data => {
+                                if (currentVersion !== version) return;
                                 dropdown.innerHTML = '';
                                 if (!data.results || data.results.length === 0) {
                                     dropdown.innerHTML = '<div class="autocomplete-empty">Nenhum professor parecido</div>';
@@ -698,11 +704,13 @@
                                     `;
                                     option.addEventListener('click', function(e) {
                                         e.stopPropagation();
+                                        clearTimeout(timeout);
+                                        if (controller) controller.abort();
+                                        ++version;
                                         input.value = item.nome;
                                         dropdown.innerHTML = '';
                                         dropdown.classList.add('hidden');
                                         
-                                        input.dispatchEvent(new Event('input', { bubbles: true }));
                                         input.dispatchEvent(new Event('change', { bubbles: true }));
                                         input.dispatchEvent(new Event('keyup', { bubbles: true }));
                                         
@@ -716,6 +724,7 @@
                                 dropdown.classList.remove('hidden');
                             })
                             .catch(err => {
+                                if (err.name === 'AbortError') return;
                                 console.error('Erro ao buscar autocomplete:', err);
                             });
                     }, 300);

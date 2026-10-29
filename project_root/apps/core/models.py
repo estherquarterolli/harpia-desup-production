@@ -730,7 +730,7 @@ class ExcecaoCargaUnidade(models.Model):
         verbose_name="Horas adicionais autorizadas",
     )
     data_inicio = models.DateField(verbose_name="Início da vigência")
-    data_fim = models.DateField(verbose_name="Fim da vigência")
+    data_fim = models.DateField(null=True, blank=True, verbose_name="Fim da vigência")
     justificativa = models.TextField(verbose_name="Justificativa")
     status = models.CharField(
         max_length=12,
