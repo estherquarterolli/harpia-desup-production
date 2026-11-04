@@ -1,7 +1,8 @@
+from django.core.mail import send_mail
 from django.core.management.base import BaseCommand
 
 from apps.accounts.models import DEFAULT_USER_PASSWORD, User
-from apps.accounts.signals import enviar_email_novo_usuario, url_login
+from apps.accounts.signals import montar_email_novo_usuario, url_login
 
 
 class Command(BaseCommand):
@@ -41,6 +42,7 @@ class Command(BaseCommand):
                 destinatarios.append(user)
             else:
                 ignorados += 1
+                self.stdout.write(f"  (ignorado, senha não é a padrão: {user.email})")
 
         self.stdout.write(f"Link de login: {url_login()}")
         for user in destinatarios:
@@ -53,10 +55,19 @@ class Command(BaseCommand):
             ))
             return
 
+        # Envio DIRETO (sem Celery): com REDIS_URL definido e sem worker rodando,
+        # o .delay() só enfileira e o e-mail nunca sai, sem nenhum erro visível.
+        enviados, falhas = 0, 0
         for user in destinatarios:
-            enviar_email_novo_usuario(user)
+            try:
+                send_mail(**montar_email_novo_usuario(user))
+                enviados += 1
+                self.stdout.write(self.style.SUCCESS(f"  enviado: {user.email}"))
+            except Exception as exc:
+                falhas += 1
+                self.stderr.write(self.style.ERROR(f"  FALHOU: {user.email} -> {exc!r}"))
 
-        self.stdout.write(self.style.SUCCESS(
-            f"{len(destinatarios)} e-mail(s) enfileirado(s); "
+        self.stdout.write(
+            f"{enviados} enviado(s), {falhas} falha(s), "
             f"{ignorados} ignorado(s) (senha já alterada)."
-        ))
+        )

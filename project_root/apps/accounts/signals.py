@@ -18,24 +18,29 @@ def url_login():
     return f"{settings.SITE_URL}{reverse('login')}"
 
 
+def montar_email_novo_usuario(user):
+    """Argumentos (assunto, corpo, remetente, destinatário) do e-mail de boas-vindas."""
+    return dict(
+        subject="HARPIA - Seu acesso foi criado",
+        message=(
+            "Olá!\n\n"
+            "Sua conta no HARPIA foi criada.\n\n"
+            f"Link de acesso: {url_login()}\n"
+            f"E-mail de acesso: {user.email}\n"
+            f"Senha de primeiro acesso: {DEFAULT_USER_PASSWORD}\n\n"
+            "No primeiro acesso o sistema pedirá que você cadastre uma nova senha. "
+            "A senha padrão diferencia maiúsculas e minúsculas."
+        ),
+        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+        recipient_list=[user.email],
+        fail_silently=False,
+    )
+
+
 def enviar_email_novo_usuario(user):
     """Enfileira o e-mail de boas-vindas com o link de login e a senha padrão (primeiro acesso)."""
     try:
-        send_email_task.delay(
-            subject="HARPIA - Seu acesso foi criado",
-            message=(
-                "Olá!\n\n"
-                "Sua conta no HARPIA foi criada.\n\n"
-                f"Link de acesso: {url_login()}\n"
-                f"E-mail de acesso: {user.email}\n"
-                f"Senha de primeiro acesso: {DEFAULT_USER_PASSWORD}\n\n"
-                "No primeiro acesso o sistema pedirá que você cadastre uma nova senha. "
-                "A senha padrão diferencia maiúsculas e minúsculas."
-            ),
-            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
+        send_email_task.delay(**montar_email_novo_usuario(user))
     except Exception:
         logger.exception(
             "Falha ao enfileirar e-mail de novo usuário.",
