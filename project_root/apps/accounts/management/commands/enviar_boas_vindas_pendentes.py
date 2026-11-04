@@ -19,6 +19,16 @@ class Command(BaseCommand):
             help="Lista quem receberia o e-mail, sem enviar nada.",
         )
         parser.add_argument(
+            "--perfil",
+            choices=[p.value for p in User.Perfil],
+            help="Limita o envio a um perfil (ex.: COORDENADOR_UNIDADE).",
+        )
+        parser.add_argument(
+            "--incluir-ja-logaram",
+            action="store_true",
+            help="Inclui quem já fez login (use após redefinir as senhas para a padrão).",
+        )
+        parser.add_argument(
             "--email",
             action="append",
             default=[],
@@ -29,9 +39,11 @@ class Command(BaseCommand):
         # "Nunca logou" = sem last_login. Só entra quem ainda tem a senha padrão:
         # enviar a senha padrão a quem já a trocou seria enganoso (e vazaria um
         # valor que já não funciona), mesmo que last_login esteja vazio.
-        candidatos = User.objects.filter(
-            is_active=True, last_login__isnull=True,
-        ).exclude(email="").order_by("email")
+        candidatos = User.objects.filter(is_active=True).exclude(email="").order_by("email")
+        if options["perfil"]:
+            candidatos = candidatos.filter(perfil=options["perfil"])
+        if not options["incluir_ja_logaram"]:
+            candidatos = candidatos.filter(last_login__isnull=True)
         if options["email"]:
             candidatos = candidatos.filter(email__in=options["email"])
 
