@@ -920,6 +920,27 @@ class EmailNovoUsuarioTests(TestCase):
         self.assertEqual(mail.outbox[0].to, ["novo.usuario@teste.com"])
         self.assertIn("novo.usuario@teste.com", mail.outbox[0].body)
         self.assertIn("Faetec@123", mail.outbox[0].body)
+        self.assertIn("/login/", mail.outbox[0].body)
+        self.assertIn("http", mail.outbox[0].body)
+
+    def test_comando_envia_apenas_a_quem_nunca_logou_e_mantem_senha_padrao(self):
+        from django.core import mail
+        from django.core.management import call_command
+        from django.utils import timezone
+
+        nunca = User.objects.create_user(email="nunca@teste.com", perfil="DESUP")
+        ja_logou = User.objects.create_user(email="logou@teste.com", perfil="DESUP")
+        ja_logou.last_login = timezone.now()
+        ja_logou.save(update_fields=["last_login"])
+        trocou = User.objects.create_user(email="trocou@teste.com", password="Outra#123", perfil="DESUP")
+        mail.outbox.clear()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            call_command("enviar_boas_vindas_pendentes", "--dry-run")
+        self.assertEqual(mail.outbox, [])
+
+        call_command("enviar_boas_vindas_pendentes")
+        self.assertEqual([m.to for m in mail.outbox], [[nunca.email]])
 
     def test_usuario_com_senha_propria_nao_recebe_senha_padrao(self):
         from django.core import mail

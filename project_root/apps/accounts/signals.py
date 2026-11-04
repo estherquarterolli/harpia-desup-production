@@ -4,6 +4,7 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.urls import reverse
 
 from apps.core.tasks import send_email_task
 
@@ -12,16 +13,22 @@ from .models import DEFAULT_USER_PASSWORD, User
 logger = logging.getLogger(__name__)
 
 
+def url_login():
+    """Link absoluto da tela de login (base vem de settings.SITE_URL)."""
+    return f"{settings.SITE_URL}{reverse('login')}"
+
+
 def enviar_email_novo_usuario(user):
-    """Enfileira o e-mail de boas-vindas com o login e a senha padrão (primeiro acesso)."""
+    """Enfileira o e-mail de boas-vindas com o link de login e a senha padrão (primeiro acesso)."""
     try:
         send_email_task.delay(
             subject="HARPIA - Seu acesso foi criado",
             message=(
                 "Olá!\n\n"
                 "Sua conta no HARPIA foi criada.\n\n"
+                f"Link de acesso: {url_login()}\n"
                 f"E-mail de acesso: {user.email}\n"
-                f"Senha padrão: {DEFAULT_USER_PASSWORD}\n\n"
+                f"Senha de primeiro acesso: {DEFAULT_USER_PASSWORD}\n\n"
                 "No primeiro acesso o sistema pedirá que você cadastre uma nova senha. "
                 "A senha padrão diferencia maiúsculas e minúsculas."
             ),

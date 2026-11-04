@@ -150,6 +150,17 @@ EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="no-reply@harpia.local")
 EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=5, cast=int)
 
+# URL pública do sistema, usada para montar o link de login nos e-mails que
+# não nascem de uma requisição (boas-vindas, comando de envio em lote).
+# Em produção defina SITE_URL (ex.: https://harpiadesup.vercel.app). Se vazio,
+# cai para o domínio de produção do Vercel e, por último, para o localhost.
+_vercel_prod_host = config("VERCEL_PROJECT_PRODUCTION_URL", default="")
+SITE_URL = (
+    config("SITE_URL", default="")
+    or (f"https://{_vercel_prod_host}" if _vercel_prod_host else "")
+    or "http://localhost:8000"
+).rstrip("/")
+
 # Recuperação de senha por e-mail: token de uso único e cooldown anti-spam.
 PASSWORD_RESET_TOKEN_TTL_SECONDS = config(
     "PASSWORD_RESET_TOKEN_TTL_SECONDS", default=3600, cast=int
