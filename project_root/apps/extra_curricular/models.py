@@ -101,6 +101,16 @@ class PendenciaExtra(models.Model):
         verbose_name_plural   = "Pendências Extracurriculares"
         unique_together       = ("professor", "semestre")
         ordering              = ["-semestre", "professor__rh_nome"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(sei_numero__isnull=True)
+                    | models.Q(sei_numero="")
+                    | models.Q(sei_numero__regex=r"^SEI-\d{6}/\d{6}/\d{4}$")
+                ),
+                name="chk_sei_formato",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.professor.nome} — {self.semestre} [{self.get_status_display()}]"

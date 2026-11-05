@@ -58,3 +58,18 @@ python manage.py makemigrations --check --dry-run
 Use `config.settings.production`. O deploy deve executar `collectstatic` e
 `migrate`; as configurações versionadas já incluem essas etapas para Vercel,
 Render e processos compatíveis com o `Procfile`.
+
+A migração `extra_curricular.0008_regularizar_sei_legado` corrige SEIs antigos
+inválidos que impediam a exclusão de usuários no admin. Antes de deixar o SEI
+como não informado, preserva seu valor original e os identificadores da pendência
+na Auditoria Global, com a ação `SEI_LEGADO_INVALIDO`. O número correto deve ser
+conferido e informado pelo fluxo normal; a migração não altera o status nem as
+justificativas da pendência. Também passa a gerenciar a restrição
+`chk_sei_formato` pelas migrações, inclusive onde ela já existia no PostgreSQL.
+
+Os testes desta migração precisam das migrações reais, habilitadas por
+`config.settings.development` (o `_tmp_test` as desabilita):
+
+```powershell
+python manage.py test apps.extra_curricular.tests_sei_migration --settings=config.settings.development
+```

@@ -1949,7 +1949,7 @@ class ListagemPendenciasTests(_BaseFluxoE2E):
             professor=self.prof_a,
             unidade=self.unidade_a,
             semestre=self.semestre,
-            sei_numero="SEI-987654/2026",
+            sei_numero="SEI-987654/123456/2026",
             status=PendenciaExtra.StatusChoices.ENVIADO,
         )
         ReducaoCargaHoraria.objects.create(
