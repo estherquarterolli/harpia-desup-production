@@ -43,10 +43,7 @@ CREATE TABLE IF NOT EXISTS public.harpiadb_alocacoes_alocacao_turma_docente (
     CONSTRAINT harpia_alocturmadocente_unica
         UNIQUE (alocacao_curricular_id, componente_matriz_id, turma_id, docente_id)
 );
-CREATE UNIQUE INDEX IF NOT EXISTS harpia_alocturmadocente_unica_sem_turma
-    ON public.harpiadb_alocacoes_alocacao_turma_docente
-    (alocacao_curricular_id, componente_matriz_id, docente_id)
-    WHERE turma_id IS NULL;
+DROP INDEX IF EXISTS public.harpia_alocturmadocente_unica_sem_turma;
 CREATE INDEX IF NOT EXISTS harpia_alocturmadocente_aloc_idx
     ON public.harpiadb_alocacoes_alocacao_turma_docente (alocacao_curricular_id);
 CREATE INDEX IF NOT EXISTS harpia_alocturmadocente_comp_idx

@@ -23,6 +23,9 @@ CSRF_TRUSTED_ORIGINS = [
     for host in ALLOWED_HOSTS if host not in ("localhost", "127.0.0.1")
 ]
 
+# Link de login nos e-mails: usa SITE_URL se definido; senão, o domínio oficial.
+SITE_URL = (config("SITE_URL", default="") or "https://harpiadesup.vercel.app").rstrip("/")
+
 database_url = config("DATABASE_URL", default="").strip()
 
 if database_url:

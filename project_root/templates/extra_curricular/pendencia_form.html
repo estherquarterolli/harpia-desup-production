@@ -33,7 +33,7 @@
       <h3 class="text-sm font-black uppercase tracking-wide text-[#025c9f]">
         <i class="ph ph-chalkboard-teacher mr-1"></i> Docentes com Pendência (Semestre: {{ semestre_atual }})
       </h3>
-      <p class="text-[10px] text-slate-400">Selecione os docentes para os quais deseja criar a justificativa em lote.</p>
+      <p class="text-[10px] text-slate-400">Os docentes com pendência aparecem primeiro. Selecione os docentes para criar a justificativa em lote.</p>
     </div>
 
     <div class="mb-6 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -41,7 +41,7 @@
         <thead>
           <tr class="bg-slate-50 text-[10px] font-black text-[#025c9f] uppercase tracking-widest border-b border-slate-100">
             <th class="px-5 py-3 w-12 text-center">
-              <input type="checkbox" onclick="document.querySelectorAll('.prof-checkbox').forEach(c => c.checked = this.checked)" class="rounded text-[#025c9f] focus:ring-[#025c9f] cursor-pointer">
+              <input type="checkbox" title="Selecionar todos os docentes com pendência" aria-label="Selecionar todos os docentes com pendência" onclick="document.querySelectorAll('.prof-checkbox[data-pendente=&quot;1&quot;]').forEach(c => c.checked = this.checked)" class="rounded text-[#025c9f] focus:ring-[#025c9f] cursor-pointer">
             </th>
             <th class="px-5 py-3">Docente</th>
             <th class="px-5 py-3 text-center">ID</th>
@@ -52,25 +52,30 @@
           {% for prof in professores %}
           <tr class="hover:bg-slate-50/50 transition-colors">
             <td class="px-3 py-3 text-center sm:px-5" data-label="Selecionar">
-              <input type="checkbox" name="professor_id" value="{{ prof.pk }}" class="prof-checkbox rounded border-slate-300 text-[#025c9f] focus:ring-[#025c9f] cursor-pointer">
+              <input type="checkbox" name="professor_id" value="{{ prof.pk }}" data-pendente="{% if prof.tem_pendencia_ch %}1{% else %}0{% endif %}" class="prof-checkbox rounded border-slate-300 text-[#025c9f] focus:ring-[#025c9f] cursor-pointer">
             </td>
             <td class="px-3 py-3 sm:px-5">
               <span class="text-sm font-bold text-[#025c9f]">{{ prof.nome }}</span>
+              {% if prof.readaptado_vigente %}
+              <span class="ml-1 inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-black uppercase text-violet-700" title="Readaptado: não é cobrado por carga horária">Readaptado</span>
+              {% elif not prof.tem_pendencia_ch %}
+              <span class="ml-1 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black uppercase text-emerald-700" title="CH em sala completa">Sem pendência</span>
+              {% endif %}
             </td>
             <td class="px-3 py-3 text-center sm:px-5" data-label="ID">
               <span class="text-xs text-slate-500">ID: {{ prof.id_funcional }}</span>
             </td>
             <td class="px-3 py-3 text-center sm:px-5" data-label="CH Alocada / Meta">
-              <span class="text-xs font-bold text-amber-600">{{ prof.ch_alocada|hhmm }}</span>
+              <span class="text-xs font-bold {% if prof.tem_pendencia_ch %}text-amber-600{% else %}text-emerald-600{% endif %}">{{ prof.ch_alocada_lote|hhmm }}</span>
               <span class="text-xs text-slate-400 mx-1">/</span>
-              <span class="text-xs font-bold text-slate-700">{{ prof.meta_horas_sala|default:20 }}h</span>
+              <span class="text-xs font-bold text-slate-700">{{ prof.meta_lote|hhmm }}</span>
             </td>
           </tr>
           {% empty %}
           <tr>
             <td colspan="4" class="px-5 py-8 text-center text-slate-400">
               <i class="ph ph-check-circle text-3xl mb-2 text-emerald-300"></i>
-              <p class="text-xs font-bold">Nenhum docente da unidade possui pendência.</p>
+              <p class="text-xs font-bold">Nenhum docente cadastrado na unidade.</p>
             </td>
           </tr>
           {% endfor %}

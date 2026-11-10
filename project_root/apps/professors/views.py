@@ -79,18 +79,20 @@ def enriquecer_professores_com_carga(professores, unidade_atual=None):
         ch_justificada_total = ch_justificada_map.get(prof.pk, 0.0)
         prof.ch_alocada_total = ch_alocada_total
         prof.ch_justificada_total = ch_justificada_total
-        prof.soma_horas = ch_alocada_total + ch_justificada_total
+        # Redução da equipe diretiva (definida pela DESUP) conta como hora já
+        # cumprida: entra na soma e, por isso, a meta comparada é a base
+        # (sem desconto), senão a redução seria abatida duas vezes.
+        prof.reducao_diretiva = prof.reducao_carga_vigente
+        prof.soma_horas = ch_alocada_total + ch_justificada_total + prof.reducao_diretiva
         # "Não alocado" é a sobra de horas EM SALA (max_class_hours do
         # contrato — ex.: 20h de um contrato de 40h), não do total do
         # contrato (ch_total/max_total_hours). Usar ch_total aqui inflava
         # o saldo (ex.: professor 40h com 6h em sala aparecia com 34h de
         # sobra em vez de 14h) — mesma meta já usada em
         # extra_curricular/services.py (get_pendencias_data).
-        meta_horas = prof.meta_horas_sala
+        meta_horas = 0.0 if prof.readaptado_vigente else prof.meta_horas_base_sala
         prof.ch_nao_alocada_total = max(meta_horas - prof.soma_horas, 0)
-        # Redução da equipe diretiva (definida pela DESUP) conta como alocação:
-        # sem isso, um diretivo cuja redução zera a meta aparecia "Sem alocação".
-        prof.reducao_diretiva = prof.reducao_carga_vigente
+        prof.acima_ch = meta_horas > 0 and prof.soma_horas > meta_horas
         if meta_horas:
             prof.percentual_alocado_total = round(min((prof.soma_horas / meta_horas) * 100, 100.0), 2)
         else:
@@ -135,7 +137,7 @@ def enriquecer_professores_com_carga(professores, unidade_atual=None):
                     chave = (
                         comp.componente_curricular_id
                         if comp.compartilhado
-                        else f'{comp.matriz_id}-{comp.pk}'
+                        else f'{comp.matriz_id}-{comp.pk}-{linha.pk}'
                     )
                     if chave in vistos_por_prof[prof_id]:
                         continue
@@ -172,6 +174,16 @@ def detalhar_alocacoes_professores(professores, user=None):
     if not ids:
         return professores
 
+    # Numeração das turmas: ordem de criação das linhas de cada componente
+    # (considera todos os docentes, não só os listados).
+    numero_turma = {}
+    contador = {}
+    for lid, cid in alocacoes_vigentes().filter(
+        componente_matriz_id__in=alocacoes_vigentes().filter(docente_id__in=ids).values('componente_matriz_id'),
+    ).order_by('pk').values_list('pk', 'componente_matriz_id'):
+        contador[cid] = contador.get(cid, 0) + 1
+        numero_turma[lid] = contador[cid]
+
     vistos = {}
     linhas = alocacoes_vigentes().filter(docente_id__in=ids).select_related(
         'alocacao_curricular__unidade',
@@ -180,7 +192,7 @@ def detalhar_alocacoes_professores(professores, user=None):
     ).order_by('alocacao_curricular__unidade__sigla', 'componente_matriz__periodo')
     for linha in linhas:
         comp = linha.componente_matriz
-        chave = comp.componente_curricular_id if comp.compartilhado else comp.pk
+        chave = comp.componente_curricular_id if comp.compartilhado else ('linha', linha.pk)
         vistos.setdefault(linha.docente_id, set())
         if chave in vistos[linha.docente_id]:
             continue
@@ -190,7 +202,10 @@ def detalhar_alocacoes_professores(professores, user=None):
         por_id[linha.docente_id].detalhe_alocacao.append({
             'unidade': linha.alocacao_curricular.unidade.sigla,
             'atividade': comp.nome_disciplina or '—',
-            'turma': linha.turma.identificador if linha.turma_id else '—',
+            'turma': (
+                linha.turma.identificador if linha.turma_id
+                else f'Turma {numero_turma.get(linha.pk, 1)}'
+            ),
             'manha': horas if turno == 'M' else None,
             'tarde': horas if turno == 'T' else None,
             'noite': horas if turno == 'N' else None,

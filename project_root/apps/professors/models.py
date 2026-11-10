@@ -397,7 +397,7 @@ class Professor(models.Model):
                 chave = (
                     comp.componente_curricular_id
                     if comp.compartilhado
-                    else comp.pk
+                    else ("linha", linha.pk)
                 )
                 if chave in vistos:
                     continue

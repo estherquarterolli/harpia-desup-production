@@ -494,3 +494,72 @@ def passos_resolvidos(conteudo):
         alvo = [s for s in (resolver_alvo(item) for item in passo['alvo']) if s]
         resolvidos.append({**passo, 'alvo': alvo})
     return resolvidos
+
+
+# ── Ajuda genérica ──────────────────────────────────────────────────────────
+# Telas sem tutorial guiado próprio (formulários, detalhes, perfil etc.) também
+# recebem o "?": um resumo do que a tela faz, com passos que não dependem de
+# elementos específicos (o popup aparece centralizado). Telas com entrada em
+# AJUDA_PAGINAS / AJUDA_PAGINAS_COORDENADOR continuam usando o tutorial guiado.
+
+_AJUDA_TELAS = {
+    'profile': ('Meu perfil', 'Dados da sua conta e acesso à troca de senha.'),
+    'password_change': ('Alterar senha', 'Troca da senha de acesso. Você receberá uma confirmação por e-mail.'),
+    'desup_user_create': ('Criar usuário', 'Cadastro de uma nova conta. O usuário recebe um e-mail com o login e a senha padrão e deve trocá-la no primeiro acesso.'),
+    'dashboard': ('Dashboard', 'Visão geral do sistema para o seu perfil.'),
+    'core:unidade_create': ('Nova unidade', 'Cadastro de uma unidade de ensino com nome e sigla.'),
+    'core:unidade_update': ('Editar unidade', 'Correção dos dados e da situação da unidade.'),
+    'core:curso_list': ('Cursos da unidade', 'Cursos vinculados à unidade selecionada.'),
+    'core:curso_create': ('Novo curso', 'Cadastro de um curso na unidade.'),
+    'core:curso_update': ('Editar curso', 'Correção dos dados do curso.'),
+    'core:janela_create': ('Nova janela de entrega', 'Define o período em que as unidades podem registrar informações.'),
+    'core:janela_update': ('Editar janela de entrega', 'Ajuste de período e situação da janela de entrega.'),
+    'core:cargo_diretivo_create': ('Novo cargo diretivo', 'Cadastro de cargo da equipe diretiva e da redução de carga associada.'),
+    'core:cargo_diretivo_update': ('Editar cargo diretivo', 'Ajuste dos dados do cargo e da redução de carga.'),
+    'core:cargo_diretivo_unidade_update': ('Editar cargo na unidade', 'Ajuste do cargo e da redução de carga para esta unidade.'),
+    'core:ocupacao_diretiva_create': ('Preencher cargo', 'Registro de quem ocupa o cargo diretivo e a vigência.'),
+    'core:ocupacao_diretiva_update': ('Editar ocupação', 'Ajuste de ocupante, vigência e redução de carga.'),
+    'core:ocupacao_diretiva_unidade_create': ('Preencher cargo', 'Registro de quem ocupa o cargo diretivo da unidade.'),
+    'core:ocupacao_diretiva_unidade_update': ('Editar ocupação', 'Ajuste de ocupante e vigência do cargo.'),
+    'core:atividade_estagio_create': ('Nova atividade de estágio', 'Registro de orientação, supervisão ou coordenação de estágio.'),
+    'core:atividade_estagio_update': ('Editar atividade de estágio', 'Ajuste dos dados da atividade de estágio.'),
+    'core:limite_carga_create': ('Novo limite de carga', 'Definição de limite de carga para uma unidade.'),
+    'core:limite_carga_update': ('Editar limite de carga', 'Ajuste do limite de carga de uma unidade.'),
+    'core:readaptacao_create': ('Nova readaptação', 'Registro de readaptação de professor, que deixa de ser cobrado por carga horária.'),
+    'core:readaptacao_update': ('Editar readaptação', 'Ajuste do período de readaptação.'),
+    'courses:matrix_create': ('Nova matriz curricular', 'Montagem de uma matriz com seus componentes curriculares.'),
+    'courses:matrix_detail': ('Matriz curricular', 'Consulta dos componentes, carga horária e vigência da matriz.'),
+    'courses:matrix_update': ('Editar matriz curricular', 'Ajuste dos dados e dos componentes da matriz.'),
+    'courses:classgroup_list': ('Turmas', 'Turmas cadastradas.'),
+    'courses:classgroup_create': ('Nova turma', 'Cadastro de turma.'),
+    'courses:component_create': ('Novo componente', 'Cadastro de componente curricular.'),
+    'courses:component_import': ('Importar componentes', 'Importação de componentes curriculares a partir de arquivo.'),
+    'courses:component_edit': ('Editar componente', 'Ajuste dos dados do componente curricular.'),
+    'professors:professor_create': ('Novo professor', 'Cadastro de professor com contrato, unidade e carga horária.'),
+    'professors:professor_solicitar_cadastro': ('Solicitar cadastro de professor', 'Pedido à DESUP para cadastrar um professor novo.'),
+    'professors:professor_solicitar_cessao': ('Solicitar professor de outra unidade', 'Pedido de cessão de professor de outra unidade.'),
+    'professors:professor_detail': ('Detalhes do professor', 'Dados, alocações e cargas do professor.'),
+    'professors:professor_update': ('Editar professor', 'Ajuste dos dados cadastrais do professor.'),
+    'extra_curricular:pendencia_create': ('Nova justificativa', 'Lista todos os docentes do semestre — os com pendência aparecem primeiro — para criar justificativas em lote.'),
+    'extra_curricular:pendencia_lote': ('Justificativas em lote', 'Preenchimento de TCC, extensão, redução e licença para vários docentes de uma vez.'),
+    'extra_curricular:pendencia_detail': ('Justificativa do docente', 'Itens de justificativa, SEI, status e parecer da DESUP para o docente.'),
+    'extra_curricular:atividade_estagio_create': ('Nova atividade de estágio', 'Registro de atividade de estágio ou supervisão.'),
+    'extra_curricular:atividade_estagio_update': ('Editar atividade de estágio', 'Ajuste da atividade de estágio ou supervisão.'),
+}
+
+
+def ajuda_generica(view_name):
+    """Ajuda resumida para telas sem tutorial guiado; sempre devolve um conteúdo."""
+    titulo, resumo = _AJUDA_TELAS.get(view_name, (
+        'Ajuda da página', 'Esta tela faz parte do fluxo do Harpia-DESUP.',
+    ))
+    return {
+        'titulo': titulo,
+        'resumo': resumo,
+        'funcionalidades': [resumo],
+        'passos': [
+            _passo('Título da página', 'O título no topo indica onde você está. Use o menu lateral para trocar de área.', ['#topbar h1']),
+            _passo('Preencha ou consulte', 'Use os campos e botões desta tela. Campos obrigatórios são validados antes de salvar e mensagens de erro indicam o que corrigir.', ['main form', 'main table', 'main']),
+            _passo('Precisa de mais ajuda?', 'Abra o "?" das telas principais, no menu lateral, para ver o tutorial guiado de cada uma.', []),
+        ],
+    }

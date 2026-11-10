@@ -76,6 +76,8 @@
                     <div class="prof-status">
                         {% if prof.soma_horas <= 0 and not prof.reducao_diretiva %}
                         <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-red-100 px-3 py-1.5 text-xs font-black text-red-700"><i class="ph-fill ph-x-circle" aria-hidden="true"></i>Sem alocação</span>
+                        {% elif prof.acima_ch %}
+                        <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-orange-100 px-3 py-1.5 text-xs font-black text-orange-700"><i class="ph-fill ph-arrow-circle-up" aria-hidden="true"></i>Acima da CH</span>
                         {% elif prof.ch_nao_alocada_total <= 0 %}
                         <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-black text-emerald-700"><i class="ph-fill ph-check-circle" aria-hidden="true"></i>Alocado</span>
                         {% else %}

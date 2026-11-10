@@ -152,13 +152,8 @@ class AlocacaoTurmaDocente(models.Model):
                 fields=['alocacao_curricular', 'componente_matriz', 'turma', 'docente'],
                 name='harpia_alocturmadocente_unica',
             ),
-            # Em SQL, NULL não colide em UNIQUE: sem este índice parcial seria
-            # possível duplicar a oferta "sem turma" do mesmo docente.
-            models.UniqueConstraint(
-                fields=['alocacao_curricular', 'componente_matriz', 'docente'],
-                condition=models.Q(turma__isnull=True),
-                name='harpia_alocturmadocente_unica_sem_turma',
-            ),
+            # Sem turma definida, o mesmo docente pode assumir mais de uma turma
+            # do componente (NULL não colide em UNIQUE).
         ]
 
     def __str__(self):

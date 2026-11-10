@@ -386,20 +386,21 @@ class PendenciaCreateView(LoginRequiredMixin, PerfilRequiredMixin, View):
         if blocked:
             return blocked
 
-        professor_ids = request.POST.getlist("professor_id")
-        
+        # Só ids numéricos: "abc" no POST virava ValueError em get_object_or_404 (HTTP 500).
+        professor_ids = [i for i in request.POST.getlist("professor_id") if i.isdigit()]
+
         if not professor_ids:
             messages.error(request, "Selecione pelo menos um professor válido.")
             return redirect("extra_curricular:pendencia_create")
-            
+
         created_count = 0
         last_pendencia = None
 
         for prof_id in professor_ids:
-            professor = get_object_or_404(Professor, pk=prof_id)
-            
-            if professor.unidade_principal != user.unidade:
-                continue # Pula se for de outra unidade por segurança
+            professor = Professor.objects.filter(pk=prof_id).first()
+
+            if professor is None or professor.unidade_principal != user.unidade:
+                continue # Pula inexistente ou de outra unidade por segurança
 
             pendencia, created = PendenciaExtra.objects.get_or_create(
                 professor=professor,

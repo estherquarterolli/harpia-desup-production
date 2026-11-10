@@ -1026,12 +1026,12 @@ class LinhasDeDocenteETurmasE2ETests(AlocacaoE2EBase):
         self.assertEqual(Carencia.objects.count(), 1)
         self.assertNotEqual(r2.json()['linha_id'], r3.json()['linha_id'])
 
-    def test_mesmo_docente_nao_pode_repetir_no_componente(self):
+    def test_mesmo_docente_pode_assumir_mais_de_uma_turma_do_componente(self):
         self._post(self.comp_algoritmos, {'docente_id': self.prof_a1.pk})
         resposta = self._post(self.comp_algoritmos, {'docente_id': self.prof_a1.pk, 'linha_id': 'novo'})
 
-        self.assertEqual(resposta.status_code, 409)
-        self.assertEqual(self._linhas(self.comp_algoritmos).count(), 1)
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(self._linhas(self.comp_algoritmos).count(), 2)
 
     def test_remover_linha_adicional(self):
         self._post(self.comp_algoritmos, {'docente_id': self.prof_a1.pk})
@@ -1215,16 +1215,14 @@ class AlocacaoTurmaDocenteModeloTests(AlocacaoE2EBase):
         with self.assertRaises(IntegrityError), transaction.atomic():
             AlocacaoTurmaDocente.objects.create(**dados)
 
-    def test_unicidade_sem_turma(self):
-        from django.db import IntegrityError, transaction
-
+    def test_mesmo_docente_sem_turma_pode_repetir(self):
         dados = dict(
             alocacao_curricular=self._alocacao(), componente_matriz=self.comp_algoritmos,
             turma=None, docente=self.prof_a1,
         )
         AlocacaoTurmaDocente.objects.create(**dados)
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            AlocacaoTurmaDocente.objects.create(**dados)
+        AlocacaoTurmaDocente.objects.create(**dados)
+        self.assertEqual(AlocacaoTurmaDocente.objects.filter(docente=self.prof_a1).count(), 2)
 
     def test_carencia_e_um_para_um_e_rat_referencia_carencia(self):
         from django.db import IntegrityError, transaction
