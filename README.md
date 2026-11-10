@@ -55,6 +55,9 @@ python manage.py makemigrations --check --dry-run
 
 ## Produção
 
+A configuração e o fluxo da Central de Ajuda estão em [doc/central-ajuda.md](doc/central-ajuda.md).
+O envio requer `HARPIA_SUPPORT_EMAIL` e as configurações de e-mail do Django.
+
 Use `config.settings.production`. O deploy deve executar `collectstatic` e
 `migrate`; as configurações versionadas já incluem essas etapas para Vercel,
 Render e processos compatíveis com o `Procfile`.
