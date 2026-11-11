@@ -19,7 +19,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='professor',
             name='vinculo_empregaticio',
-            field=models.CharField(blank=True, choices=[('EFETIVO', 'Efetivo'), ('CONTR TEMPORARIO', 'Contrato temporário'), ('CARGO COMISSAO', 'Cargo em comissão'), ('REQUISICAO INTERNA', 'Requisição interna'), ('CEDIDO', 'Cedido')], default='', help_text='Vínculo individual do professor, independente do cargo.', max_length=30, verbose_name='Vínculo empregatício'),
+            field=models.CharField(blank=True, choices=[('EFETIVO', 'Efetivo'), ('CONTR TEMPORARIO', 'Contrato temporário'), ('CARGO COMISSAO', 'Cargo em comissão'), ('REQUISICAO INTERNA', 'Requisição interna'), ('REQUISICAO EXTERNA', 'Requisição externa'), ('CEDIDO', 'Cedido')], default='', help_text='Vínculo individual do professor, independente do cargo.', max_length=30, verbose_name='Vínculo empregatício'),
         ),
         migrations.RunPython(criar_cargo, migrations.RunPython.noop),
     ]
