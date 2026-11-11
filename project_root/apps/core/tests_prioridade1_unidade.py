@@ -230,6 +230,79 @@ class Prioridade1UnidadeTests(TestCase):
         self.assertNotIn("unidade", form_estagio.fields)
         self.assertEqual(list(form_estagio.fields["curso"].queryset), [self.curso_unid_a])
 
+    def test_coordenacao_exibe_todos_ou_checklist_de_cursos(self):
+        form = OcupacaoEquipeDiretivaUnidadeForm(
+            unidade=self.unidade_a,
+            cargo=self.cargo_coord_curso,
+        )
+
+        self.assertEqual(
+            list(form.fields['abrangencia_cursos'].choices),
+            [('TODOS', 'Todos os cursos'), ('ESPECIFICOS', 'Cursos específicos')],
+        )
+        self.assertIn('cursos', form.fields)
+        self.assertTrue(form.fields['curso'].widget.is_hidden)
+
+        self.client.force_login(self.coord_a)
+        painel = self.client.get(reverse('core:equipe_diretiva_unidade'))
+        self.assertContains(painel, 'Todos os cursos')
+        self.assertContains(painel, 'Cursos específicos')
+        self.assertContains(painel, 'data-cursos-especificos')
+
+        invalido = self.client.post(
+            reverse('core:ocupacao_diretiva_unidade_create', args=[self.cargo_coord_curso.pk]),
+            {
+                'professor': self.prof_a.pk,
+                'abrangencia_cursos': 'ESPECIFICOS',
+                'data_inicio': self.hoje.isoformat(),
+            },
+        )
+        self.assertEqual(invalido.status_code, 200)
+        self.assertContains(invalido, 'Selecione ao menos um curso.')
+
+    def test_coordenador_pode_vincular_todos_os_cursos_e_adicionar_outro_coordenador(self):
+        curso_2 = Course.objects.create(nome='Gestão Pública', sigla='GP')
+        curso_unid_2 = CourseUnit.objects.create(
+            curso=curso_2, unidade=self.unidade_a, ativo=True,
+        )
+        self.assertTrue(self.cargo_coord_curso.permite_multiplos)
+        self.client.force_login(self.coord_a)
+        url = reverse('core:ocupacao_diretiva_unidade_create', args=[self.cargo_coord_curso.pk])
+
+        resposta = self.client.post(url, {
+            'professor': self.prof_a.pk,
+            'abrangencia_cursos': 'TODOS',
+            'data_inicio': self.hoje.isoformat(),
+        })
+        self.assertRedirects(resposta, reverse('core:equipe_diretiva_unidade'))
+        self.assertEqual(
+            set(OcupacaoEquipeDiretiva.objects.filter(
+                cargo=self.cargo_coord_curso, professor=self.prof_a,
+            ).values_list('curso_id', flat=True)),
+            {self.curso_unid_a.pk, curso_unid_2.pk},
+        )
+
+        resposta = self.client.post(url, {
+            'professor': self.prof_a2.pk,
+            'abrangencia_cursos': 'ESPECIFICOS',
+            'cursos': [self.curso_unid_a.pk],
+            'data_inicio': self.hoje.isoformat(),
+        })
+        self.assertRedirects(resposta, reverse('core:equipe_diretiva_unidade'))
+        self.assertTrue(OcupacaoEquipeDiretiva.objects.filter(
+            cargo=self.cargo_coord_curso,
+            professor=self.prof_a2,
+            curso=self.curso_unid_a,
+        ).exists())
+
+        painel = self.client.get(reverse('core:equipe_diretiva_unidade'))
+        item = next(
+            item for item in painel.context['composicao']
+            if item['cargo'] == self.cargo_coord_curso
+        )
+        self.assertTrue(item['pode_adicionar'])
+        self.assertEqual(len(item['ocupantes']), 3)
+
     # ------------------------------------------------------------------
     # 3. Testes de Autorização e Escopo nas Views
     # ------------------------------------------------------------------

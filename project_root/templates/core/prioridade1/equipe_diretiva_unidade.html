@@ -321,6 +321,16 @@
   function abrirModal(id) { var m = document.getElementById(id); if (m) m.classList.remove('hidden'); }
   function fecharModal(id) { var m = document.getElementById(id); if (m) m.classList.add('hidden'); }
   function trocarModal(de, para) { fecharModal(de); abrirModal(para); }
+  document.querySelectorAll('[data-abrangencia-cursos]').forEach(function (grupo) {
+    var form = grupo.closest('form');
+    var checklist = form && form.querySelector('[data-cursos-especificos]');
+    function atualizarCursos() {
+      var selecionado = grupo.querySelector('input:checked');
+      if (checklist) checklist.classList.toggle('hidden', !selecionado || selecionado.value !== 'ESPECIFICOS');
+    }
+    grupo.addEventListener('change', atualizarCursos);
+    atualizarCursos();
+  });
   document.querySelectorAll('.modal-equipe').forEach(function (m) {
     m.addEventListener('click', function (e) { if (e.target === m) m.classList.add('hidden'); });
   });
