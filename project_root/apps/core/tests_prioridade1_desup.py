@@ -95,10 +95,11 @@ class Prioridade1DesupTests(TestCase):
 
         form = OcupacaoEquipeDiretivaForm(unidade=self.origem, cargo=cargo)
 
-        self.assertTrue(form.fields["curso"].required)
-        self.assertEqual(list(form.fields["curso"].queryset), [curso_unidade])
-        self.assertEqual(form.fields["curso"].label, "Curso")
-        self.assertIn("curso ativo desta unidade", form.fields["curso"].help_text)
+        self.assertFalse(form.fields["curso"].required)
+        self.assertTrue(form.fields["curso"].widget.is_hidden)
+        self.assertEqual(list(form.fields["cursos"].queryset), [curso_unidade])
+        self.assertEqual(form.fields["abrangencia_cursos"].initial, "TODOS")
+        self.assertIn("Marque um ou mais cursos", form.fields["cursos"].help_text)
 
     def test_formulario_informa_quando_unidade_nao_tem_curso_ativo(self):
         from .forms import OcupacaoEquipeDiretivaForm
@@ -111,8 +112,37 @@ class Prioridade1DesupTests(TestCase):
 
         form = OcupacaoEquipeDiretivaForm(unidade=self.origem, cargo=cargo)
 
-        self.assertEqual(form.fields["curso"].queryset.count(), 0)
-        self.assertIn("Nenhum curso ativo cadastrado", form.fields["curso"].help_text)
+        self.assertEqual(form.fields["cursos"].queryset.count(), 0)
+        self.assertIn("Nenhum curso ativo cadastrado", form.fields["cursos"].help_text)
+
+    def test_desup_preenche_coordenacao_para_cursos_especificos_em_um_envio(self):
+        cargo = TipoCargoDiretivo.objects.get(codigo='COORDENACAO_DE_CURSO')
+        curso_a = Course.objects.create(nome='Curso Checklist A', sigla='CCA')
+        curso_b = Course.objects.create(nome='Curso Checklist B', sigla='CCB')
+        vinculo_a = CourseUnit.objects.create(curso=curso_a, unidade=self.origem)
+        vinculo_b = CourseUnit.objects.create(curso=curso_b, unidade=self.origem)
+        self.client.force_login(self.desup)
+
+        resposta = self.client.post(
+            reverse('core:ocupacao_diretiva_create', args=[self.origem.pk, cargo.pk]),
+            {
+                'professor': self.professor.pk,
+                'abrangencia_cursos': 'ESPECIFICOS',
+                'cursos': [vinculo_a.pk, vinculo_b.pk],
+                'data_inicio': self.hoje.isoformat(),
+            },
+        )
+
+        self.assertRedirects(
+            resposta,
+            f"{reverse('core:equipe_diretiva_desup')}?unidade_id={self.origem.pk}",
+        )
+        self.assertEqual(
+            set(OcupacaoEquipeDiretiva.objects.filter(
+                cargo=cargo, professor=self.professor,
+            ).values_list('curso_id', flat=True)),
+            {vinculo_a.pk, vinculo_b.pk},
+        )
 
     def test_configuracao_de_cargo_nao_exibe_ordem_ou_catalogo_de_cursos(self):
         curso = Course.objects.create(nome="Curso Oculto", sigla="CO")

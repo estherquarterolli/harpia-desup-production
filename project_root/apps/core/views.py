@@ -1159,6 +1159,30 @@ class TipoCargoDiretivoDeleteView(DesupPrioridade1Mixin, View):
         return HttpResponseRedirect(reverse_lazy('core:equipe_diretiva_desup'))
 
 
+def _criar_ocupacoes_diretivas_dos_demais_cursos(ocupacao_base, form):
+    """Replica a ocupação validada para os demais cursos do checklist."""
+    from .models import OcupacaoEquipeDiretiva
+
+    criadas = [ocupacao_base]
+    for curso in getattr(form, 'cursos_selecionados', [])[1:]:
+        ocupacao = OcupacaoEquipeDiretiva(
+            unidade=ocupacao_base.unidade,
+            cargo=ocupacao_base.cargo,
+            professor=ocupacao_base.professor,
+            curso=curso,
+            data_inicio=ocupacao_base.data_inicio,
+            data_fim=ocupacao_base.data_fim,
+            carga_reducao_horas=ocupacao_base.carga_reducao_horas,
+            observacoes=ocupacao_base.observacoes,
+            reducao_personalizada=ocupacao_base.reducao_personalizada,
+            criado_por=ocupacao_base.criado_por,
+        )
+        ocupacao.full_clean()
+        ocupacao.save()
+        criadas.append(ocupacao)
+    return criadas
+
+
 class OcupacaoEquipeDiretivaCreateView(DesupPrioridade1Mixin, CreateView):
     from .forms import OcupacaoEquipeDiretivaForm
     from .models import OcupacaoEquipeDiretiva
@@ -1194,18 +1218,26 @@ class OcupacaoEquipeDiretivaCreateView(DesupPrioridade1Mixin, CreateView):
         return ctx
 
     def form_valid(self, form):
+        from django.db import transaction
         from .services import obter_reducao_cargo_unidade, registrar_evento_prioridade1
         form.instance.criado_por = self.request.user
         form.instance.carga_reducao_horas = obter_reducao_cargo_unidade(self.cargo, self.unidade)
         form.instance.reducao_personalizada = False
-        response = super().form_valid(form)
-        registrar_evento_prioridade1(
+        with transaction.atomic():
+            response = super().form_valid(form)
+            criadas = _criar_ocupacoes_diretivas_dos_demais_cursos(self.object, form)
+            registrar_evento_prioridade1(
+                self.request,
+                'OCUPACAO_DIRETIVA_CRIADA',
+                f'Ocupações {", ".join(str(item.pk) for item in criadas)}; '
+                f'unidade {self.unidade.pk}; cargo {self.cargo.pk}; '
+                f'redução semanal {self.object.carga_reducao_horas} h.',
+            )
+        messages.success(
             self.request,
-            'OCUPACAO_DIRETIVA_CRIADA',
-            f'Ocupação {self.object.pk}; unidade {self.unidade.pk}; cargo {self.cargo.pk}; '
-            f'redução semanal {self.object.carga_reducao_horas} h.',
+            'Cargo preenchido com sucesso.' if len(criadas) == 1
+            else f'Coordenador vinculado com sucesso a {len(criadas)} cursos.',
         )
-        messages.success(self.request, 'Cargo preenchido com sucesso.')
         return response
 
 
@@ -1850,11 +1882,14 @@ class OcupacaoEquipeDiretivaUnidadeCreateView(UnidadePrioridade1Mixin, RetornoOr
         ctx.update({
             'titulo': f'Preencher {self.cargo.nome} — {self.unidade.sigla}',
             'subtitulo': 'A carga horária de redução semanal é definida exclusivamente pela DESUP.',
-            'cancel_url': self.get_success_url(),
+            # Em POST inválido ainda não existe ``self.object``; usar a URL
+            # fixa evita que o mixin de retorno tente formatar um objeto nulo.
+            'cancel_url': self.success_url,
         })
         return ctx
 
     def form_valid(self, form):
+        from django.db import transaction
         from .services import registrar_evento_prioridade1
 
         form.instance.unidade = self.unidade
@@ -1864,14 +1899,21 @@ class OcupacaoEquipeDiretivaUnidadeCreateView(UnidadePrioridade1Mixin, RetornoOr
         # Garantia no servidor: a unidade recebe o padrão definido pela DESUP.
         form.instance.carga_reducao_horas = obter_reducao_cargo_unidade(self.cargo, self.unidade)
         form.instance.reducao_personalizada = False
-        response = super().form_valid(form)
-        registrar_evento_prioridade1(
+        with transaction.atomic():
+            response = super().form_valid(form)
+            criadas = _criar_ocupacoes_diretivas_dos_demais_cursos(self.object, form)
+            registrar_evento_prioridade1(
+                self.request,
+                'OCUPACAO_DIRETIVA_UNIDADE_CRIADA',
+                f'Ocupações {", ".join(str(item.pk) for item in criadas)}; '
+                f'unidade {self.unidade.pk}; cargo {self.cargo.pk}; '
+                f'professor {self.object.professor_id}.',
+            )
+        messages.success(
             self.request,
-            'OCUPACAO_DIRETIVA_UNIDADE_CRIADA',
-            f'Ocupação {self.object.pk}; unidade {self.unidade.pk}; cargo {self.cargo.pk}; '
-            f'professor {self.object.professor_id}.',
+            'Ocupante registrado com sucesso na equipe diretiva.' if len(criadas) == 1
+            else f'Coordenador vinculado com sucesso a {len(criadas)} cursos.',
         )
-        messages.success(self.request, 'Ocupante registrado com sucesso na equipe diretiva.')
         return response
 
 

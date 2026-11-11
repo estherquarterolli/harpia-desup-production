@@ -130,12 +130,11 @@ class JanelaEntregaForm(JanelaEntregaValidacaoMixin, forms.ModelForm):
 class TipoCargoDiretivoForm(forms.ModelForm):
     class Meta:
         model = TipoCargoDiretivo
-        fields = ["nome", "carga_reducao_horas", "exige_curso", "permite_multiplos", "ativo"]
+        fields = ["nome", "carga_reducao_horas", "exige_curso", "ativo"]
         widgets = {
             "nome": forms.TextInput(attrs={"class": _INPUT_CSS}),
             "carga_reducao_horas": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": "0", "max": "20", "step": "0.25"}),
             "exige_curso": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
-            "permite_multiplos": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
             "ativo": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
         }
 
@@ -144,7 +143,7 @@ class TipoCargoDiretivoUpdateForm(TipoCargoDiretivoForm):
     """A edição do catálogo não recebe a redução específica da unidade."""
 
     class Meta(TipoCargoDiretivoForm.Meta):
-        fields = ["nome", "exige_curso", "permite_multiplos", "ativo"]
+        fields = ["nome", "exige_curso", "ativo"]
 
 
 class TipoCargoDiretivoUnidadeForm(TipoCargoDiretivoUpdateForm):
@@ -166,7 +165,7 @@ class TipoCargoDiretivoUnidadeForm(TipoCargoDiretivoUpdateForm):
             'Esta redução vale somente para a unidade selecionada. '
             'Reduções individuais são preservadas.'
         )
-        self.order_fields(['nome', 'carga_reducao_unidade', 'exige_curso', 'permite_multiplos', 'ativo'])
+        self.order_fields(['nome', 'carga_reducao_unidade', 'exige_curso', 'ativo'])
 
 
 class OpcoesOcupacaoEquipeDiretiva:
@@ -206,7 +205,115 @@ class ConfiguracaoCargoDiretivoUnidadeForm(forms.ModelForm):
         }
 
 
-class OcupacaoEquipeDiretivaForm(forms.ModelForm):
+class CursosOcupacaoDiretivaMixin:
+    TODOS_OS_CURSOS = 'TODOS'
+    CURSOS_ESPECIFICOS = 'ESPECIFICOS'
+
+    def _configurar_cursos(self, *, unidade, cargo, opcoes=None):
+        from apps.courses.models import CourseUnit
+
+        if not cargo.exige_curso:
+            del self.fields['curso']
+            return
+
+        cursos_unidade = CourseUnit.objects.filter(
+            unidade=unidade, ativo=True,
+        ).select_related('curso', 'unidade').order_by('curso__nome')
+        self.fields['curso'].queryset = cursos_unidade
+
+        # Na edição mantemos o vínculo unitário existente. O checklist é
+        # usado no preenchimento para criar, em uma única operação, uma
+        # ocupação por curso selecionado.
+        if self.instance.pk:
+            self.fields['curso'].required = True
+            self.fields['curso'].queryset = cursos_unidade
+            if opcoes is not None:
+                self.fields['curso'].choices = [('', self.fields['curso'].empty_label), *opcoes.cursos]
+            self.fields['curso'].label = 'Curso'
+            self.fields['curso'].help_text = 'Selecione um curso ativo desta unidade.'
+            return
+
+        self.fields['curso'].required = False
+        self.fields['curso'].widget = forms.HiddenInput()
+        self.fields['abrangencia_cursos'] = forms.ChoiceField(
+            label='Cursos atendidos',
+            choices=(
+                (self.TODOS_OS_CURSOS, 'Todos os cursos'),
+                (self.CURSOS_ESPECIFICOS, 'Cursos específicos'),
+            ),
+            initial=self.TODOS_OS_CURSOS,
+            required=False,
+            widget=forms.RadioSelect(attrs={'data-abrangencia-cursos': 'true'}),
+        )
+        self.fields['cursos'] = forms.ModelMultipleChoiceField(
+            label='Selecione os cursos',
+            queryset=cursos_unidade,
+            required=False,
+            widget=forms.CheckboxSelectMultiple(attrs={'data-checklist-cursos': 'true'}),
+            help_text=(
+                'Marque um ou mais cursos desta unidade.'
+                if (bool(opcoes.cursos) if opcoes is not None else cursos_unidade.exists())
+                else 'Nenhum curso ativo cadastrado nesta unidade. Cadastre ou ative um curso antes de preencher este cargo.'
+            ),
+        )
+        if opcoes is not None:
+            self.fields['cursos'].choices = opcoes.cursos
+        self.order_fields([
+            'professor', 'abrangencia_cursos', 'cursos', 'curso',
+            'data_inicio', 'data_fim', 'observacoes',
+        ])
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not self.instance.cargo_id or not self.instance.cargo.exige_curso or self.instance.pk:
+            return cleaned_data
+
+        abrangencia = cleaned_data.get('abrangencia_cursos')
+        curso_legado = cleaned_data.get('curso')
+        if not abrangencia and curso_legado:
+            # Compatibilidade com integrações/POSTs anteriores ao checklist.
+            cursos = [curso_legado]
+        elif abrangencia == self.TODOS_OS_CURSOS:
+            cursos = list(self.fields['cursos'].queryset)
+        else:
+            cursos = list(cleaned_data.get('cursos') or [])
+
+        if not cursos:
+            self.add_error(
+                'cursos',
+                'Selecione ao menos um curso.' if abrangencia == self.CURSOS_ESPECIFICOS
+                else 'A unidade precisa ter ao menos um curso ativo.',
+            )
+            return cleaned_data
+
+        self.cursos_selecionados = cursos
+        # O campo legado continua representando cada ocupação individual.
+        # O primeiro item permite que a validação normal do ModelForm rode;
+        # a view cria as demais ocupações na mesma transação.
+        cleaned_data['curso'] = cursos[0]
+        self.instance.curso = cursos[0]
+
+        professor = cleaned_data.get('professor')
+        data_inicio = cleaned_data.get('data_inicio')
+        if professor and data_inicio:
+            for curso in cursos:
+                candidata = OcupacaoEquipeDiretiva(
+                    unidade=self.instance.unidade,
+                    cargo=self.instance.cargo,
+                    professor=professor,
+                    curso=curso,
+                    data_inicio=data_inicio,
+                    data_fim=cleaned_data.get('data_fim'),
+                )
+                if candidata.conflitos_de_vigencia().exists():
+                    self.add_error(
+                        'cursos',
+                        f'Já existe uma ocupação conflitante para {curso}.',
+                    )
+        return cleaned_data
+
+
+class OcupacaoEquipeDiretivaForm(CursosOcupacaoDiretivaMixin, forms.ModelForm):
     """Preenche um cargo da equipe diretiva de uma unidade já escolhida na tela."""
 
     class Meta:
@@ -223,7 +330,6 @@ class OcupacaoEquipeDiretivaForm(forms.ModelForm):
     def __init__(self, *args, unidade, cargo, opcoes=None, **kwargs):
         super().__init__(*args, **kwargs)
         from django.db.models import Q
-        from apps.courses.models import CourseUnit
         from apps.professors.models import Professor
 
         # Atribuídos antes do full_clean para que o clean() do modelo valide
@@ -236,22 +342,7 @@ class OcupacaoEquipeDiretivaForm(forms.ModelForm):
         ).distinct().order_by("rh_nome")
         if opcoes is not None:
             self.fields['professor'].choices = [('', self.fields['professor'].empty_label), *opcoes.professores]
-        if cargo.exige_curso:
-            self.fields["curso"].required = True
-            cursos_unidade = CourseUnit.objects.filter(
-                unidade=unidade, ativo=True,
-            ).select_related("curso", "unidade").order_by("curso__nome")
-            self.fields["curso"].queryset = cursos_unidade
-            if opcoes is not None:
-                self.fields['curso'].choices = [('', self.fields['curso'].empty_label), *opcoes.cursos]
-            self.fields["curso"].label = "Curso"
-            self.fields["curso"].help_text = (
-                "Selecione um curso ativo desta unidade."
-                if (bool(opcoes.cursos) if opcoes is not None else cursos_unidade.exists())
-                else "Nenhum curso ativo cadastrado nesta unidade. Cadastre ou ative um curso antes de preencher este cargo."
-            )
-        else:
-            del self.fields["curso"]
+        self._configurar_cursos(unidade=unidade, cargo=cargo, opcoes=opcoes)
 
 
 class ReducaoOcupacaoEquipeDiretivaForm(forms.ModelForm):
@@ -264,7 +355,7 @@ class ReducaoOcupacaoEquipeDiretivaForm(forms.ModelForm):
         }
 
 
-class OcupacaoEquipeDiretivaUnidadeForm(forms.ModelForm):
+class OcupacaoEquipeDiretivaUnidadeForm(CursosOcupacaoDiretivaMixin, forms.ModelForm):
     """
     Formulário de preenchimento e atualização de ocupante da equipe diretiva
     pelo Coordenador de Unidade. Não expõe `carga_reducao_horas`, que é
@@ -285,7 +376,6 @@ class OcupacaoEquipeDiretivaUnidadeForm(forms.ModelForm):
     def __init__(self, *args, unidade, cargo, opcoes=None, **kwargs):
         super().__init__(*args, **kwargs)
         from django.db.models import Q
-        from apps.courses.models import CourseUnit
         from apps.professors.models import Professor
 
         self.instance.unidade = unidade
@@ -296,22 +386,7 @@ class OcupacaoEquipeDiretivaUnidadeForm(forms.ModelForm):
         ).distinct().order_by("rh_nome")
         if opcoes is not None:
             self.fields['professor'].choices = [('', self.fields['professor'].empty_label), *opcoes.professores]
-        if cargo.exige_curso:
-            self.fields["curso"].required = True
-            cursos_unidade = CourseUnit.objects.filter(
-                unidade=unidade, ativo=True,
-            ).select_related("curso", "unidade").order_by("curso__nome")
-            self.fields["curso"].queryset = cursos_unidade
-            if opcoes is not None:
-                self.fields['curso'].choices = [('', self.fields['curso'].empty_label), *opcoes.cursos]
-            self.fields["curso"].label = "Curso"
-            self.fields["curso"].help_text = (
-                "Selecione um curso ativo desta unidade."
-                if (bool(opcoes.cursos) if opcoes is not None else cursos_unidade.exists())
-                else "Nenhum curso ativo cadastrado nesta unidade. Cadastre ou ative um curso antes de preencher este cargo."
-            )
-        else:
-            del self.fields["curso"]
+        self._configurar_cursos(unidade=unidade, cargo=cargo, opcoes=opcoes)
 
 
 class AtividadeEstagioSupervisaoUnidadeForm(forms.ModelForm):
