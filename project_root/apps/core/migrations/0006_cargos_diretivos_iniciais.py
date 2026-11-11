@@ -4,7 +4,7 @@ from django.db import migrations
 CARGOS_INICIAIS = (
     ("Diretor(a)", "DIRECAO", False, False, 10),
     ("Vice-Diretor(a)", "VICE_DIRECAO", False, False, 20),
-    ("Secretário(a)", "SECRETARIA", False, True, 30),
+    ("Secretário(a) Acadêmico(a)", "SECRETARIA", False, True, 30),
     ("Coordenação de Curso", "COORDENACAO_DE_CURSO", True, False, 40),
     (
         "Coordenação de Pesquisa e Extensão",

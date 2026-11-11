@@ -1100,12 +1100,13 @@ class JornadaDashboardsTests(BaseE2ETestCase):
         self.assertContains(temporarios, 'Contrato temporário')
 
     def test_filtro_vinculo_nas_listagens_desup(self):
-        contrato_terceirizado = ContractType.objects.create(
-            nome='Terceirizado 20h', categoria=ContractType.CategoriaChoices.TERCEIRIZADO,
+        contrato_cedido = ContractType.objects.create(
+            nome='Cedido 20h', categoria=ContractType.CategoriaChoices.TERCEIRIZADO,
             max_class_hours=10, max_total_hours=20, max_classes=2,
         )
-        self.prof_pendente.tipo_contrato = contrato_terceirizado
-        self.prof_pendente.save(update_fields=['tipo_contrato'])
+        self.prof_pendente.tipo_contrato = contrato_cedido
+        self.prof_pendente.vinculo_empregaticio = Professor.VinculoEmpregaticioChoices.CEDIDO
+        self.prof_pendente.save(update_fields=['tipo_contrato', 'vinculo_empregaticio'])
         self.client.force_login(self.desup)
 
         professores = self.client.get(reverse('professors:professor_list'), {'vinculo': 'EFETIVO'})
@@ -1113,13 +1114,13 @@ class JornadaDashboardsTests(BaseE2ETestCase):
         self.assertContains(professores, 'Ana Conforme')
         self.assertNotContains(professores, 'Bruno Pendente')
 
-        alertas = self.client.get(reverse('core:alertas_carga_desup'), {'vinculo': 'TERCEIRIZADO'})
+        alertas = self.client.get(reverse('core:alertas_carga_desup'), {'vinculo': 'CEDIDO'})
         nomes_alertas = {item['nome'] for item in alertas.context['resumo_p1']['detalhe_sobra']}
         self.assertEqual(nomes_alertas, {'Bruno Pendente'})
 
         for url in ('core:solicitacao_professor_list', 'extra_curricular:pendencia_list'):
             with self.subTest(url=url):
-                resposta = self.client.get(reverse(url), {'vinculo': 'TERCEIRIZADO'})
+                resposta = self.client.get(reverse(url), {'vinculo': 'CEDIDO'})
                 self.assertEqual(resposta.status_code, 200)
                 self.assertContains(resposta, 'Vínculo empregatício')
 

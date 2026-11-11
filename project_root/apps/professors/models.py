@@ -13,6 +13,7 @@ TIPOS_CONTRATO_PERMITIDOS = [
     'TÉCNICO SUPERIOR',
     'ORIENTADOR EDUCACIONAL',
     'PROFESSOR CEDIDO',
+    'SECRETÁRIO ACADÊMICO',
 ]
 
 
@@ -78,8 +79,7 @@ class Professor(models.Model):
         CONTR_TEMPORARIO = 'CONTR TEMPORARIO', 'Contrato temporário'
         CARGO_COMISSAO = 'CARGO COMISSAO', 'Cargo em comissão'
         REQUISICAO_INTERNA = 'REQUISICAO INTERNA', 'Requisição interna'
-        REQUISICAO_EXTERNA = 'REQUISICAO EXTERNA', 'Requisição externa'
-        TERCEIRIZADO = 'TERCEIRIZADO', 'Terceirizado'
+        CEDIDO = 'CEDIDO', 'Cedido'
 
     # --- Campos Originais RH (Read-only por Regra de Negócio) ---
     id_funcional = models.CharField(
