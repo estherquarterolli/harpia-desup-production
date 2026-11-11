@@ -1,9 +1,12 @@
 from django.urls import path
 from . import views
+from .support_views import CentralAjudaView, FaqView
 
 app_name = 'core'
 
 urlpatterns = [
+    path('ajuda/', CentralAjudaView.as_view(), name='central_ajuda'),
+    path('ajuda/faq/', FaqView.as_view(), name='faq'),
     # Unidades
     path('unidades/', views.UnidadeListView.as_view(), name='unidade_list'),
     path('unidades/add/', views.UnidadeCreateView.as_view(), name='unidade_create'),

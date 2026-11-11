@@ -1,3 +1,5 @@
+import unicodedata
+
 from django.core.exceptions import ValidationError
 from django.db import models
 from apps.core.models import UnitBoundManager
@@ -13,6 +15,7 @@ TIPOS_CONTRATO_PERMITIDOS = [
     'TÉCNICO SUPERIOR',
     'ORIENTADOR EDUCACIONAL',
     'PROFESSOR CEDIDO',
+    'SECRETÁRIO ACADÊMICO',
 ]
 
 
@@ -79,7 +82,7 @@ class Professor(models.Model):
         CARGO_COMISSAO = 'CARGO COMISSAO', 'Cargo em comissão'
         REQUISICAO_INTERNA = 'REQUISICAO INTERNA', 'Requisição interna'
         REQUISICAO_EXTERNA = 'REQUISICAO EXTERNA', 'Requisição externa'
-        TERCEIRIZADO = 'TERCEIRIZADO', 'Terceirizado'
+        CEDIDO = 'CEDIDO', 'Cedido'
 
     # --- Campos Originais RH (Read-only por Regra de Negócio) ---
     id_funcional = models.CharField(
@@ -266,7 +269,29 @@ class Professor(models.Model):
 
     @property
     def locais_lotacao_lista(self):
-        return [l.strip() for l in (self.locais_lotacao or '').split('|') if l.strip()]
+        """Setor de origem (editável no cadastro) sem repetir o que já aparece como unidade (ex.: 'ISERJ - Instituto...')."""
+        def norm(texto):
+            texto = unicodedata.normalize('NFKD', texto or '')
+            texto = ''.join(c for c in texto if not unicodedata.combining(c))
+            return ' '.join(texto.replace('—', '-').replace('–', '-').casefold().split())
+
+        conhecidos = set()
+        prefixos = []
+        for u in self.unidades_exibicao:
+            sigla, nome = norm(u.sigla), norm(u.nome)
+            conhecidos.update({sigla, nome, f'{sigla} - {nome}'})
+            prefixos.append(f'{sigla} -')
+        vistos, locais = set(), []
+        for bruto in (self.setor_origem or '').split('|'):
+            local = bruto.strip()
+            chave = norm(local)
+            if not chave or chave in vistos or chave in conhecidos:
+                continue
+            if any(chave.startswith(pref) for pref in prefixos):
+                continue
+            vistos.add(chave)
+            locais.append(local)
+        return locais
 
     # --- Propriedades para Dashboard (UC08) e Limites (UC05) ---
 

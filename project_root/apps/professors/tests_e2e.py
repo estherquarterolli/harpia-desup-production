@@ -1139,6 +1139,7 @@ class SolicitacaoCadastroEMatriculaOpcionalTests(ProfessorE2EBase):
             rh_matricula='MAT-CH20',
             rh_nome='Professor Vinte Horas',
             tipo_contrato=contrato_20h,
+            vinculo_empregaticio=Professor.VinculoEmpregaticioChoices.CEDIDO,
         )
         self.client.force_login(self.desup)
 
@@ -1151,7 +1152,7 @@ class SolicitacaoCadastroEMatriculaOpcionalTests(ProfessorE2EBase):
         self.assertContains(resposta, 'Cargo')
         self.assertContains(resposta, 'Vínculo empregatício')
         self.assertContains(resposta, 'PROFESSOR VINTE HORAS')
-        self.assertContains(resposta, 'Terceirizado')
+        self.assertContains(resposta, 'Cedido')
         self.assertContains(resposta, '20h')
 
     def test_formulario_e_filtro_so_oferecem_os_tipos_oficiais(self):

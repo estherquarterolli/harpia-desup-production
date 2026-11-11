@@ -38,9 +38,6 @@
             <div class="rounded-xl bg-slate-50 p-4 sm:col-span-2">
                 <p class="text-[10px] font-black uppercase tracking-wide text-slate-400">Cargo</p>
                 <p class="mt-1 text-sm font-bold text-slate-700">{{ professor.tipo_contrato.nome }}</p>
-                {% if professor.cargo_origem and professor.cargo_origem != professor.tipo_contrato.nome %}
-                    <p class="mt-1 text-xs text-amber-700">Cargo informado no PDF: {{ professor.cargo_origem }}</p>
-                {% endif %}
                 <p class="mt-1 text-xs text-slate-500">
                     Vínculo {{ professor.vinculo_empregaticio_exibicao }} · CH {{ professor.carga_total_efetiva|hhmm }}
                 </p>
