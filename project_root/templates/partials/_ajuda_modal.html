@@ -27,8 +27,8 @@
       </div>
     </div>
     {% if user.is_authenticated and user.perfil != 'ADMIN' %}
-    <a href="{% url 'core:central_ajuda' %}?pagina={{ request.resolver_match.view_name|urlencode }}" class="mt-3 inline-flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-bold text-[#025c9f] hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#025c9f]">
-      <i class="ph ph-lifebuoy text-lg" aria-hidden="true"></i> Perguntas frequentes e suporte
+    <a href="{% url 'core:faq' %}?pagina={{ request.resolver_match.view_name|urlencode }}" class="mt-3 inline-flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-bold text-[#025c9f] hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#025c9f]">
+      <i class="ph ph-headset text-lg" aria-hidden="true"></i> Perguntas frequentes e suporte
     </a>
     {% endif %}
   </div>

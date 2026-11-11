@@ -1,15 +1,17 @@
+from urllib.parse import urlencode
+
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
-from django.views.generic import FormView
+from django.views.generic import FormView, TemplateView
 
 from apps.accounts.mixins import PerfilRequiredMixin
 from .models import SolicitacaoSuporte
 from .support import (
-    SuporteErro, email_disponivel, enviar_suporte, ler_contexto,
+    SuporteErro, email_suporte, enviar_suporte, ler_contexto, motivo_email_indisponivel,
     novo_contexto, pagina_suporte,
 )
 from .support_forms import SuporteForm
@@ -21,13 +23,23 @@ class CentralAjudaView(LoginRequiredMixin, PerfilRequiredMixin, FormView):
     template_name = 'core/central_ajuda.html'
     form_class = SuporteForm
 
+    def get(self, request, *args, **kwargs):
+        # Compatibilidade com os links anteriores, quando FAQ era uma aba.
+        if request.GET.get('aba') == 'faq' and not request.GET.get('enviado'):
+            query = urlencode({'pagina': request.GET.get('pagina', '')})
+            return HttpResponseRedirect(f'{reverse("core:faq")}?{query}')
+        return super().get(request, *args, **kwargs)
+
     def get_initial(self):
         pagina = pagina_suporte(self.request.GET.get('pagina'))
         return {'contexto': novo_contexto(self.request.user, pagina)}
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['suporte_disponivel'] = email_disponivel()
+        context['aba_ativa'] = 'suporte'
+        context['suporte_indisponivel_motivo'] = motivo_email_indisponivel()
+        context['suporte_disponivel'] = not context['suporte_indisponivel_motivo']
+        context['email_suporte'] = email_suporte()
         form = context['form']
         try:
             context['pagina_origem'] = ler_contexto(form['contexto'].value(), self.request.user)['pagina']
@@ -42,6 +54,35 @@ class CentralAjudaView(LoginRequiredMixin, PerfilRequiredMixin, FormView):
                 ).first()
         except (ValidationError, ValueError):
             pass
+        return context
+
+    def form_valid(self, form):
+        try:
+            contexto = ler_contexto(form.cleaned_data['contexto'], self.request.user)
+        except ValidationError as exc:
+            form.add_error(None, exc)
+            return self.form_invalid(form)
+        try:
+            recibo = enviar_suporte(self.request.user, form.cleaned_data, contexto)
+        except SuporteErro as exc:
+            form.add_error(None, str(exc))
+            # Falhas concluídas recebem uma nova chave, preservando os campos;
+            # reservas em andamento conservam a chave para não duplicar envios.
+            if exc.renovar_contexto:
+                form.data = form.data.copy()
+                form.data['contexto'] = novo_contexto(self.request.user, contexto['pagina'])
+            return self.form_invalid(form)
+        return HttpResponseRedirect(f'{reverse("core:central_ajuda")}?enviado={recibo.pk}')
+
+
+@method_decorator(never_cache, name='dispatch')
+class FaqView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
+    allowed_profiles = ['COORDENADOR_UNIDADE', 'DESUP']
+    template_name = 'core/central_ajuda.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['aba_ativa'] = 'faq'
         context['faq'] = self.get_faq()
         return context
 
@@ -64,21 +105,3 @@ class CentralAjudaView(LoginRequiredMixin, PerfilRequiredMixin, FormView):
             ('O que fazer ao encontrar dados inconsistentes ou um erro?',
              'Use Solicitar suporte nesta Central, escolha o tipo e descreva a funcionalidade, o comportamento observado e o esperado. Evite incluir dados pessoais de terceiros, senhas ou informações sigilosas. O contato não substitui pedidos de cadastro, cessão, RAT ou aprovações administrativas.'),
         ]
-
-    def form_valid(self, form):
-        try:
-            contexto = ler_contexto(form.cleaned_data['contexto'], self.request.user)
-        except ValidationError as exc:
-            form.add_error(None, exc)
-            return self.form_invalid(form)
-        try:
-            recibo = enviar_suporte(self.request.user, form.cleaned_data, contexto)
-        except SuporteErro as exc:
-            form.add_error(None, str(exc))
-            # Falhas concluídas recebem uma nova chave, preservando os campos;
-            # reservas em andamento conservam a chave para não duplicar envios.
-            if exc.renovar_contexto:
-                form.data = form.data.copy()
-                form.data['contexto'] = novo_contexto(self.request.user, contexto['pagina'])
-            return self.form_invalid(form)
-        return HttpResponseRedirect(f'{reverse("core:central_ajuda")}?enviado={recibo.pk}')

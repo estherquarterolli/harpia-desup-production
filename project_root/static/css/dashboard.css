@@ -286,20 +286,20 @@ h1, h2, h3, h4, h5, h6, .font-black {
     height: auto;
 }
 
-/* Faixa exclusiva para o suporte: nunca cobre tabelas ou ações do conteúdo.
+/* Faixa reservada para a posição padrão da aba de suporte.
    Modais e menus usam camadas superiores e não participam desta faixa. */
-.support-enabled .main-content { margin-right: 3.5rem; max-width: calc(100% - 3.5rem); }
-.support-dock { position: fixed; right: 0; bottom: max(1rem, env(safe-area-inset-bottom)); width: 3.5rem; z-index: 20; }
+.support-enabled .main-content { margin-right: 2.5rem; max-width: calc(100% - 2.5rem); }
+.support-dock { position: fixed; right: 0; bottom: max(1rem, env(safe-area-inset-bottom)); width: 2.5rem; z-index: 20; }
 .support-dock[hidden] { display: none; }
-.support-expanded { display: flex; flex-direction: column; align-items: center; }
-.support-open { display: flex; width: 44px; height: 44px; align-items: center; justify-content: center; border-radius: 50%; color: white; background: #025c9f; font-size: 1.5rem; box-shadow: 0 3px 12px #025c9f33; }
-.support-open:hover { background: #153e70; }
-.support-minimize { width: 44px; height: 44px; color: #025c9f; }
-.support-tab { display: none; margin-left: auto; width: 32px; min-height: 88px; padding: 8px 4px; border: 1px solid #cbd5e1; border-right: 0; border-radius: 12px 0 0 12px; color: #025c9f; background: white; }
-.support-tab span { display: block; writing-mode: vertical-rl; margin: 4px auto 0; font-size: 12px; font-weight: 700; }
-.support-dock.is-minimized .support-expanded { display: none; }
-.support-dock.is-minimized .support-tab { display: block; }
-.support-dock a:focus-visible, .support-dock button:focus-visible { outline: 2px solid #025c9f; outline-offset: 2px; }
+.support-tab { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-left: auto; width: 36px; min-height: 112px; padding: 12px 6px; border: 1px solid #bfdbfe; border-right: 0; border-radius: 12px 0 0 12px; color: #025c9f; background: white; box-shadow: 0 2px 10px #025c9f14; transition: background-color .15s ease; cursor: grab; user-select: none; }
+.support-tab:hover { background: #eff6ff; }
+.support-dock.is-positioned .support-tab { border-right: 1px solid #bfdbfe; border-radius: 12px; }
+.support-dock.is-dragging .support-tab { cursor: grabbing; }
+.support-tab i { font-size: 20px; }
+.support-tab span { writing-mode: vertical-rl; font-size: 12px; font-weight: 700; letter-spacing: .025em; }
+.support-dock a:focus-visible { outline: 2px solid #025c9f; outline-offset: -2px; }
+.faq-question { list-style: none; }
+.faq-question::-webkit-details-marker { display: none; }
 @media print { .support-dock { display: none; } .support-enabled .main-content { margin-right: 0; max-width: 100%; } }
 
 /* ─── Tabela → Cards no mobile (classe .stack-table) ───────────────────

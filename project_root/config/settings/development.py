@@ -7,9 +7,12 @@ from .database_options import configure_for_transaction_pooler, resolve_sqlite_d
 DEBUG = True
 ALLOWED_HOSTS = ["*"]
 
-# Email de desenvolvimento no console
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-DEFAULT_FROM_EMAIL = "dev@harpia.local"
+# Simulação por padrão; permite testar o serviço real quando configurado
+# explicitamente no ambiente local, sem sobrescrever o remetente informado.
+EMAIL_BACKEND = config(
+    "EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend",
+)
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="dev@harpia.local")
 
 # Database config via environment variables.
 # Se DATABASE_URL estiver definido, ele tem prioridade.

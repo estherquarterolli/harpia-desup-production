@@ -33,6 +33,7 @@ class CentralAjudaTests(TestCase):
 
     def setUp(self):
         self.url = reverse('core:central_ajuda')
+        self.faq_url = reverse('core:faq')
         self.client.force_login(self.coord)
 
     def dados(self, **kwargs):
@@ -52,6 +53,15 @@ class CentralAjudaTests(TestCase):
         self.assertContains(response, 'data-ajuda-abrir')
         self.assertContains(response, 'Perguntas frequentes e suporte')
         self.assertContains(response, 'id="supportDock"')
+        self.assertContains(response, 'ph-headset')
+        self.assertContains(response, '<span>Suporte</span>')
+        self.assertEqual(response.context['aba_ativa'], 'suporte')
+        self.assertContains(response, 'data-support-form')
+        self.assertNotContains(response, 'id="faq-titulo"')
+        self.assertNotContains(response, 'ph-caret-right')
+        self.assertNotContains(response, 'data-support-minimize')
+        self.assertNotContains(response, 'data-support-restore')
+        self.assertNotContains(response, 'class="support-open"')
         self.assertEqual(response.context['pagina_origem'], 'Professores')
         self.assertIn('no-store', response.headers['Cache-Control'])
         self.assertEqual(SolicitacaoSuporte.objects.count(), 0)
@@ -95,9 +105,11 @@ class CentralAjudaTests(TestCase):
             {'assunto': 'Texto\r\nBcc: outro@example.test'},
         ):
             with self.subTest(fields=tuple(fields)):
-                response = self.client.post(self.url, self.dados(**fields))
+                response = self.client.post(f'{self.url}?aba=faq', self.dados(**fields))
                 self.assertEqual(response.status_code, 200)
                 self.assertTrue(response.context['form'].errors)
+                self.assertEqual(response.context['aba_ativa'], 'suporte')
+                self.assertContains(response, 'data-support-form')
         self.assertFalse(SolicitacaoSuporte.objects.exists())
 
     def test_contexto_adulterado_expirado_ou_de_outro_usuario(self):
@@ -231,16 +243,35 @@ class CentralAjudaTests(TestCase):
 
     def test_sem_destinatario_ou_backend_de_simulacao_nao_anuncia_envio(self):
         configs = [
-            {'HARPIA_SUPPORT_EMAIL': ''}, {'HARPIA_SUPPORT_EMAIL': 'invalido'},
+            {'HARPIA_SUPPORT_EMAIL': '', 'DEFAULT_FROM_EMAIL': ''}, {'HARPIA_SUPPORT_EMAIL': 'invalido'},
             {'EMAIL_BACKEND': 'django.core.mail.backends.console.EmailBackend'},
             {'EMAIL_BACKEND': 'django.core.mail.backends.dummy.EmailBackend'},
             {'EMAIL_BACKEND': 'django.core.mail.backends.filebased.EmailBackend'},
         ]
         for config in configs:
             with self.subTest(config=config), override_settings(**config):
-                self.assertContains(self.client.get(self.url), 'O envio está indisponível')
+                response = self.client.get(self.url)
+                self.assertContains(response, 'O envio está indisponível')
+                if config.get('EMAIL_BACKEND'):
+                    self.assertContains(response, 'modo de simulação de e-mail')
+                else:
+                    self.assertContains(response, 'não está configurado corretamente')
                 self.assertContains(self.client.post(self.url, self.dados()), 'O envio de suporte está indisponível')
         self.assertFalse(SolicitacaoSuporte.objects.exists())
+
+    @override_settings(HARPIA_SUPPORT_EMAIL='', DEFAULT_FROM_EMAIL='harpia@desup.faetec.rj.gov.br')
+    def test_destino_reutiliza_caixa_institucional_existente(self):
+        response = self.client.get(self.url)
+        self.assertTrue(response.context['suporte_disponivel'])
+        self.assertContains(response, 'harpia@desup.faetec.rj.gov.br')
+        self.assertEqual(self.client.post(self.url, self.dados()).status_code, 302)
+        self.assertEqual(mail.outbox[0].to, ['harpia@desup.faetec.rj.gov.br'])
+        self.assertEqual(mail.outbox[0].from_email, 'harpia@desup.faetec.rj.gov.br')
+
+    @override_settings(HARPIA_SUPPORT_EMAIL='', DEFAULT_FROM_EMAIL='Harpia <harpia@example.test>')
+    def test_destino_padrao_extrai_apenas_endereco_do_remetente(self):
+        self.client.post(self.url, self.dados())
+        self.assertEqual(mail.outbox[0].to, ['harpia@example.test'])
 
     def test_confirmacao_nao_expoe_recibo_de_outro_usuario(self):
         recibo = SolicitacaoSuporte.objects.create(usuario=self.desup, status=SolicitacaoSuporte.Status.ENVIADO)
@@ -259,14 +290,43 @@ class CentralAjudaTests(TestCase):
         self.assertNotContains(response, '<script>alert("x")</script>')
 
     def test_faq_adaptado_ao_perfil_e_fluxos_existentes(self):
-        response = self.client.get(self.url)
+        response = self.client.get(self.faq_url)
         self.assertContains(response, 'Nova justificativa')
         self.assertContains(response, 'Solicitar abertura')
         self.assertContains(response, 'redução de carga da unidade é definida pela DESUP')
         self.client.force_login(self.desup)
-        response = self.client.get(self.url)
+        response = self.client.get(self.faq_url)
         self.assertContains(response, 'gestão das janelas de entrega')
         self.assertNotContains(response, 'Use Nova justificativa')
+
+    def test_aba_faq_separa_perguntas_e_oferece_suporte_ao_final(self):
+        response = self.client.get(self.faq_url, {'pagina': 'professors:professor_list'})
+        self.assertEqual(response.context['aba_ativa'], 'faq')
+        self.assertContains(response, 'id="faq-titulo"')
+        self.assertNotContains(response, 'data-support-form')
+        html = response.content.decode()
+        self.assertLess(html.index('</details>', html.index('id="faq-titulo"')), html.index('Como podemos ajudar?'))
+        self.assertContains(response, '?pagina=professors%3Aprofessor_list#solicitar-suporte')
+
+    def test_faq_no_menu_apos_ensino_com_item_ativo_por_perfil(self):
+        for user in (self.coord, self.desup):
+            self.client.force_login(user)
+            response = self.client.get(self.faq_url)
+            html = response.content.decode()
+            menu = html[html.index('aria-label="Menu principal"'):html.index('</nav>')]
+            self.assertLess(menu.index('Ensino e currículo'), menu.index('Perguntas frequentes'))
+            self.assertIn(f'href="{self.faq_url}" class="sb-link is-active" aria-current="page"', menu)
+            self.assertNotContains(response, 'aria-label="Seções da Central de Ajuda"')
+
+    def test_faq_exige_autenticacao_e_nao_processa_formularios(self):
+        self.assertEqual(self.client.post(self.faq_url, self.dados()).status_code, 405)
+        self.assertFalse(SolicitacaoSuporte.objects.exists())
+        self.client.logout()
+        self.assertEqual(self.client.get(self.faq_url).status_code, 302)
+
+    def test_link_antigo_de_faq_redireciona_para_pagina_no_menu(self):
+        response = self.client.get(self.url, {'aba': 'faq', 'pagina': 'professors:professor_list'})
+        self.assertRedirects(response, f'{self.faq_url}?pagina=professors%3Aprofessor_list')
 
     def test_visualizacao_admin_usa_unidade_e_perfil_da_sessao_sem_alterar_conta(self):
         self.client.force_login(self.admin)

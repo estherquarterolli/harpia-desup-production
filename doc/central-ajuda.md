@@ -7,13 +7,20 @@ CSRF, validação por formulário Django e os perfis operacionais Unidade/DESUP.
 O perfil ADMIN mantém o redirecionamento à administração; a visualização operacional
 do superadministrador segue o perfil/unidade definidos pelo middleware existente.
 O botão `?` continua abrindo o tutorial anterior. O link “Perguntas frequentes e
-suporte” no painel do tutorial abre a Central, que reúne FAQ por perfil e formulário,
-sem acrescentar ícones ao cabeçalho em telas estreitas.
+suporte” no painel do tutorial abre a página FAQ, com perguntas por perfil.
+O menu lateral inclui a seção “Perguntas frequentes” logo abaixo de “Ensino e currículo”,
+com o item FAQ e ícone de interrogação. A rota é `/core/ajuda/faq/` (`core:faq`).
+Ao final das perguntas, “Como podemos ajudar?” oferece o botão “Solicitar suporte”.
+O suporte tem página própria em `/core/ajuda/`; não há mais abas internas de navegação.
 
-O acesso flutuante reserva uma faixa de 56 px à direita do conteúdo, inclusive
-no celular, para não cobrir tabelas, filtros e botões. Pode ser recolhido para uma
-aba lateral de 32 px. O estado fica em `localStorage` (`harpia.support.minimized`);
-se o armazenamento estiver bloqueado, o controle continua funcionando na página.
+O acesso começa no canto inferior direito: a aba lateral “Suporte”, com ícone de
+headset. Ela abre diretamente o formulário, sem botão circular, X ou estado de
+recolhimento. A faixa reservada foi reduzida para 40 px, para não cobrir conteúdo
+e aproveitar melhor a largura em dispositivos móveis. O usuário pode arrastá-la
+com o mouse para outra posição dentro da tela. Um clique simples abre o formulário;
+o término do arraste não dispara a navegação. A posição é salva em `localStorage`
+(`harpia.support.position.v1`) e se adapta ao redimensionamento da janela.
+Se o armazenamento estiver bloqueado, o arraste continua funcionando na página.
 Modais, tutorial e menu móvel ocultam o acesso flutuante. Não há polling nem
 consultas adicionais de suporte durante a navegação nas demais páginas.
 
@@ -36,7 +43,7 @@ Configure as variáveis no ambiente do servidor (não no frontend):
 
 | Variável | Uso |
 | --- | --- |
-| `HARPIA_SUPPORT_EMAIL` | Endereço institucional de destino, obrigatório para habilitar envio. Sem valor padrão. |
+| `HARPIA_SUPPORT_EMAIL` | Opcional. Define outra caixa de destino; quando vazio, usa o endereço de `DEFAULT_FROM_EMAIL`. |
 | `EMAIL_BACKEND` | Backend Django. Produção usa `django.core.mail.backends.smtp.EmailBackend` por padrão. |
 | `EMAIL_HOST`, `EMAIL_PORT` | Servidor e porta fornecidos pela instituição/provedor. |
 | `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | Credenciais do provedor, quando exigidas. |
@@ -44,11 +51,25 @@ Configure as variáveis no ambiente do servidor (não no frontend):
 | `DEFAULT_FROM_EMAIL` | Remetente autorizado pelo provedor. |
 | `EMAIL_TIMEOUT` | Limite de espera SMTP, em segundos; padrão existente: 5. |
 
-Não foram definidos destinatários ou credenciais institucionais. Os backends de
+O endereço institucional informado é `harpia@desup.faetec.rj.gov.br`, já definido
+em `DEFAULT_FROM_EMAIL` no Vercel. O suporte reutiliza essa configuração, sem
+duplicar o endereço no código nem exigir uma nova variável de ambiente. Uma
+configuração explícita de `HARPIA_SUPPORT_EMAIL` continua tendo precedência.
+Não foram alteradas credenciais nem configurações do Vercel. Os backends de
 console, arquivo e dummy deixam o envio indisponível para não anunciar uma entrega
-inexistente. `development.py` força o backend console; para testar SMTP use uma
-configuração local própria que importe development e sobrescreva essa opção.
+inexistente. `development.py` usa console por padrão e respeita `EMAIL_BACKEND`
+e `DEFAULT_FROM_EMAIL` quando definidos explicitamente no ambiente local.
+Variáveis cadastradas apenas no Vercel não são copiadas automaticamente para
+a máquina local. Para testar SMTP localmente, configure o backend SMTP e os
+dados do provedor no ambiente local; o endereço do remetente, sozinho, não
+configura a conexão com o serviço. O aviso do formulário distingue modo de
+simulação e endereços ausentes ou inválidos, sem expor credenciais.
 O backend locmem é usado somente nos testes, sem comprovar entrega real.
+
+Ajuste de posicionamento e diagnóstico: a aba permanece recolhida na lateral,
+por padrão no canto inferior direito. A validação do diagnóstico executou 32 testes de
+suporte e conferiu separadamente que console e SMTP explícitos são respeitados
+por `development.py`, sem enviar mensagens reais.
 
 Há Celery no código, mas os manifestos de implantação não incluem um worker.
 Por isso o suporte usa envio síncrono com o timeout existente, sem depender de
@@ -106,30 +127,43 @@ python manage.py check
 python manage.py makemigrations --check --dry-run
 ```
 
+O arraste tem testes de eventos e persistência com o runner nativo do Node,
+sem dependências adicionais (executar na raiz do repositório):
+
+```powershell
+node --test project_root/apps/core/tests_support_drag.cjs
+```
+
 Para verificar a migração real, execute os testes focados com
 `--settings=config.settings.development` em banco de testes local isolado.
 
-Resultados da implementação em 10/11/2026:
+Resultados da revisão de interface e envio em 11/11/2026:
 
-- 26 testes de suporte aprovados, com migrações reais e SQLite em memória.
-- Suíte completa: 856 testes; 42 falhas, 5 erros e 20 ignorados. Comparação com
-  o `HEAD` anterior (830 testes) confirmou os mesmos 47 testes com falha/erro,
-  sem novas ocorrências. As pendências existentes envolvem alocação, carga
-  horária, permissões/expectativas de telas e iconografia, fora deste escopo.
+- 43 testes focados de suporte e tutoriais aprovados. Incluem FAQ no menu,
+  separação das páginas, compatibilidade dos links anteriores, ausência do botão
+  circular e envio para a caixa de `DEFAULT_FROM_EMAIL` quando não há outro destino.
+- Os dois testes do menu em `SidebarAbertaEmBlocosTests` foram atualizados para
+  a organização atual das seções e as permissões de Unidade/DESUP.
+- Suíte completa: 862 testes, com 40 falhas, 5 erros e 20 ignorados. Comparação
+  por identificador com a execução anterior confirmou ausência de novas falhas
+  ou erros e resolução dos dois testes de menu. As 45 ocorrências restantes já
+  existiam em áreas como alocação, carga horária, expectativas de telas e iconografia.
+- A migração já havia sido validada em 26 testes com migrações reais em 10/11.
+  Esta revisão não altera modelos nem exige novas migrações.
 - Para executar a suíte completa em tempo razoável, o processo de teste usou
-  `MD5PasswordHasher` em memória, tanto no código atual quanto na referência.
-  Nenhuma configuração de senha da aplicação foi alterada. Os 26 testes focados
-  com migrações reais usaram a configuração padrão de hashing.
+  `MD5PasswordHasher` apenas no processo dos testes. Nenhuma configuração de senha
+  da aplicação foi alterada. Os 43 testes focados usaram o hashing padrão.
 - `manage.py check`, `makemigrations --check --dry-run`, compilação Tailwind,
   `node --check static/js/support.js` e `git diff --check` passaram.
-- O controle de computador interrompeu a validação visual porque não conseguiu
-  determinar com segurança a URL do navegador. Layout desktop/móvel, recolhimento
-  entre páginas e sobreposição com componentes ainda requerem conferência visual.
-- Não houve envio real ao provedor SMTP ou à caixa institucional. É necessário
-  configurar o destinatário/remetente/provedor e verificar essa entrega no ambiente.
+- A revisão visual foi tentada novamente, mas o host de acesso ao navegador
+  permanece indisponível. Layout desktop/móvel e sobreposição com componentes
+  ainda requerem conferência visual.
+- Não houve envio real à caixa institucional durante os testes. O remetente
+  informado pelo usuário já está no Vercel; o código reutiliza essa variável.
+  A entrega real precisa ser verificada após a implantação.
 
-Logs locais: `output/support-real-migrations.log`, `output/support-regression-final.log`,
-`output/support-baseline-tests.log` e `output/support-comparison.log` na raiz do projeto.
+Logs locais da revisão: `output/support-menu-regression.log` e
+`output/support-menu-comparison.log` na raiz do projeto.
 
 ## Arquivos da implementação
 
@@ -138,16 +172,20 @@ Logs locais: `output/support-real-migrations.log`, `output/support-regression-fi
 | `apps/core/support.py` | Serviço de envio, contexto assinado, idempotência e limites. |
 | `apps/core/support_forms.py` | Campos e validação do formulário. |
 | `apps/core/support_views.py` | Central autenticada e FAQ por perfil. |
+| `apps/core/ajuda.py` | Orientações dos tutoriais para as páginas FAQ e Suporte. |
 | `apps/core/models.py` | Recibo mínimo de envio. |
 | `apps/core/migrations/0016_solicitacao_suporte.py` | Tabela e índices dos recibos. |
-| `apps/core/urls.py` | Rota da Central de Ajuda. |
+| `apps/core/urls.py` | Rotas separadas de FAQ e Suporte. |
 | `apps/core/tests_support.py` | Testes de suporte. |
-| `config/settings/base.py` | Destinatário por variável de ambiente. |
+| `apps/core/tests_support_drag.cjs` | Testes unitários do arraste, limites da tela e persistência. |
+| `apps/core/tests.py` | Validação do menu atual por perfil. |
+| `config/settings/base.py` | Destinatário opcional; usa o remetente institucional por padrão. |
+| `config/settings/development.py` | Simulação por padrão e respeito às opções de e-mail explícitas no ambiente local. |
 | `templates/core/central_ajuda.html` | FAQ, contexto, formulário e confirmação. |
-| `templates/partials/_suporte_flutuante.html` | Botão recolhível e aba lateral. |
+| `templates/partials/_suporte_flutuante.html` | Link lateral fixo para Suporte. |
 | `templates/partials/_ajuda_modal.html` | Link para a Central no tutorial existente. |
 | `templates/base.html` | Inclusão compartilhada do suporte. |
-| `static/js/support.js` | Minimização persistida, overlays e bloqueio de cliques repetidos. |
+| `static/js/support.js` | Overlays e bloqueio de cliques repetidos. |
 | `static/css/dashboard.css` | Faixa reservada e estilos do acesso lateral. |
 | `static/css/tailwind.min.css` | CSS recompilado. |
 | `README.md` e `doc/central-ajuda.md` (raiz do repositório) | Configuração, operação e limitações. |

@@ -50,20 +50,31 @@ def ler_contexto(token, user):
         raise ValidationError('O formulário expirou ou é inválido. Reabra a Central de Ajuda antes de enviar.') from None
 
 
-def email_disponivel():
+def email_suporte():
+    """A caixa institucional de envio também recebe o suporte por padrão."""
+    return settings.HARPIA_SUPPORT_EMAIL or parseaddr(settings.DEFAULT_FROM_EMAIL)[1]
+
+
+def motivo_email_indisponivel():
     try:
-        validate_email(settings.HARPIA_SUPPORT_EMAIL)
+        validate_email(email_suporte())
         validate_email(parseaddr(settings.DEFAULT_FROM_EMAIL)[1])
         if '\r' in settings.DEFAULT_FROM_EMAIL or '\n' in settings.DEFAULT_FROM_EMAIL:
-            return False
+            return 'O endereço do remetente não está configurado corretamente.'
     except ValidationError:
-        return False
+        return 'O endereço de suporte ou do remetente não está configurado corretamente.'
     # Estes backends não encaminham mensagens à equipe de suporte.
-    return settings.EMAIL_BACKEND not in {
+    if settings.EMAIL_BACKEND in {
         'django.core.mail.backends.console.EmailBackend',
         'django.core.mail.backends.dummy.EmailBackend',
         'django.core.mail.backends.filebased.EmailBackend',
-    }
+    }:
+        return 'Este ambiente está em modo de simulação de e-mail. Nenhuma mensagem será encaminhada à equipe de suporte.'
+    return ''
+
+
+def email_disponivel():
+    return not motivo_email_indisponivel()
 
 
 class SuporteErro(Exception):
@@ -98,8 +109,9 @@ def _reservar_envio(user, contexto):
 
 
 def enviar_suporte(user, cleaned_data, contexto):
-    if not email_disponivel():
-        raise SuporteErro('O envio de suporte está indisponível. A configuração de e-mail precisa ser concluída pela administração.')
+    motivo = motivo_email_indisponivel()
+    if motivo:
+        raise SuporteErro(f'O envio de suporte está indisponível. {motivo}')
     try:
         recibo, ja_enviado = _reservar_envio(user, contexto)
     except DatabaseError as exc:
@@ -132,7 +144,7 @@ def enviar_suporte(user, cleaned_data, contexto):
         message = EmailMessage(
             subject=f'[HARPIA][SUPORTE][{cleaned_data["tipo"]}] {cleaned_data["assunto"]}',
             body=texto, from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[settings.HARPIA_SUPPORT_EMAIL], reply_to=[user.email],
+            to=[email_suporte()], reply_to=[user.email],
         )
         if message.send(fail_silently=False) != 1:
             raise SuporteErro('O serviço não confirmou o envio.')

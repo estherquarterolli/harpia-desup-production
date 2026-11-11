@@ -1,11 +1,7 @@
 {% load static %}
 {% if user.is_authenticated and user.perfil != 'ADMIN' %}
 <nav id="supportDock" class="support-dock" aria-label="Suporte técnico">
-  <div class="support-expanded">
-    <a href="{% url 'core:central_ajuda' %}?pagina={{ request.resolver_match.view_name|urlencode }}" class="support-open" aria-label="Abrir Central de Ajuda" title="Central de Ajuda"><i class="ph ph-lifebuoy" aria-hidden="true"></i></a>
-    <button type="button" data-support-minimize class="support-minimize" aria-label="Recolher suporte para a aba lateral" title="Recolher suporte"><i class="ph ph-caret-right" aria-hidden="true"></i></button>
-  </div>
-  <button type="button" data-support-restore class="support-tab" aria-label="Expandir acesso ao suporte" title="Expandir suporte"><i class="ph ph-lifebuoy" aria-hidden="true"></i><span>Ajuda</span></button>
+  <a href="{% url 'core:central_ajuda' %}?pagina={{ request.resolver_match.view_name|urlencode }}" class="support-tab" aria-label="Abrir suporte" title="Abrir suporte · arraste para mover" draggable="false"><i class="ph ph-headset" aria-hidden="true"></i><span>Suporte</span></a>
 </nav>
 <script defer src="{% static 'js/support.js' %}"></script>
 {% endif %}

@@ -2,20 +2,84 @@
     'use strict';
     var dock = document.getElementById('supportDock');
     if (!dock) return;
-    var key = 'harpia.support.minimized';
-    var minimize = dock.querySelector('[data-support-minimize]');
-    var restore = dock.querySelector('[data-support-restore]');
-    function setMinimized(value, focus) {
-        dock.classList.toggle('is-minimized', value);
-        try { localStorage.setItem(key, value ? '1' : '0'); } catch (error) { /* Storage opcional. */ }
-        if (focus) (value ? restore : dock.querySelector('a')).focus();
+
+    var link = dock.querySelector('.support-tab');
+    var positionKey = 'harpia.support.position.v1';
+    var position = null;
+    var drag = null;
+    var suppressClick = false;
+    try {
+        var saved = JSON.parse(localStorage.getItem(positionKey));
+        if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y) &&
+            saved.x >= 0 && saved.x <= 1 && saved.y >= 0 && saved.y <= 1) position = saved;
+    } catch (error) { /* Armazenamento opcional; usa o canto inferior direito. */ }
+
+    function bounds() {
+        return {
+            x: Math.max(0, window.innerWidth - (dock.offsetWidth || 40)),
+            y: Math.max(0, window.innerHeight - (dock.offsetHeight || 112)),
+        };
     }
-    try { setMinimized(localStorage.getItem(key) === '1', false); } catch (error) { /* Usa estado expandido. */ }
-    minimize.addEventListener('click', function () { setMinimized(true, true); });
-    restore.addEventListener('click', function () { setMinimized(false, true); });
-    window.addEventListener('storage', function (event) {
-        if (event.key === key) setMinimized(event.newValue === '1', false);
+    function moveDock(left, top) {
+        var limits = bounds();
+        left = Math.min(limits.x, Math.max(0, left));
+        top = Math.min(limits.y, Math.max(0, top));
+        dock.style.left = left + 'px';
+        dock.style.top = top + 'px';
+        dock.style.right = 'auto';
+        dock.style.bottom = 'auto';
+        dock.classList.add('is-positioned');
+        // Frações mantêm a posição relativa ao trocar de página ou de tamanho de tela.
+        position = { x: limits.x ? left / limits.x : 0, y: limits.y ? top / limits.y : 0 };
+    }
+    function restorePosition() {
+        if (!position) return;
+        var limits = bounds();
+        moveDock(position.x * limits.x, position.y * limits.y);
+    }
+    function finishDrag(event) {
+        if (!drag || event.pointerId !== drag.id) return;
+        var finished = drag;
+        drag = null;
+        dock.classList.remove('is-dragging');
+        if (link.hasPointerCapture && link.hasPointerCapture(finished.id)) link.releasePointerCapture(finished.id);
+        if (!finished.moved) return;
+        try { localStorage.setItem(positionKey, JSON.stringify(position)); } catch (error) { /* Mantém a posição nesta página. */ }
+        if (event.type === 'pointerup') {
+            suppressClick = true;
+            // O click gerado pelo término do arraste não deve abrir o formulário.
+            setTimeout(function () { suppressClick = false; }, 0);
+        }
+    }
+    link.addEventListener('pointerdown', function (event) {
+        if (event.pointerType !== 'mouse' || event.button !== 0 || drag ||
+            event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+        var rect = dock.getBoundingClientRect();
+        drag = { id: event.pointerId, x: event.clientX, y: event.clientY, left: rect.left, top: rect.top, moved: false };
+        if (link.setPointerCapture) link.setPointerCapture(event.pointerId);
     });
+    window.addEventListener('pointermove', function (event) {
+        if (!drag || event.pointerId !== drag.id) return;
+        var dx = event.clientX - drag.x;
+        var dy = event.clientY - drag.y;
+        if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+        drag.moved = true;
+        dock.classList.add('is-dragging');
+        event.preventDefault();
+        moveDock(drag.left + dx, drag.top + dy);
+    }, { passive: false });
+    window.addEventListener('pointerup', finishDrag);
+    window.addEventListener('pointercancel', finishDrag);
+    link.addEventListener('lostpointercapture', finishDrag);
+    link.addEventListener('click', function (event) {
+        if (suppressClick && event.detail !== 0) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            suppressClick = false;
+        }
+    }, true);
+    window.addEventListener('resize', restorePosition);
+    restorePosition();
 
     // Sem polling: overlays já ficam acima do suporte por z-index; escondê-lo
     // também evita que o teclado alcance controles por trás de um modal.
@@ -54,6 +118,7 @@
         form.setAttribute('aria-busy', 'true');
     });
     window.addEventListener('pageshow', function () {
+        restorePosition();
         if (form) { delete form.dataset.submitting; form.removeAttribute('aria-busy'); }
     });
 })();
