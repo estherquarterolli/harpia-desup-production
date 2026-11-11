@@ -1,0 +1,7 @@
+{% load static %}
+{% if user.is_authenticated and user.perfil != 'ADMIN' %}
+<nav id="supportDock" class="support-dock" aria-label="Suporte técnico">
+  <a href="{% url 'core:central_ajuda' %}?pagina={{ request.resolver_match.view_name|urlencode }}" class="support-tab" aria-label="Abrir suporte" title="Abrir suporte · arraste para mover" draggable="false"><i class="ph ph-headset" aria-hidden="true"></i><span>Suporte</span></a>
+</nav>
+<script defer src="{% static 'js/support.js' %}"></script>
+{% endif %}

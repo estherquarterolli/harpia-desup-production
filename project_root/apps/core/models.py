@@ -1,10 +1,33 @@
 from decimal import Decimal
+import uuid
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
+
+
+class SolicitacaoSuporte(models.Model):
+    """Recibo técnico de envio; o conteúdo da mensagem permanece apenas no e-mail."""
+
+    class Status(models.TextChoices):
+        ENVIANDO = 'ENVIANDO', 'Envio em andamento ou não confirmado'
+        ENVIADO = 'ENVIADO', 'Aceito pelo serviço de e-mail'
+        FALHOU = 'FALHOU', 'Falha no envio'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    unidade = models.ForeignKey('Unidade', null=True, blank=True, on_delete=models.SET_NULL)
+    criado_em = models.DateTimeField(default=timezone.now, db_index=True)
+    enviado_em = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.ENVIANDO)
+
+    class Meta:
+        db_table = 'harpiadb_core_solicitacao_suporte'
+        indexes = [models.Index(fields=['usuario', 'criado_em'], name='harpia_suporte_usuario_data')]
+
 
 class Unidade(models.Model):
     """

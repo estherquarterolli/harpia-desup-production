@@ -942,8 +942,10 @@ class SidebarAbertaEmBlocosTests(TestCase):
     def test_desup_ve_todos_os_blocos_do_menu(self):
         html = self.client.get('/core/unidades/').content.decode()
 
-        for titulo in ('Visão geral', 'Gestão institucional', 'Alocação e carga', 'Currículo', 'Prazos'):
+        for titulo in ('Início', 'Gestão', 'Ensino e currículo', 'Perguntas frequentes'):
             self.assertIn(f'sb-title">{titulo}<', html)
+        self.assertLess(html.index('sb-title">Ensino e currículo<'), html.index('sb-title">Perguntas frequentes<'))
+        self.assertIn('href="/core/ajuda/faq/"', html)
 
     def test_unidade_ve_blocos_proprios_sem_gestao_da_desup(self):
         unidade = Unidade.objects.create(nome='Unidade Menu', sigla='UMN')
@@ -955,9 +957,13 @@ class SidebarAbertaEmBlocosTests(TestCase):
 
         html = self.client.get('/dashboard/unidade/').content.decode()
 
-        self.assertIn('sb-title">Minha unidade<', html)
-        self.assertNotIn('sb-title">Gestão institucional<', html)
-        self.assertNotIn('sb-title">Prazos<', html)
+        sidebar = html[html.index('<aside id="sidebar"'):html.index('</aside>')]
+        for titulo in ('Início', 'Gestão', 'Ensino e currículo', 'Perguntas frequentes'):
+            self.assertIn(f'sb-title">{titulo}<', sidebar)
+        self.assertIn('href="/core/unidade/rat/"', sidebar)
+        self.assertIn('href="/core/ajuda/faq/"', sidebar)
+        self.assertNotIn('href="/core/unidades/"', sidebar)
+        self.assertNotIn('href="/accounts/usuarios/"', sidebar)
 
     def test_menu_principal_continua_com_rolagem_vertical(self):
         html = self.client.get('/core/unidades/').content.decode()

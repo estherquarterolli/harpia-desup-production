@@ -503,6 +503,8 @@ def passos_resolvidos(conteudo):
 # AJUDA_PAGINAS / AJUDA_PAGINAS_COORDENADOR continuam usando o tutorial guiado.
 
 _AJUDA_TELAS = {
+    'core:faq': ('FAQ', 'Perguntas frequentes sobre as funcionalidades do Harpia e acesso ao suporte técnico.'),
+    'core:central_ajuda': ('Suporte', 'Envio de dúvidas e problemas à equipe de suporte técnico do Harpia.'),
     'profile': ('Meu perfil', 'Dados da sua conta e acesso à troca de senha.'),
     'password_change': ('Alterar senha', 'Troca da senha de acesso. Você receberá uma confirmação por e-mail.'),
     'desup_user_create': ('Criar usuário', 'Cadastro de uma nova conta. O usuário recebe um e-mail com o login e a senha padrão e deve trocá-la no primeiro acesso.'),

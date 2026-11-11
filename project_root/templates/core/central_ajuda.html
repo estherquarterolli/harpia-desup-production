@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if aba_ativa == 'faq' %}FAQ{% else %}Suporte{% endif %} — Harpia{% endblock %}
+{% block header_title %}{% if aba_ativa == 'faq' %}FAQ{% else %}Suporte{% endif %}{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-5xl space-y-6">
+  {% if aba_ativa == 'faq' %}
+  <section aria-labelledby="faq-titulo" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+    <div class="mb-6 flex items-start gap-3 sm:gap-4">
+      <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#025c9f]"><i class="ph ph-question text-2xl" aria-hidden="true"></i></span>
+      <div class="min-w-0">
+        <h2 id="faq-titulo" class="text-lg font-black text-[#025c9f]">Perguntas frequentes</h2>
+        <p class="mt-1 text-sm leading-relaxed text-slate-500">Encontre orientações sobre o Harpia. Selecione uma pergunta para consultar a resposta.</p>
+      </div>
+    </div>
+    <div class="space-y-3">
+      {% for pergunta, resposta in faq %}
+      <details class="group rounded-xl border border-slate-200 bg-white open:border-blue-200 open:bg-blue-50/40">
+        <summary class="faq-question flex min-h-14 cursor-pointer items-center gap-3 rounded-xl p-4 text-sm font-bold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#025c9f]">
+          <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-black text-slate-500" aria-hidden="true">{{ forloop.counter|stringformat:'02d' }}</span>
+          <span class="flex-1">{{ pergunta }}</span>
+          <i class="ph ph-caret-down shrink-0 text-lg text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true"></i>
+        </summary>
+        <p class="border-t border-blue-100 px-4 py-4 text-sm leading-relaxed text-slate-600 sm:pl-14">{{ resposta }}</p>
+      </details>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="flex flex-col gap-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 md:flex-row md:items-center md:justify-between">
+    <div class="flex items-start gap-3 sm:gap-4">
+      <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#025c9f]"><i class="ph ph-headset text-2xl" aria-hidden="true"></i></span>
+      <div class="min-w-0">
+        <h2 class="text-lg font-black text-[#025c9f]">Como podemos ajudar?</h2>
+        <p class="mt-1 text-sm leading-relaxed text-slate-500">Não encontrou sua resposta? Fale com a equipe de suporte do Harpia.</p>
+      </div>
+    </div>
+    <a href="{% url 'core:central_ajuda' %}?pagina={{ request.GET.pagina|default:'core:faq'|urlencode }}#solicitar-suporte" class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#025c9f] px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#153e70] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#025c9f]">Solicitar suporte <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+  </section>
+  {% else %}
+  {% if recibo %}
+  <div role="status" class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+    <p class="font-bold">E-mail aceito pelo serviço de envio.</p>
+    <p class="mt-1">Referência: <span class="break-all">{{ recibo.pk }}</span></p>
+    <p class="mt-1">Isso confirma a aceitação pelo serviço de e-mail; a entrega na caixa de destino depende do provedor. A resposta será encaminhada ao seu e-mail cadastrado.</p>
+  </div>
+  {% endif %}
+
+  <section id="solicitar-suporte" aria-labelledby="suporte-titulo" class="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+    <div class="flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-start sm:justify-between">
+      <div class="flex items-start gap-3 sm:gap-4">
+        <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#025c9f]"><i class="ph ph-headset text-2xl" aria-hidden="true"></i></span>
+        <div class="min-w-0">
+          <h2 id="suporte-titulo" class="text-lg font-black text-[#025c9f]">Solicitar suporte</h2>
+          <p class="mt-1 text-sm leading-relaxed text-slate-500">Descreva sua dúvida ou o problema encontrado no sistema.</p>
+        </div>
+      </div>
+      <a href="{% url 'core:faq' %}" class="inline-flex min-h-11 shrink-0 items-center gap-2 self-start rounded-lg px-3 py-2 text-sm font-bold text-[#025c9f] hover:bg-blue-50"><i class="ph ph-question text-lg" aria-hidden="true"></i> Consultar FAQ</a>
+    </div>
+
+    <details class="my-5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-600">
+      <summary class="cursor-pointer rounded-xl px-4 py-3 font-bold text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#025c9f]">Dados de contato incluídos automaticamente</summary>
+      <dl class="grid gap-4 border-t border-slate-200 p-4 sm:grid-cols-2">
+        <div class="min-w-0"><dt class="text-xs font-bold text-slate-500">Usuário</dt> <dd class="mt-1 break-words font-semibold text-slate-700">{{ user.get_full_name|default:user.email }}</dd><dd class="mt-1 break-all text-xs">{{ user.email }}</dd></div>
+        <div class="min-w-0"><dt class="text-xs font-bold text-slate-500">Unidade</dt> <dd class="mt-1 break-words">{{ user.unidade|default:'Sem unidade vinculada' }}</dd></div>
+        <div class="min-w-0"><dt class="text-xs font-bold text-slate-500">Perfil</dt> <dd class="mt-1">{{ user.get_perfil_display }}{% if superadmin_visualizando %} (visualização por administrador){% endif %}</dd></div>
+        <div class="min-w-0"><dt class="text-xs font-bold text-slate-500">Funcionalidade de origem</dt> <dd class="mt-1">{{ pagina_origem }}</dd></div>
+      </dl>
+      <p class="px-4 pb-4 text-xs leading-relaxed">Também enviaremos a data, o horário e uma referência da mensagem. Dados de professores não são incluídos automaticamente.</p>
+    </details>
+
+    {% if not suporte_disponivel %}
+    <p role="alert" class="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">O envio está indisponível: {{ suporte_indisponivel_motivo }} As perguntas frequentes e os tutoriais continuam disponíveis.</p>
+    {% endif %}
+
+    <form method="post" action="{% url 'core:central_ajuda' %}" class="space-y-5" data-support-form>
+      {% csrf_token %}
+      {{ form.contexto }}
+      {% if form.non_field_errors or form.contexto.errors %}
+      <div role="alert" tabindex="-1" data-support-errors class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{{ form.non_field_errors }}{{ form.contexto.errors }}</div>
+      {% endif %}
+      {% if suporte_disponivel %}<p class="text-xs leading-relaxed text-slate-500">Sua mensagem será encaminhada para <span class="break-all font-semibold text-slate-700">{{ email_suporte }}</span>. A equipe poderá responder ao seu e-mail cadastrado.</p>{% endif %}
+      <div class="grid gap-5 sm:grid-cols-2">
+      {% for field in form.visible_fields %}
+      <div class="min-w-0{% if field.name == 'descricao' %} sm:col-span-2{% endif %}">
+        <label for="{{ field.id_for_label }}" class="mb-1.5 block text-sm font-bold text-slate-700">{{ field.label }} <span class="text-xs font-normal text-slate-500">(obrigatório)</span></label>
+        {{ field }}
+        <p id="{{ field.name }}-ajuda" class="mt-1 text-xs text-slate-500">{{ field.help_text }}</p>
+        <div id="{{ field.name }}-erros" class="mt-1 text-sm text-red-700">{{ field.errors }}</div>
+      </div>
+      {% endfor %}
+      </div>
+      <p class="text-xs leading-relaxed text-slate-500">Não inclua senhas, documentos ou dados pessoais desnecessários. Este contato não altera registros nem substitui solicitações administrativas. Anexos não estão disponíveis.</p>
+      <div class="flex justify-end border-t border-slate-100 pt-5">
+        <button type="submit" {% if not suporte_disponivel %}disabled{% endif %} class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#025c9f] px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#153e70] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#025c9f] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
+          <i class="ph ph-paper-plane-right" aria-hidden="true"></i> Enviar ao suporte
+        </button>
+      </div>
+    </form>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

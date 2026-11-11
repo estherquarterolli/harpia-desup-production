@@ -150,6 +150,10 @@ EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="no-reply@harpia.local")
 EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=5, cast=int)
 
+# Opcional: destinatário específico. Sem ele, o suporte usa a caixa
+# institucional já definida em DEFAULT_FROM_EMAIL.
+HARPIA_SUPPORT_EMAIL = config("HARPIA_SUPPORT_EMAIL", default="").strip()
+
 # URL pública do sistema, usada para montar o link de login nos e-mails que
 # não nascem de uma requisição (boas-vindas, comando de envio em lote).
 # Em produção defina SITE_URL (ex.: https://harpiadesup.vercel.app). Se vazio,

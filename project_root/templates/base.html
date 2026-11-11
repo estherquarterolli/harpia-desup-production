@@ -13,7 +13,7 @@
     <script defer src="/_vercel/insights/script.js"></script>
     {% block extra_head %}{% endblock %}
 </head>
-<body class="bg-dashboard bg-pattern min-h-screen flex no-scrollbar">
+<body class="bg-dashboard bg-pattern min-h-screen flex no-scrollbar{% if user.is_authenticated and user.perfil != 'ADMIN' %} support-enabled{% endif %}">
 
     <div id="sidebarBackdrop" class="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
 
@@ -109,6 +109,14 @@
                 </a>
                 {% endif %}
             </div>
+            {% if user.is_authenticated and user.perfil != 'ADMIN' %}
+            <div class="sb-block">
+                <p class="sb-title">Perguntas frequentes</p>
+                <a href="{% url 'core:faq' %}" class="sb-link {% if request.resolver_match.view_name == 'core:faq' %}is-active{% endif %}" {% if request.resolver_match.view_name == 'core:faq' %}aria-current="page"{% endif %}>
+                    <i class="ph ph-question" aria-hidden="true"></i><span class="sb-label">FAQ</span>
+                </a>
+            </div>
+            {% endif %}
         </nav>
 
         <div class="sb-footer">
@@ -749,6 +757,7 @@
         });
     </script>
     {% include 'partials/_ajuda_modal.html' %}
+    {% include 'partials/_suporte_flutuante.html' %}
     {% block extra_js %}{% endblock %}
 </body>
 </html>
