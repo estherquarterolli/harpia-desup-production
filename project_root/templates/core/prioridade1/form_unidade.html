@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}{{ titulo }} - Harpia{% endblock %}
 {% block header_title %}{{ titulo }}{% endblock %}
@@ -15,7 +16,7 @@
       {% endif %}
     </div>
 
-    <form method="post" class="space-y-5 p-4 sm:p-6" novalidate>
+    <form method="post" class="space-y-5 p-4 sm:p-6" novalidate{% if form.abrangencia_cursos %} data-ocupacao-form{% endif %}>
       {% csrf_token %}
       {% if retorno %}<input type="hidden" name="next" value="{{ retorno }}">{% endif %}
 
@@ -33,6 +34,9 @@
         </div>
       </div>
 
+      {% if form.abrangencia_cursos %}
+      <div data-ocupacao-campos>{% include 'core/prioridade1/_campos_form.html' %}</div>
+      {% else %}
       {% if form.non_field_errors %}
       <div class="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">
         {{ form.non_field_errors }}
@@ -49,6 +53,7 @@
         </div>
         {% endfor %}
       </div>
+      {% endif %}
 
       <div class="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
         <a href="{{ cancel_url }}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50">Cancelar</a>
@@ -57,5 +62,6 @@
     </form>
   </div>
 </div>
+{% if form.abrangencia_cursos %}<script src="{% static 'js/equipe-diretiva.js' %}"></script>{% endif %}
 {% endblock %}
 
