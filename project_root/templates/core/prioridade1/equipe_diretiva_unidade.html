@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Equipe Diretiva e Coordenações - {{ unidade.sigla }}{% endblock %}
 {% block header_title %}Equipe Diretiva e Coordenações{% endblock %}
@@ -248,7 +249,7 @@
         <i class="ph ph-x text-xl" aria-hidden="true"></i>
       </button>
     </div>
-    <form method="post" action="{% url 'core:ocupacao_diretiva_unidade_create' item.cargo.pk %}">
+    <form method="post" action="{% url 'core:ocupacao_diretiva_unidade_create' item.cargo.pk %}" data-ocupacao-form>
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ retorno }}">
       <div class="max-h-[62vh] space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
@@ -256,7 +257,7 @@
           <i class="ph ph-lock-key text-base text-slate-400 shrink-0" aria-hidden="true"></i>
           <span>A <strong>carga horária de redução semanal</strong> é definida exclusivamente pela DESUP.</span>
         </div>
-        {% include 'core/prioridade1/_campos_form.html' with form=item.form %}
+        <div data-ocupacao-campos>{% include 'core/prioridade1/_campos_form.html' with form=item.form %}</div>
       </div>
       <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-4 sm:px-6">
         <button type="button" onclick="fecharModal('modalPreencherUnidade{{ item.cargo.pk }}')" class="min-h-10 rounded-lg px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100">Cancelar</button>
@@ -294,7 +295,7 @@
         <i class="ph ph-x text-xl" aria-hidden="true"></i>
       </button>
     </div>
-    <form method="post" action="{% url 'core:ocupacao_diretiva_unidade_update' ocupacao.pk %}">
+    <form method="post" action="{% url 'core:ocupacao_diretiva_unidade_update' ocupacao.pk %}" data-ocupacao-form>
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ retorno }}">
       <div class="max-h-[62vh] space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
@@ -302,7 +303,7 @@
           <span class="font-bold">Redução semanal (definida pela DESUP):</span>
           <span class="font-black text-emerald-800">{{ ocupacao.carga_reducao_horas|hhmm }}/semana</span>
         </div>
-        {% include 'core/prioridade1/_campos_form.html' with form=ocupacao.edit_form %}
+        <div data-ocupacao-campos>{% include 'core/prioridade1/_campos_form.html' with form=ocupacao.edit_form %}</div>
       </div>
       <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-4 sm:px-6">
         <button type="button" onclick="fecharModal('modalEditarOcupacaoUnidade{{ ocupacao.pk }}')" class="min-h-10 rounded-lg px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100">Cancelar</button>
@@ -321,16 +322,6 @@
   function abrirModal(id) { var m = document.getElementById(id); if (m) m.classList.remove('hidden'); }
   function fecharModal(id) { var m = document.getElementById(id); if (m) m.classList.add('hidden'); }
   function trocarModal(de, para) { fecharModal(de); abrirModal(para); }
-  document.querySelectorAll('[data-abrangencia-cursos]').forEach(function (grupo) {
-    var form = grupo.closest('form');
-    var checklist = form && form.querySelector('[data-cursos-especificos]');
-    function atualizarCursos() {
-      var selecionado = grupo.querySelector('input:checked');
-      if (checklist) checklist.classList.toggle('hidden', !selecionado || selecionado.value !== 'ESPECIFICOS');
-    }
-    grupo.addEventListener('change', atualizarCursos);
-    atualizarCursos();
-  });
   document.querySelectorAll('.modal-equipe').forEach(function (m) {
     m.addEventListener('click', function (e) { if (e.target === m) m.classList.add('hidden'); });
   });
@@ -338,5 +329,6 @@
     if (e.key === 'Escape') document.querySelectorAll('.modal-equipe').forEach(function (m) { m.classList.add('hidden'); });
   });
 </script>
+<script src="{% static 'js/equipe-diretiva.js' %}"></script>
 {% endblock %}
 

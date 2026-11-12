@@ -221,18 +221,6 @@ class CursosOcupacaoDiretivaMixin:
         ).select_related('curso', 'unidade').order_by('curso__nome')
         self.fields['curso'].queryset = cursos_unidade
 
-        # Na edição mantemos o vínculo unitário existente. O checklist é
-        # usado no preenchimento para criar, em uma única operação, uma
-        # ocupação por curso selecionado.
-        if self.instance.pk:
-            self.fields['curso'].required = True
-            self.fields['curso'].queryset = cursos_unidade
-            if opcoes is not None:
-                self.fields['curso'].choices = [('', self.fields['curso'].empty_label), *opcoes.cursos]
-            self.fields['curso'].label = 'Curso'
-            self.fields['curso'].help_text = 'Selecione um curso ativo desta unidade.'
-            return
-
         self.fields['curso'].required = False
         self.fields['curso'].widget = forms.HiddenInput()
         self.fields['abrangencia_cursos'] = forms.ChoiceField(
@@ -241,7 +229,7 @@ class CursosOcupacaoDiretivaMixin:
                 (self.TODOS_OS_CURSOS, 'Todos os cursos'),
                 (self.CURSOS_ESPECIFICOS, 'Cursos específicos'),
             ),
-            initial=self.TODOS_OS_CURSOS,
+            initial=self.CURSOS_ESPECIFICOS if self.instance.pk else self.TODOS_OS_CURSOS,
             required=False,
             widget=forms.RadioSelect(attrs={'data-abrangencia-cursos': 'true'}),
         )
@@ -258,6 +246,8 @@ class CursosOcupacaoDiretivaMixin:
         )
         if opcoes is not None:
             self.fields['cursos'].choices = opcoes.cursos
+        if self.instance.pk:
+            self.initial['cursos'] = [self.instance.curso_id]
         self.order_fields([
             'professor', 'abrangencia_cursos', 'cursos', 'curso',
             'data_inicio', 'data_fim', 'observacoes',
@@ -265,7 +255,7 @@ class CursosOcupacaoDiretivaMixin:
 
     def clean(self):
         cleaned_data = super().clean()
-        if not self.instance.cargo_id or not self.instance.cargo.exige_curso or self.instance.pk:
+        if not self.instance.cargo_id or not self.instance.cargo.exige_curso:
             return cleaned_data
 
         abrangencia = cleaned_data.get('abrangencia_cursos')
@@ -286,6 +276,10 @@ class CursosOcupacaoDiretivaMixin:
             )
             return cleaned_data
 
+        # Preserva o registro e a redução individual do curso atual quando ele
+        # continua marcado. Os cursos adicionais recebem vínculos próprios.
+        if self.instance.pk:
+            cursos.sort(key=lambda curso: curso.pk != self.instance.curso_id)
         self.cursos_selecionados = cursos
         # O campo legado continua representando cada ocupação individual.
         # O primeiro item permite que a validação normal do ModelForm rode;
@@ -298,6 +292,7 @@ class CursosOcupacaoDiretivaMixin:
         if professor and data_inicio:
             for curso in cursos:
                 candidata = OcupacaoEquipeDiretiva(
+                    pk=self.instance.pk,
                     unidade=self.instance.unidade,
                     cargo=self.instance.cargo,
                     professor=professor,

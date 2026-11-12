@@ -1159,12 +1159,17 @@ class TipoCargoDiretivoDeleteView(DesupPrioridade1Mixin, View):
         return HttpResponseRedirect(reverse_lazy('core:equipe_diretiva_desup'))
 
 
-def _criar_ocupacoes_diretivas_dos_demais_cursos(ocupacao_base, form):
+def _criar_ocupacoes_diretivas_dos_demais_cursos(ocupacao_base, form, *, criado_por=None):
     """Replica a ocupação validada para os demais cursos do checklist."""
     from .models import OcupacaoEquipeDiretiva
+    from .services import obter_reducao_cargo_unidade
 
     criadas = [ocupacao_base]
-    for curso in getattr(form, 'cursos_selecionados', [])[1:]:
+    cursos_adicionais = getattr(form, 'cursos_selecionados', [])[1:]
+    if not cursos_adicionais:
+        return criadas
+    reducao_padrao = obter_reducao_cargo_unidade(ocupacao_base.cargo, ocupacao_base.unidade)
+    for curso in cursos_adicionais:
         ocupacao = OcupacaoEquipeDiretiva(
             unidade=ocupacao_base.unidade,
             cargo=ocupacao_base.cargo,
@@ -1172,10 +1177,10 @@ def _criar_ocupacoes_diretivas_dos_demais_cursos(ocupacao_base, form):
             curso=curso,
             data_inicio=ocupacao_base.data_inicio,
             data_fim=ocupacao_base.data_fim,
-            carga_reducao_horas=ocupacao_base.carga_reducao_horas,
+            carga_reducao_horas=reducao_padrao,
             observacoes=ocupacao_base.observacoes,
-            reducao_personalizada=ocupacao_base.reducao_personalizada,
-            criado_por=ocupacao_base.criado_por,
+            reducao_personalizada=False,
+            criado_por=criado_por or ocupacao_base.criado_por,
         )
         ocupacao.full_clean()
         ocupacao.save()
@@ -1183,7 +1188,30 @@ def _criar_ocupacoes_diretivas_dos_demais_cursos(ocupacao_base, form):
     return criadas
 
 
-class OcupacaoEquipeDiretivaCreateView(DesupPrioridade1Mixin, CreateView):
+class OcupacaoDiretivaModalMixin:
+    """Mantém os erros no modal sem interferir na validação ou persistência."""
+
+    def post(self, request, *args, **kwargs):
+        from django.http import JsonResponse
+
+        response = super().post(request, *args, **kwargs)
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' and response.status_code == 302:
+            return JsonResponse({'redirect_url': response['Location']})
+        return response
+
+    def form_invalid(self, form):
+        from django.http import JsonResponse
+        from django.template.loader import render_to_string
+
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            html = render_to_string(
+                'core/prioridade1/_campos_form.html', {'form': form}, request=self.request,
+            )
+            return JsonResponse({'html': html}, status=422)
+        return super().form_invalid(form)
+
+
+class OcupacaoEquipeDiretivaCreateView(DesupPrioridade1Mixin, OcupacaoDiretivaModalMixin, CreateView):
     from .forms import OcupacaoEquipeDiretivaForm
     from .models import OcupacaoEquipeDiretiva
 
@@ -1199,7 +1227,10 @@ class OcupacaoEquipeDiretivaCreateView(DesupPrioridade1Mixin, CreateView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs.update({'unidade': self.unidade, 'cargo': self.cargo})
+        kwargs.update({
+            'unidade': self.unidade, 'cargo': self.cargo,
+            'auto_id': f'id_ocup{self.cargo.pk}_%s',
+        })
         return kwargs
 
     def get_initial(self):
@@ -1852,7 +1883,7 @@ class EquipeDiretivaUnidadeView(UnidadePrioridade1Mixin, TemplateView):
         return ctx
 
 
-class OcupacaoEquipeDiretivaUnidadeCreateView(UnidadePrioridade1Mixin, RetornoOrigemMixin, CreateView):
+class OcupacaoEquipeDiretivaUnidadeCreateView(UnidadePrioridade1Mixin, RetornoOrigemMixin, OcupacaoDiretivaModalMixin, CreateView):
     from .forms import OcupacaoEquipeDiretivaUnidadeForm
     from .models import OcupacaoEquipeDiretiva
 
@@ -1870,7 +1901,10 @@ class OcupacaoEquipeDiretivaUnidadeCreateView(UnidadePrioridade1Mixin, RetornoOr
     def get_form_kwargs(self):
         self._carregar_escopo()
         kwargs = super().get_form_kwargs()
-        kwargs.update({'unidade': self.unidade, 'cargo': self.cargo})
+        kwargs.update({
+            'unidade': self.unidade, 'cargo': self.cargo,
+            'auto_id': f'id_unidocup{self.cargo.pk}_%s',
+        })
         return kwargs
 
     def get_initial(self):
@@ -1917,7 +1951,7 @@ class OcupacaoEquipeDiretivaUnidadeCreateView(UnidadePrioridade1Mixin, RetornoOr
         return response
 
 
-class OcupacaoEquipeDiretivaUnidadeUpdateView(UnidadePrioridade1Mixin, RetornoOrigemMixin, UpdateView):
+class OcupacaoEquipeDiretivaUnidadeUpdateView(UnidadePrioridade1Mixin, RetornoOrigemMixin, OcupacaoDiretivaModalMixin, UpdateView):
     from .forms import OcupacaoEquipeDiretivaUnidadeForm
     from .models import OcupacaoEquipeDiretiva
 
@@ -1937,7 +1971,10 @@ class OcupacaoEquipeDiretivaUnidadeUpdateView(UnidadePrioridade1Mixin, RetornoOr
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs.update({'unidade': self.object.unidade, 'cargo': self.object.cargo})
+        kwargs.update({
+            'unidade': self.object.unidade, 'cargo': self.object.cargo,
+            'auto_id': f'id_editocup{self.object.pk}_%s',
+        })
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -1954,6 +1991,7 @@ class OcupacaoEquipeDiretivaUnidadeUpdateView(UnidadePrioridade1Mixin, RetornoOr
         return ctx
 
     def form_valid(self, form):
+        from django.db import transaction
         from .models import OcupacaoEquipeDiretiva
         from .services import registrar_evento_prioridade1
 
@@ -1963,12 +2001,17 @@ class OcupacaoEquipeDiretivaUnidadeUpdateView(UnidadePrioridade1Mixin, RetornoOr
         form.instance.unidade_id = original.unidade_id
         form.instance.cargo_id = original.cargo_id
         form.instance.carga_reducao_horas = original.carga_reducao_horas
-        response = super().form_valid(form)
-        registrar_evento_prioridade1(
-            self.request,
-            'OCUPACAO_DIRETIVA_UNIDADE_ATUALIZADA',
-            f'Ocupação {self.object.pk}; unidade {self.object.unidade_id}; cargo {self.object.cargo_id}.',
-        )
+        with transaction.atomic():
+            response = super().form_valid(form)
+            ocupacoes = _criar_ocupacoes_diretivas_dos_demais_cursos(
+                self.object, form, criado_por=self.request.user,
+            )
+            registrar_evento_prioridade1(
+                self.request,
+                'OCUPACAO_DIRETIVA_UNIDADE_ATUALIZADA',
+                f'Ocupações {", ".join(str(item.pk) for item in ocupacoes)}; '
+                f'unidade {self.object.unidade_id}; cargo {self.object.cargo_id}.',
+            )
         messages.success(self.request, 'Ocupação da equipe diretiva atualizada com sucesso.')
         return response
 
