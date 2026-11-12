@@ -2,7 +2,7 @@ import re
 from datetime import timedelta
 from unittest.mock import patch
 
-from django.test import TestCase, override_settings
+from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
 from apps.core.models import Unidade
@@ -85,6 +85,75 @@ class EmailPasswordResetWorkflowTests(TestCase):
         self.assertNotContains(unknown_response, 'não foi encontrado')
         existing_delay.assert_called_once()
         unknown_delay.assert_not_called()
+
+    def test_redefine_senha_em_https_com_csrf_ativo(self):
+        _, delay = self._request_link()
+        raw_token = self._raw_token_from_mock(delay)
+        url = f'/accounts/redefinir-senha/{raw_token}/'
+        client = Client(enforce_csrf_checks=True)
+
+        page = client.get(url, secure=True)
+        # Preserva o Referer no POST local, sem vazar o token para outros sites.
+        self.assertContains(page, '<meta name="referrer" content="same-origin">')
+        self.assertIn('no-store', page.headers['Cache-Control'])
+        csrf_token = re.search(
+            r'name="csrfmiddlewaretoken" value="([^"]+)"',
+            page.content.decode(),
+        ).group(1)
+        new_password = 'NovaSenhaSegura@2026'
+
+        invalid = client.post(url, {
+            'csrfmiddlewaretoken': csrf_token,
+            'new_password1': new_password,
+            'new_password2': 'ConfirmacaoDiferente@2026',
+        }, secure=True, HTTP_ORIGIN='https://testserver')
+        self.assertEqual(invalid.status_code, 200)
+        self.assertFormError(
+            invalid.context['form'], 'new_password2',
+            'Os dois campos de senha não correspondem.',
+        )
+        self.assertFalse(EmailPasswordResetToken.objects.get(user=self.user).usado)
+        csrf_token = re.search(
+            r'name="csrfmiddlewaretoken" value="([^"]+)"',
+            invalid.content.decode(),
+        ).group(1)
+
+        response = client.post(url, {
+            'csrfmiddlewaretoken': csrf_token,
+            'new_password1': new_password,
+            'new_password2': new_password,
+        }, secure=True, HTTP_REFERER=f'https://testserver{url}')
+
+        self.assertRedirects(response, '/login/?changed=1', fetch_redirect_response=False)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(new_password))
+        self.assertTrue(EmailPasswordResetToken.objects.get(user=self.user).usado)
+
+    def test_redefinicao_mantem_protecao_csrf(self):
+        _, delay = self._request_link()
+        raw_token = self._raw_token_from_mock(delay)
+        url = f'/accounts/redefinir-senha/{raw_token}/'
+        client = Client(enforce_csrf_checks=True)
+        client.get(url, secure=True)
+        csrf_token = client.cookies['csrftoken'].value
+
+        for token, headers in (
+            ('', {'HTTP_REFERER': f'https://testserver{url}'}),
+            ('x' * 32, {'HTTP_REFERER': f'https://testserver{url}'}),
+            (csrf_token, {'HTTP_ORIGIN': 'https://outro-site.example'}),
+            (csrf_token, {}),
+        ):
+            with self.subTest(token=bool(token), headers=headers):
+                response = client.post(url, {
+                    'csrfmiddlewaretoken': token,
+                    'new_password1': 'NovaSenhaSegura@2026',
+                    'new_password2': 'NovaSenhaSegura@2026',
+                }, secure=True, **headers)
+
+                self.assertEqual(response.status_code, 403)
+                self.user.refresh_from_db()
+                self.assertTrue(self.user.check_password(self.old_password))
+                self.assertFalse(EmailPasswordResetToken.objects.get(user=self.user).usado)
 
     def test_cooldown_nao_dispara_varios_emails(self):
         first_response, first_delay = self._request_link()
