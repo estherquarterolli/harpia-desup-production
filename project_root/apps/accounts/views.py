@@ -500,6 +500,7 @@ class ForgotPasswordView(View):
         })
 
 
+@method_decorator(never_cache, name='dispatch')
 class EmailPasswordResetConfirmView(View):
     """Valida o token opaco e permite cadastrar uma nova senha uma única vez."""
 
