@@ -1,3 +1,4 @@
+import re
 import unicodedata
 
 from django.core.exceptions import ValidationError
@@ -270,25 +271,34 @@ class Professor(models.Model):
 
     @property
     def locais_lotacao_lista(self):
-        """Setor de origem (editável no cadastro) sem repetir o que já aparece como unidade (ex.: 'ISERJ - Instituto...')."""
-        def norm(texto):
-            texto = unicodedata.normalize('NFKD', texto or '')
-            texto = ''.join(c for c in texto if not unicodedata.combining(c))
-            return ' '.join(texto.replace('—', '-').replace('–', '-').casefold().split())
+        """Setor de origem (editável no cadastro) sem repetir o que já aparece como unidade.
 
-        conhecidos = set()
-        prefixos = []
-        for u in self.unidades_exibicao:
-            sigla, nome = norm(u.sigla), norm(u.nome)
-            conhecidos.update({sigla, nome, f'{sigla} - {nome}'})
-            prefixos.append(f'{sigla} -')
+        Considera repetido o setor que, ignorando acentos, pontuação e conectivos (de/do/da),
+        usa só palavras da sigla/nome da unidade, ou que contém o nome inteiro da unidade
+        (ex.: unidade 'Bom Jesus do Itabapoana' x setor 'FAETERJ Bom Jesus de Itabapoana').
+        """
+        def palavras(texto):
+            texto = unicodedata.normalize('NFKD', texto or '')
+            texto = ''.join(c for c in texto if not unicodedata.combining(c)).casefold()
+            texto = re.sub(r'[^a-z0-9]+', ' ', texto)
+            return [w for w in texto.split() if w not in {'de', 'do', 'da', 'dos', 'das', 'e'}]
+
+        unidades = [(set(palavras(u.sigla)), set(palavras(u.nome))) for u in self.unidades_exibicao]
+
+        def repete_unidade(tokens):
+            for sigla, nome in unidades:
+                if tokens <= (sigla | nome):
+                    return True
+                if len(nome) >= 2 and nome <= tokens:
+                    return True
+            return False
+
         vistos, locais = set(), []
         for bruto in (self.setor_origem or '').split('|'):
             local = bruto.strip()
-            chave = norm(local)
-            if not chave or chave in vistos or chave in conhecidos:
-                continue
-            if any(chave.startswith(pref) for pref in prefixos):
+            palavras_local = palavras(local)
+            chave = ' '.join(palavras_local)
+            if not chave or chave in vistos or repete_unidade(set(palavras_local)):
                 continue
             vistos.add(chave)
             locais.append(local)
