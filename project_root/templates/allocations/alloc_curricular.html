@@ -182,7 +182,8 @@
   </div>
   {% endfor %}
 
-  {% include 'partials/pagination.html' %}
+  {# Autocomplete, turmas e modais dependem do carregamento completo: trocar só main via HTMX perde os eventos. #}
+  {% include 'partials/pagination.html' with pagination_full_reload=True %}
 
   {% else %}
   <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-16 text-center">
