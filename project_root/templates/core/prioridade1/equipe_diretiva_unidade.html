@@ -133,32 +133,32 @@
      role="dialog"
      aria-modal="true"
      aria-labelledby="tituloDetalheUnidade{{ item.cargo.pk }}">
-  <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
-    <div class="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
+  <div class="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div class="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-5 sm:px-6">
       <div class="min-w-0">
-        <h3 id="tituloDetalheUnidade{{ item.cargo.pk }}" class="truncate text-base font-black text-slate-900">{{ item.cargo.nome }}</h3>
-        <p class="text-xs text-slate-500">{{ unidade.sigla }}{% if item.cargo.exige_curso %} · exige seleção de curso da unidade{% endif %}</p>
+        <h3 id="tituloDetalheUnidade{{ item.cargo.pk }}" class="break-words text-sm font-bold leading-relaxed text-slate-900 sm:text-base">{{ item.cargo.nome }}</h3>
+        <p class="mt-1 text-xs leading-relaxed text-slate-500">{{ unidade.sigla }}{% if item.cargo.exige_curso %} · exige seleção de curso da unidade{% endif %}</p>
       </div>
       <button type="button"
               onclick="fecharModal('modalDetalheUnidade{{ item.cargo.pk }}')"
               aria-label="Fechar modal de {{ item.cargo.nome }}"
-              class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+              class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600">
         <i class="ph ph-x text-xl" aria-hidden="true"></i>
       </button>
     </div>
 
     <ul class="max-h-[58vh] divide-y divide-slate-100 overflow-y-auto">
       {% for ocupacao in item.ocupantes %}
-      <li class="space-y-2 px-5 py-4 sm:px-6">
-        <div class="flex flex-wrap items-start justify-between gap-2">
+      <li class="space-y-3 px-5 py-5 sm:px-6">
+        <div class="flex flex-col items-start gap-3 sm:flex-row sm:justify-between sm:gap-4">
           <div class="min-w-0 flex-1">
-            <p class="font-bold text-slate-900">{{ ocupacao.professor.nome }}</p>
-            <p class="text-xs text-slate-500">
+            <p class="break-words text-sm font-semibold leading-relaxed text-slate-900">{{ ocupacao.professor.nome }}</p>
+            <p class="mt-1 text-xs leading-relaxed text-slate-500">
               {% if ocupacao.curso %}<strong>{{ ocupacao.curso.sigla }}{% if ocupacao.turno %} ({{ ocupacao.get_turno_display }}){% endif %}</strong> · {% endif %}
               Vigência: {{ ocupacao.data_inicio|date:"d/m/Y" }}{% if ocupacao.data_fim %} até {{ ocupacao.data_fim|date:"d/m/Y" }}{% else %} (em aberto){% endif %}
             </p>
           </div>
-          <span class="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700"
+          <span class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-slate-100 px-2.5 py-1.5 text-[11px] font-semibold leading-relaxed text-slate-700"
                 title="Carga horária de redução definida exclusivamente pela DESUP">
             <i class="ph ph-lock-key text-slate-400" aria-hidden="true"></i>Redução DESUP: {{ ocupacao.carga_reducao_horas|hhmm }}
           </span>
@@ -166,12 +166,12 @@
 
         {% if ocupacao.em_sala %}
         <details class="group rounded-lg border border-amber-300 bg-amber-50 text-xs text-amber-900" data-alerta-sala>
-          <summary class="flex cursor-pointer list-none items-start gap-1.5 rounded-lg px-3 py-2 font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-600 [&::-webkit-details-marker]:hidden">
+          <summary class="flex cursor-pointer list-none items-start gap-2 rounded-lg px-3 py-2.5 font-medium leading-relaxed focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-600 [&::-webkit-details-marker]:hidden">
             <i class="ph-fill ph-warning-circle mt-0.5 shrink-0 text-amber-600" aria-hidden="true"></i>
             <span class="min-w-0 flex-1">Docente também alocado em sala de aula ({{ ocupacao.horas_sala|hhmm }}/sem).</span>
             <i class="ph ph-caret-down mt-0.5 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true"></i>
           </summary>
-          <ul class="mx-3 mb-3 space-y-1 border-t border-amber-200 pt-2 pl-4 list-disc">
+          <ul class="mx-3 mb-3 space-y-2 border-t border-amber-200 pt-3 pl-4 leading-relaxed list-disc">
             {% for disciplina in ocupacao.disciplinas_sala %}
             <li class="break-words">{{ disciplina }}</li>
             {% endfor %}
@@ -180,35 +180,35 @@
         {% endif %}
 
         {% if ocupacao.observacoes %}
-        <p class="text-xs text-slate-600">{{ ocupacao.observacoes }}</p>
+        <p class="break-words text-xs leading-relaxed text-slate-600">{{ ocupacao.observacoes }}</p>
         {% endif %}
 
-        <div class="grid grid-cols-3 items-stretch gap-2 pt-1" data-acoes-ocupacao>
-          <button type="button"
-                  onclick="trocarModal('modalDetalheUnidade{{ item.cargo.pk }}','modalEditarOcupacaoUnidade{{ ocupacao.pk }}')"
-                  aria-label="Atualizar dados de {{ ocupacao.professor.nome }}"
-                  class="inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-2 py-2 text-xs font-bold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-[#025c9f]">
-            <i class="ph ph-pencil-simple hidden sm:inline" aria-hidden="true"></i>Atualizar
-          </button>
-          <form method="post" action="{% url 'core:ocupacao_diretiva_unidade_encerrar' ocupacao.pk %}" class="m-0 flex min-w-0">
-            {% csrf_token %}
-            <button type="submit"
-                    aria-label="Encerrar ocupação de {{ ocupacao.professor.nome }}"
-                    class="inline-flex min-h-10 w-full min-w-0 items-center justify-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50/70 px-2 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100"
-                    title="Definir fim da vigência como hoje">
-              <i class="ph ph-stop-circle hidden sm:inline" aria-hidden="true"></i>Encerrar
-            </button>
-          </form>
+        <div class="grid grid-cols-[1.5fr_1fr_1fr] items-stretch gap-2 pt-2 sm:gap-3" data-acoes-ocupacao>
           <form method="post" action="{% url 'core:ocupacao_diretiva_unidade_remover' ocupacao.pk %}" class="m-0 flex min-w-0">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ retorno }}">
             <button type="submit"
                     aria-label="Excluir cadastro indevido de {{ ocupacao.professor.nome }}"
-                    class="inline-flex min-h-10 w-full min-w-0 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50/70 px-2 py-2 text-xs font-bold text-red-700 hover:bg-red-100"
+                    class="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50/70 px-2 py-2 text-[11px] font-semibold leading-snug text-red-700 hover:bg-red-100 sm:text-xs"
                     title="Excluir cadastro indevido; não ficará no histórico funcional">
-              <i class="ph ph-user-minus hidden sm:inline" aria-hidden="true"></i>Excluir
+              <i class="ph ph-user-minus hidden shrink-0 sm:inline" aria-hidden="true"></i><span>Excluir cadastro indevido</span>
             </button>
           </form>
+          <form method="post" action="{% url 'core:ocupacao_diretiva_unidade_encerrar' ocupacao.pk %}" class="m-0 flex min-w-0">
+            {% csrf_token %}
+            <button type="submit"
+                    aria-label="Encerrar ocupação de {{ ocupacao.professor.nome }}"
+                    class="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50/70 px-2 py-2 text-[11px] font-semibold leading-snug text-amber-800 hover:bg-amber-100 sm:text-xs"
+                    title="Definir fim da vigência como hoje">
+              <i class="ph ph-stop-circle hidden sm:inline" aria-hidden="true"></i>Encerrar
+            </button>
+          </form>
+          <button type="button"
+                  onclick="trocarModal('modalDetalheUnidade{{ item.cargo.pk }}','modalEditarOcupacaoUnidade{{ ocupacao.pk }}')"
+                  aria-label="Atualizar dados de {{ ocupacao.professor.nome }}"
+                  class="inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-2 py-2 text-[11px] font-semibold leading-snug text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-[#025c9f] sm:text-xs">
+            <i class="ph ph-pencil-simple hidden sm:inline" aria-hidden="true"></i>Atualizar
+          </button>
         </div>
       </li>
       {% empty %}
@@ -221,10 +221,10 @@
     </ul>
 
     {% if item.pode_adicionar %}
-    <div class="border-t border-slate-100 bg-slate-50/60 px-5 py-4 sm:px-6">
+    <div class="border-t border-slate-100 bg-slate-50/60 px-5 py-5 sm:px-6">
       <button type="button"
               onclick="trocarModal('modalDetalheUnidade{{ item.cargo.pk }}','modalPreencherUnidade{{ item.cargo.pk }}')"
-              class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#025c9f] px-4 py-2.5 text-sm font-black text-white hover:bg-[#153e70]">
+              class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#025c9f] px-4 py-3 text-sm font-bold text-white hover:bg-[#153e70]">
         <i class="ph ph-user-plus text-lg" aria-hidden="true"></i>
         {% if item.ocupantes %}Adicionar ocupante{% else %}Preencher cargo{% endif %}
       </button>
