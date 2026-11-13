@@ -130,11 +130,12 @@ class JanelaEntregaForm(JanelaEntregaValidacaoMixin, forms.ModelForm):
 class TipoCargoDiretivoForm(forms.ModelForm):
     class Meta:
         model = TipoCargoDiretivo
-        fields = ["nome", "carga_reducao_horas", "exige_curso", "ativo"]
+        fields = ["nome", "carga_reducao_horas", "exige_curso", "permite_multiplos", "ativo"]
         widgets = {
             "nome": forms.TextInput(attrs={"class": _INPUT_CSS}),
             "carga_reducao_horas": forms.NumberInput(attrs={"class": _INPUT_CSS, "min": "0", "max": "20", "step": "0.25"}),
             "exige_curso": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
+            "permite_multiplos": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
             "ativo": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded"}),
         }
 
@@ -143,7 +144,7 @@ class TipoCargoDiretivoUpdateForm(TipoCargoDiretivoForm):
     """A edição do catálogo não recebe a redução específica da unidade."""
 
     class Meta(TipoCargoDiretivoForm.Meta):
-        fields = ["nome", "exige_curso", "ativo"]
+        fields = ["nome", "exige_curso", "permite_multiplos", "ativo"]
 
 
 class TipoCargoDiretivoUnidadeForm(TipoCargoDiretivoUpdateForm):
@@ -165,7 +166,7 @@ class TipoCargoDiretivoUnidadeForm(TipoCargoDiretivoUpdateForm):
             'Esta redução vale somente para a unidade selecionada. '
             'Reduções individuais são preservadas.'
         )
-        self.order_fields(['nome', 'carga_reducao_unidade', 'exige_curso', 'ativo'])
+        self.order_fields(['nome', 'carga_reducao_unidade', 'exige_curso', 'permite_multiplos', 'ativo'])
 
 
 class OpcoesOcupacaoEquipeDiretiva:
@@ -185,13 +186,50 @@ class OpcoesOcupacaoEquipeDiretiva:
         return [(prof.pk, str(prof)) for prof in professores]
 
     @cached_property
-    def cursos(self):
+    def cursos_unidade(self):
         from apps.courses.models import CourseUnit
 
-        cursos = CourseUnit.objects.filter(unidade=self.unidade, ativo=True).select_related(
+        return list(CourseUnit.objects.filter(unidade=self.unidade, ativo=True).select_related(
             'curso', 'unidade',
-        ).order_by('curso__nome')
-        return [(curso.pk, str(curso)) for curso in cursos]
+        ).order_by('curso__nome'))
+
+    @cached_property
+    def cursos(self):
+        return [(curso.pk, str(curso)) for curso in self.cursos_unidade]
+
+    @cached_property
+    def ofertas_cursos(self):
+        from apps.courses.models import CurriculumMatrix
+
+        turnos_por_curso = {}
+        matrizes = CurriculumMatrix.objects.filter(
+            unidades=self.unidade, is_vigente=True, is_rascunho=False,
+            curso_id__in=[curso.curso_id for curso in self.cursos_unidade],
+            turno__in=['M', 'T', 'N'],
+        ).order_by().values_list('curso_id', 'turno').distinct()
+        for curso_id, turno in matrizes:
+            turnos_por_curso.setdefault(curso_id, set()).add(turno)
+        ofertas = {}
+        for curso in self.cursos_unidade:
+            disponiveis = turnos_por_curso.get(curso.curso_id, set())
+            turnos = [turno for turno in ('M', 'T', 'N') if turno in disponiveis] or ['']
+            for turno in turnos:
+                chave = f'{curso.pk}:{turno}' if turno else str(curso.pk)
+                ofertas[chave] = (curso, turno)
+        return ofertas
+
+
+class CursosTurnosDiretivosField(forms.MultipleChoiceField):
+    """Checklist com uma chave distinta para cada oferta de curso e turno."""
+
+    def __init__(self, *, queryset, ofertas, **kwargs):
+        self.queryset = queryset
+        self.ofertas = ofertas
+        turnos = {'M': 'Manhã', 'T': 'Tarde', 'N': 'Noite', '': 'Turno não informado'}
+        super().__init__(choices=[
+            (chave, f'{curso.sigla} ({turnos[turno]})')
+            for chave, (curso, turno) in ofertas.items()
+        ], **kwargs)
 
 
 class ConfiguracaoCargoDiretivoUnidadeForm(forms.ModelForm):
@@ -220,6 +258,18 @@ class CursosOcupacaoDiretivaMixin:
             unidade=unidade, ativo=True,
         ).select_related('curso', 'unidade').order_by('curso__nome')
         self.fields['curso'].queryset = cursos_unidade
+        opcoes = opcoes or OpcoesOcupacaoEquipeDiretiva(unidade)
+        self.opcoes_cursos = opcoes
+        ofertas = dict(opcoes.ofertas_cursos)
+        chave_atual = None
+        if self.instance.pk:
+            chave_atual = (
+                f'{self.instance.curso_id}:{self.instance.turno}'
+                if self.instance.turno else str(self.instance.curso_id)
+            )
+            # Mantém editáveis os vínculos anteriores e os turnos arquivados.
+            if self.instance.curso_id in {curso.pk for curso in opcoes.cursos_unidade}:
+                ofertas.setdefault(chave_atual, (self.instance.curso, self.instance.turno))
 
         self.fields['curso'].required = False
         self.fields['curso'].widget = forms.HiddenInput()
@@ -233,21 +283,28 @@ class CursosOcupacaoDiretivaMixin:
             required=False,
             widget=forms.RadioSelect(attrs={'data-abrangencia-cursos': 'true'}),
         )
-        self.fields['cursos'] = forms.ModelMultipleChoiceField(
-            label='Selecione os cursos',
+        self.fields['cursos'] = CursosTurnosDiretivosField(
+            label='Selecione os cursos e turnos',
             queryset=cursos_unidade,
+            ofertas=ofertas,
             required=False,
             widget=forms.CheckboxSelectMultiple(attrs={'data-checklist-cursos': 'true'}),
             help_text=(
-                'Marque um ou mais cursos desta unidade.'
-                if (bool(opcoes.cursos) if opcoes is not None else cursos_unidade.exists())
+                'Marque um ou mais cursos e turnos desta unidade. Todos os cursos inclui todos os turnos disponíveis.'
+                if opcoes.cursos
                 else 'Nenhum curso ativo cadastrado nesta unidade. Cadastre ou ative um curso antes de preencher este cargo.'
             ),
         )
-        if opcoes is not None:
-            self.fields['cursos'].choices = opcoes.cursos
         if self.instance.pk:
-            self.initial['cursos'] = [self.instance.curso_id]
+            self.initial['cursos'] = [chave_atual]
+            if not self.instance.turno and chave_atual in ofertas and any(
+                curso.pk == self.instance.curso_id and turno
+                for curso, turno in opcoes.ofertas_cursos.values()
+            ):
+                self.fields['cursos'].choices = [
+                    (chave, f'{self.instance.curso.sigla} (Todos os turnos)' if chave == chave_atual else label)
+                    for chave, label in self.fields['cursos'].choices
+                ]
         self.order_fields([
             'professor', 'abrangencia_cursos', 'cursos', 'curso',
             'data_inicio', 'data_fim', 'observacoes',
@@ -262,13 +319,16 @@ class CursosOcupacaoDiretivaMixin:
         curso_legado = cleaned_data.get('curso')
         if not abrangencia and curso_legado:
             # Compatibilidade com integrações/POSTs anteriores ao checklist.
-            cursos = [curso_legado]
+            ofertas = [(curso_legado, self.instance.turno)]
         elif abrangencia == self.TODOS_OS_CURSOS:
-            cursos = list(self.fields['cursos'].queryset)
+            ofertas = list(self.opcoes_cursos.ofertas_cursos.values())
         else:
-            cursos = list(cleaned_data.get('cursos') or [])
+            ofertas = [
+                self.fields['cursos'].ofertas[chave]
+                for chave in dict.fromkeys(cleaned_data.get('cursos') or [])
+            ]
 
-        if not cursos:
+        if not ofertas:
             self.add_error(
                 'cursos',
                 'Selecione ao menos um curso.' if abrangencia == self.CURSOS_ESPECIFICOS
@@ -276,34 +336,50 @@ class CursosOcupacaoDiretivaMixin:
             )
             return cleaned_data
 
+        if not self.instance.cargo.permite_multiplos and len(ofertas) > 1:
+            self.add_error('cursos', (
+                'Este cargo permite apenas um ocupante. Selecione um curso e turno '
+                'ou habilite mais de um ocupante no cadastro do cargo.'
+            ))
+            return cleaned_data
+        cursos_sem_turno = {curso.pk for curso, turno in ofertas if not turno}
+        if any(curso.pk in cursos_sem_turno for curso, turno in ofertas if turno):
+            self.add_error('cursos', (
+                'Selecione todos os turnos ou os turnos específicos de cada curso, '
+                'sem combinar as duas opções.'
+            ))
+            return cleaned_data
+
         # Preserva o registro e a redução individual do curso atual quando ele
         # continua marcado. Os cursos adicionais recebem vínculos próprios.
         if self.instance.pk:
-            cursos.sort(key=lambda curso: curso.pk != self.instance.curso_id)
-        self.cursos_selecionados = cursos
+            ofertas.sort(key=lambda oferta: (oferta[0].pk, oferta[1]) != (self.instance.curso_id, self.instance.turno))
+        self.ofertas_selecionadas = ofertas
         # O campo legado continua representando cada ocupação individual.
         # O primeiro item permite que a validação normal do ModelForm rode;
         # a view cria as demais ocupações na mesma transação.
-        cleaned_data['curso'] = cursos[0]
-        self.instance.curso = cursos[0]
+        cleaned_data['curso'] = ofertas[0][0]
+        self.instance.curso, self.instance.turno = ofertas[0]
 
         professor = cleaned_data.get('professor')
         data_inicio = cleaned_data.get('data_inicio')
         if professor and data_inicio:
-            for curso in cursos:
+            for curso, turno in ofertas:
                 candidata = OcupacaoEquipeDiretiva(
                     pk=self.instance.pk,
                     unidade=self.instance.unidade,
                     cargo=self.instance.cargo,
                     professor=professor,
                     curso=curso,
+                    turno=turno,
                     data_inicio=data_inicio,
                     data_fim=cleaned_data.get('data_fim'),
                 )
                 if candidata.conflitos_de_vigencia().exists():
                     self.add_error(
                         'cursos',
-                        f'Já existe uma ocupação conflitante para {curso}.',
+                        f'Já existe uma ocupação conflitante para {curso}'
+                        f'{" (" + candidata.get_turno_display() + ")" if turno else ""}.',
                     )
         return cleaned_data
 

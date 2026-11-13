@@ -5,10 +5,10 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.models import User
-from apps.courses.models import Course, CourseUnit
+from apps.courses.models import Course, CourseUnit, CurriculumMatrix
 from apps.professors.models import ContractType, Professor
 
-from .forms import OcupacaoEquipeDiretivaUnidadeForm
+from .forms import OcupacaoEquipeDiretivaUnidadeForm, OpcoesOcupacaoEquipeDiretiva
 from .models import (
     AuditoriaGlobal, ConfiguracaoCargoDiretivoUnidade, OcupacaoEquipeDiretiva,
     TipoCargoDiretivo, Unidade,
@@ -75,7 +75,7 @@ class EquipeDiretivaModalTests(TestCase):
         )
         self.assertTrue(form.fields['curso'].widget.is_hidden)
         self.assertEqual(form['abrangencia_cursos'].value(), 'ESPECIFICOS')
-        self.assertEqual(form['cursos'].value(), [self.curso.pk])
+        self.assertEqual(form['cursos'].value(), [str(self.curso.pk)])
         self.assertEqual(set(form.fields['cursos'].queryset), {self.curso, self.adicional})
         self.client.force_login(self.coord)
         page = self.client.get(reverse('core:equipe_diretiva_unidade'))
@@ -184,3 +184,158 @@ class EquipeDiretivaModalTests(TestCase):
         ocupacao.refresh_from_db()
         self.assertEqual(ocupacao.curso, self.adicional)
         self.assertEqual(OcupacaoEquipeDiretiva.objects.count(), 1)
+
+    def criar_matriz(self, curso=None, unidade=None, turno='M', **kwargs):
+        matriz = CurriculumMatrix.objects.create(
+            curso=(curso or self.curso).curso, turno=turno, **kwargs,
+        )
+        matriz.unidades.add(unidade or self.unidade)
+        return matriz
+
+    def test_checklist_separa_turnos_vigentes_sem_duplicar_matrizes(self):
+        self.criar_matriz(turno='M')
+        self.criar_matriz(turno='M')
+        self.criar_matriz(turno='N')
+        self.criar_matriz(turno='T', is_rascunho=True)
+        self.criar_matriz(turno='T', is_vigente=False)
+        self.criar_matriz(turno='T', unidade=self.outra)
+        for compartilhadas in (False, True):
+            with self.subTest(compartilhadas=compartilhadas):
+                form = OcupacaoEquipeDiretivaUnidadeForm(
+                    unidade=self.unidade, cargo=self.cargo,
+                    opcoes=OpcoesOcupacaoEquipeDiretiva(self.unidade) if compartilhadas else None,
+                )
+                choices = dict(form.fields['cursos'].choices)
+                self.assertEqual(choices[f'{self.curso.pk}:M'], 'ZCA (Manhã)')
+                self.assertEqual(choices[f'{self.curso.pk}:N'], 'ZCA (Noite)')
+                self.assertNotIn(f'{self.curso.pk}:T', choices)
+                self.assertNotIn(str(self.curso.pk), choices)
+                self.assertEqual(choices[str(self.adicional.pk)], 'ACA (Turno não informado)')
+                self.assertEqual(len(choices), 3)
+
+    def test_cadastro_e_edicao_preservam_turnos_independentes_nos_dois_perfis(self):
+        self.criar_matriz(turno='M')
+        self.criar_matriz(turno='N')
+        for user, url in (
+            (self.coord, reverse('core:ocupacao_diretiva_unidade_create', args=[self.cargo.pk])),
+            (self.desup, reverse('core:ocupacao_diretiva_create', args=[self.unidade.pk, self.cargo.pk])),
+        ):
+            with self.subTest(perfil=user.perfil):
+                self.client.force_login(user)
+                response = self.enviar(url, self.dados(cursos=[f'{self.curso.pk}:M', f'{self.curso.pk}:N']))
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(set(OcupacaoEquipeDiretiva.objects.values_list('turno', flat=True)), {'M', 'N'})
+                ocupacao = OcupacaoEquipeDiretiva.objects.get(turno='N')
+                form = OcupacaoEquipeDiretivaUnidadeForm(unidade=self.unidade, cargo=self.cargo, instance=ocupacao)
+                self.assertEqual(form['cursos'].value(), [f'{self.curso.pk}:N'])
+                self.client.force_login(self.coord)
+                response = self.enviar(
+                    reverse('core:ocupacao_diretiva_unidade_update', args=[ocupacao.pk]),
+                    self.dados(cursos=[f'{self.curso.pk}:N'], observacoes='Somente noite'),
+                )
+                self.assertEqual(response.status_code, 200)
+                ocupacao.refresh_from_db()
+                self.assertEqual(ocupacao.turno, 'N')
+                self.assertEqual(ocupacao.observacoes, 'Somente noite')
+                self.assertEqual(OcupacaoEquipeDiretiva.objects.get(turno='M').observacoes, '')
+                self.client.force_login(user)
+                duplicada = self.enviar(url, self.dados(cursos=[f'{self.curso.pk}:N']))
+                self.assertEqual(duplicada.status_code, 422)
+                OcupacaoEquipeDiretiva.objects.all().delete()
+
+    def test_todos_os_cursos_inclui_todos_os_turnos(self):
+        self.criar_matriz(turno='M')
+        self.criar_matriz(turno='N')
+        self.client.force_login(self.coord)
+        response = self.enviar(
+            reverse('core:ocupacao_diretiva_unidade_create', args=[self.cargo.pk]),
+            self.dados(abrangencia_cursos='TODOS', cursos=[]),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            set(OcupacaoEquipeDiretiva.objects.values_list('curso_id', 'turno')),
+            {(self.curso.pk, 'M'), (self.curso.pk, 'N'), (self.adicional.pk, '')},
+        )
+
+    def test_rejeita_turno_inexistente_e_oferta_de_outra_unidade(self):
+        self.criar_matriz(turno='M')
+        self.client.force_login(self.coord)
+        for chave in (f'{self.curso.pk}:T', f'{self.externo.pk}:M'):
+            with self.subTest(chave=chave):
+                response = self.enviar(
+                    reverse('core:ocupacao_diretiva_unidade_create', args=[self.cargo.pk]),
+                    self.dados(cursos=[chave]),
+                )
+                self.assertEqual(response.status_code, 422)
+                self.assertFalse(OcupacaoEquipeDiretiva.objects.exists())
+
+    def test_vinculo_legado_pode_ser_editado_sem_escolher_turno(self):
+        ocupacao = self.criar_ocupacao()
+        self.criar_matriz(turno='M')
+        self.client.force_login(self.coord)
+        response = self.enviar(
+            reverse('core:ocupacao_diretiva_unidade_update', args=[ocupacao.pk]),
+            self.dados(cursos=[str(self.curso.pk)]),
+        )
+        self.assertEqual(response.status_code, 200)
+        ocupacao.refresh_from_db()
+        self.assertEqual(ocupacao.turno, '')
+        self.assertEqual(ocupacao.carga_reducao_horas, Decimal('7'))
+        self.assertEqual(OcupacaoEquipeDiretiva.objects.count(), 1)
+
+    def test_desup_pode_habilitar_multiplos_e_unidade_adicionar_segundo_ocupante(self):
+        cargo = TipoCargoDiretivo.objects.create(nome='Cargo com vários ocupantes')
+        primeiro = OcupacaoEquipeDiretiva.objects.create(
+            unidade=self.unidade, cargo=cargo, professor=self.professor, data_inicio=self.hoje,
+        )
+        self.client.force_login(self.desup)
+        response = self.client.post(
+            reverse('core:cargo_diretivo_unidade_update', args=[self.unidade.pk, cargo.pk]),
+            {'nome': cargo.nome, 'carga_reducao_unidade': '5', 'permite_multiplos': 'on', 'ativo': 'on'},
+        )
+        self.assertEqual(response.status_code, 302)
+        cargo.refresh_from_db()
+        self.assertTrue(cargo.permite_multiplos)
+        segundo = Professor.objects.create(
+            id_funcional='MODAL-2', rh_matricula='MODAL-2', rh_nome='Segundo ocupante',
+            tipo_contrato=self.professor.tipo_contrato, unidade_principal=self.unidade,
+        )
+        self.client.force_login(self.coord)
+        page = self.client.get(reverse('core:equipe_diretiva_unidade'))
+        self.assertContains(page, f"modalPreencherUnidade{cargo.pk}")
+        response = self.enviar(
+            reverse('core:ocupacao_diretiva_unidade_create', args=[cargo.pk]),
+            {'professor': segundo.pk, 'data_inicio': self.hoje.isoformat()},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(OcupacaoEquipeDiretiva.objects.filter(cargo=cargo).count(), 2)
+        self.assertTrue(OcupacaoEquipeDiretiva.objects.filter(pk=primeiro.pk).exists())
+
+    def test_alerta_sala_com_resumo_curto_e_lista_recolhida(self):
+        from apps.allocations.models import AlocacaoCurricular, AlocacaoTurmaDocente
+        from apps.courses.models import CurricularComponent, MatrixComponent
+        from apps.allocations.services import semestre_atual
+
+        self.criar_ocupacao()
+        matriz = self.criar_matriz()
+        componente = MatrixComponent.objects.create(
+            matriz=matriz,
+            componente_curricular=CurricularComponent.objects.create(
+                nome='Administração e Gerenciamento de Projetos', carga_horaria_padrao=360,
+            ),
+            periodo=1, carga_horaria=360,
+        )
+        alocacao = AlocacaoCurricular.objects.create(
+            unidade=self.unidade, curso=self.curso, semestre=semestre_atual(), turno='M',
+        )
+        AlocacaoTurmaDocente.objects.create(
+            alocacao_curricular=alocacao, componente_matriz=componente, docente=self.professor,
+        )
+        self.client.force_login(self.coord)
+        response = self.client.get(reverse('core:equipe_diretiva_unidade'))
+        alerta = response.content.decode().split('data-alerta-sala>', 1)[1].split('</details>', 1)[0]
+        resumo = alerta.split('</summary>', 1)[0]
+        self.assertIn('Docente também alocado em sala de aula (18h/sem).', resumo)
+        self.assertNotIn('Administração e Gerenciamento de Projetos', resumo)
+        self.assertIn('<li class="break-words">Administração e Gerenciamento de Projetos</li>', alerta)
+        self.assertNotIn(' open', response.content.decode().split('data-alerta-sala>', 1)[0].rsplit('<details', 1)[1])

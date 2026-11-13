@@ -79,7 +79,7 @@ class TipoCargoDiretivoAdmin(HarpiaModelAdmin):
     list_display = ('nome', 'codigo', 'exige_curso', 'permite_multiplos', 'ativo', 'ordem')
     list_filter = ('ativo', 'exige_curso', 'permite_multiplos')
     search_fields = ('nome', 'codigo')
-    readonly_fields = ('codigo', 'permite_multiplos', 'criado_em', 'atualizado_em')
+    readonly_fields = ('codigo', 'criado_em', 'atualizado_em')
 
 
 class OcupacaoEquipeDiretivaAdmin(HarpiaModelAdmin):

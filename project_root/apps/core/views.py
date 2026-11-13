@@ -1165,16 +1165,17 @@ def _criar_ocupacoes_diretivas_dos_demais_cursos(ocupacao_base, form, *, criado_
     from .services import obter_reducao_cargo_unidade
 
     criadas = [ocupacao_base]
-    cursos_adicionais = getattr(form, 'cursos_selecionados', [])[1:]
+    cursos_adicionais = getattr(form, 'ofertas_selecionadas', [])[1:]
     if not cursos_adicionais:
         return criadas
     reducao_padrao = obter_reducao_cargo_unidade(ocupacao_base.cargo, ocupacao_base.unidade)
-    for curso in cursos_adicionais:
+    for curso, turno in cursos_adicionais:
         ocupacao = OcupacaoEquipeDiretiva(
             unidade=ocupacao_base.unidade,
             cargo=ocupacao_base.cargo,
             professor=ocupacao_base.professor,
             curso=curso,
+            turno=turno,
             data_inicio=ocupacao_base.data_inicio,
             data_fim=ocupacao_base.data_fim,
             carga_reducao_horas=reducao_padrao,

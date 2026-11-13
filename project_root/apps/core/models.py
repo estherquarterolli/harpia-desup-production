@@ -215,6 +215,11 @@ class OcupacaoEquipeDiretiva(models.Model):
         related_name="ocupacoes_diretivas",
         verbose_name="Curso",
     )
+    turno = models.CharField(
+        max_length=1, blank=True, default='',
+        choices=[('M', 'Manhã'), ('T', 'Tarde'), ('N', 'Noite')],
+        verbose_name="Turno do curso",
+    )
     data_inicio = models.DateField(verbose_name="Início da vigência")
     data_fim = models.DateField(null=True, blank=True, verbose_name="Fim da vigência")
     carga_reducao_horas = models.DecimalField(
@@ -295,6 +300,8 @@ class OcupacaoEquipeDiretiva(models.Model):
         if self.cargo.permite_multiplos:
             if self.cargo.exige_curso:
                 conflitos = conflitos.filter(curso_id=self.curso_id)
+                if self.turno:
+                    conflitos = conflitos.filter(models.Q(turno=self.turno) | models.Q(turno=''))
             else:
                 conflitos = conflitos.filter(curso__isnull=True)
             conflitos = conflitos.filter(professor_id=self.professor_id)
@@ -317,6 +324,8 @@ class OcupacaoEquipeDiretiva(models.Model):
                 erros["curso"] = "Este cargo exige a seleção de um curso da unidade."
             if not self.cargo.exige_curso and self.curso_id:
                 erros["curso"] = "Este cargo não deve ser vinculado a um curso."
+            if self.turno and not self.cargo.exige_curso:
+                erros["turno"] = "O turno só pode ser informado em cargos vinculados a um curso."
 
         if self.curso_id and self.unidade_id and self.curso.unidade_id != self.unidade_id:
             erros["curso"] = "O curso selecionado não pertence à unidade informada."

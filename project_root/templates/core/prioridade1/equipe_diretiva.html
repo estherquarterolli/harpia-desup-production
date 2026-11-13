@@ -48,7 +48,7 @@
         <span class="block font-black text-slate-900">{{ item.cargo.nome }}<span class="ml-2 text-xs font-bold text-emerald-700">{{ item.carga_reducao_horas|floatformat:"-2" }} h de redução</span></span>
 
         {% if item.ocupantes %}
-        <span class="block truncate text-sm text-slate-500">{% for ocupacao in item.ocupantes %}{{ ocupacao.professor.nome }}{% if ocupacao.curso %} ({{ ocupacao.curso.sigla }}){% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+        <span class="block truncate text-sm text-slate-500">{% for ocupacao in item.ocupantes %}{{ ocupacao.professor.nome }}{% if ocupacao.curso %} ({{ ocupacao.curso.sigla }}{% if ocupacao.turno %} · {{ ocupacao.get_turno_display }}{% endif %}){% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
         {% endif %}
       </span>
       {% if not item.cargo.ativo %}<span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500">Inativo</span>
@@ -86,7 +86,7 @@
     <div class="flex items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
       <div class="min-w-0">
         <h3 id="tituloDetalhe{{ item.cargo.pk }}" class="truncate text-base font-black text-slate-900">{{ item.cargo.nome }}</h3>
-        <p class="text-xs text-slate-500">{{ unidade_selecionada.sigla }}{% if item.cargo.exige_curso %} · um ocupante por curso{% endif %}</p>
+        <p class="text-xs text-slate-500">{{ unidade_selecionada.sigla }}{% if item.cargo.exige_curso %} · ocupações por curso e turno{% endif %}</p>
       </div>
       <div class="flex shrink-0 items-center gap-1">
         <button type="button" onclick="trocarModal('modalDetalhe{{ item.cargo.pk }}','modalCargo{{ item.cargo.pk }}')" title="Editar cargo" aria-label="Editar cargo {{ item.cargo.nome }}" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-[#025c9f]"><i class="ph ph-gear-six text-lg"></i></button>
@@ -101,7 +101,7 @@
       <li class="flex items-center gap-3 px-6 py-4">
         <div class="min-w-0 flex-1">
           <p class="truncate font-bold text-slate-800">{{ ocupacao.professor.nome }}</p>
-          <p class="text-xs text-slate-500">{% if ocupacao.curso %}{{ ocupacao.curso.sigla }} · {% endif %}desde {{ ocupacao.data_inicio|date:'d/m/Y' }}{% if ocupacao.data_fim %} até {{ ocupacao.data_fim|date:'d/m/Y' }}{% endif %}</p>
+          <p class="text-xs text-slate-500">{% if ocupacao.curso %}{{ ocupacao.curso.sigla }}{% if ocupacao.turno %} ({{ ocupacao.get_turno_display }}){% endif %} · {% endif %}desde {{ ocupacao.data_inicio|date:'d/m/Y' }}{% if ocupacao.data_fim %} até {{ ocupacao.data_fim|date:'d/m/Y' }}{% endif %}</p>
         </div>
         <span class="flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-sm font-black text-emerald-700"><i class="ph ph-clock"></i>{{ ocupacao.carga_reducao_horas|hhmm }}</span>
         <button type="button" onclick="trocarModal('modalDetalhe{{ item.cargo.pk }}','modalReducao{{ ocupacao.pk }}')" title="Ajustar redução" aria-label="Ajustar redução de {{ ocupacao.professor.nome }}" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-blue-50 hover:text-[#025c9f]"><i class="ph ph-pencil-simple text-lg"></i></button>
@@ -169,7 +169,7 @@
       {% for ocupacao in historico %}
       <li class="flex items-center justify-between gap-3 px-6 py-3">
         <div class="min-w-0">
-          <p class="truncate text-sm font-bold text-slate-800">{{ ocupacao.cargo.nome }}{% if ocupacao.curso %} · {{ ocupacao.curso.sigla }}{% endif %}</p>
+          <p class="truncate text-sm font-bold text-slate-800">{{ ocupacao.cargo.nome }}{% if ocupacao.curso %} · {{ ocupacao.curso.sigla }}{% if ocupacao.turno %} ({{ ocupacao.get_turno_display }}){% endif %}{% endif %}</p>
           <p class="truncate text-xs text-slate-500">{{ ocupacao.professor.nome }} · {{ ocupacao.data_inicio|date:'d/m/Y' }} – {{ ocupacao.data_fim|date:'d/m/Y'|default:'atual' }}</p>
         </div>
         <div class="flex shrink-0 items-center gap-2">
