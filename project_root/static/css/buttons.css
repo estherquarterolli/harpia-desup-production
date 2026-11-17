@@ -1,0 +1,72 @@
+/*
+ * Cores dos botões do HARPIA DESUP — ponto único de controle.
+ *
+ * Para trocar a cor de TODOS os botões de um tipo, altere só as variáveis abaixo.
+ *
+ *   .btn-primary  ação principal (Salvar, Enviar, Aprovar)      -> azul institucional
+ *   .btn-danger   ação destrutiva (Excluir, Sim, excluir)       -> vermelho (SÓ para isso)
+ *   .btn-cancel   Cancelar / Voltar                             -> cinza neutro, vazado
+ *
+ * As classes só definem cor/borda; tamanho e espaçamento continuam nas classes
+ * Tailwind de cada botão.
+ */
+:root {
+  --btn-primary-bg: #025c9f;
+  --btn-primary-bg-hover: #153e70;
+  --btn-primary-text: #ffffff;
+
+  --btn-danger-bg: #dc2626;
+  --btn-danger-bg-hover: #b91c1c;
+  --btn-danger-text: #ffffff;
+
+  --btn-cancel-bg: #ffffff;
+  --btn-cancel-bg-hover: #f1f5f9;
+  --btn-cancel-text: #475569;
+  --btn-cancel-border: #cbd5e1;
+  --btn-cancel-border-hover: #94a3b8;
+}
+
+.btn-primary,
+.btn-danger,
+.btn-cancel {
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.btn-primary {
+  background-color: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+}
+.btn-primary:hover { background-color: var(--btn-primary-bg-hover); }
+
+.btn-danger {
+  background-color: var(--btn-danger-bg);
+  color: var(--btn-danger-text);
+}
+.btn-danger:hover { background-color: var(--btn-danger-bg-hover); }
+
+.btn-cancel {
+  background-color: var(--btn-cancel-bg);
+  border-color: var(--btn-cancel-border);
+  color: var(--btn-cancel-text);
+}
+.btn-cancel:hover {
+  background-color: var(--btn-cancel-bg-hover);
+  border-color: var(--btn-cancel-border-hover);
+}
+
+.btn-primary:focus-visible,
+.btn-danger:focus-visible,
+.btn-cancel:focus-visible {
+  outline: 2px solid var(--btn-primary-bg);
+  outline-offset: 2px;
+}
+
+.btn-primary:disabled,
+.btn-danger:disabled,
+.btn-cancel:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
