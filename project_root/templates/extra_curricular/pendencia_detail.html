@@ -145,7 +145,7 @@
             {% csrf_token %}
             <button type="submit"
               onclick="if(!confirm('Tem certeza que deseja enviar para a DESUP? Após o envio não será possível alterar as justificativas.')) return false;"
-              class="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-black text-xs px-4 py-2 rounded-xl transition-colors shadow-sm">
+              class="btn-primary flex items-center gap-2 font-black text-xs px-4 py-2 rounded-xl transition-colors">
               <i class="ph ph-paper-plane-right"></i> Enviar para Aprovação
             </button>
           </form>

@@ -31,7 +31,7 @@
     <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Ações da matriz">
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 {% if not editando_vigente %}md:grid-cols-3{% endif %}">
         <a href="{% url 'courses:matrix_list' %}"
-          class="flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-3 text-xs font-black uppercase text-white shadow-sm transition-colors hover:bg-red-700">
+          class="btn-cancel flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-xs font-black uppercase transition-colors">
           <i class="ph ph-x-circle text-base"></i> Cancelar
         </a>
         {% if editando_vigente %}
