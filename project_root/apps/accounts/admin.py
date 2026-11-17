@@ -97,49 +97,43 @@ class HarpiaAdminSite(UnfoldAdminSite):
         itens = [
             (
                 'atencao', ErroSistema.objects.filter(criado_em__gte=agora - timedelta(hours=24)).count(),
-                'Erros nas últimas 24 horas',
-                'Falhas registradas pelo sistema que podem ter atrapalhado alguém.',
+                'Erros nas últimas 24h',
                 'core_errosistema_changelist', 'periodo=24h',
             ),
             (
                 'atencao', Unidade.objects.filter(status=True, usuarios__isnull=True).count(),
-                'Unidades ativas sem nenhum usuário',
-                'Ninguém consegue entrar para preencher os dados dessas unidades.',
+                'Unidades sem usuário',
                 'core_unidade_changelist', 'acesso=sem_usuario',
             ),
             (
                 'atencao', usuarios_por_situacao(usuarios, 'sem_unidade').count(),
                 'Coordenadores sem unidade',
-                'Usuários de unidade sem unidade vinculada não enxergam dados.',
                 'accounts_user_changelist', 'situacao=sem_unidade',
             ),
             (
                 'info', usuarios_por_situacao(usuarios, 'nunca_acessou').count(),
-                'Usuários que nunca acessaram',
-                'Contas ativas que ainda não fizeram o primeiro acesso.',
+                'Nunca acessaram',
                 'accounts_user_changelist', 'situacao=nunca_acessou',
             ),
             (
                 'info', usuarios_por_situacao(usuarios, 'senha_temporaria').count(),
-                'Usuários com senha temporária',
-                'Ainda não trocaram a senha padrão.',
+                'Com senha temporária',
                 'accounts_user_changelist', 'situacao=senha_temporaria',
             ),
             (
                 'info', JanelaEntrega.objects.filter(
                     status__in=[JanelaEntrega.StatusChoices.ABERTO, JanelaEntrega.StatusChoices.REABERTO],
                 ).count(),
-                'Prazos de entrega abertos',
-                'Janelas em que as unidades ainda podem enviar a matriz.',
+                'Prazos abertos',
                 'core_janelaentrega_changelist', 'prazo=abertas',
             ),
         ]
         return [
             {
-                'gravidade': gravidade, 'quantidade': quantidade, 'titulo': titulo, 'texto': texto,
+                'gravidade': gravidade, 'quantidade': quantidade, 'titulo': titulo,
                 'url': f"{reverse(f'{self.name}:{rota}')}?{consulta}",
             }
-            for gravidade, quantidade, titulo, texto, rota, consulta in itens
+            for gravidade, quantidade, titulo, rota, consulta in itens
             if quantidade
         ]
 
@@ -235,7 +229,7 @@ class CustomUserAdmin(DjangoUserAdmin, ModelAdmin):
             ),
         )
         if not linhas:
-            return format_html('{}<p class="sa-muted">Nenhuma ação registrada na auditoria por este e-mail.</p>', resumo)
+            return format_html('{}<p class="sa-muted">Nenhuma ação registrada.</p>', resumo)
 
         tabela = format_html(
             '<div class="sa-table-wrap"><table class="sa-table"><thead><tr>'
@@ -255,17 +249,17 @@ class CustomUserAdmin(DjangoUserAdmin, ModelAdmin):
         )
         link = reverse(f'{self.admin_site.name}:core_auditoriaglobal_changelist')
         return format_html(
-            '{}{}<p><a href="{}?quem_contem={}">Ver tudo o que este usuário fez na auditoria →</a></p>',
+            '{}{}<p><a href="{}?quem_contem={}">Ver tudo na auditoria →</a></p>',
             resumo, tabela, link, obj.email,
         )
 
     # ---- ações ------------------------------------------------------------
 
-    @admin.action(description='Ativar usuários selecionados')
+    @admin.action(description='Ativar selecionados')
     def ativar_usuarios(self, request, queryset):
         return self._alterar_ativo(request, queryset, True)
 
-    @admin.action(description='Desativar usuários selecionados (não conseguem mais entrar)')
+    @admin.action(description='Desativar selecionados')
     def desativar_usuarios(self, request, queryset):
         return self._alterar_ativo(request, queryset, False)
 

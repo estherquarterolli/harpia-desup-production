@@ -11,63 +11,36 @@
 {% if request.user.is_superuser %}
 <div class="sa-page">
 
-    {# Cabeçalho: cores definidas em static/css/superadmin.css (funciona nos temas claro e escuro). #}
     <section class="sa-hero" aria-label="Boas-vindas">
-        <p class="sa-hero__eyebrow">Painel do superadministrador</p>
         <h1 class="sa-hero__title">Olá, {{ request.user.email }}</h1>
-        <p class="sa-hero__text">
-            Daqui você administra os dados técnicos do HARPIA DESUP ou confere o sistema
-            exatamente como a DESUP e cada unidade o enxergam.
-        </p>
-        <div class="sa-hero__chips">
-            <span class="sa-chip">Modo atual: administração técnica</span>
-        </div>
     </section>
 
-    {# 0. Precisa de atenção: pendências reais, cada uma leva à lista já filtrada. #}
+    {% if precisa_atencao %}
     <section>
-        <div class="sa-section__head">
-            <h2 class="sa-section__title">Precisa de atenção</h2>
-            <p class="sa-section__hint">Clique em um item para abrir só os registros envolvidos.</p>
-        </div>
-        {% if precisa_atencao %}
+        <h2 class="sa-section__title">Precisa de atenção</h2>
         <div class="sa-alertas">
             {% for alerta in precisa_atencao %}
             <a href="{{ alerta.url }}" class="sa-alerta sa-alerta--{{ alerta.gravidade }}">
                 <span class="sa-alerta__num">{{ alerta.quantidade }}</span>
-                <span>
-                    <span class="sa-alerta__titulo">{{ alerta.titulo }}</span>
-                    <span class="sa-alerta__texto">{{ alerta.texto }}</span>
-                    <span class="sa-alerta__ir">Ver lista →</span>
-                </span>
+                <span class="sa-alerta__titulo">{{ alerta.titulo }}</span>
             </a>
             {% endfor %}
         </div>
-        {% else %}
-        <p class="sa-tudo-certo">Tudo em ordem: nenhuma pendência no momento.</p>
-        {% endif %}
     </section>
+    {% endif %}
 
-    {# 1. O que fazer: ver o sistema como outro perfil. #}
     <section>
-        <div class="sa-section__head">
-            <h2 class="sa-section__title">Ver o sistema como outro perfil</h2>
-            <p class="sa-section__hint">Escolha uma visão e clique em abrir. É só uma simulação: seu cadastro e seus privilégios não mudam.</p>
-        </div>
-
+        <h2 class="sa-section__title">Ver o sistema como</h2>
         <div class="sa-grid sa-grid--2">
             <form method="post" action="{% url 'superadmin_visualizacao' %}" class="sa-card sa-choice">
                 {% csrf_token %}
                 <input type="hidden" name="modo" value="DESUP">
                 <div class="sa-choice__top">
                     <span class="material-symbols-outlined sa-choice__icon">apartment</span>
-                    <div>
-                        <h3 class="sa-card__title">Como a DESUP</h3>
-                        <p class="sa-card__text">Painel geral, pareceres, matrizes, entregas e dados de <strong>todas</strong> as unidades.</p>
-                    </div>
+                    <h3 class="sa-card__title">DESUP</h3>
                 </div>
                 <div class="sa-choice__form">
-                    <button type="submit" class="sa-btn sa-btn--primary">Abrir como DESUP</button>
+                    <button type="submit" class="sa-btn sa-btn--primary">Abrir</button>
                 </div>
             </form>
 
@@ -76,72 +49,53 @@
                 <input type="hidden" name="modo" value="COORDENADOR_UNIDADE">
                 <div class="sa-choice__top">
                     <span class="material-symbols-outlined sa-choice__icon">school</span>
-                    <div>
-                        <h3 class="sa-card__title">Como uma unidade</h3>
-                        <p class="sa-card__text">Menus, dados e restrições que a coordenação de <strong>uma</strong> unidade enxerga.</p>
-                    </div>
+                    <h3 class="sa-card__title">Unidade</h3>
                 </div>
                 <div class="sa-choice__form">
-                    <label for="unidade_id" class="sa-label">1. Escolha a unidade</label>
-                    <select id="unidade_id" name="unidade_id" required class="sa-select">
+                    <select id="unidade_id" name="unidade_id" required class="sa-select" aria-label="Unidade">
                         <option value="">Selecione uma unidade</option>
                         {% for unidade in unidades_visualizacao %}
                             <option value="{{ unidade.pk }}">{{ unidade.sigla }} — {{ unidade.nome }}</option>
                         {% endfor %}
                     </select>
-                    <button type="submit" id="btn-visao-unidade" class="sa-btn sa-btn--primary" disabled>2. Abrir como unidade</button>
+                    <button type="submit" id="btn-visao-unidade" class="sa-btn sa-btn--primary" disabled>Abrir</button>
                 </div>
             </form>
         </div>
-
-        <p class="sa-aviso">
-            Enquanto estiver simulando, uma faixa amarela <strong>"Modo de visualização"</strong> aparece no topo do
-            sistema, com o botão <strong>"Voltar à administração"</strong> para retornar a este painel.
-        </p>
     </section>
 
-    {# 2. Números do sistema (cada cartão leva à lista correspondente). #}
     <section>
-        <div class="sa-section__head">
-            <h2 class="sa-section__title">Resumo do sistema</h2>
-            <p class="sa-section__hint">Clique em um número para abrir a lista.</p>
-        </div>
         <div class="sa-grid sa-grid--4">
             <a href="/admin/accounts/user/" class="sa-stat">
                 <div class="sa-stat__label">Usuários</div>
                 <div class="sa-stat__value">{{ total_usuarios }}</div>
-                <div class="sa-stat__link">Ver usuários →</div>
             </a>
             <a href="/admin/core/unidade/" class="sa-stat">
                 <div class="sa-stat__label">Unidades ativas</div>
                 <div class="sa-stat__value">{{ total_unidades }}</div>
-                <div class="sa-stat__link">Ver unidades →</div>
             </a>
             <a href="/admin/professors/professor/" class="sa-stat">
                 <div class="sa-stat__label">Professores ativos</div>
                 <div class="sa-stat__value">{{ total_professores }}</div>
-                <div class="sa-stat__link">Ver professores →</div>
             </a>
             <a href="/admin/core/errosistema/" class="sa-stat">
-                <div class="sa-stat__label">Erros registrados</div>
+                <div class="sa-stat__label">Erros</div>
                 <div class="sa-stat__value">{{ total_erros }}</div>
-                <div class="sa-stat__link">Ver erros →</div>
             </a>
         </div>
     </section>
 
-    {# 3. Atividade recente: o que aconteceu por último no sistema. #}
     <section>
         <div class="sa-section__head">
             <h2 class="sa-section__title">Atividade recente</h2>
-            <p class="sa-section__hint">Os últimos registros da auditoria. <a href="/admin/core/auditoriaglobal/">Abrir a auditoria completa</a></p>
+            <p class="sa-section__hint"><a href="/admin/core/auditoriaglobal/">Ver tudo</a></p>
         </div>
         <div class="sa-card" style="padding: 0;">
             {% if atividade_recente %}
             <div class="sa-table-wrap">
                 <table class="sa-table">
                     <thead>
-                        <tr><th>Quando</th><th>O que aconteceu</th><th>Quem fez</th><th>Registro</th></tr>
+                        <tr><th>Quando</th><th>O que aconteceu</th><th>Quem</th><th>Registro</th></tr>
                     </thead>
                     <tbody>
                         {% for item in atividade_recente %}
@@ -156,60 +110,8 @@
                 </table>
             </div>
             {% else %}
-            <p class="sa-muted" style="padding: 1.25rem;">Ainda não há registros de auditoria.</p>
+            <p class="sa-muted" style="padding: 1.25rem;">Sem registros.</p>
             {% endif %}
-        </div>
-    </section>
-
-    {# 4. Acessos rápidos por tarefa. O menu lateral continua com todas as funções. #}
-    <section>
-        <div class="sa-section__head">
-            <h2 class="sa-section__title">Tarefas frequentes</h2>
-            <p class="sa-section__hint">Atalhos para o que mais se faz aqui. Todas as funções estão no menu lateral; <strong>Ctrl+K</strong> (⌘K no Mac) abre a busca rápida.</p>
-        </div>
-        <div class="sa-grid sa-grid--3">
-            <a href="/admin/accounts/user/" class="sa-shortcut">
-                <span class="material-symbols-outlined sa-shortcut__icon">manage_accounts</span>
-                <span>
-                    <span class="sa-shortcut__title">Usuários e senhas</span>
-                    <span class="sa-shortcut__text" style="display:block;">Cadastrar, ativar, desativar ou redefinir a senha de alguém.</span>
-                </span>
-            </a>
-            <a href="/admin/core/auditoriaglobal/" class="sa-shortcut">
-                <span class="material-symbols-outlined sa-shortcut__icon">history</span>
-                <span>
-                    <span class="sa-shortcut__title">Quem fez o quê</span>
-                    <span class="sa-shortcut__text" style="display:block;">Auditoria com antes e depois de cada alteração.</span>
-                </span>
-            </a>
-            <a href="/admin/core/errosistema/" class="sa-shortcut">
-                <span class="material-symbols-outlined sa-shortcut__icon">bug_report</span>
-                <span>
-                    <span class="sa-shortcut__title">Erros do sistema</span>
-                    <span class="sa-shortcut__text" style="display:block;">Falhas registradas, com data, usuário e tela.</span>
-                </span>
-            </a>
-            <a href="/admin/core/janelaentrega/" class="sa-shortcut">
-                <span class="material-symbols-outlined sa-shortcut__icon">lock_clock</span>
-                <span>
-                    <span class="sa-shortcut__title">Janelas de entrega</span>
-                    <span class="sa-shortcut__text" style="display:block;">Abrir, reabrir ou encerrar prazos das unidades.</span>
-                </span>
-            </a>
-            <a href="/admin/core/unidade/" class="sa-shortcut">
-                <span class="material-symbols-outlined sa-shortcut__icon">account_balance</span>
-                <span>
-                    <span class="sa-shortcut__title">Unidades</span>
-                    <span class="sa-shortcut__text" style="display:block;">Cadastro e situação de cada unidade.</span>
-                </span>
-            </a>
-            <a href="/admin/courses/curriculummatrix/" class="sa-shortcut">
-                <span class="material-symbols-outlined sa-shortcut__icon">account_tree</span>
-                <span>
-                    <span class="sa-shortcut__title">Matrizes curriculares</span>
-                    <span class="sa-shortcut__text" style="display:block;">Consultar matrizes vigentes e o histórico.</span>
-                </span>
-            </a>
         </div>
     </section>
 </div>

@@ -314,16 +314,22 @@ class CurriculumMatrixFormsetMixin:
 
         if editando_vigente:
             from apps.accounts.views import registrar_auditoria
+            from apps.core.audit import _unidades_m2m, ha_alteracoes_pendentes
 
             sigla = self.object.curso.sigla if self.object.curso_id else '?'
+            rotulo = f'#{self.object.pk} "{self.object.nome}" ({sigla})'
+            detalhes = f'Matriz vigente {rotulo} editada.'
+            if not ha_alteracoes_pendentes(self.request):
+                detalhes += ' Nenhum campo foi alterado.'
+            # As alterações da matriz e dos componentes (adicionados, removidos ou editados)
+            # são anexadas a este evento, com o antes → depois de cada campo.
             registrar_auditoria(
                 self.request,
                 acao='MATRIZ_VIGENTE_EDITADA',
                 usuario=self.request.user,
-                detalhes=(
-                    f'Matriz vigente #{self.object.pk} "{self.object.nome}" '
-                    f'({sigla}) editada.'
-                ),
+                detalhes=detalhes,
+                entidade='Matriz curricular', objeto=rotulo, objeto_id=str(self.object.pk),
+                unidade_objeto=_unidades_m2m(self.object),
             )
             messages.success(self.request, 'Matriz vigente atualizada com sucesso.')
         else:

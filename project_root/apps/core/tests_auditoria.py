@@ -6,6 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.courses.models import Course, CurricularComponent, CurriculumMatrix, MatrixComponent
 from apps.professors.models import ContractType, Professor
 
 from .models import AuditoriaGlobal, Unidade
@@ -294,15 +295,15 @@ class SuperadminExperienciaTests(TestCase):
         Unidade.objects.create(nome='Unidade Sem Ninguém', sigla='USN', status=True)
         resposta = self.client.get(reverse('alloc_admin:index'))
         self.assertContains(resposta, 'Precisa de atenção')
-        self.assertContains(resposta, 'Unidades ativas sem nenhum usuário')
+        self.assertContains(resposta, 'Unidades sem usuário')
         self.assertContains(resposta, 'acesso=sem_usuario')
 
-    def test_home_diz_que_esta_tudo_em_ordem_quando_nao_ha_pendencias(self):
+    def test_home_esconde_o_painel_de_atencao_quando_nao_ha_pendencias(self):
         self.superadmin.last_login = timezone.now()
         self.superadmin.forcar_troca_senha = False
         self.superadmin.save(update_fields=['last_login', 'forcar_troca_senha'])
         resposta = self.client.get(reverse('alloc_admin:index'))
-        self.assertContains(resposta, 'Tudo em ordem')
+        self.assertNotContains(resposta, 'Precisa de atenção')
 
     def test_filtro_de_unidades_sem_usuario_mostra_so_as_sem_usuario(self):
         Unidade.objects.create(nome='Unidade Vazia', sigla='UVZ', status=True)
@@ -417,3 +418,104 @@ class SuperadminExperienciaTests(TestCase):
         self.assertContains(resposta, 'ErroNovo')
         self.assertNotContains(resposta, 'ErroVelho')
         self.assertTrue(novo.pk)
+
+
+class MatrizVigenteAuditoriaTests(TestCase):
+    """"Matriz vigente editada" precisa dizer o que mudou, inclusive componentes novos e removidos."""
+
+    def setUp(self):
+        self.desup = User.objects.create_user(
+            email='desup.mat@harpia.test', password='pw', perfil='DESUP', forcar_troca_senha=False,
+        )
+        self.unidade = Unidade.objects.create(nome='Unidade Teste', sigla='UT')
+        self.curso = Course.objects.create(nome='Curso Teste', sigla='PW')
+        self.algoritmos = CurricularComponent.objects.create(
+            nome='Algoritmos', codigo='AL1', carga_horaria_padrao=80, creditos=4,
+        )
+        self.banco = CurricularComponent.objects.create(
+            nome='Banco de Dados', codigo='BD1', carga_horaria_padrao=60, creditos=3,
+        )
+        self.matriz = CurriculumMatrix.objects.create(
+            curso=self.curso, nome='GAIO', is_vigente=True, is_rascunho=False, turno='M',
+        )
+        self.matriz.unidades.add(self.unidade)
+        self.componente = MatrixComponent.objects.create(
+            matriz=self.matriz, componente_curricular=self.algoritmos, periodo='1º Semestre',
+            carga_horaria=80, creditos=4, carga_horaria_semanal=4,
+            status=MatrixComponent.StatusChoices.SEM_PROFESSOR,
+        )
+
+    def _editar(self, carga_horaria='100', adicionar_banco=True):
+        dados = {
+            'curso': self.curso.id, 'unidades': [self.unidade.id], 'nome': 'GAIO', 'turno': 'M',
+            'acao': 'salvar_vigente',
+            'componentes-TOTAL_FORMS': '2' if adicionar_banco else '1',
+            'componentes-INITIAL_FORMS': '1',
+            'componentes-MIN_NUM_FORMS': '1',
+            'componentes-MAX_NUM_FORMS': '1000',
+            'componentes-0-id': self.componente.pk,
+            'componentes-0-matriz': self.matriz.pk,
+            'componentes-0-componente_curricular': self.algoritmos.id,
+            'componentes-0-codigo': 'AL1',
+            'componentes-0-periodo': '1º Semestre',
+            'componentes-0-carga_horaria': carga_horaria,
+            'componentes-0-creditos': '4',
+            'componentes-0-carga_horaria_semanal': '4',
+            'componentes-0-status': MatrixComponent.StatusChoices.SEM_PROFESSOR,
+        }
+        if adicionar_banco:
+            dados.update({
+                'componentes-1-componente_curricular': self.banco.id,
+                'componentes-1-periodo': '2º Semestre',
+                'componentes-1-carga_horaria': '60',
+                'componentes-1-creditos': '3',
+                'componentes-1-carga_horaria_semanal': '3',
+                'componentes-1-status': MatrixComponent.StatusChoices.SEM_PROFESSOR,
+            })
+        self.client.force_login(self.desup)
+        return self.client.post(
+            reverse('courses:matrix_update', kwargs={'pk': self.matriz.pk}), dados,
+        )
+
+    def test_evento_lista_campo_alterado_e_componente_novo(self):
+        resposta = self._editar()
+        self.assertEqual(resposta.status_code, 302)
+
+        evento = AuditoriaGlobal.objects.get(acao='MATRIZ_VIGENTE_EDITADA')
+        self.assertEqual(evento.entidade, 'Matriz curricular')
+        self.assertIn('GAIO', evento.objeto)
+        campos = evento.mudancas
+        self.assertTrue(any(
+            'arga' in c['campo'] and c['antes'] == '80' and c['depois'] == '100' for c in campos
+        ), campos)
+        self.assertTrue(any(
+            'Banco de Dados' in c['campo'] or 'Banco de Dados' in c['depois'] for c in campos
+        ), campos)
+
+    def test_componentes_nao_geram_linhas_soltas_quando_a_matriz_vigente_e_editada(self):
+        self._editar()
+        self.assertFalse(AuditoriaGlobal.objects.filter(acao__startswith='COMPONENTE_MATRIZ').exists())
+
+    def test_componente_removido_aparece_no_evento(self):
+        dados_ok = self._editar(carga_horaria='80', adicionar_banco=False)
+        self.assertEqual(dados_ok.status_code, 302)
+        AuditoriaGlobal.objects.all().delete()
+        self.client.post(
+            reverse('courses:matrix_update', kwargs={'pk': self.matriz.pk}),
+            {
+                'curso': self.curso.id, 'unidades': [self.unidade.id], 'nome': 'GAIO', 'turno': 'M',
+                'acao': 'salvar_vigente',
+                'componentes-TOTAL_FORMS': '2', 'componentes-INITIAL_FORMS': '1',
+                'componentes-MIN_NUM_FORMS': '1', 'componentes-MAX_NUM_FORMS': '1000',
+                'componentes-0-id': self.componente.pk, 'componentes-0-matriz': self.matriz.pk,
+                'componentes-0-DELETE': 'on',
+                'componentes-1-componente_curricular': self.banco.id,
+                'componentes-1-periodo': '1º Semestre', 'componentes-1-carga_horaria': '60',
+                'componentes-1-creditos': '3', 'componentes-1-carga_horaria_semanal': '3',
+                'componentes-1-status': MatrixComponent.StatusChoices.SEM_PROFESSOR,
+            },
+        )
+        evento = AuditoriaGlobal.objects.get(acao='MATRIZ_VIGENTE_EDITADA')
+        self.assertTrue(any(
+            'Algoritmos' in c['campo'] and c['depois'] == '—' for c in evento.mudancas
+        ), evento.mudancas)
