@@ -102,13 +102,13 @@ class DetalhesContemFilter(_ContemFilter):
 
 
 class QuemFezContemFilter(_ContemFilter):
-    title = 'Quem fez contém (e-mail ou perfil)'
+    title = 'Quem fez contém'
     parameter_name = 'quem_contem'
     campos = ('email', 'perfil_usuario')
 
 
 class RegistroContemFilter(_ContemFilter):
-    title = 'Nome do registro contém (ex.: nome do professor)'
+    title = 'Registro contém'
     parameter_name = 'registro_contem'
     campos = ('objeto', 'entidade', 'objeto_id')
 
@@ -120,13 +120,13 @@ class UnidadeContemFilter(_ContemFilter):
 
 
 class AcaoContemFilter(_ContemFilter):
-    title = 'Código da ação contém'
+    title = 'Ação contém'
     parameter_name = 'acao_contem'
     campos = ('acao',)
 
 
 class OperacaoContemFilter(_ContemFilter):
-    title = 'Código da operação (todos os registros de uma mesma ação)'
+    title = 'Código da operação'
     parameter_name = 'operacao'
     campos = ('operacao',)
 
@@ -216,10 +216,7 @@ class AuditoriaGlobalAdmin(HarpiaModelAdmin):
         'detalhes', 'acao', 'email', 'perfil_usuario', 'unidade_usuario',
         'entidade', 'objeto', 'objeto_id', 'unidade_objeto', 'ip',
     )
-    search_help_text = (
-        'Busca por qualquer parte do texto (contém), em detalhes, ação, e-mail, '
-        'nome do registro, unidade e IP. Várias palavras = todas precisam aparecer.'
-    )
+    search_help_text = 'Busca em qualquer parte do texto.'
     ordering = ('-criado_em',)
     readonly_fields = (
         'painel_resumo', 'painel_alteracoes', 'painel_autor', 'painel_operacao',
@@ -246,7 +243,7 @@ class AuditoriaGlobalAdmin(HarpiaModelAdmin):
 
     actions = ['exportar_csv']
 
-    @admin.action(description='Exportar selecionados em CSV (abre no Excel)', permissions=['view'])
+    @admin.action(description='Exportar selecionados (CSV)', permissions=['view'])
     def exportar_csv(self, request, queryset):
         """Planilha com uma linha por registro, incluindo o antes → depois de cada campo."""
         agora = timezone.localtime()
@@ -478,7 +475,7 @@ class ErroSistemaAdmin(HarpiaModelAdmin):
         'request_id', 'email_usuario', 'caminho', 'tipo_erro',
         'mensagem', 'fingerprint',
     )
-    search_help_text = 'Busca por tipo de erro, mensagem, tela, e-mail do usuário ou ID da requisição.'
+    search_help_text = 'Tipo, mensagem, tela, e-mail ou ID.'
     readonly_fields = (
         'criado_em', 'status_http', 'tipo_erro', 'mensagem', 'traceback',
         'metodo', 'caminho', 'usuario', 'email_usuario', 'perfil_usuario',

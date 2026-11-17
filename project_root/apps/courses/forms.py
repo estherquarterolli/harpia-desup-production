@@ -332,6 +332,9 @@ class MatrixComponentBaseFormSet(BaseInlineFormSet):
                     temporarios.append(obj)
             if temporarios:
                 MatrixComponent.objects.bulk_update(temporarios, ['codigo'])
+            # bulk_create não dispara os sinais: registra a criação de cada linha na auditoria.
+            from apps.core.audit import auditar_criacoes
+            auditar_criacoes(novos)
         self.new_objects = novos
         return novos
 

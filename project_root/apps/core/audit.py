@@ -409,10 +409,16 @@ def _obj_solicitacao_externo(s):
     return f'{s.get_tipo_display()} — {nome}' if nome else str(s)
 
 
+def _obj_componente_matriz(c):
+    nome = c.nome_disciplina or 'Disciplina sem nome'
+    return f'{nome} ({c.periodo})' if c.periodo else nome
+
+
 # Cada entrada: label (texto), g (gênero: m/f), codigo (prefixo do código da ação),
 # objeto (como chamar o registro), unidade (a que unidade pertence),
 # defer (True = evento explícito costuma acompanhar; o texto é anexado a ele),
-# m2m (campos many-to-many que também devem ser acompanhados).
+# m2m (campos many-to-many que também devem ser acompanhados),
+# ignorar (campos que não valem ser listados, ex.: a ligação com o registro "pai").
 CONFIG = {
     'professors.professor': dict(
         label='Professor', g='m', codigo='PROFESSOR', objeto=_obj_professor,
@@ -483,7 +489,8 @@ CONFIG = {
     ),
     'courses.matrixcomponent': dict(
         label='Componente da matriz', g='m', codigo='COMPONENTE_MATRIZ',
-        unidade=lambda o: _unidades_m2m(o.matriz),
+        objeto=_obj_componente_matriz, unidade=lambda o: _unidades_m2m(o.matriz),
+        defer=True, ignorar=('matriz',),
     ),
     'courses.classgroup': dict(
         label='Turma', g='f', codigo='TURMA',
@@ -563,8 +570,9 @@ def _unidade_do_registro(obj):
 def _campos_auditados(model, update_fields=None):
     campos = []
     nomes = set(update_fields) if update_fields is not None else None
+    ignorar = (CONFIG.get(model._meta.label_lower) or {}).get('ignorar', ())
     for campo in model._meta.concrete_fields:
-        if campo.primary_key or campo.name in CAMPOS_IGNORADOS:
+        if campo.primary_key or campo.name in CAMPOS_IGNORADOS or campo.name in ignorar:
             continue
         if isinstance(campo, (models.DateTimeField, models.DateField)) and (
             getattr(campo, 'auto_now', False) or getattr(campo, 'auto_now_add', False)
@@ -693,6 +701,29 @@ def _enviar(request, mudanca):
         _estado(request)['pendentes'].append(mudanca)
     else:
         _gravar_mudanca(request, mudanca)
+
+
+def auditar_criacoes(instancias):
+    """Audita registros criados em lote (``bulk_create`` não dispara os sinais do Django)."""
+    request = _request_ativo()
+    if request is None:
+        return
+    for instance in instancias:
+        try:
+            if instance._meta.label_lower not in CONFIG:
+                continue
+            _enviar(request, _montar_mudanca(
+                instance, CRIACAO, dados=_dados_do_registro(instance),
+                campos=_campos_de_criacao_ou_exclusao(instance, CRIACAO),
+            ))
+        except Exception:
+            logger.exception('Falha ao auditar a criação em lote de %s.', type(instance).__name__)
+
+
+def ha_alteracoes_pendentes(request):
+    """Há alterações de cadastro desta requisição esperando para entrar num evento explícito?"""
+    estado = getattr(request, '_harpia_audit', None)
+    return bool(estado and estado['pendentes'])
 
 
 def _anexar_texto(request, modelo, pk, texto, unidade=None, campos_estruturados=None):
