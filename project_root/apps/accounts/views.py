@@ -200,14 +200,10 @@ def get_client_ip(request):
 
 
 def registrar_auditoria(request, acao, usuario=None, email="", detalhes=""):
-    AuditoriaGlobal.objects.create(
-        usuario=usuario if getattr(usuario, "is_authenticated", False) else usuario,
-        email=email or getattr(usuario, "email", ""),
-        acao=acao,
-        detalhes=detalhes,
-        ip=get_client_ip(request),
-        user_agent=request.META.get("HTTP_USER_AGENT", ""),
-    )
+    """Grava no log (autor, perfil, unidade, data/hora, IP e o detalhe do que mudou)."""
+    from apps.core.audit import registrar
+
+    return registrar(request, acao, detalhes, usuario=usuario, email=email)
 
 
 class ProfileView(LoginRequiredMixin, View):

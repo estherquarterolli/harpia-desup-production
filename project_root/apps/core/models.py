@@ -1015,6 +1015,14 @@ class AuditoriaGlobal(models.Model):
     Registro central de eventos sensiveis do sistema.
     """
 
+    class Categoria(models.TextChoices):
+        CRIACAO = 'CRIACAO', 'Criação / cadastro'
+        ALTERACAO = 'ALTERACAO', 'Alteração'
+        EXCLUSAO = 'EXCLUSAO', 'Exclusão'
+        ACESSO = 'ACESSO', 'Acesso ao sistema'
+        SEGURANCA = 'SEGURANCA', 'Segurança / senha'
+        OUTRO = 'OUTRO', 'Outro'
+
     usuario = models.ForeignKey(
         'accounts.User',
         on_delete=models.SET_NULL,
@@ -1023,12 +1031,35 @@ class AuditoriaGlobal(models.Model):
         related_name='eventos_auditoria',
         verbose_name='Usuario',
     )
-    email = models.EmailField(blank=True, verbose_name='E-mail')
+    email = models.EmailField(blank=True, verbose_name='E-mail de quem fez')
+    perfil_usuario = models.CharField(
+        max_length=80, blank=True, db_index=True, verbose_name='Perfil de quem fez',
+    )
+    unidade_usuario = models.CharField(
+        max_length=255, blank=True, verbose_name='Unidade de quem fez',
+    )
     acao = models.CharField(max_length=120, db_index=True, verbose_name='Acao')
+    categoria = models.CharField(
+        max_length=12, choices=Categoria.choices, default=Categoria.OUTRO,
+        db_index=True, verbose_name='Tipo de ação',
+    )
+    entidade = models.CharField(
+        max_length=80, blank=True, db_index=True,
+        verbose_name='O que foi mexido', help_text='Ex.: Professor, Unidade, Curso.',
+    )
+    objeto = models.CharField(
+        max_length=255, blank=True, verbose_name='Nome do registro',
+        help_text='Ex.: nome do professor, da unidade ou do curso afetado.',
+    )
+    objeto_id = models.CharField(max_length=40, blank=True, verbose_name='ID do registro')
+    unidade_objeto = models.CharField(
+        max_length=255, blank=True, verbose_name='Unidade do registro',
+        help_text='Unidade à qual o registro afetado pertence.',
+    )
     detalhes = models.TextField(blank=True, verbose_name='Detalhes')
     ip = models.GenericIPAddressField(null=True, blank=True, verbose_name='IP')
     user_agent = models.TextField(blank=True, verbose_name='User-Agent')
-    criado_em = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name='Data de Criacao')
+    criado_em = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name='Data e hora')
 
     class Meta:
         db_table = 'harpiadb_nucleo_auditoria'
