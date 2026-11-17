@@ -1,4 +1,8 @@
 from django.contrib import admin
+from django.db.models import Q
+from django.utils import timezone
+from unfold.contrib.filters.admin import ChoicesDropdownFilter, RangeDateTimeFilter, TextFilter
+
 from apps.accounts.admin import HarpiaModelAdmin, admin_site
 from .models import (
     AtividadeEstagioSupervisao,
@@ -33,12 +37,126 @@ class NotificacaoAdmin(HarpiaModelAdmin):
     search_fields = ('titulo', 'mensagem')
     ordering = ('-data_criacao',)
 
+class _ContemFilter(TextFilter):
+    """Caixa de texto "contém": cada palavra digitada precisa aparecer em algum dos campos.
+
+    Ex.: "maria faeterj" acha todo registro que tenha "maria" E "faeterj" (em qualquer
+    ordem, em qualquer maiúscula/minúscula), mesmo no meio de uma frase.
+    """
+
+    campos = ()
+
+    def queryset(self, request, queryset):
+        valor = (self.value() or '').strip()
+        if not valor:
+            return queryset
+        for termo in valor.split():
+            condicao = Q()
+            for campo in self.campos:
+                condicao |= Q(**{f'{campo}__icontains': termo})
+            queryset = queryset.filter(condicao)
+        return queryset
+
+
+class DetalhesContemFilter(_ContemFilter):
+    title = 'Detalhes contém'
+    parameter_name = 'detalhes_contem'
+    campos = ('detalhes',)
+
+
+class QuemFezContemFilter(_ContemFilter):
+    title = 'Quem fez contém (e-mail ou perfil)'
+    parameter_name = 'quem_contem'
+    campos = ('email', 'perfil_usuario')
+
+
+class RegistroContemFilter(_ContemFilter):
+    title = 'Nome do registro contém (ex.: nome do professor)'
+    parameter_name = 'registro_contem'
+    campos = ('objeto', 'entidade', 'objeto_id')
+
+
+class UnidadeContemFilter(_ContemFilter):
+    title = 'Unidade contém'
+    parameter_name = 'unidade_contem'
+    campos = ('unidade_objeto', 'unidade_usuario')
+
+
+class AcaoContemFilter(_ContemFilter):
+    title = 'Código da ação contém'
+    parameter_name = 'acao_contem'
+    campos = ('acao',)
+
+
 class AuditoriaGlobalAdmin(HarpiaModelAdmin):
-    list_display = ('criado_em', 'acao', 'email', 'usuario', 'ip')
-    list_filter = ('acao', 'criado_em')
-    search_fields = ('email', 'acao', 'detalhes', 'ip')
-    readonly_fields = ('usuario', 'email', 'acao', 'detalhes', 'ip', 'user_agent', 'criado_em')
+    """Log do sistema: só leitura, com busca "contém" por qualquer parte do texto."""
+
+    list_display = (
+        'quando', 'tipo_acao', 'acao', 'quem', 'perfil_usuario', 'entidade',
+        'objeto', 'unidade_objeto', 'resumo',
+    )
+    list_display_links = ('quando', 'acao')
+    list_per_page = 50
+    list_filter_submit = True
+    list_filter = (
+        DetalhesContemFilter,
+        RegistroContemFilter,
+        QuemFezContemFilter,
+        UnidadeContemFilter,
+        AcaoContemFilter,
+        ('categoria', ChoicesDropdownFilter),
+        ('criado_em', RangeDateTimeFilter),
+    )
+    search_fields = (
+        'detalhes', 'acao', 'email', 'perfil_usuario', 'unidade_usuario',
+        'entidade', 'objeto', 'objeto_id', 'unidade_objeto', 'ip',
+    )
+    search_help_text = (
+        'Busca por qualquer parte do texto (contém), em detalhes, ação, e-mail, '
+        'nome do registro, unidade e IP. Várias palavras = todas precisam aparecer.'
+    )
     ordering = ('-criado_em',)
+    readonly_fields = (
+        'criado_em', 'usuario', 'email', 'perfil_usuario', 'unidade_usuario',
+        'categoria', 'acao', 'entidade', 'objeto', 'objeto_id', 'unidade_objeto',
+        'detalhes', 'ip', 'user_agent',
+    )
+    fieldsets = (
+        ('Quando e quem', {'fields': (
+            'criado_em', 'usuario', 'email', 'perfil_usuario', 'unidade_usuario',
+        )}),
+        ('O que foi feito', {'fields': (
+            'categoria', 'acao', 'entidade', 'objeto', 'objeto_id', 'unidade_objeto', 'detalhes',
+        )}),
+        ('Origem técnica', {'fields': ('ip', 'user_agent'), 'classes': ('collapse',)}),
+    )
+
+    @admin.display(description='Data e hora', ordering='criado_em')
+    def quando(self, obj):
+        return timezone.localtime(obj.criado_em).strftime('%d/%m/%Y %H:%M:%S')
+
+    @admin.display(description='Tipo', ordering='categoria')
+    def tipo_acao(self, obj):
+        return obj.get_categoria_display()
+
+    @admin.display(description='Quem fez', ordering='email')
+    def quem(self, obj):
+        return obj.email or (obj.usuario.email if obj.usuario_id else '—')
+
+    @admin.display(description='Resumo')
+    def resumo(self, obj):
+        texto = ' '.join((obj.detalhes or '').split())
+        return texto if len(texto) <= 140 else texto[:139].rstrip() + '…'
+
+    # O log é prova de auditoria: ninguém cria, edita ou apaga linhas pelo painel.
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 class ErroSistemaAdmin(HarpiaModelAdmin):

@@ -403,7 +403,72 @@ class UnidadeListView(UnidadeBaseView, ListView):
         params = self.request.GET.copy()
         params.pop('page', None)
         ctx['querystring'] = params.urlencode()
+        self._anexar_preenchimento(ctx['unidades'])
         return ctx
+
+    @staticmethod
+    def _anexar_preenchimento(unidades):
+        """Anexa `unidade.preenchimento` (dict) a cada unidade da página.
+
+        % de preenchimento = horas em sala já cumpridas ÷ horas em sala esperadas dos
+        professores ATIVOS vinculados à unidade. A mesma conta da "% alocado" da
+        lista de professores: horas alocadas + justificadas + redução da equipe
+        diretiva, limitadas à meta de cada professor, para que um professor com
+        excesso de horas não compense a falta de outro. Professor readaptado vigente
+        não tem meta e fica fora da conta. Quem atua em mais de uma unidade conta em
+        cada uma delas, como no indicador de conformidade do painel da DESUP.
+        """
+        from apps.professors.models import Professor
+        from apps.professors.views import enriquecer_professores_com_carga
+
+        unidades = list(unidades)
+        ids = {unidade.pk for unidade in unidades}
+        acumulado = {
+            pk: {'meta': 0.0, 'feito': 0.0, 'professores': 0, 'completos': 0} for pk in ids
+        }
+        if ids:
+            professores = list(
+                Professor.objects.filter(status=Professor.StatusChoices.ATIVO)
+                .filter(Q(unidades__id__in=ids) | Q(unidade_principal_id__in=ids))
+                .select_related('tipo_contrato')
+                .prefetch_related('unidades', 'ocupacoes_diretivas', 'readaptacoes')
+                .distinct()
+            )
+            enriquecer_professores_com_carga(professores)
+            for prof in professores:
+                meta = 0.0 if prof.readaptado_vigente else float(prof.meta_horas_base_sala)
+                if meta <= 0:
+                    continue
+                feito = min(float(prof.soma_horas), meta)
+                vinculadas = {u.pk for u in prof.unidades.all()}
+                if prof.unidade_principal_id:
+                    vinculadas.add(prof.unidade_principal_id)
+                for unidade_id in vinculadas & ids:
+                    dados = acumulado[unidade_id]
+                    dados['meta'] += meta
+                    dados['feito'] += feito
+                    dados['professores'] += 1
+                    if feito >= meta:
+                        dados['completos'] += 1
+
+        for unidade in unidades:
+            dados = acumulado[unidade.pk]
+            if dados['meta'] > 0:
+                pct = round(dados['feito'] / dados['meta'] * 100, 1)
+                tom = '#059669' if pct >= 100 else '#0284c7' if pct >= 70 else '#d97706' if pct >= 40 else '#dc2626'
+            else:
+                pct, tom = None, '#94a3b8'
+            unidade.preenchimento = {
+                'percentual': pct,
+                # Texto puro: evita a vírgula decimal do pt-BR dentro do CSS/ARIA.
+                'largura_css': '0' if pct is None else f'{min(max(pct, 0), 100):.1f}',
+                'cor': tom,
+                'professores': dados['professores'],
+                'completos': dados['completos'],
+                'horas_feitas': round(dados['feito'], 1),
+                'horas_meta': round(dados['meta'], 1),
+            }
+
 
 class UnidadeCreateView(UnidadeBaseView, CreateView):
     model = Unidade
@@ -858,28 +923,40 @@ class ExportarLogsView(LoginRequiredMixin, PerfilRequiredMixin, View):
     def get(self, request):
         import csv
         from django.http import HttpResponse
+        from django.utils import timezone
         from apps.core.models import AuditoriaGlobal
 
         response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
         response['Content-Disposition'] = 'attachment; filename="auditoria_sistema.csv"'
 
         writer = csv.writer(response, delimiter=';')
-        writer.writerow(['ID', 'Data/Hora', 'Usuario (E-mail)', 'Acao', 'Detalhes', 'IP', 'User-Agent'])
+        writer.writerow([
+            'ID', 'Data/Hora', 'Quem fez (E-mail)', 'Perfil de quem fez', 'Unidade de quem fez',
+            'Tipo', 'Acao', 'O que foi mexido', 'Nome do registro', 'ID do registro',
+            'Unidade do registro', 'Detalhes', 'IP', 'User-Agent',
+        ])
 
         logs = AuditoriaGlobal.objects.all().select_related('usuario').order_by('-criado_em')
-        for log in logs:
-            data_str = log.criado_em.strftime('%d/%m/%Y %H:%M:%S')
+        for log in logs.iterator(chunk_size=2000):
+            data_str = timezone.localtime(log.criado_em).strftime('%d/%m/%Y %H:%M:%S')
             email_str = log.email or (log.usuario.email if log.usuario else '')
             writer.writerow([
                 log.pk,
                 data_str,
                 email_str,
+                log.perfil_usuario,
+                log.unidade_usuario,
+                log.get_categoria_display(),
                 log.acao,
+                log.entidade,
+                log.objeto,
+                log.objeto_id,
+                log.unidade_objeto,
                 log.detalhes,
                 log.ip or '',
-                log.user_agent or ''
+                log.user_agent or '',
             ])
-        
+
         return response
 
 

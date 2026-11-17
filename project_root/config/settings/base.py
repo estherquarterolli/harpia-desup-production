@@ -57,6 +57,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'apps.accounts.middleware.SuperadminVisualizationMiddleware',
     'apps.core.middleware.SystemErrorLoggingMiddleware',
+    'apps.core.audit.AuditContextMiddleware',
     'apps.accounts.middleware.PasswordChangeForceMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',

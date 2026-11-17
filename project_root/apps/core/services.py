@@ -270,18 +270,14 @@ def create_window_ticket(*, request, area_label, action_label, target_label="", 
 
 
 def registrar_evento_prioridade1(request, acao, detalhes):
-    """Registra eventos administrativos sem incluir segredos ou conteúdo médico."""
-    user = request.user
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    ip = forwarded.split(",", 1)[0].strip() if forwarded else request.META.get("REMOTE_ADDR")
-    return AuditoriaGlobal.objects.create(
-        usuario=user if user.is_authenticated else None,
-        email=user.email if user.is_authenticated else "",
-        acao=acao,
-        detalhes=detalhes,
-        ip=ip or None,
-        user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:1000],
-    )
+    """Registra eventos administrativos sem incluir segredos ou conteúdo médico.
+
+    O evento sai com autor, perfil, unidade, data/hora e, quando a mesma requisição
+    alterou cadastros (ocupação, cargo, limite...), com o detalhe do que mudou.
+    """
+    from .audit import registrar
+
+    return registrar(request, acao, detalhes)
 
 
 def _exigir_desup(user):
