@@ -24,6 +24,7 @@ import datetime
 import ipaddress
 import logging
 import threading
+import uuid
 from decimal import Decimal
 
 from django.apps import apps as django_apps
@@ -144,9 +145,22 @@ def _request_ativo():
 def _estado(request):
     estado = getattr(request, '_harpia_audit', None)
     if estado is None:
-        estado = {'pendentes': [], 'total': 0, 'excedentes': {}, 'linhas': {}}
+        estado = {
+            'pendentes': [], 'total': 0, 'excedentes': {}, 'linhas': {},
+            # Mesmo código em todas as linhas geradas por esta requisição: permite ver,
+            # a partir de uma linha, tudo o que a mesma ação do usuário alterou.
+            'operacao': uuid.uuid4().hex,
+        }
         request._harpia_audit = estado
     return estado
+
+
+def _caminho(request):
+    if request is None:
+        return ''
+    metodo = getattr(request, 'method', '') or ''
+    caminho = getattr(request, 'path', '') or ''
+    return f'{metodo} {caminho}'.strip()[:255]
 
 
 class AuditContextMiddleware:
@@ -171,20 +185,91 @@ class AuditContextMiddleware:
 # Gravação
 # ---------------------------------------------------------------------------
 
+# Prefixos de códigos de ação que não vêm de um modelo de `CONFIG` (eventos explícitos).
+ENTIDADES_EXTRAS = {
+    'EXTRACURRICULAR': 'Atividade extracurricular',
+    'LOGIN': 'Acesso ao sistema',
+    'LOGOUT': 'Acesso ao sistema',
+    'PASSWORD': 'Senha de usuário',
+    'DESUP_PASSWORD': 'Senha de usuário',
+    'ADMIN_FORCE_PASSWORD': 'Senha de usuário',
+    'OPERACAO_EM_LOTE': 'Operação em lote',
+    'AUDITORIA': 'Auditoria',
+}
+
+# Nomes em português para códigos de ação que não seguem o padrão `<MODELO>_<VERBO>`.
+TITULOS_ACAO = {
+    'LOGIN': 'Entrou no sistema',
+    'LOGOUT': 'Saiu do sistema',
+    'LOGIN_FALHOU': 'Tentativa de acesso recusada',
+    'PASSWORD_RESET_EMAIL_REQUESTED': 'Link de redefinição de senha enviado por e-mail',
+    'PASSWORD_RESET_COMPLETED_BY_EMAIL': 'Senha redefinida pelo link enviado por e-mail',
+    'DESUP_PASSWORD_FORCE_RESET': 'Senha redefinida pela DESUP (troca obrigatória)',
+    'ADMIN_FORCE_PASSWORD_RESET': 'Senha redefinida pelo superadmin (troca obrigatória)',
+    'MATRIZ_VIGENTE_EDITADA': 'Matriz vigente editada',
+    'MATRIZ_ARQUIVADA': 'Matriz arquivada',
+    'MATRIZ_REATIVADA': 'Matriz reativada',
+    'EXTRACURRICULAR_EXCLUIDO': 'Item extracurricular excluído',
+    'OPERACAO_EM_LOTE': 'Operação em lote (resumo)',
+    'AUDITORIA_EXPORTADA': 'Auditoria exportada em CSV',
+    'USUARIO_ATIVADO': 'Contas de usuário ativadas',
+    'USUARIO_DESATIVADO': 'Contas de usuário desativadas',
+}
+
+
+def inferir_entidade(acao):
+    """Descobre "o que foi mexido" a partir do prefixo do código da ação."""
+    codigo = (acao or '').upper()
+    candidatos = [(cfg['codigo'], cfg['label']) for cfg in CONFIG.values()]
+    candidatos += list(ENTIDADES_EXTRAS.items())
+    for prefixo, rotulo in sorted(candidatos, key=lambda par: -len(par[0])):
+        if codigo == prefixo or codigo.startswith(prefixo + '_'):
+            return rotulo
+    return ''
+
+
+def titulo_da_acao(acao):
+    """Nome legível da ação (ex.: ``PROFESSOR_ALTERADO`` → "Professor alterado")."""
+    codigo = (acao or '').upper()
+    if codigo in TITULOS_ACAO:
+        return TITULOS_ACAO[codigo]
+    for cfg in CONFIG.values():
+        for categoria, sufixo in _SUFIXO_ACAO.items():
+            if codigo == f"{cfg['codigo']}_{sufixo}":
+                return f"{cfg['label']} {_VERBOS[cfg['g']][categoria]}"
+    texto = codigo.replace('_', ' ').strip().capitalize()
+    return texto or '—'
+
+
+def _campos_do_item(item, primeiro):
+    """Campos alterados de uma pendência; identifica o registro quando difere do primeiro."""
+    campos = list(item.get('campos') or [])
+    if (item['modelo'], item['pk']) == (primeiro['modelo'], primeiro['pk']):
+        return campos
+    origem = f"{item['entidade']} {item['objeto']}".strip()
+    return [{**campo, 'campo': f"{origem} — {campo['campo']}"} for campo in campos]
+
+
 def registrar(
     request, acao, detalhes='', *, categoria=None, entidade='', objeto='', objeto_id='',
-    unidade_objeto='', usuario=None, email='', absorver=True,
+    unidade_objeto='', usuario=None, email='', absorver=True, mudancas=None,
 ):
     """Grava uma linha de auditoria. Nunca levanta exceção para quem chamou.
 
     Quando `absorver` é verdadeiro, as alterações de cadastro feitas na mesma
     requisição por modelos de "evento explícito" (equipe diretiva, cargos, limites,
     readaptações, matrizes, usuários...) são anexadas ao texto deste evento, que
-    passa a dizer exatamente o que mudou.
+    passa a dizer exatamente o que mudou. Se, mesmo assim, o evento não souber qual
+    registro foi mexido, ele herda o primeiro registro gravado na mesma requisição
+    (ex.: o item extracurricular excluído) e, por fim, deduz o tipo pelo código da ação.
+
+    `mudancas` é a lista estruturada ``[{campo, antes, depois}]`` exibida como tabela
+    no painel de auditoria.
     """
     from .models import AuditoriaGlobal
 
     try:
+        campos = list(mudancas or [])
         if absorver and request is not None:
             estado = getattr(request, '_harpia_audit', None)
             if estado and estado['pendentes']:
@@ -196,20 +281,39 @@ def registrar(
                 objeto = objeto or primeiro['objeto']
                 objeto_id = objeto_id or primeiro['objeto_id']
                 unidade_objeto = unidade_objeto or primeiro['unidade']
+                for item in itens:
+                    campos.extend(_campos_do_item(item, primeiro))
+
+        if absorver and request is not None and not objeto:
+            estado = getattr(request, '_harpia_audit', None)
+            if estado and estado['linhas']:
+                anterior = next(iter(estado['linhas'].values()))
+                entidade = entidade or anterior.entidade
+                objeto = anterior.objeto
+                objeto_id = objeto_id or anterior.objeto_id
+                unidade_objeto = unidade_objeto or anterior.unidade_objeto
 
         user, email_ator, perfil, unidade_ator = _ator(request, usuario)
+        categoria_final = categoria or inferir_categoria(acao)
+        entidade = entidade or inferir_entidade(acao)
+        if not objeto and entidade in ('Senha de usuário', 'Acesso ao sistema'):
+            objeto = email or email_ator
+        operacao = _estado(request)['operacao'] if request is not None else ''
         linha = AuditoriaGlobal(
             usuario=user,
             email=(email or email_ator or '')[:254],
             perfil_usuario=perfil[:80],
             unidade_usuario=unidade_ator[:255],
             acao=str(acao)[:120],
-            categoria=categoria or inferir_categoria(acao),
+            categoria=categoria_final,
             entidade=str(entidade or '')[:80],
             objeto=str(objeto or '')[:255],
             objeto_id=str(objeto_id or '')[:40],
             unidade_objeto=str(unidade_objeto or '')[:255],
             detalhes=detalhes or '',
+            mudancas=campos,
+            operacao=operacao,
+            caminho=_caminho(request),
             ip=_ip(request),
             user_agent=((getattr(request, 'META', {}) or {}).get('HTTP_USER_AGENT') or '')[:1000],
         )
@@ -501,18 +605,39 @@ def _rotulo_campo(campo):
     return nome[:1].upper() + nome[1:]
 
 
-def _dados_do_registro(instance):
-    """Lista 'Campo: valor' de tudo o que está preenchido (para criação e exclusão)."""
-    partes = []
+def _pares_do_registro(instance):
+    """Lista (rótulo, valor formatado) de tudo o que está preenchido no registro."""
+    pares = []
     for campo in _campos_auditados(type(instance)):
         valor = getattr(instance, campo.attname, None)
         if valor is None or valor == '':
             continue
-        partes.append(f'{_rotulo_campo(campo)}: {_formatar_valor(campo, valor)}')
+        pares.append((_rotulo_campo(campo), _formatar_valor(campo, valor)))
+    return pares
+
+
+def _dados_do_registro(instance):
+    """Texto 'Campo: valor' de tudo o que está preenchido (para criação e exclusão)."""
+    partes = [f'{rotulo}: {valor}' for rotulo, valor in _pares_do_registro(instance)]
     return _cortar('; '.join(partes), LIMITE_TEXTO_DADOS)
 
 
-def _montar_mudanca(instance, categoria, *, dados='', diffs=None, objeto=None, unidade=None):
+def _campos_de_criacao_ou_exclusao(instance, categoria):
+    """Versão estruturada de `_dados_do_registro`: antes/depois por campo preenchido."""
+    if categoria == EXCLUSAO:
+        return [
+            {'campo': rotulo, 'antes': valor, 'depois': '—'}
+            for rotulo, valor in _pares_do_registro(instance)
+        ]
+    return [
+        {'campo': rotulo, 'antes': '—', 'depois': valor}
+        for rotulo, valor in _pares_do_registro(instance)
+    ]
+
+
+def _montar_mudanca(
+    instance, categoria, *, dados='', diffs=None, objeto=None, unidade=None, campos=None,
+):
     label_model = instance._meta.label_lower
     cfg = CONFIG[label_model]
     objeto = objeto if objeto is not None else _rotulo(instance)
@@ -536,6 +661,7 @@ def _montar_mudanca(instance, categoria, *, dados='', diffs=None, objeto=None, u
         'objeto_id': str(instance.pk or ''),
         'unidade': unidade,
         'texto': texto,
+        'campos': list(campos or []),
     }
 
 
@@ -549,7 +675,7 @@ def _gravar_mudanca(request, mudanca):
     linha = registrar(
         request, mudanca['acao'], mudanca['texto'], categoria=mudanca['categoria'],
         entidade=mudanca['entidade'], objeto=mudanca['objeto'], objeto_id=mudanca['objeto_id'],
-        unidade_objeto=mudanca['unidade'], absorver=False,
+        unidade_objeto=mudanca['unidade'], mudancas=mudanca.get('campos'), absorver=False,
     )
     if linha is not None:
         estado['linhas'][(mudanca['modelo'], mudanca['pk'])] = linha
@@ -569,12 +695,14 @@ def _enviar(request, mudanca):
         _gravar_mudanca(request, mudanca)
 
 
-def _anexar_texto(request, modelo, pk, texto, unidade=None):
-    """Anexa `texto` à linha/pendência do mesmo registro nesta requisição."""
+def _anexar_texto(request, modelo, pk, texto, unidade=None, campos_estruturados=None):
+    """Anexa `texto` (e os campos estruturados) à linha/pendência do mesmo registro."""
     estado = _estado(request)
+    novos = list(campos_estruturados or [])
     for mudanca in estado['pendentes']:
         if mudanca['modelo'] == modelo and mudanca['pk'] == pk:
             mudanca['texto'] += f'\n{texto}'
+            mudanca.setdefault('campos', []).extend(novos)
             if unidade:
                 mudanca['unidade'] = unidade
             return True
@@ -583,6 +711,9 @@ def _anexar_texto(request, modelo, pk, texto, unidade=None):
         return False
     linha.detalhes = f'{linha.detalhes}\n{texto}' if linha.detalhes else texto
     campos = ['detalhes']
+    if novos:
+        linha.mudancas = list(linha.mudancas or []) + novos
+        campos.append('mudancas')
     if unidade:
         linha.unidade_objeto = unidade[:255]
         campos.append('unidade_objeto')
@@ -621,12 +752,16 @@ def _post_save(sender, instance, created, raw=False, update_fields=None, **kwarg
         return
     try:
         if created:
-            mudanca = _montar_mudanca(instance, CRIACAO, dados=_dados_do_registro(instance))
+            mudanca = _montar_mudanca(
+                instance, CRIACAO, dados=_dados_do_registro(instance),
+                campos=_campos_de_criacao_ou_exclusao(instance, CRIACAO),
+            )
         else:
             antes = getattr(instance, '_audit_antes', None)
             if not antes:
                 return
             diffs = []
+            campos_diff = []
             for campo in getattr(instance, '_audit_campos', []):
                 antigo = antes.get(campo.attname)
                 novo = getattr(instance, campo.attname, None)
@@ -634,13 +769,15 @@ def _post_save(sender, instance, created, raw=False, update_fields=None, **kwarg
                     continue
                 if antigo == novo:
                     continue
-                diffs.append(
-                    f'{_rotulo_campo(campo)}: {_formatar_valor(campo, antigo)} → '
-                    f'{_formatar_valor(campo, novo)}'
-                )
+                valor_antes = _formatar_valor(campo, antigo)
+                valor_depois = _formatar_valor(campo, novo)
+                diffs.append(f'{_rotulo_campo(campo)}: {valor_antes} → {valor_depois}')
+                campos_diff.append({
+                    'campo': _rotulo_campo(campo), 'antes': valor_antes, 'depois': valor_depois,
+                })
             if not diffs:
                 return
-            mudanca = _montar_mudanca(instance, ALTERACAO, diffs=diffs)
+            mudanca = _montar_mudanca(instance, ALTERACAO, diffs=diffs, campos=campos_diff)
         _enviar(request, mudanca)
     except Exception:
         logger.exception('Falha ao auditar %s #%s.', sender.__name__, instance.pk)
@@ -654,6 +791,7 @@ def _pre_delete(sender, instance, **kwargs):
     try:
         instance._audit_instantaneo = _montar_mudanca(
             instance, EXCLUSAO, dados=_dados_do_registro(instance),
+            campos=_campos_de_criacao_ou_exclusao(instance, EXCLUSAO),
         )
     except Exception:
         instance._audit_instantaneo = None
@@ -695,13 +833,23 @@ def _criar_handler_m2m(modelo, campo):
                 return
             adicionou = action == 'post_add'
             rotulo_campo = str(instance._meta.get_field(campo).verbose_name)
+            rotulo_campo = rotulo_campo[:1].upper() + rotulo_campo[1:]
             texto = (
-                f"{rotulo_campo[:1].upper() + rotulo_campo[1:]} — "
+                f"{rotulo_campo} — "
                 f"{'adicionado(s)' if adicionou else 'removido(s)'}: {', '.join(nomes)}."
             )
+            lista_nomes = ', '.join(nomes)
+            campos_m2m = [{
+                'campo': f"{rotulo_campo} ({'adicionado(s)' if adicionou else 'removido(s)'})",
+                'antes': '—' if adicionou else lista_nomes,
+                'depois': lista_nomes if adicionou else '—',
+            }]
             cfg = CONFIG[modelo]
             unidade = _unidade_do_registro(instance)
-            if _anexar_texto(request, modelo, instance.pk, texto, unidade or None):
+            if _anexar_texto(
+                request, modelo, instance.pk, texto, unidade or None,
+                campos_estruturados=campos_m2m,
+            ):
                 return
             objeto = _rotulo(instance)
             mudanca = {
@@ -718,6 +866,7 @@ def _criar_handler_m2m(modelo, campo):
                     + (f' Unidade: {unidade}.' if unidade else '')
                     + f' {texto}'
                 ),
+                'campos': campos_m2m,
             }
             _enviar(request, mudanca)
         except Exception:
