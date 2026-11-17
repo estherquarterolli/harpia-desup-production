@@ -199,11 +199,15 @@ def get_client_ip(request):
     return request.META.get("REMOTE_ADDR")
 
 
-def registrar_auditoria(request, acao, usuario=None, email="", detalhes=""):
-    """Grava no log (autor, perfil, unidade, data/hora, IP e o detalhe do que mudou)."""
+def registrar_auditoria(request, acao, usuario=None, email="", detalhes="", **extra):
+    """Grava no log (autor, perfil, unidade, data/hora, IP e o detalhe do que mudou).
+
+    `extra` repassa `entidade`, `objeto`, `objeto_id` e `unidade_objeto` quando a ação
+    afeta outra pessoa (ex.: a DESUP redefine a senha de um usuário).
+    """
     from apps.core.audit import registrar
 
-    return registrar(request, acao, detalhes, usuario=usuario, email=email)
+    return registrar(request, acao, detalhes, usuario=usuario, email=email, **extra)
 
 
 class ProfileView(LoginRequiredMixin, View):
@@ -628,6 +632,8 @@ class DesupUserCreateView(LoginRequiredMixin, View):
                         f'{created_user.perfil} e unidade '
                         f'{created_user.unidade_id or "não aplicável"}.'
                     ),
+                    entidade='Usuário', objeto=created_user.email,
+                    objeto_id=str(created_user.pk),
                 )
 
             messages.success(request, 'Usuário criado com sucesso.')
@@ -677,6 +683,8 @@ class DesupUserPasswordResetView(LoginRequiredMixin, View):
             usuario=request.user,
             email=request.user.email,
             detalhes=f"Senha de {self.target.email} redefinida para o padrão com troca obrigatória.",
+            entidade='Senha de usuário', objeto=self.target.email,
+            objeto_id=str(self.target.pk),
         )
         return redirect('desup_user_list')
 
@@ -734,6 +742,8 @@ class ApprovePasswordResetView(View):
                 usuario=request.user,
                 email=request.user.email,
                 detalhes=f"Tentativa de aprovar reset de {reset_req.user.email} sem permissão.",
+                entidade='Senha de usuário', objeto=reset_req.user.email,
+                objeto_id=str(reset_req.user.pk),
             )
             return HttpResponse("Permissão negada.", status=403)
 

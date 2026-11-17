@@ -328,6 +328,16 @@ UNFOLD = {
     # ou uma unidade). O link genérico do Unfold causava um redirecionamento
     # circular para o superadmin e repetia essa função.
     "SITE_URL": None,
+    # CSS próprio do painel (cabeçalho, cartões, tabelas, auditoria). O Unfold só inclui as
+    # classes Tailwind que ele mesmo usa; estilos novos precisam vir deste arquivo.
+    "STYLES": [
+        lambda request: static("css/superadmin.css"),
+    ],
+    # Busca rápida (Ctrl+K / ⌘K): procura nos cadastros que têm `search_fields` e nas páginas do menu.
+    "COMMAND": {
+        "search_models": True,
+        "show_history": True,
+    },
     "SITE_ICON": {
         "light": lambda request: static("img/logo-harpia-colorida-modificada.PNG"),
         "dark": lambda request: static("img/logo-harpia-colorida-modificada.PNG"),

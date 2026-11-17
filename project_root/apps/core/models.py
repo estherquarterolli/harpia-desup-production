@@ -1057,6 +1057,18 @@ class AuditoriaGlobal(models.Model):
         help_text='Unidade à qual o registro afetado pertence.',
     )
     detalhes = models.TextField(blank=True, verbose_name='Detalhes')
+    mudancas = models.JSONField(
+        default=list, blank=True, verbose_name='Campos alterados',
+        help_text='Lista de {campo, antes, depois} com o que mudou no registro.',
+    )
+    operacao = models.CharField(
+        max_length=32, blank=True, db_index=True, verbose_name='Operação',
+        help_text='Código comum a todos os registros gerados pela mesma ação do usuário.',
+    )
+    caminho = models.CharField(
+        max_length=255, blank=True, verbose_name='Tela / endereço',
+        help_text='Método e endereço da requisição que originou o registro.',
+    )
     ip = models.GenericIPAddressField(null=True, blank=True, verbose_name='IP')
     user_agent = models.TextField(blank=True, verbose_name='User-Agent')
     criado_em = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name='Data e hora')

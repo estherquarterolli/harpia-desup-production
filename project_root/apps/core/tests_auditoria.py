@@ -3,6 +3,7 @@
 
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.professors.models import ContractType, Professor
@@ -134,3 +135,285 @@ class PreenchimentoUnidadesTests(TestCase):
         self.assertIsNone(por_sigla['UVZ']['percentual'])
         self.assertContains(resposta, 'Preenchimento')
         self.assertContains(resposta, 'Sem professores')
+
+
+class AuditoriaEstruturadaTests(TestCase):
+    """Antes/depois por campo, código da operação, inferência do registro e painéis do admin."""
+
+    def setUp(self):
+        self.desup = User.objects.create_user(
+            email='desup.est@harpia.test', password='pw', perfil='DESUP', forcar_troca_senha=False,
+        )
+        self.superadmin = User.objects.create_superuser(
+            email='super.est@harpia.test', password='pw',
+        )
+
+    def test_alteracao_guarda_antes_e_depois_por_campo(self):
+        unidade = Unidade.objects.create(nome='Unidade Alfa', sigla='UAL', status=True)
+        self.client.force_login(self.desup)
+        self.client.post(
+            reverse('core:unidade_update', args=[unidade.pk]),
+            {'nome': 'Unidade Alfa', 'sigla': 'UAX', 'status': 'on'},
+        )
+
+        log = AuditoriaGlobal.objects.get(acao='UNIDADE_ALTERADO')
+        self.assertTrue(
+            any(c['antes'] == 'UAL' and c['depois'] == 'UAX' for c in log.mudancas),
+            log.mudancas,
+        )
+
+    def test_linhas_da_mesma_requisicao_compartilham_operacao_e_guardam_a_tela(self):
+        self.client.force_login(self.desup)
+        self.client.post(
+            reverse('core:unidade_create'),
+            {'nome': 'Unidade Op', 'sigla': 'UOP', 'status': 'on'},
+        )
+        log = AuditoriaGlobal.objects.get(acao='UNIDADE_CRIADO')
+        self.assertEqual(len(log.operacao), 32)
+        self.assertTrue(log.caminho.startswith('POST '))
+        self.assertTrue(any(c['campo'] == 'Sigla' and c['depois'] == 'UOP' for c in log.mudancas))
+
+    def test_evento_explicito_deduz_o_tipo_pelo_codigo_da_acao(self):
+        from apps.core.audit import registrar, titulo_da_acao
+
+        linha = registrar(None, 'MATRIZ_VIGENTE_EDITADA', 'Matriz editada.')
+        self.assertEqual(linha.entidade, 'Matriz curricular')
+        self.assertEqual(titulo_da_acao('MATRIZ_VIGENTE_EDITADA'), 'Matriz vigente editada')
+        self.assertEqual(titulo_da_acao('PROFESSOR_ALTERADO'), 'Professor alterado')
+        self.assertEqual(titulo_da_acao('LOGIN_FALHOU'), 'Tentativa de acesso recusada')
+        self.assertEqual(titulo_da_acao('ALGO_NOVO_QUALQUER'), 'Algo novo qualquer')
+
+    def test_evento_explicito_herda_o_registro_gravado_na_mesma_requisicao(self):
+        from apps.core import audit
+
+        self.client.force_login(self.desup)
+        requisicao = self.client.get(reverse('core:unidade_list')).wsgi_request
+        audit._local.request = requisicao
+        try:
+            Unidade.objects.create(nome='Unidade Herdada', sigla='UHE')
+            evento = audit.registrar(requisicao, 'EXTRACURRICULAR_EXCLUIDO', 'Item excluído.')
+        finally:
+            audit._local.request = None
+
+        filha = AuditoriaGlobal.objects.get(acao='UNIDADE_CRIADO')
+        self.assertIn('Unidade Herdada', evento.objeto)
+        self.assertEqual(evento.operacao, filha.operacao)
+        self.assertTrue(evento.operacao)
+
+    def test_reset_de_senha_pela_desup_registra_o_usuario_afetado(self):
+        alvo = User.objects.create_user(
+            email='alvo.senha@harpia.test', password='pw', perfil='COORDENADOR_UNIDADE',
+            forcar_troca_senha=False,
+        )
+        self.client.force_login(self.desup)
+        self.client.post(reverse('desup_user_password_reset', args=[alvo.pk]), {'confirmar': 'sim'})
+
+        log = AuditoriaGlobal.objects.get(acao='DESUP_PASSWORD_FORCE_RESET')
+        self.assertEqual(log.email, 'desup.est@harpia.test')
+        self.assertEqual(log.objeto, 'alvo.senha@harpia.test')
+        self.assertEqual(log.entidade, 'Senha de usuário')
+
+    def test_detalhe_mostra_tabela_de_antes_e_depois(self):
+        log = AuditoriaGlobal.objects.create(
+            email='a@x.test', acao='UNIDADE_ALTERADO', categoria='ALTERACAO', entidade='Unidade',
+            objeto='Unidade Alfa', detalhes='Unidade alterada: Unidade Alfa.',
+            mudancas=[{'campo': 'Sigla', 'antes': 'UAL', 'depois': 'UAX'}],
+        )
+        self.client.force_login(self.superadmin)
+        resposta = self.client.get(reverse('alloc_admin:core_auditoriaglobal_change', args=[log.pk]))
+        self.assertEqual(resposta.status_code, 200)
+        self.assertContains(resposta, 'Unidade alterada')
+        self.assertContains(resposta, '<th>Antes</th>')
+        self.assertContains(resposta, 'UAL')
+        self.assertContains(resposta, 'UAX')
+
+    def test_detalhe_de_registro_antigo_le_antes_e_depois_do_texto(self):
+        log = AuditoriaGlobal.objects.create(
+            email='a@x.test', acao='UNIDADE_ALTERADO', categoria='ALTERACAO',
+            detalhes='Unidade alterada: X. Alterações: Sigla: AAA → BBB.',
+        )
+        self.client.force_login(self.superadmin)
+        resposta = self.client.get(reverse('alloc_admin:core_auditoriaglobal_change', args=[log.pk]))
+        self.assertContains(resposta, 'AAA')
+        self.assertContains(resposta, 'BBB')
+
+    def test_detalhe_lista_os_outros_registros_da_mesma_operacao(self):
+        codigo = 'a' * 32
+        principal = AuditoriaGlobal.objects.create(
+            email='a@x.test', acao='MATRIZ_VIGENTE_EDITADA', categoria='ALTERACAO', operacao=codigo,
+        )
+        AuditoriaGlobal.objects.create(
+            email='a@x.test', acao='COMPONENTE_MATRIZ_ALTERADO', categoria='ALTERACAO',
+            entidade='Componente da matriz', objeto='Cálculo I', operacao=codigo,
+        )
+        self.client.force_login(self.superadmin)
+        resposta = self.client.get(
+            reverse('alloc_admin:core_auditoriaglobal_change', args=[principal.pk]),
+        )
+        self.assertContains(resposta, 'Componente da matriz alterado')
+        self.assertContains(resposta, 'Cálculo I')
+
+    def test_lista_mostra_nome_legivel_da_acao(self):
+        AuditoriaGlobal.objects.create(
+            email='a@x.test', acao='PROFESSOR_CRIADO', categoria='CRIACAO',
+            entidade='Professor', objeto='JOÃO PEDRO', detalhes='Professor cadastrado: JOÃO PEDRO.',
+        )
+        self.client.force_login(self.superadmin)
+        resposta = self.client.get(reverse('alloc_admin:core_auditoriaglobal_changelist'))
+        self.assertEqual(resposta.status_code, 200)
+        self.assertContains(resposta, 'Professor cadastrado')
+        self.assertContains(resposta, 'JOÃO PEDRO')
+
+    def test_painel_inicial_mostra_nome_atividade_e_carrega_o_css_proprio(self):
+        AuditoriaGlobal.objects.create(
+            email='a@x.test', acao='UNIDADE_CRIADO', categoria='CRIACAO', objeto='Unidade Zeta',
+        )
+        self.client.force_login(self.superadmin)
+        resposta = self.client.get(reverse('alloc_admin:index'))
+        self.assertEqual(resposta.status_code, 200)
+        self.assertContains(resposta, 'Olá, super.est@harpia.test')
+        self.assertContains(resposta, 'sa-hero')
+        self.assertContains(resposta, 'Atividade recente')
+        self.assertContains(resposta, 'Unidade cadastrada')
+        self.assertContains(resposta, 'css/superadmin.css')
+
+
+class SuperadminExperienciaTests(TestCase):
+    """Painel "Precisa de atenção", filtros de acesso, ativar/desativar, CSV e erros legíveis."""
+
+    def setUp(self):
+        self.superadmin = User.objects.create_superuser(
+            email='super.exp@harpia.test', password='pw',
+        )
+        self.client.force_login(self.superadmin)
+
+    def _lista_de_usuarios(self, consulta=''):
+        return self.client.get(reverse('alloc_admin:accounts_user_changelist') + consulta)
+
+    def test_home_lista_pendencias_com_link_para_a_lista_filtrada(self):
+        Unidade.objects.create(nome='Unidade Sem Ninguém', sigla='USN', status=True)
+        resposta = self.client.get(reverse('alloc_admin:index'))
+        self.assertContains(resposta, 'Precisa de atenção')
+        self.assertContains(resposta, 'Unidades ativas sem nenhum usuário')
+        self.assertContains(resposta, 'acesso=sem_usuario')
+
+    def test_home_diz_que_esta_tudo_em_ordem_quando_nao_ha_pendencias(self):
+        self.superadmin.last_login = timezone.now()
+        self.superadmin.forcar_troca_senha = False
+        self.superadmin.save(update_fields=['last_login', 'forcar_troca_senha'])
+        resposta = self.client.get(reverse('alloc_admin:index'))
+        self.assertContains(resposta, 'Tudo em ordem')
+
+    def test_filtro_de_unidades_sem_usuario_mostra_so_as_sem_usuario(self):
+        Unidade.objects.create(nome='Unidade Vazia', sigla='UVZ', status=True)
+        com_gente = Unidade.objects.create(nome='Unidade Ocupada', sigla='UOC', status=True)
+        User.objects.create_user(
+            email='coord.ocupada@harpia.test', password='pw', unidade=com_gente,
+        )
+        resposta = self.client.get(reverse('alloc_admin:core_unidade_changelist') + '?acesso=sem_usuario')
+        self.assertContains(resposta, 'Unidade Vazia')
+        self.assertNotContains(resposta, 'Unidade Ocupada')
+
+    def test_filtro_de_situacao_separa_quem_nunca_acessou(self):
+        User.objects.create_user(email='nunca@harpia.test', password='pw')
+        antigo = User.objects.create_user(email='ja.entrou@harpia.test', password='pw')
+        antigo.last_login = timezone.now()
+        antigo.save(update_fields=['last_login'])
+        resposta = self._lista_de_usuarios('?situacao=nunca_acessou')
+        self.assertContains(resposta, 'nunca@harpia.test')
+        self.assertNotContains(resposta, 'ja.entrou@harpia.test')
+
+    def test_lista_de_usuarios_mostra_selos_de_situacao(self):
+        User.objects.create_user(email='temp@harpia.test', password='pw')
+        resposta = self._lista_de_usuarios()
+        self.assertContains(resposta, 'Nunca acessou')
+        self.assertContains(resposta, 'Senha temporária')
+
+    def test_desativar_usuarios_pela_lista_audita_e_protege_a_propria_conta(self):
+        alvo = User.objects.create_user(email='sair@harpia.test', password='pw')
+        antes = AuditoriaGlobal.objects.count()
+        self.client.post(
+            reverse('alloc_admin:accounts_user_changelist'),
+            {
+                'action': 'desativar_usuarios',
+                '_selected_action': [alvo.pk, self.superadmin.pk],
+                'index': '0',
+            },
+            follow=True,
+        )
+        alvo.refresh_from_db()
+        self.superadmin.refresh_from_db()
+        self.assertFalse(alvo.is_active)
+        self.assertTrue(self.superadmin.is_active)
+        self.assertGreater(AuditoriaGlobal.objects.count(), antes)
+        evento = AuditoriaGlobal.objects.get(acao='USUARIO_DESATIVADO')
+        self.assertEqual(evento.email, 'super.exp@harpia.test')
+        self.assertIn('sair@harpia.test', evento.objeto)
+
+    def test_ativar_usuarios_reativa_a_conta(self):
+        alvo = User.objects.create_user(email='volta@harpia.test', password='pw', is_active=False)
+        self.client.post(
+            reverse('alloc_admin:accounts_user_changelist'),
+            {'action': 'ativar_usuarios', '_selected_action': [alvo.pk], 'index': '0'},
+            follow=True,
+        )
+        alvo.refresh_from_db()
+        self.assertTrue(alvo.is_active)
+
+    def test_pagina_do_usuario_mostra_atividade_recente_com_link_para_a_auditoria(self):
+        alvo = User.objects.create_user(email='ativo@harpia.test', password='pw')
+        AuditoriaGlobal.objects.create(
+            email='ativo@harpia.test', acao='UNIDADE_CRIADO', categoria='CRIACAO', objeto='Unidade Beta',
+        )
+        resposta = self.client.get(reverse('alloc_admin:accounts_user_change', args=[alvo.pk]))
+        self.assertContains(resposta, 'Atividade recente')
+        self.assertContains(resposta, 'Unidade cadastrada')
+        self.assertContains(resposta, 'quem_contem=ativo@harpia.test')
+
+    def test_exportar_auditoria_em_csv_traz_antes_depois_e_neutraliza_formulas(self):
+        linha = AuditoriaGlobal.objects.create(
+            email='quem@harpia.test', acao='PROFESSOR_ALTERADO', categoria='ALTERACAO',
+            objeto='=CMD()', entidade='Professor',
+            mudancas=[{'campo': 'Carga horária', 'antes': '20', 'depois': '40'}],
+        )
+        resposta = self.client.post(
+            reverse('alloc_admin:core_auditoriaglobal_changelist'),
+            {'action': 'exportar_csv', '_selected_action': [linha.pk], 'index': '0'},
+        )
+        self.assertEqual(resposta.status_code, 200)
+        self.assertIn('text/csv', resposta['Content-Type'])
+        conteudo = resposta.content.decode('utf-8')
+        self.assertIn('Carga horária: 20 → 40', conteudo)
+        self.assertIn("'=CMD()", conteudo)
+        self.assertTrue(AuditoriaGlobal.objects.filter(acao='AUDITORIA_EXPORTADA').exists())
+
+    def test_lista_de_erros_mostra_gravidade_e_mensagem_curta(self):
+        from .models import ErroSistema
+
+        ErroSistema.objects.create(
+            metodo='POST', caminho='/matrizes/salvar/', status_http=500, tipo_erro='ValueError',
+            mensagem='valor inválido na carga horária', request_id='abc123', fingerprint='f' * 16,
+        )
+        resposta = self.client.get(reverse('alloc_admin:core_errosistema_changelist'))
+        self.assertContains(resposta, 'Erro do sistema')
+        self.assertContains(resposta, 'valor inválido na carga horária')
+        self.assertContains(resposta, '/matrizes/salvar/')
+
+    def test_filtro_de_periodo_dos_erros_esconde_os_antigos(self):
+        from datetime import timedelta
+
+        from .models import ErroSistema
+
+        novo = ErroSistema.objects.create(
+            metodo='GET', caminho='/novo/', status_http=500, tipo_erro='ErroNovo',
+            request_id='n1', fingerprint='n' * 16,
+        )
+        velho = ErroSistema.objects.create(
+            metodo='GET', caminho='/velho/', status_http=500, tipo_erro='ErroVelho',
+            request_id='v1', fingerprint='v' * 16,
+        )
+        ErroSistema.objects.filter(pk=velho.pk).update(criado_em=timezone.now() - timedelta(days=3))
+        resposta = self.client.get(reverse('alloc_admin:core_errosistema_changelist') + '?periodo=24h')
+        self.assertContains(resposta, 'ErroNovo')
+        self.assertNotContains(resposta, 'ErroVelho')
+        self.assertTrue(novo.pk)
