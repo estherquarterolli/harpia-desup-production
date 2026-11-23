@@ -1,11 +1,14 @@
 import re
 from datetime import timedelta
+from smtplib import SMTPException
 from unittest.mock import patch
 
+from django.contrib.messages import get_messages
+from django.core import mail
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
-from apps.core.models import Unidade
+from apps.core.models import AuditoriaGlobal, Unidade
 
 from .models import DEFAULT_USER_PASSWORD, EmailPasswordResetToken, User
 from .services import password_reset_token_hash
@@ -179,7 +182,12 @@ class EmailPasswordResetWorkflowTests(TestCase):
         self.assertNotContains(response, 'name="new_password1"')
 
 
-@override_settings(PASSWORD_RESET_COOLDOWN_SECONDS=900)
+@override_settings(
+    PASSWORD_RESET_COOLDOWN_SECONDS=900,
+    EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+    DEFAULT_FROM_EMAIL='desup@harpia.test',
+    SITE_URL='https://harpia.test/',
+)
 class DesupUserManagementTests(TestCase):
     def setUp(self):
         self.password = 'Senha@2026'
@@ -314,19 +322,112 @@ class DesupUserManagementTests(TestCase):
 
         confirm_page = self.client.get(url)
         self.assertEqual(confirm_page.status_code, 200)
-        self.assertContains(confirm_page, 'Confirmo que desejo enviar')
+        self.assertContains(confirm_page, 'Confirmo a redefinição da senha deste usuário.')
+        self.assertEqual(len(mail.outbox), 0)
 
-        with patch('apps.accounts.services.send_email_task.delay') as delay:
-            missing_confirmation = self.client.post(url, {})
+        missing_confirmation = self.client.post(url, {})
         self.assertEqual(missing_confirmation.status_code, 200)
         self.assertContains(missing_confirmation, 'Marque a confirmação')
-        delay.assert_not_called()
+        self.assertEqual(len(mail.outbox), 0)
+        self.target.refresh_from_db()
+        self.assertTrue(self.target.check_password(self.password))
+        self.assertFalse(self.target.forcar_troca_senha)
 
-        with patch('apps.accounts.services.send_email_task.delay') as delay:
-            with self.captureOnCommitCallbacks(execute=True):
-                confirmed = self.client.post(url, {'confirmar': 'sim'})
+        confirmed = self.client.post(url, {'confirmar': 'sim'})
         self.assertRedirects(confirmed, '/accounts/usuarios/')
-        delay.assert_called_once()
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertTrue(mail.outbox[0].body.startswith('Olá!\n'))
+        self.target.refresh_from_db()
+        self.assertTrue(self.target.check_password(DEFAULT_USER_PASSWORD))
+        self.assertTrue(self.target.forcar_troca_senha)
+
+    def test_reset_envia_credenciais_personalizadas_e_confirma_para_desup(self):
+        self.target.first_name = 'Maria'
+        self.target.last_name = 'Silva'
+        self.target.save(update_fields=['first_name', 'last_name'])
+
+        response = self.client.post(
+            f'/accounts/usuarios/{self.target.pk}/redefinir-senha/',
+            {'confirmar': 'sim'},
+        )
+
+        self.assertRedirects(response, '/accounts/usuarios/')
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+        self.assertEqual(email.to, [self.target.email])
+        self.assertEqual(email.from_email, 'desup@harpia.test')
+        self.assertEqual(email.subject, 'HARPIA - Sua senha foi redefinida')
+        self.assertEqual(email.content_subtype, 'plain')
+        self.assertEqual(email.body, (
+            'Olá, Maria Silva!\n\n'
+            'Informamos que sua senha de acesso ao HARPIA foi redefinida.\n'
+            'Seguem suas credenciais temporárias:\n\n'
+            f'Acesso: {self.target.email}\n'
+            f'Senha: {DEFAULT_USER_PASSWORD}\n\n'
+            'Será necessário cadastrar uma nova senha no primeiro acesso à conta.\n'
+            'A senha temporária diferencia maiúsculas e minúsculas.\n\n'
+            'Acesse em: https://harpia.test/login/\n\n'
+            'Para novas solicitações ou dúvidas, utilize a aba Suporte dentro da plataforma.'
+        ))
+        avisos = [str(message) for message in get_messages(response.wsgi_request)]
+        self.assertIn('E-mail com as credenciais temporárias enviado ao usuário.', avisos)
+        self.assertTrue(any(DEFAULT_USER_PASSWORD in aviso for aviso in avisos))
+        self.assertFalse(EmailPasswordResetToken.objects.filter(user=self.target).exists())
+        auditoria = AuditoriaGlobal.objects.get(acao='DESUP_PASSWORD_FORCE_RESET')
+        self.assertEqual(auditoria.objeto_id, str(self.target.pk))
+        self.assertNotIn(DEFAULT_USER_PASSWORD, auditoria.detalhes)
+
+    def test_reset_mantem_senha_e_auditoria_quando_email_falha(self):
+        for resultado in (SMTPException('detalhe-sigiloso'), 0):
+            with self.subTest(resultado=type(resultado).__name__):
+                AuditoriaGlobal.objects.filter(acao='DESUP_PASSWORD_FORCE_RESET').delete()
+                self.target.set_password(self.password)
+                self.target.forcar_troca_senha = False
+                self.target.save(update_fields=['password', 'forcar_troca_senha'])
+                envio = (
+                    {'side_effect': resultado} if isinstance(resultado, Exception)
+                    else {'return_value': resultado}
+                )
+                with patch('apps.accounts.services.send_mail', **envio) as send:
+                    with self.assertLogs('apps.accounts.services', level='ERROR') as logs:
+                        response = self.client.post(
+                            f'/accounts/usuarios/{self.target.pk}/redefinir-senha/',
+                            {'confirmar': 'sim'},
+                        )
+
+                self.assertRedirects(response, '/accounts/usuarios/')
+                send.assert_called_once()
+                self.target.refresh_from_db()
+                self.assertTrue(self.target.check_password(DEFAULT_USER_PASSWORD))
+                self.assertTrue(self.target.forcar_troca_senha)
+                self.assertTrue(AuditoriaGlobal.objects.filter(
+                    acao='DESUP_PASSWORD_FORCE_RESET', objeto_id=str(self.target.pk),
+                ).exists())
+                avisos = [str(message) for message in get_messages(response.wsgi_request)]
+                self.assertIn(
+                    'Senha redefinida, mas não foi possível confirmar o envio do e-mail. '
+                    'Avise o usuário por outro meio.',
+                    avisos,
+                )
+                self.assertNotIn('E-mail com as credenciais temporárias enviado ao usuário.', avisos)
+                self.assertEqual(len(mail.outbox), 0)
+                texto_log = '\n'.join(logs.output)
+                self.assertIn(f'user_id={self.target.pk}', texto_log)
+                for segredo in ('detalhe-sigiloso', DEFAULT_USER_PASSWORD, self.target.email):
+                    self.assertNotIn(segredo, texto_log)
+
+    def test_reset_nao_envia_email_para_requisicoes_sem_permissao(self):
+        url = f'/accounts/usuarios/{self.target.pk}/redefinir-senha/'
+        self.client.logout()
+        response = self.client.post(url, {'confirmar': 'sim'})
+        self.assertEqual(response.status_code, 302)
+
+        self.client.force_login(self.target)
+        response = self.client.post(url, {'confirmar': 'sim'})
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(len(mail.outbox), 0)
+        self.target.refresh_from_db()
+        self.assertTrue(self.target.check_password(self.password))
 
     def test_coordenador_nao_acessa_gestao_de_usuarios(self):
         self.client.logout()
@@ -346,3 +447,9 @@ class DesupUserManagementTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
+        response = self.client.post(
+            f'/accounts/usuarios/{superadmin.pk}/redefinir-senha/',
+            {'confirmar': 'sim'},
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(len(mail.outbox), 0)

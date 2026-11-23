@@ -6,16 +6,59 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.mail import send_mail
 from django.db import transaction
 from django.urls import reverse
 from django.utils import timezone
 
 from apps.core.tasks import send_email_task
 
-from .models import EmailPasswordResetToken, User
+from .models import DEFAULT_USER_PASSWORD, EmailPasswordResetToken, User
 
 
 logger = logging.getLogger(__name__)
+
+
+def montar_email_senha_redefinida(user):
+    nome = user.get_full_name().strip()
+    saudacao = f"Olá, {nome}!" if nome else "Olá!"
+    login_url = f"{settings.SITE_URL.rstrip('/')}{reverse('login')}"
+    return dict(
+        subject="HARPIA - Sua senha foi redefinida",
+        message=(
+            f"{saudacao}\n\n"
+            "Informamos que sua senha de acesso ao HARPIA foi redefinida.\n"
+            "Seguem suas credenciais temporárias:\n\n"
+            f"Acesso: {user.email}\n"
+            f"Senha: {DEFAULT_USER_PASSWORD}\n\n"
+            "Será necessário cadastrar uma nova senha no primeiro acesso à conta.\n"
+            "A senha temporária diferencia maiúsculas e minúsculas.\n\n"
+            f"Acesse em: {login_url}\n\n"
+            "Para novas solicitações ou dúvidas, utilize a aba Suporte dentro da plataforma."
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user.email],
+        fail_silently=False,
+    )
+
+
+def enviar_email_senha_redefinida(user):
+    """Envia diretamente para confirmar o resultado sem depender de worker Celery."""
+    try:
+        if send_mail(**montar_email_senha_redefinida(user)) == 1:
+            return True
+    except Exception as exc:
+        # A mensagem da exceção SMTP pode conter o corpo e a senha temporária.
+        logger.error(
+            "Falha no envio de e-mail de senha redefinida user_id=%s erro=%s",
+            user.pk, type(exc).__name__,
+        )
+        return False
+
+    logger.error(
+        "Envio de e-mail de senha redefinida não confirmado user_id=%s", user.pk,
+    )
+    return False
 
 
 def password_reset_token_hash(raw_token):
