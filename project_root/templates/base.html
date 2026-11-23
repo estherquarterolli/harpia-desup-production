@@ -162,7 +162,7 @@
             </div>
 
             <div class="flex shrink-0 items-center gap-3 md:gap-4">
-                <div class="relative">
+                <div class="relative notif-wrap">
                     <button onclick="toggleElement('notificationMenu')" class="relative text-[#025c9f] p-1">
                         <i class="ph ph-bell text-3xl"></i>
                         {% if total_notificacoes_nao_lidas > 0 %}
@@ -215,7 +215,7 @@
                 </div>
                 
                 <div class="relative">
-                    <div onclick="toggleElement('userMenu')" class="flex items-center gap-3 bg-white p-2 px-4 rounded-full shadow-sm border cursor-pointer select-none">
+                    <div onclick="toggleElement('userMenu')" class="user-pill flex items-center gap-3 bg-white p-2 px-4 rounded-full shadow-sm border cursor-pointer select-none">
                         {% comment %}
                         CORR-017: mostra o E-MAIL do usuário. Antes era
                         `get_full_name|default:email|upper` + `get_perfil_display`, o que

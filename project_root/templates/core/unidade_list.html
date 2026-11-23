@@ -31,7 +31,7 @@
       </a>
     </div>
 
-    <div class="overflow-x-auto">
+    <div class="overflow-x-auto stack-cards-wrap">
       <table class="w-full min-w-[760px] border-collapse text-left stack-table">
         <thead class="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500">
           <tr><th scope="col" class="px-5 py-3">Unidade</th><th scope="col" class="px-5 py-3 text-center">Cursos ativos</th><th scope="col" class="px-5 py-3">Preenchimento</th><th scope="col" class="px-5 py-3">Status</th><th scope="col" class="px-5 py-3 text-right">Ações</th></tr>
@@ -52,10 +52,14 @@
               {% else %}
               <div class="min-w-[9rem]" title="{{ unidade.preenchimento.horas_feitas|floatformat:"-1" }} h de {{ unidade.preenchimento.horas_meta|floatformat:"-1" }} h em sala · {{ unidade.preenchimento.completos }} de {{ unidade.preenchimento.professores }} professor(es) com a carga completa">
                 <div class="flex items-baseline justify-between gap-2">
+                  <span class="text-[11px] text-slate-500">Carga preenchida</span>
                   <span class="text-sm font-black" style="color: {{ unidade.preenchimento.cor }};">{{ unidade.preenchimento.percentual|floatformat:"-1" }}%</span>
-                  <span class="text-[11px] text-slate-500">{{ unidade.preenchimento.completos }}/{{ unidade.preenchimento.professores }} prof.</span>
                 </div>
-                <div class="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label="Preenchimento de {{ unidade.sigla }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ unidade.preenchimento.largura_css }}">
+                <div class="flex items-baseline justify-between gap-2">
+                  <span class="text-[11px] text-slate-500">Prof. completos</span>
+                  <span class="text-[11px] font-semibold text-slate-700">{{ unidade.preenchimento.completos }}/{{ unidade.preenchimento.professores }}</span>
+                </div>
+                <div class="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label="Carga preenchida de {{ unidade.sigla }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ unidade.preenchimento.largura_css }}">
                   <div class="h-2 rounded-full" style="width: {{ unidade.preenchimento.largura_css }}%; background-color: {{ unidade.preenchimento.cor }};"></div>
                 </div>
               </div>

@@ -302,6 +302,70 @@ h1, h2, h3, h4, h5, h6, .font-black {
 .faq-question::-webkit-details-marker { display: none; }
 @media print { .support-dock { display: none; } .support-enabled .main-content { margin-right: 0; max-width: 100%; } }
 
+/* ─── Mobile (< 768px): suporte, topbar e cartões ───────────────────────
+   - A faixa de 2.5rem reservada à aba lateral de suporte só faz sentido em
+     telas largas; no celular ela roubava largura do conteúdo e deixava o
+     cabeçalho fixo desalinhado.
+   - A aba vira um botão redondo compacto no canto inferior direito
+     (o texto "Suporte" continua disponível para leitores de tela).
+   - Posições salvas pelo arraste no desktop são ignoradas aqui. */
+@media (max-width: 767px) {
+    .support-enabled .main-content {
+        margin-right: 0;
+        max-width: 100%;
+        /* Folga para o botão flutuante não cobrir o último cartão/paginação. */
+        padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)) !important;
+    }
+    .support-dock {
+        width: 3rem;
+        left: auto !important;
+        top: auto !important;
+        right: max(0.75rem, env(safe-area-inset-right)) !important;
+        bottom: max(0.75rem, env(safe-area-inset-bottom)) !important;
+    }
+    .support-tab,
+    .support-dock.is-positioned .support-tab {
+        width: 3rem;
+        height: 3rem;
+        min-height: 0;
+        padding: 0;
+        justify-content: center;
+        border: 1px solid #bfdbfe;
+        border-radius: 9999px;
+        box-shadow: 0 4px 14px #025c9f33;
+        cursor: pointer;
+    }
+    .support-tab i { font-size: 24px; }
+    .support-tab span {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+
+    /* Topbar: título pode encolher e os controles da direita ocupam menos. */
+    #topbar { gap: 0.5rem; }
+    #topbar h1 { font-size: 1rem; }
+    #topbar .user-pill { padding: 0.25rem 0.5rem; gap: 0.25rem; }
+    #topbar .user-pill i { font-size: 2rem; }
+
+    /* Menu de notificações: w-80 + right-0 estourava a tela pela esquerda.
+       O cabeçalho (sticky) vira a referência e o menu ocupa a largura útil. */
+    #topbar .notif-wrap { position: static; }
+    #notificationMenu {
+        left: 0.75rem;
+        right: 0.75rem;
+        top: 100%;
+        width: auto;
+        margin-top: 0.25rem;
+    }
+
+    /* Listas em cartões: respiro entre os cartões e a borda da seção. */
+    .stack-cards-wrap { padding: 0.75rem; }
+}
+
 /* ─── Tabela → Cards no mobile (classe .stack-table) ───────────────────
    Aplique class="... stack-table" no <table> e data-label="Titulo" em
    cada <td> que deva exibir rotulo no celular. Em telas < 768px cada
