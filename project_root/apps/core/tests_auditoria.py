@@ -135,6 +135,9 @@ class PreenchimentoUnidadesTests(TestCase):
         self.assertEqual(por_sigla['UCP']['percentual'], 0.0)
         self.assertIsNone(por_sigla['UVZ']['percentual'])
         self.assertContains(resposta, 'Preenchimento')
+        self.assertContains(resposta, 'Carga preenchida')
+        self.assertContains(resposta, 'Prof. completos')
+        self.assertContains(resposta, '0/1')
         self.assertContains(resposta, 'Sem professores')
 
 
