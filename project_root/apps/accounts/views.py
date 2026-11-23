@@ -461,7 +461,11 @@ from .models import (
     PasswordResetRequest,
     DEFAULT_USER_PASSWORD,
 )
-from .services import issue_email_password_reset, password_reset_token_hash
+from .services import (
+    enviar_email_senha_redefinida,
+    issue_email_password_reset,
+    password_reset_token_hash,
+)
 
 def is_coordinator_or_desup(user):
     return user.is_authenticated and (user.is_superuser or user.perfil in ['DESUP', 'COORDENADOR_UNIDADE'])
@@ -666,26 +670,36 @@ class DesupUserPasswordResetView(LoginRequiredMixin, View):
                 'error': 'Marque a confirmação antes de redefinir a senha.',
             })
 
-        self.target.set_password(DEFAULT_USER_PASSWORD)
-        self.target.forcar_troca_senha = True
-        self.target.save(update_fields=['password', 'forcar_troca_senha'])
-        # Banner fixo (warning não some sozinho) com a senha EXATA em vigor, já que
-        # ela vem de DEFAULT_USER_PASSWORD do ambiente e diferencia maiúsculas/minúsculas.
+        with transaction.atomic():
+            self.target.set_password(DEFAULT_USER_PASSWORD)
+            self.target.forcar_troca_senha = True
+            self.target.save(update_fields=['password', 'forcar_troca_senha'])
+            registrar_auditoria(
+                request,
+                "DESUP_PASSWORD_FORCE_RESET",
+                usuario=request.user,
+                email=request.user.email,
+                detalhes=f"Senha de {self.target.email} redefinida para o padrão com troca obrigatória.",
+                entidade='Senha de usuário', objeto=self.target.email,
+                objeto_id=str(self.target.pk),
+            )
+
+        email_enviado = enviar_email_senha_redefinida(self.target)
+        # Banner fixo com a senha exata em vigor e troca obrigatória no próximo acesso.
         messages.warning(
             request,
             f'Senha de {self.target.email} redefinida. Senha temporária: '
             f'{DEFAULT_USER_PASSWORD}  (diferencia maiúsculas e minúsculas). '
             'A troca será exigida no primeiro acesso.',
         )
-        registrar_auditoria(
-            request,
-            "DESUP_PASSWORD_FORCE_RESET",
-            usuario=request.user,
-            email=request.user.email,
-            detalhes=f"Senha de {self.target.email} redefinida para o padrão com troca obrigatória.",
-            entidade='Senha de usuário', objeto=self.target.email,
-            objeto_id=str(self.target.pk),
-        )
+        if email_enviado:
+            messages.success(request, 'E-mail com as credenciais temporárias enviado ao usuário.')
+        else:
+            messages.warning(
+                request,
+                'Senha redefinida, mas não foi possível confirmar o envio do e-mail. '
+                'Avise o usuário por outro meio.',
+            )
         return redirect('desup_user_list')
 
 
