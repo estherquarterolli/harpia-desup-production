@@ -393,7 +393,7 @@ class ParseMatrixRowsTests(TestCase):
         self.assertEqual(p.nome, 'Algoritmos')
         self.assertEqual(p.codigo, 'SI001')
         self.assertEqual(p.carga_horaria, 80)
-        self.assertEqual(p.periodo, '1º Semestre')
+        self.assertEqual(p.periodo, '1º Período')
 
     def test_mesmo_nome_com_carga_diferente_vira_temporaria(self):
         previews = parse_matrix_rows([
@@ -404,7 +404,7 @@ class ParseMatrixRowsTests(TestCase):
         self.assertIsNone(p.componente_curricular_id)
         self.assertEqual(p.codigo, '')
         self.assertEqual(p.carga_horaria, 60)
-        self.assertEqual(p.periodo, '3º Semestre')
+        self.assertEqual(p.periodo, '3º Período')
 
     def test_disciplina_fora_do_catalogo_com_ch_vira_temporaria(self):
         previews = parse_matrix_rows([

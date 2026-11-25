@@ -278,6 +278,7 @@ def _avisar_professor_de_outra_unidade(request, comp, unidade, docente):
     Notificacao.objects.create(
         destinatario=None,
         unidade_destino=None,
+        unidade_origem=unidade,
         titulo=f'Professor de outra unidade alocado - {unidade.sigla}',
         mensagem=(
             f'{docente.nome} foi alocado em {comp.nome_disciplina} na unidade {unidade.sigla}, '

@@ -5,7 +5,7 @@
 {% block header_title %}Meu Perfil{% endblock %}
 
 {% block content %}
-{# CORR-017: tela somente leitura. Alterações de senha ficam em "Alterar senha". #}
+{# Tela somente leitura; comunicação e senha ficam em Configurações. #}
 <div class="max-w-2xl mx-auto p-2 md:p-0">
 
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -40,10 +40,10 @@
     </dl>
 
     <div class="flex flex-col gap-2 border-t border-slate-100 bg-slate-50/60 px-6 py-4 sm:flex-row sm:justify-end">
-      <a href="{% url 'password_change' %}"
+      <a href="{% url 'configuracoes' %}"
          class="flex items-center justify-center gap-2 rounded-xl bg-[#025c9f] px-5 py-2.5 text-sm font-black text-white shadow-md transition-all hover:bg-[#153e70]">
-        <i class="ph ph-key text-lg"></i>
-        Alterar senha
+        <i class="ph ph-gear text-lg"></i>
+        Configurações
       </a>
     </div>
 

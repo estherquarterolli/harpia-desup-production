@@ -20,6 +20,7 @@ from django.core.exceptions import ValidationError
 from apps.core.busca import normalizar
 
 from .models import CurricularComponent
+from .periods import normalizar_periodo_matriz as _normalizar_periodo_matriz
 
 
 class SpreadsheetImportError(Exception):
@@ -446,7 +447,7 @@ def parse_matrix_rows(rows):
                 i, periodo, codigo, nome, status="error",
                 message=(
                     "Período ausente ou inválido — informe um valor entre "
-                    "1º e 8º semestre na coluna Período."
+                    "1º e 8º período na coluna Período."
                 ),
             ))
             continue
@@ -486,17 +487,3 @@ def parse_matrix_rows(rows):
         ))
 
     return previews
-
-
-def _normalizar_periodo_matriz(periodo):
-    """Converte variações comuns da planilha para as opções do formulário."""
-    texto = normalizar(periodo)
-    if not texto:
-        return None
-
-    inicio = re.match(r"^([1-8])(?:\s|º|°|o|a|$)", texto)
-    invertido = re.search(r"(?:semestre|periodo)\s*([1-8])$", texto)
-    match = inicio or invertido
-    if not match:
-        return None
-    return f"{match.group(1)}º Semestre"

@@ -88,7 +88,7 @@ class RatUnidadeTests(ProfessorE2EBase):
         self.assertEqual(pedido.professor, self.prof_a1)
         self.assertEqual(pedido.status, 'PENDENTE')
         self.assertEqual(pedido.horas_adicionais, Decimal('4.50'))
-        self.assertTrue(Notificacao.objects.filter(titulo='Solicitação de RAT').exists())
+        self.assertTrue(Notificacao.objects.filter(titulo='Solicitação de RAT', unidade_origem=self.unidade_a).exists())
         self.assertTrue(AuditoriaGlobal.objects.filter(acao='RAT_SOLICITADO').exists())
 
     def test_professor_estrangeiro_nao_aparece_e_nao_pode_ser_enviado(self):

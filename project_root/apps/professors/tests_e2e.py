@@ -1026,7 +1026,7 @@ class SolicitacaoCadastroEMatriculaOpcionalTests(ProfessorE2EBase):
         self.assertContains(pagina_lista, 'text-black')
         self.assertContains(pagina_lista, '<i class="ph ph-plus"></i>', html=True)
 
-        with patch('apps.core.tasks.send_email_task.delay') as delay, \
+        with patch('apps.core.tasks.send_notification_email_task.delay') as delay, \
                 self.captureOnCommitCallbacks(execute=True):
             resposta = self.client.post(url, {
                 'nome': 'Professor Novo',
@@ -1045,10 +1045,10 @@ class SolicitacaoCadastroEMatriculaOpcionalTests(ProfessorE2EBase):
         self.assertEqual(solicitacao.tipo_contrato_solicitado, self.contrato)
         self.assertEqual(solicitacao.observacao_cadastro, 'Turma de ADS')
         self.assertIsNone(notificacao.destinatario)
+        self.assertEqual(notificacao.unidade_origem, self.unidade_a)
         self.assertIn('Professor Novo', notificacao.mensagem)
         self.assertIn(self.unidade_a.sigla, notificacao.mensagem)
-        delay.assert_called_once()
-        self.assertIn(self.desup.email, delay.call_args.kwargs['recipient_list'])
+        delay.assert_called_once_with(notificacao.pk)
 
     def test_desup_abre_cadastro_semipreenchido_a_partir_da_solicitacao(self):
         from apps.core.models import SolicitacaoProfessorExterno

@@ -2,6 +2,7 @@ import csv
 from datetime import timedelta
 
 from django.contrib import admin
+from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.db.models import Q
 from django.urls import reverse
@@ -18,6 +19,7 @@ from .audit import registrar, titulo_da_acao
 from .models import (
     AtividadeEstagioSupervisao,
     AuditoriaGlobal,
+    ConfiguracaoComunicacao,
     ErroSistema,
     ExcecaoCargaUnidade,
     JanelaEntrega,
@@ -30,6 +32,34 @@ from .models import (
     Unidade,
 )
 from .forms import JanelaEntregaForm
+from .communication import comunicacao_admin, pode_gerenciar_comunicacao
+
+
+class ConfiguracaoComunicacaoAdmin(HarpiaModelAdmin):
+    """Gestão de preferências pessoais e silenciamento global dentro do admin."""
+
+    def has_module_permission(self, request):
+        return pode_gerenciar_comunicacao(request.user)
+
+    def has_view_permission(self, request, obj=None):
+        return pode_gerenciar_comunicacao(request.user)
+
+    def has_change_permission(self, request, obj=None):
+        return pode_gerenciar_comunicacao(request.user)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        return comunicacao_admin(request, self.admin_site, self.model._meta)
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        return self.changelist_view(request, extra_context)
 
 class UnidadeSemUsuarioFilter(DropdownFilter):
     title = 'Acesso à unidade'
@@ -69,8 +99,8 @@ class JanelaEntregaAdmin(HarpiaModelAdmin):
     search_fields = ('semestre',)
 
 class NotificacaoAdmin(HarpiaModelAdmin):
-    list_display = ('titulo', 'destinatario', 'unidade_destino', 'lida', 'data_criacao')
-    list_filter = ('lida', 'unidade_destino', 'data_criacao')
+    list_display = ('titulo', 'destinatario', 'unidade_origem', 'unidade_destino', 'lida', 'data_criacao')
+    list_filter = ('lida', 'unidade_origem', 'unidade_destino', 'data_criacao')
     search_fields = ('titulo', 'mensagem')
     ordering = ('-data_criacao',)
 
@@ -596,6 +626,7 @@ class ReadaptacaoProfessorAdmin(HarpiaModelAdmin):
 admin_site.register(Unidade, UnidadeAdmin)
 admin_site.register(JanelaEntrega, JanelaEntregaAdmin)
 admin_site.register(Notificacao, NotificacaoAdmin)
+admin_site.register(ConfiguracaoComunicacao, ConfiguracaoComunicacaoAdmin)
 admin_site.register(AuditoriaGlobal, AuditoriaGlobalAdmin)
 admin_site.register(ErroSistema, ErroSistemaAdmin)
 admin_site.register(TipoCargoDiretivo, TipoCargoDiretivoAdmin)

@@ -13,15 +13,12 @@ from .models import (
     calcular_carga_horaria_semanal,
 )
 from apps.core.models import Unidade
+from .periods import PERIODO_COMPONENTE_CHOICES
 
 
 # ── Classe base de widget para campo de texto/select padrão ──────────────────
 _FIELD_CSS = 'form-field'        # definido em dashboard.css
 _TEXTAREA_CSS = 'form-field compact'
-
-# ── Opções de Período/Semestre ───────────────────────────────────────────────
-PERIODO_COMPONENTE_CHOICES = [('', 'Selecione')] + [(f"{i}º Semestre", f"{i}º Semestre") for i in range(1, 9)]
-
 
 class CurriculumMatrixForm(forms.ModelForm):
     duplicar_de = forms.ModelChoiceField(
@@ -144,6 +141,19 @@ class MatrixComponentForm(forms.ModelForm):
 
     def __init__(self, *args, catalogo_cache=None, **kwargs):
         super().__init__(*args, **kwargs)
+        # O campo continua textual: preserve exatamente valores legados e os
+        # recebidos por cópia/POST, inclusive ao reconstruir um formulário inválido.
+        choices = list(PERIODO_COMPONENTE_CHOICES)
+        valores = {valor for valor, _ in choices}
+        atuais = [self.initial.get('periodo')]
+        if self.is_bound:
+            atuais.append(self.data.get(self.add_prefix('periodo')))
+        for atual in atuais:
+            if atual and atual not in valores:
+                choices.append((atual, atual))
+                valores.add(atual)
+        self.fields['periodo'].widget.choices = choices
+        self.fields['periodo'].strip = False
         self.fields['codigo'].required = False
         self.fields['carga_horaria'].required = False
         self.fields['creditos'].required = False

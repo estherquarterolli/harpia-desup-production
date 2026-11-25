@@ -499,7 +499,13 @@ function preencherLinhaComponente(row, comp) {
     }
     if (name.endsWith('-nome_temporario')) { input.value = comp.nome_temporario || ''; return; }
     if (name.includes('codigo')) input.value = comp.codigo || '';
-    if (name.includes('periodo')) input.value = comp.periodo || '';
+    if (name.endsWith('-periodo')) {
+      const periodo = comp.periodo || '';
+      if (periodo && !Array.from(input.options).some(opt => opt.value === periodo)) {
+        input.add(new Option(periodo, periodo));
+      }
+      input.value = periodo;
+    }
     if (name.includes('carga_horaria') && !name.includes('semanal')) input.value = comp.carga_horaria || '';
     if (name.includes('creditos')) input.value = comp.creditos || '';
     if (name.includes('carga_horaria_semanal')) input.value = comp.carga_horaria_semanal || '';
@@ -777,7 +783,15 @@ function addComponent() {
   
   // Limpar valores dos campos copiados
   newRow.querySelectorAll('input[type=text], input[type=number]').forEach(i => i.value = '');
-  newRow.querySelectorAll('select').forEach(s => s.selectedIndex = 0);
+  newRow.querySelectorAll('select').forEach(s => {
+    // A linha nova oferece só o padrão atual; cópias adicionam seu legado ao preencher.
+    if (s.name.endsWith('-periodo')) {
+      Array.from(s.options).forEach(opt => {
+        if (opt.value && !/^[1-8]º Período$/.test(opt.value)) opt.remove();
+      });
+    }
+    s.selectedIndex = 0;
+  });
   newRow.querySelectorAll('input[type=checkbox]').forEach(c => c.checked = false);
   newRow.querySelectorAll('input[type=hidden][name*="id"]').forEach(h => h.value = '');
 

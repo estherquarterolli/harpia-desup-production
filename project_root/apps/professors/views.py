@@ -641,6 +641,7 @@ class ProfessorSolicitarCadastroView(CoordenadorOnlyMixin, View):
         Notificacao.objects.create(
             destinatario=None,
             unidade_destino=None,
+            unidade_origem=unidade,
             titulo=f'Solicitação de cadastro de professor - {unidade.sigla if unidade else "Geral"}',
             mensagem=mensagem,
             url_acao=reverse('core:solicitacao_professor_list'),
@@ -699,6 +700,7 @@ class ProfessorSolicitarCessaoView(CoordenadorOnlyMixin, View):
         Notificacao.objects.create(
             destinatario=None,
             unidade_destino=None,
+            unidade_origem=unidade,
             titulo=f'Solicitação de professor - {unidade.sigla}',
             mensagem=(
                 f'{unidade.sigla} solicitou o professor {professor.nome} (origem: {origem.sigla}).\n\n'

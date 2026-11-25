@@ -142,7 +142,6 @@ class CurriculumMatrixListView(MatrixBaseView, ListView):
         ctx['pode_editar'] = True
         ctx['is_desup'] = self.request.user.perfil == 'DESUP' or self.request.user.is_superuser
         ctx['unidades'] = Unidade.objects.filter(status=True).order_by('nome')
-        ctx['semestres'] = [f'{i}º Semestre' for i in range(1, 9)]
         
         unidade_id = self.request.GET.get('unidade_id')
         cursos_qs = Course.objects.all()

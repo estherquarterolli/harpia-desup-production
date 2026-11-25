@@ -955,6 +955,45 @@ class JanelaEntrega(models.Model):
         return self.status != self.StatusChoices.FECHADO and self.data_inicio <= hoje <= self.data_fim
 
 
+class ConfiguracaoComunicacao(models.Model):
+    """Política única dos avisos operacionais enviados à DESUP."""
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    unidades_silenciadas = models.ManyToManyField(
+        Unidade, blank=True, related_name='configuracoes_comunicacao',
+        verbose_name='Unidades de origem silenciadas',
+    )
+
+    class Meta:
+        db_table = 'harpiadb_nucleo_configuracao_comunicacao'
+        verbose_name = 'Comunicação'
+        verbose_name_plural = 'Comunicação'
+        constraints = [models.CheckConstraint(condition=models.Q(id=1), name='harpia_comunicacao_unica')]
+
+    def __str__(self):
+        return 'Comunicação por e-mail'
+
+
+class PreferenciaComunicacao(models.Model):
+    usuario = models.OneToOneField(
+        'accounts.User', on_delete=models.CASCADE, related_name='preferencia_comunicacao',
+        verbose_name='Usuário',
+    )
+    receber_emails = models.BooleanField(default=False, verbose_name='Receber notificações por e-mail')
+    unidades_silenciadas = models.ManyToManyField(
+        Unidade, blank=True, related_name='preferencias_comunicacao',
+        verbose_name='Unidades silenciadas para este usuário',
+    )
+
+    class Meta:
+        db_table = 'harpiadb_nucleo_preferencia_comunicacao'
+        verbose_name = 'Preferência de comunicação'
+        verbose_name_plural = 'Preferências de comunicação'
+
+    def __str__(self):
+        return f'Comunicação de {self.usuario.email}'
+
+
 class Notificacao(models.Model):
     """
     Representa uma notificação/aviso no sistema.
@@ -975,6 +1014,10 @@ class Notificacao(models.Model):
         null=True,
         blank=True,
         verbose_name='Unidade Destino'
+    )
+    unidade_origem = models.ForeignKey(
+        Unidade, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='notificacoes_originadas', verbose_name='Unidade de origem',
     )
     titulo = models.CharField(max_length=255, verbose_name="Título", default="Nova Notificação")
     mensagem = models.TextField(verbose_name="Mensagem")

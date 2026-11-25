@@ -1,0 +1,17 @@
+{{ form.non_field_errors }}
+<div class="space-y-4">
+  <div>
+    <label for="{{ form.receber_emails.id_for_label }}" class="flex items-center gap-2 font-semibold">
+      {{ form.receber_emails }} <span>{{ form.receber_emails.label }}</span>
+    </label>
+    {{ form.receber_emails.errors }}
+  </div>
+  <fieldset class="space-y-2">
+    <legend class="font-semibold">Unidades silenciadas {% if modo_admin %}para este usuário{% else %}para mim{% endif %}</legend>
+    <p class="text-sm">Marcar uma unidade impede apenas os e-mails enviados a {% if modo_admin %}este usuário{% else %}você{% endif %}. Os demais destinatários e a caixa Harpia continuam recebendo.</p>
+    {{ form.unidades_silenciadas.errors }}
+    {% for checkbox in form.unidades_silenciadas %}
+      <label class="flex items-center gap-2 text-sm">{{ checkbox.tag }} <span>{{ checkbox.choice_label }}</span></label>
+    {% empty %}<p class="text-sm">Nenhuma unidade cadastrada.</p>{% endfor %}
+  </fieldset>
+</div>

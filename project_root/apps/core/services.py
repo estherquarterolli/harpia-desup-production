@@ -15,6 +15,7 @@ from .models import (
     SolicitacaoProfessorExterno,
 )
 from .tasks import send_email_task
+from .communication import get_desup_recipients
 
 logger = logging.getLogger(__name__)
 
@@ -173,6 +174,7 @@ def record_window_attempt(request, *, area_label, action_label, target_label="",
     Notificacao.objects.create(
         destinatario=None,
         unidade_destino=None,
+        unidade_origem=unidade,
         titulo=f"Tentativa bloqueada - {area_label}",
         mensagem=mensagem,
         url_acao=reverse("core:janela_list"),
@@ -215,18 +217,6 @@ def enforce_window_or_redirect(request, *, area_label, action_label, target_labe
     return redirect(fallback_url or request.META.get("HTTP_REFERER") or "/")
 
 
-def get_desup_recipients():
-    from apps.accounts.models import User
-
-    return list(
-        User.objects.filter(perfil="DESUP", is_active=True)
-        .exclude(email__isnull=True)
-        .exclude(email="")
-        .values_list("email", flat=True)
-        .distinct()
-    )
-
-
 def create_window_ticket(*, request, area_label, action_label, target_label="", details="", unidade=None, next_url=""):
     unidade = unidade or getattr(request.user, "unidade", None)
     unidade_label = f"{unidade.sigla} - {unidade.nome}" if unidade else "Geral"
@@ -242,17 +232,17 @@ def create_window_ticket(*, request, area_label, action_label, target_label="", 
         f"Solicitante: {request.user.email}"
     )
 
-    Notificacao.objects.create(
+    notificacao = Notificacao.objects.create(
         destinatario=None,
         unidade_destino=None,
+        unidade_origem=unidade,
         titulo=titulo,
         mensagem=mensagem,
         url_acao=reverse("core:janela_list"),
     )
 
-    # O e-mail para os administradores DESUP sai do signal de `Notificacao`
-    # (apps/core/signals.py), que cobre todas as notificações endereçadas à DESUP.
-    email_sent = bool(get_desup_recipients())
+    # O signal distingue supressão, fila e falha; enfileirar não confirma entrega.
+    email_status = notificacao._email_status
 
     logger.info(
         "Chamado de alteração criado",
@@ -263,10 +253,10 @@ def create_window_ticket(*, request, area_label, action_label, target_label="", 
             "action": action_label,
             "target": target_label,
             "unit_id": unidade.pk if unidade else None,
-            "email_sent": email_sent,
+            "email_status": email_status,
         },
     )
-    return email_sent
+    return email_status
 
 
 def registrar_evento_prioridade1(request, acao, detalhes):
@@ -409,6 +399,7 @@ def solicitar_rat(*, request, professor_id, horas_adicionais, data_inicio, data_
     solicitacao.full_clean()
     solicitacao.save()
     Notificacao.objects.create(
+        unidade_origem=unidade,
         titulo='Solicitação de RAT',
         mensagem=f'{unidade.sigla} solicitou +{horas_adicionais} h semanais para {professor.nome}.',
         url_acao=reverse('core:alertas_carga_desup') + '#excecoes',

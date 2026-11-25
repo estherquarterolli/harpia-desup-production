@@ -1672,7 +1672,7 @@ class DisciplinaTemporariaEImportacaoE2ETests(BaseCoursesE2ETests):
 
         self.assertEqual(resp.status_code, 200, resp.content)
         componente = resp.json()['componentes'][0]
-        self.assertEqual(componente['periodo'], '3º Semestre')
+        self.assertEqual(componente['periodo'], '3º Período')
         self.assertEqual(componente['carga_horaria'], 60)
         self.assertEqual(componente['componente_curricular'], '')
         self.assertEqual(componente['nome_temporario'], self.algoritmos.nome)
