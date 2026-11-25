@@ -877,6 +877,7 @@ class EnviarParaDesupLoteView(LoginRequiredMixin, PerfilRequiredMixin, View):
             Notificacao.objects.create(
                 destinatario=None,
                 unidade_destino=None,
+                unidade_origem=unidade,
                 titulo=f"📋 Pendência Extracurricular — {unidade.sigla}",
                 mensagem=f"A unidade {unidade.nome} enviou {enviadas} justificativa(s) extracurricular(es) para aprovação ({semestre}). Docentes: {nomes_str}.",
                 url_acao=f"{reverse('extra_curricular:pendencia_list')}?unidade_id={unidade.pk}&semestre={semestre}"

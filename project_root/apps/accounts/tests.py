@@ -573,9 +573,10 @@ class PerfilPageTests(TestCase):
         html = self.client.get(reverse('profile')).content.decode()
 
         self.assertIn(f'href="{reverse("profile")}"', html)
-        # Os dois itens coexistem no menu, cada um com seu destino.
+        # Perfil somente leitura e Configurações têm destinos separados.
         self.assertIn('Meu Perfil', html)
-        self.assertIn('Alterar senha', html)
+        self.assertIn('Configurações', html)
+        self.assertIn(f'href="{reverse("configuracoes")}"', html)
 
     def test_superuser_tambem_ve_meu_perfil(self):
         superuser = User.objects.create_superuser(

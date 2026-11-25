@@ -149,6 +149,7 @@ EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=False, cast=bool)
 EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="no-reply@harpia.local")
+HARPIA_NOTIFICATION_EMAIL = 'harpia@desup.faetec.rj.gov.br'
 EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=5, cast=int)
 
 # Opcional: destinatário específico. Sem ele, o suporte usa a caixa
@@ -474,6 +475,11 @@ UNFOLD = {
                         "title": "Notificações",
                         "icon": "notifications",
                         "link": "/admin/core/notificacao/",
+                    },
+                    {
+                        "title": "Comunicação",
+                        "icon": "mail",
+                        "link": "/admin/core/configuracaocomunicacao/",
                     },
                     {
                         "title": "Auditoria Global",

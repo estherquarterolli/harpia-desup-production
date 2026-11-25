@@ -17,20 +17,21 @@ Uso:
 import re
 from django.core.management.base import BaseCommand
 from django.db import connection
+from apps.courses.periods import normalizar_periodo_matriz
 
 
 def _detect_periodo(codigo_materia: str) -> str:
     """
     Tenta extrair o período letivo do código da matéria.
-    Exemplos: '1-HEB' → '1o periodo', '2-FE' → '2o periodo',
-              '1ORG' → '1o periodo',  'BDA-I' → ''
+    Exemplos: '1-HEB' → '1º Período', '2-FE' → '2º Período',
+              '1ORG' → '1º Período',  'BDA-I' → ''
     """
     m = re.match(r'^(\d+)[-]', codigo_materia)
     if m:
-        return f"{m.group(1)}o periodo"
+        return normalizar_periodo_matriz(m.group(1)) or ''
     m = re.match(r'^(\d+)[A-Z]', codigo_materia)
     if m:
-        return f"{m.group(1)}o periodo"
+        return normalizar_periodo_matriz(m.group(1)) or ''
     return ''
 
 
@@ -186,13 +187,11 @@ class Command(BaseCommand):
                             'status': MatrixComponent.StatusChoices.SEM_PROFESSOR,
                         },
                     )
-                    if not mc_created and (mc.codigo != codigo_materia or mc.periodo != periodo):
-                        # Reimportações devem refletir código/período atualizados da fonte;
-                        # status e carga_horária não são tocados pois podem ter sido
-                        # ajustados manualmente após a criação (ex: alocação de professor).
+                    if not mc_created and mc.codigo != codigo_materia:
+                        # Reimportar não reescreve o período de um vínculo existente.
+                        # A inferência pelo código só define o período de linhas novas.
                         mc.codigo = codigo_materia
-                        mc.periodo = periodo
-                        mc.save(update_fields=['codigo', 'periodo'])
+                        mc.save(update_fields=['codigo'])
                     if mc_created:
                         stats['vinculos'] += 1
                 else:

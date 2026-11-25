@@ -76,6 +76,11 @@
                     <i class="ph ph-clock-countdown"></i><span class="sb-label">Entrega</span>
                 </a>
             </div>
+            {% elif user.perfil == 'ADMIN' %}
+            <div class="sb-block">
+                <p class="sb-title">Gestão</p>
+                <a href="/admin/" class="sb-link"><i class="ph ph-shield-check"></i><span class="sb-label">Administração</span></a>
+            </div>
             {% elif user.perfil == 'COORDENADOR_UNIDADE' %}
             <div class="sb-block">
                 <p class="sb-title">Gestão</p>
@@ -231,12 +236,11 @@
                     </div>
                     <div id="userMenu" class="menu-hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border z-50 py-2 font-bold text-sm">
                         {% comment %}
-                        CORR-017: "Meu Perfil" e "Alterar senha" são itens SEPARADOS. Antes
-                        os dois apontavam para `password_change` — o link de senha se
-                        disfarçava de "Meu Perfil" para quem não era superuser.
+                        Meu Perfil permanece somente leitura. As preferências de
+                        comunicação e o acesso à troca de senha ficam em Configurações.
                         {% endcomment %}
                         <a href="{% url 'profile' %}" class="block px-4 py-2 hover:bg-slate-50"><i class="ph ph-user-circle mr-2"></i> Meu Perfil</a>
-                        <a href="{% url 'password_change' %}" class="block px-4 py-2 hover:bg-slate-50"><i class="ph ph-key mr-2"></i> Alterar senha</a>
+                        <a href="{% url 'configuracoes' %}" class="block px-4 py-2 hover:bg-slate-50"><i class="ph ph-gear mr-2"></i> Configurações</a>
                         {% if is_real_superadmin %}
                         <a href="/admin/" class="block px-4 py-2 hover:bg-slate-50"><i class="ph ph-shield-check mr-2"></i> Administração</a>
                         {% endif %}

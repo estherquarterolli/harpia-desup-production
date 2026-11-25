@@ -24,6 +24,7 @@ from django.conf import settings
 from django.core import mail
 from django.core.cache import cache
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.models import (
@@ -935,17 +936,19 @@ class MeuPerfilE2ETests(BaseE2ETestCase):
                     self.assertContains(resposta, self.unidade.nome)
                 else:
                     self.assertNotContains(resposta, 'Unidade</dt>')
-                # Somente leitura: a única ação oferecida é ir para a troca de senha.
-                self.assertContains(resposta, f'href="{URL_TROCA_SENHA}"')
+                # Somente leitura: preferências e senha ficam em Configurações.
+                self.assertContains(resposta, f'href="{reverse("configuracoes")}"')
                 self.assertNotContains(resposta, '<input type="text"')
 
     def test_do_perfil_o_usuario_chega_a_troca_de_senha(self):
-        """O botão "Alterar senha" precisa levar a uma tela funcional."""
+        """Perfil → Configurações → Alterar senha mantém o fluxo funcional."""
         navegador = self.client_class()
         self.fazer_login(self.desup.email, self.senha, client=navegador)
 
         perfil = navegador.get(URL_PERFIL)
-        self.assertContains(perfil, 'Alterar senha')
+        self.assertContains(perfil, 'Configurações')
+        configuracoes = navegador.get(reverse('configuracoes'))
+        self.assertContains(configuracoes, f'href="{URL_TROCA_SENHA}"')
 
         destino = navegador.get(URL_TROCA_SENHA)
         self.assertEqual(destino.status_code, 200)

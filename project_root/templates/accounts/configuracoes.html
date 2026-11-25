@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block title %}Configurações — Harpia{% endblock %}
+{% block header_title %}Configurações{% endblock %}
+{% block content %}
+<div class="max-w-3xl space-y-6">
+  {% if form is not None %}
+  <section id="comunicacao" class="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
+    <h2 class="text-lg font-bold text-[#025c9f]">Comunicação</h2>
+    <p class="text-sm text-slate-600">Preferências de <strong>{{ user.email }}</strong>. Estas opções afetam somente seus e-mails de notificação; solicitações, registros e avisos no sino permanecem disponíveis.</p>
+    <form method="post" class="space-y-4">
+      {% csrf_token %}
+      {% include 'core/partials/_preferencia_comunicacao.html' %}
+      <button type="submit" class="bg-[#025c9f] text-white font-bold px-5 py-3 rounded-xl">Salvar minhas preferências</button>
+    </form>
+    {% if unidades_globais %}
+    <div class="bg-slate-50 rounded-xl p-4 text-sm space-y-2">
+      <p class="font-semibold">Unidades silenciadas globalmente pelo administrador</p>
+      <ul class="list-disc pl-5">{% for unidade in unidades_globais %}<li>{{ unidade }}</li>{% endfor %}</ul>
+      <p>Essas unidades não enviam avisos por e-mail a ninguém, inclusive à caixa Harpia. Somente o administrador pode remover esse bloqueio.</p>
+    </div>
+    {% endif %}
+  </section>
+  {% endif %}
+  <section id="senha" class="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
+    <h2 class="text-lg font-bold text-[#025c9f]">Alterar senha</h2>
+    <p class="text-sm text-slate-600">Atualize sua senha de acesso ao Harpia.</p>
+    <a href="{% url 'password_change' %}" class="inline-flex items-center gap-2 bg-[#025c9f] text-white font-bold px-5 py-3 rounded-xl"><i class="ph ph-key"></i> Alterar senha</a>
+  </section>
+</div>
+{% endblock %}

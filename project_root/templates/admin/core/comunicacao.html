@@ -1,0 +1,44 @@
+{% extends 'admin/base_site.html' %}
+{% block content %}
+<div class="space-y-6">
+  <section class="rounded-default border border-base-200 bg-white p-6 space-y-4 dark:border-base-800 dark:bg-base-900">
+    <h2 class="text-lg font-semibold">Preferências por usuário</h2>
+    <p class="text-sm">Gerencie suas preferências e as dos usuários DESUP. Cada pessoa também pode alterar as próprias opções; vale a última alteração salva.</p>
+    <form method="get" action="{{ admin_url }}" class="flex flex-wrap items-end gap-3">
+      <div class="space-y-2">
+        <label for="usuario-comunicacao" class="block font-semibold">Usuário</label>
+        <select name="usuario" id="usuario-comunicacao" class="rounded-default border border-base-200 p-2 dark:border-base-700 dark:bg-base-900">
+          {% for usuario in usuarios %}
+          <option value="{{ usuario.pk }}" {% if usuario.pk == usuario_selecionado.pk %}selected{% endif %}>{{ usuario.email }}{% if usuario.pk == request.user.pk %} (você){% endif %}{% if not usuario.is_active %} — inativo{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="rounded-default border border-base-200 px-4 py-2 dark:border-base-700">Selecionar usuário</button>
+    </form>
+    <h3 class="font-semibold">{{ usuario_selecionado.email }}</h3>
+    {% if not usuario_selecionado.is_active %}<p class="text-sm">Esta conta está inativa e não receberá e-mails enquanto não for reativada.</p>{% endif %}
+    <form method="post" action="{{ admin_url }}" class="space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="acao" value="preferencia">
+      <input type="hidden" name="usuario" value="{{ usuario_selecionado.pk }}">
+      {% include 'core/partials/_preferencia_comunicacao.html' with modo_admin=True %}
+      <button type="submit" class="bg-primary-600 text-white rounded-default px-4 py-2 font-semibold">Salvar preferências do usuário</button>
+    </form>
+  </section>
+  <section class="rounded-default border border-base-200 bg-white p-6 space-y-4 dark:border-base-800 dark:bg-base-900">
+    <h2 class="text-lg font-semibold">Silenciamento global de unidades</h2>
+    <p class="text-sm">As unidades marcadas não enviam notificações por e-mail para ninguém, inclusive para <strong>{{ email_principal }}</strong>. Solicitações, registros e avisos no sino continuam disponíveis.</p>
+    <form method="post" action="{{ admin_url }}" class="space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="acao" value="global">
+      <input type="hidden" name="usuario" value="{{ usuario_selecionado.pk }}">
+      {{ global_form.non_field_errors }}
+      {{ global_form.unidades_silenciadas.errors }}
+      <div class="space-y-2">{% for checkbox in global_form.unidades_silenciadas %}
+        <label class="flex items-center gap-2 text-sm">{{ checkbox.tag }} <span>{{ checkbox.choice_label }}</span></label>
+      {% empty %}<p class="text-sm">Nenhuma unidade cadastrada.</p>{% endfor %}</div>
+      <button type="submit" class="bg-primary-600 text-white rounded-default px-4 py-2 font-semibold">Salvar silenciamento global</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

@@ -216,7 +216,7 @@ class ProfileView(LoginRequiredMixin, View):
 
     Antes o item "Meu Perfil" do menu de usuário apontava direto para a troca de
     senha (`password_change`) e não existia nenhuma tela de perfil. Aqui o usuário
-    vê e-mail, tipo de perfil e unidade; a troca de senha virou um item separado.
+    vê e-mail, tipo de perfil e unidade; Configurações reúne comunicação e senha.
     """
 
     template_name = 'accounts/profile.html'

@@ -1,6 +1,5 @@
 import logging
 
-from django.conf import settings
 from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -11,39 +10,31 @@ logger = logging.getLogger(__name__)
 
 
 @receiver(post_save, sender=Notificacao)
-def enviar_email_notificacao_desup(sender, instance, created, **kwargs):
-    """Espelha por e-mail, para os administradores DESUP, toda notificação à DESUP.
-
-    Notificação "da DESUP" = sem destinatário e sem unidade de destino (chamados,
-    justificativas extracurriculares enviadas, solicitações de cadastro, tentativas
-    bloqueadas...). Avisos endereçados a uma unidade ou usuário não passam por aqui.
-    """
-    if not created or instance.destinatario_id or instance.unidade_destino_id:
+def enviar_email_notificacao_desup(sender, instance, created, raw=False, **kwargs):
+    """Enfileira avisos à DESUP após commit, respeitando a unidade de origem."""
+    if raw or not created or instance.destinatario_id or instance.unidade_destino_id:
         return
 
-    from .services import get_desup_recipients
-    from .tasks import send_email_task
-
-    recipients = get_desup_recipients()
-    if not recipients:
-        return
-
-    corpo = instance.mensagem
-    if instance.url_acao:
-        corpo = f"{corpo}\n\nAcesse: {instance.url_acao}"
-    corpo = f"{corpo}\n\n— Notificação automática do sistema Harpia."
-    assunto = f"[Harpia] {instance.titulo}"
+    from .communication import unidade_silenciada
+    from .tasks import send_notification_email_task
 
     def _enviar():
         try:
-            send_email_task.delay(
-                subject=assunto,
-                message=corpo,
-                recipient_list=recipients,
-                from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
-                fail_silently=False,
-            )
+            if unidade_silenciada(instance.unidade_origem_id):
+                logger.info('E-mail de notificação silenciado', extra={
+                    'notification_id': instance.pk, 'unit_id': instance.unidade_origem_id,
+                    'email_status': 'silenciado',
+                })
+                instance._email_status = 'silenciado'
+                return
+            send_notification_email_task.delay(instance.pk)
+            instance._email_status = 'enfileirado'
+            logger.info('E-mail de notificação enfileirado', extra={
+                'notification_id': instance.pk, 'email_status': 'enfileirado',
+            })
         except Exception:
+            instance._email_status = 'falhou'
             logger.exception("Falha ao enfileirar e-mail da notificação %s", instance.pk)
 
+    instance._email_status = 'aguardando_commit'
     transaction.on_commit(_enviar)

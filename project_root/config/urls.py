@@ -3,6 +3,7 @@ from django.urls import path, include
 from django.views.generic import RedirectView
 from apps.accounts.admin import admin_site
 from apps.core.views import custom_500
+from apps.core.communication import ConfiguracoesView
 
 handler500 = custom_500
 from apps.accounts.views import (
@@ -29,6 +30,7 @@ urlpatterns = [
     # CORR-017: página "Meu Perfil" (somente leitura) — antes o item do menu
     # apontava direto para a troca de senha.
     path('accounts/perfil/', ProfileView.as_view(), name='profile'),
+    path('accounts/configuracoes/', ConfiguracoesView.as_view(), name='configuracoes'),
     path(
         'accounts/visualizacao/',
         SuperadminVisualizationView.as_view(),

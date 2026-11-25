@@ -772,6 +772,7 @@ class FluxoLoteUnidadeTests(_BaseFluxoE2E):
         # A DESUP é notificada do envio.
         aviso = Notificacao.objects.filter(titulo__contains="Pendência Extracurricular").first()
         self.assertIsNotNone(aviso)
+        self.assertEqual(aviso.unidade_origem, self.unidade_a)
         self.assertIn("2 justificativa(s)", aviso.mensagem)
 
         # ── DESUP defere tudo pela mesa e ambos finalizam ────────────
