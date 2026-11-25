@@ -144,6 +144,51 @@
             {% if form.unidades.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.unidades.errors.0 }}</p>{% endif %}
           </div>
 
+          {% if form.vem_com_rat %}
+          <!-- RAT de entrada: só aparece no cadastro de um professor novo -->
+          <div class="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <label for="{{ form.vem_com_rat.id_for_label }}" class="flex cursor-pointer items-center justify-between gap-4">
+              <span>
+                <span class="block text-sm font-black text-slate-800">Professor já vem como RAT</span>
+                <span class="block text-xs text-slate-500">Marque quando o professor já chega cumprindo Regime Adicional de Trabalho. O RAT é registrado como aprovado junto com o cadastro.</span>
+              </span>
+              <span class="rat-switch shrink-0">
+                <input type="checkbox" name="{{ form.vem_com_rat.html_name }}" id="{{ form.vem_com_rat.id_for_label }}" {% if form.vem_com_rat.value %}checked{% endif %}>
+                <span class="rat-switch-trilho" aria-hidden="true"></span>
+              </span>
+            </label>
+
+            <div id="rat-campos" class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label for="{{ form.rat_unidade.id_for_label }}" class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Unidade do RAT <span class="text-red-400">*</span></label>
+                {{ form.rat_unidade }}
+                <p class="mt-1 text-xs text-slate-500">Precisa ser uma das unidades marcadas acima. Com uma só unidade marcada, ela é usada automaticamente.</p>
+                {% if form.rat_unidade.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.rat_unidade.errors.0 }}</p>{% endif %}
+              </div>
+              <div>
+                <label for="{{ form.rat_horas_adicionais.id_for_label }}" class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Horas adicionais semanais <span class="text-red-400">*</span></label>
+                {{ form.rat_horas_adicionais }}
+                {% if form.rat_horas_adicionais.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.rat_horas_adicionais.errors.0 }}</p>{% endif %}
+              </div>
+              <div>
+                <label for="{{ form.rat_data_inicio.id_for_label }}" class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Início da vigência <span class="text-red-400">*</span></label>
+                {{ form.rat_data_inicio }}
+                {% if form.rat_data_inicio.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.rat_data_inicio.errors.0 }}</p>{% endif %}
+              </div>
+              <div>
+                <label for="{{ form.rat_data_fim.id_for_label }}" class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Fim da vigência <span class="text-slate-400 normal-case font-medium">(opcional)</span></label>
+                {{ form.rat_data_fim }}
+                {% if form.rat_data_fim.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.rat_data_fim.errors.0 }}</p>{% endif %}
+              </div>
+              <div class="md:col-span-2">
+                <label for="{{ form.rat_justificativa.id_for_label }}" class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Observação <span class="text-slate-400 normal-case font-medium">(opcional)</span></label>
+                {{ form.rat_justificativa }}
+                {% if form.rat_justificativa.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.rat_justificativa.errors.0 }}</p>{% endif %}
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
           <div>
             <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Status</label>
             {{ form.status }}
@@ -220,6 +265,15 @@
   </div>
 </div>
 
+<style>
+  .rat-switch { position: relative; display: inline-flex; width: 2.75rem; height: 1.5rem; }
+  .rat-switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
+  .rat-switch-trilho { width: 100%; height: 100%; border-radius: 9999px; background: #cbd5e1; transition: background-color .15s; position: relative; }
+  .rat-switch-trilho::after { content: ''; position: absolute; top: .125rem; left: .125rem; width: 1.25rem; height: 1.25rem; border-radius: 9999px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .15s; }
+  .rat-switch input:checked + .rat-switch-trilho { background: #025c9f; }
+  .rat-switch input:checked + .rat-switch-trilho::after { transform: translateX(1.25rem); }
+  .rat-switch input:focus-visible + .rat-switch-trilho { outline: 2px solid #025c9f; outline-offset: 2px; }
+</style>
 <script>
 (function () {
   var botoes = document.querySelectorAll('.tab-btn');
@@ -238,6 +292,12 @@
   var box = document.getElementById('carga-custom');
   function carga() { box.classList.toggle('hidden', !chk.checked); }
   chk.addEventListener('change', carga); carga();
+  var chkRat = document.getElementById('id_vem_com_rat');
+  var boxRat = document.getElementById('rat-campos');
+  if (chkRat && boxRat) {
+    var rat = function () { boxRat.style.display = chkRat.checked ? '' : 'none'; };
+    chkRat.addEventListener('change', rat); rat();
+  }
   botoes.forEach(function (b) { b.addEventListener('click', function () { abrir(b.dataset.tab); }); });
   // Se a validação falhou, abre a aba que contém o primeiro erro.
   var erro = document.querySelector('.tab-panel p.text-red-500');

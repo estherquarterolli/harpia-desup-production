@@ -1,4 +1,7 @@
+from decimal import Decimal
+
 from django import forms
+from django.utils import timezone
 from .models import ContractType, Professor
 from apps.courses.models import Course
 
@@ -6,8 +9,48 @@ from apps.courses.models import Course
 _INPUT_CSS = 'w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:border-[#1e4e8c] outline-none transition bg-white'
 _SELECT_CSS = 'w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-[#1e4e8c] outline-none transition'
 
+JUSTIFICATIVA_PADRAO_RAT_CADASTRO = (
+    'Professor cadastrado pela DESUP já em Regime Adicional de Trabalho (RAT).'
+)
+# Campos do RAT de entrada: existem só no cadastro de um professor novo.
+CAMPOS_RAT_CADASTRO = (
+    'vem_com_rat', 'rat_unidade', 'rat_horas_adicionais',
+    'rat_data_inicio', 'rat_data_fim', 'rat_justificativa',
+)
+
 
 class ProfessorForm(forms.ModelForm):
+    # --- RAT de entrada (somente no cadastro) -------------------------------
+    vem_com_rat = forms.BooleanField(
+        label='Professor já vem como RAT', required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'w-4 h-4'}),
+    )
+    rat_unidade = forms.ModelChoiceField(
+        label='Unidade do RAT', queryset=None, required=False,
+        empty_label='Selecione a unidade',
+        widget=forms.Select(attrs={'class': _SELECT_CSS}),
+    )
+    rat_horas_adicionais = forms.DecimalField(
+        label='Horas adicionais semanais', required=False,
+        max_digits=7, decimal_places=2, min_value=Decimal('0.01'),
+        widget=forms.NumberInput(attrs={'class': _INPUT_CSS, 'min': '0.01', 'step': '0.01', 'placeholder': 'Ex: 4'}),
+    )
+    rat_data_inicio = forms.DateField(
+        label='Início da vigência', required=False,
+        widget=forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'class': _INPUT_CSS}),
+    )
+    rat_data_fim = forms.DateField(
+        label='Fim da vigência (opcional)', required=False,
+        widget=forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'class': _INPUT_CSS}),
+    )
+    rat_justificativa = forms.CharField(
+        label='Observação do RAT (opcional)', required=False,
+        widget=forms.Textarea(attrs={
+            'class': _INPUT_CSS, 'rows': 2,
+            'placeholder': JUSTIFICATIVA_PADRAO_RAT_CADASTRO,
+        }),
+    )
+
     class Meta:
         model = Professor
         fields = [
@@ -66,6 +109,15 @@ class ProfessorForm(forms.ModelForm):
         if not self.is_bound and self.initial.get('rh_nome'):
             self.initial['rh_nome'] = " ".join(self.initial['rh_nome'].split()).upper()
         self.fields['tipo_contrato'].queryset = ContractType.objects.permitidos().order_by('nome')
+        if self.instance.pk:
+            # O RAT de entrada só faz sentido no cadastro; depois disso o RAT segue
+            # o fluxo normal (pedido da unidade e decisão da DESUP).
+            for campo in CAMPOS_RAT_CADASTRO:
+                self.fields.pop(campo, None)
+        else:
+            self.fields['rat_unidade'].queryset = self.fields['unidades'].queryset.order_by('nome')
+            if not self.is_bound:
+                self.fields['rat_data_inicio'].initial = timezone.localdate()
         # Cadastros e integrações anteriores a este campo podem omiti-lo. O
         # valor institucional seguro nesses casos é "Não informado".
         self.fields['nivel_ensino_origem'].required = False
@@ -115,6 +167,37 @@ class ProfessorForm(forms.ModelForm):
             self.cleaned_data.get('nivel_ensino_origem')
             or Professor.NivelEnsinoOrigemChoices.NAO_INFORMADO
         )
+
+    def clean(self):
+        cleaned = super().clean()
+        if not cleaned.get('vem_com_rat'):
+            return cleaned
+
+        if not (cleaned.get('id_funcional') or '').strip():
+            self.add_error('id_funcional', 'Informe o ID funcional para cadastrar o professor como RAT.')
+
+        unidades = list(cleaned.get('unidades') or [])
+        unidade_rat = cleaned.get('rat_unidade')
+        if not unidade_rat and len(unidades) == 1:
+            unidade_rat = cleaned['rat_unidade'] = unidades[0]
+        if not unidade_rat:
+            self.add_error('rat_unidade', 'Informe em qual unidade o professor vem como RAT.')
+        elif unidade_rat not in unidades:
+            self.add_error('rat_unidade', 'A unidade do RAT precisa estar entre as unidades marcadas do professor.')
+
+        if not cleaned.get('rat_horas_adicionais'):
+            self.add_error('rat_horas_adicionais', 'Informe as horas adicionais semanais do RAT.')
+
+        inicio, fim = cleaned.get('rat_data_inicio'), cleaned.get('rat_data_fim')
+        if not inicio:
+            self.add_error('rat_data_inicio', 'Informe o início da vigência do RAT.')
+        elif fim and fim < inicio:
+            self.add_error('rat_data_fim', 'O fim da vigência não pode ser anterior ao início.')
+
+        cleaned['rat_justificativa'] = (
+            (cleaned.get('rat_justificativa') or '').strip() or JUSTIFICATIVA_PADRAO_RAT_CADASTRO
+        )
+        return cleaned
 
     def save(self, commit=True):
         professor = super().save(commit=False)
