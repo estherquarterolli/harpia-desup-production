@@ -5,7 +5,7 @@
     <div class="space-y-2 p-4">
       <div class="flex flex-wrap items-start justify-between gap-2">
         <div class="min-w-0 flex-1">
-          <p class="font-black text-slate-900">{{ ocupacao.cargo.nome }}{% if ocupacao.curso %} · {{ ocupacao.curso.sigla }}{% endif %}</p>
+          <p class="font-black text-slate-900">{{ ocupacao.cargo.nome }}{% if ocupacao.curso %} · {{ ocupacao.curso.sigla }}{% if ocupacao.turno %} ({{ ocupacao.get_turno_display }}){% endif %}{% endif %}</p>
           <p class="text-sm font-semibold text-slate-700">{{ ocupacao.professor.nome }}</p>
         </div>
         {% if ocupacao.vigente %}
@@ -54,7 +54,7 @@
         <tr class="hover:bg-slate-50/80">
           <td class="px-5 py-3.5">
             <p class="font-bold text-slate-900">{{ ocupacao.cargo.nome }}</p>
-            {% if ocupacao.curso %}<p class="text-xs text-slate-500">Curso: {{ ocupacao.curso.sigla }}</p>{% endif %}
+            {% if ocupacao.curso %}<p class="text-xs text-slate-500">Curso: {{ ocupacao.curso.sigla }}{% if ocupacao.turno %} ({{ ocupacao.get_turno_display }}){% endif %}</p>{% endif %}
           </td>
           <td class="px-5 py-3.5">
             <p class="font-semibold text-slate-800">{{ ocupacao.professor.nome }}</p>

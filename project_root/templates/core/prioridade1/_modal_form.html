@@ -7,10 +7,10 @@
       </div>
       <button type="button" onclick="fecharModal('{{ modal_id }}{{ modal_key }}')" aria-label="Fechar" class="text-slate-400 hover:text-slate-600"><i class="ph ph-x text-xl"></i></button>
     </div>
-    <form method="post" action="{{ action_url }}">
+    <form method="post" action="{{ action_url }}"{% if form.abrangencia_cursos %} data-ocupacao-form{% endif %}>
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ retorno }}">
-      <div class="max-h-[60vh] overflow-y-auto px-6 py-4">
+      <div data-ocupacao-campos class="max-h-[60vh] overflow-y-auto px-6 py-4">
         {% include 'core/prioridade1/_campos_form.html' %}
       </div>
       <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-6 py-4">
