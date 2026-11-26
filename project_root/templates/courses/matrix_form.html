@@ -473,6 +473,15 @@ function copiarMatriz() {
 // periodo/codigo/carga_horaria/creditos/carga_horaria_semanal/componente_curricular
 // [+_nome]/nome_temporario). Usada por preencherFormsetComCopia() e por
 // adicionarComponentesImportados().
+function normalizarPeriodoComponente(valor) {
+  const original = String(valor || '').trim();
+  const texto = original.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const inicio = texto.match(/^([1-8])(?:\s|º|°|o|a|$)/);
+  const invertido = texto.match(/(?:semestre|periodo)\s*([1-8])$/);
+  const numero = inicio?.[1] || invertido?.[1];
+  return numero ? `${numero}º Período` : original;
+}
+
 function preencherLinhaComponente(row, comp) {
   const temporaria = !comp.componente_curricular && !!comp.nome_temporario;
   aplicarModoDisciplina(row, temporaria);
@@ -500,7 +509,7 @@ function preencherLinhaComponente(row, comp) {
     if (name.endsWith('-nome_temporario')) { input.value = comp.nome_temporario || ''; return; }
     if (name.includes('codigo')) input.value = comp.codigo || '';
     if (name.endsWith('-periodo')) {
-      const periodo = comp.periodo || '';
+      const periodo = normalizarPeriodoComponente(comp.periodo);
       if (periodo && !Array.from(input.options).some(opt => opt.value === periodo)) {
         input.add(new Option(periodo, periodo));
       }
