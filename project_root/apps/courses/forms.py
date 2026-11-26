@@ -13,7 +13,7 @@ from .models import (
     calcular_carga_horaria_semanal,
 )
 from apps.core.models import Unidade
-from .periods import PERIODO_COMPONENTE_CHOICES
+from .periods import PERIODO_COMPONENTE_CHOICES, normalizar_periodo_matriz
 
 
 # ── Classe base de widget para campo de texto/select padrão ──────────────────
@@ -141,13 +141,23 @@ class MatrixComponentForm(forms.ModelForm):
 
     def __init__(self, *args, catalogo_cache=None, **kwargs):
         super().__init__(*args, **kwargs)
-        # O campo continua textual: preserve exatamente valores legados e os
-        # recebidos por cópia/POST, inclusive ao reconstruir um formulário inválido.
+        # Valores antigos como "1º Semestre" entram e reaparecem na tela como
+        # "1º Período". Valores especiais não reconhecidos continuam preservados.
         choices = list(PERIODO_COMPONENTE_CHOICES)
         valores = {valor for valor, _ in choices}
+        inicial_normalizado = normalizar_periodo_matriz(self.initial.get('periodo'))
+        if inicial_normalizado:
+            self.initial['periodo'] = inicial_normalizado
         atuais = [self.initial.get('periodo')]
         if self.is_bound:
-            atuais.append(self.data.get(self.add_prefix('periodo')))
+            nome_campo = self.add_prefix('periodo')
+            atual_post = self.data.get(nome_campo)
+            post_normalizado = normalizar_periodo_matriz(atual_post)
+            if post_normalizado and atual_post != post_normalizado:
+                self.data = self.data.copy()
+                self.data[nome_campo] = post_normalizado
+                atual_post = post_normalizado
+            atuais.append(atual_post)
         for atual in atuais:
             if atual and atual not in valores:
                 choices.append((atual, atual))
@@ -199,6 +209,10 @@ class MatrixComponentForm(forms.ModelForm):
             # model.full_clean() faria um EXISTS no banco para cada linha.
             exclude.add('componente_curricular')
         return exclude
+
+    def clean_periodo(self):
+        periodo = self.cleaned_data.get('periodo')
+        return normalizar_periodo_matriz(periodo) or periodo
 
     def _choices_disciplina_atual(self, catalogo_cache):
         choices = [('', '---------')]

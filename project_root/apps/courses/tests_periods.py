@@ -36,15 +36,26 @@ class PeriodosMatrizTests(TestCase):
             preview = parse_matrix_rows([{'nome': 'Algoritmos', 'periodo': valor, 'carga_horaria': 80}])[0]
             self.assertEqual(preview.periodo, '1º Período')
 
-    def test_editar_preserva_valor_exato_carga_e_identificador(self):
+    def test_editar_normaliza_semestre_e_preserva_valores_especiais(self):
         self.client.force_login(self.desup)
-        for valor in ('1o periodo', '1º Período', '1º Semestre', '', '9º Período', 'Módulo especial', ' 1o periodo '):
+        casos = (
+            ('1o periodo', '1º Período'),
+            ('1º Período', '1º Período'),
+            ('1º Semestre', '1º Período'),
+            ('', ''),
+            ('9º Período', '9º Período'),
+            ('Módulo especial', 'Módulo especial'),
+            (' 1o periodo ', '1º Período'),
+        )
+        for valor, esperado in casos:
             with self.subTest(valor=valor):
                 comp = self.componente(valor)
+                comp.refresh_from_db()
+                self.assertEqual(comp.periodo, esperado)
                 url = reverse('courses:matrix_update', args=[self.matriz.pk])
                 response = self.client.get(url)
                 form = response.context['component_formset'].forms[0]
-                self.assertInHTML(f'<option value="{valor}" selected>{valor or "Selecione"}</option>', str(form['periodo']))
+                self.assertInHTML(f'<option value="{esperado}" selected>{esperado or "Selecione"}</option>', str(form['periodo']))
                 data = {
                     'curso': self.curso.pk, 'nome': 'Matriz com outro nome', 'turno': 'N', 'acao': 'salvar_vigente',
                     'componentes-TOTAL_FORMS': 1, 'componentes-INITIAL_FORMS': 1,
@@ -54,7 +65,7 @@ class PeriodosMatrizTests(TestCase):
                 response = self.client.post(url, data)
                 self.assertEqual(response.status_code, 302, getattr(response, 'context', None))
                 comp.refresh_from_db()
-                self.assertEqual(comp.periodo, valor)
+                self.assertEqual(comp.periodo, esperado)
                 self.assertEqual(comp.carga_horaria, 60)
                 self.assertEqual(comp.componente_curricular_id, self.disciplina.pk)
                 comp.delete()
@@ -68,17 +79,17 @@ class PeriodosMatrizTests(TestCase):
         self.assertEqual(comp.periodo, '2º Período')
 
     def test_erro_nao_perde_periodo_legado_ou_copiado(self):
-        for valor in ('1o periodo', 'Módulo especial'):
+        for valor, esperado in (('1o periodo', '1º Período'), ('Módulo especial', 'Módulo especial')):
             form = MatrixComponentForm(data={'periodo': valor})
             self.assertFalse(form.is_valid())
-            self.assertInHTML(f'<option value="{valor}" selected>{valor}</option>', str(form['periodo']))
+            self.assertInHTML(f'<option value="{esperado}" selected>{esperado}</option>', str(form['periodo']))
             copia = MatrixComponentForm(initial={'periodo': valor})
-            self.assertInHTML(f'<option value="{valor}" selected>{valor}</option>', str(copia['periodo']))
+            self.assertInHTML(f'<option value="{esperado}" selected>{esperado}</option>', str(copia['periodo']))
 
     def test_copias_json_e_html_preservam_texto(self):
         self.client.force_login(self.desup)
         comp = self.componente('1o periodo')
         response = self.client.get(reverse('courses:matrix_dados_copiar', args=[self.matriz.pk]))
-        self.assertEqual(response.json()['componentes'][0]['periodo'], comp.periodo)
+        self.assertEqual(response.json()['componentes'][0]['periodo'], '1º Período')
         response = self.client.get(reverse('courses:matrix_import_previous'), {'curso_id': self.curso.pk})
-        self.assertContains(response, '<option value="1o periodo" selected>1o periodo</option>', html=True)
+        self.assertContains(response, '<option value="1º Período" selected>1º Período</option>', html=True)

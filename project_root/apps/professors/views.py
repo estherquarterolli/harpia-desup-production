@@ -573,8 +573,32 @@ class ProfessorUpdateView(ProfessorEditDeleteMixin, UpdateView):
         return kwargs
 
     def form_valid(self, form):
-        messages.success(self.request, 'Professor atualizado com sucesso.')
-        return super().form_valid(form)
+        from django.core.exceptions import ValidationError
+        from django.db import transaction
+        from apps.core.services import salvar_rat_na_edicao
+
+        dados = form.cleaned_data
+        try:
+            with transaction.atomic():
+                resposta = super().form_valid(form)
+                if 'vem_com_rat' in form.fields:
+                    salvar_rat_na_edicao(
+                        request=self.request,
+                        professor=self.object,
+                        rat=form.rat_registro,
+                        ativo=dados.get('vem_com_rat', False),
+                        unidade=dados.get('rat_unidade'),
+                        horas_adicionais=dados.get('rat_horas_adicionais'),
+                        data_inicio=dados.get('rat_data_inicio'),
+                        data_fim=dados.get('rat_data_fim'),
+                        justificativa=dados.get('rat_justificativa', ''),
+                    )
+        except ValidationError as exc:
+            form.add_error(None, ' '.join(exc.messages))
+            return self.form_invalid(form)
+
+        messages.success(self.request, 'Professor e RAT atualizados com sucesso.')
+        return resposta
 
 
 class ProfessorDeleteView(ProfessorEditDeleteMixin, DeleteView):

@@ -325,6 +325,9 @@ class MatrixComponent(models.Model):
         Separado do save() para que o formset possa gravar várias linhas de uma
         vez (bulk_create) aplicando exatamente a mesma regra.
         """
+        from .periods import normalizar_periodo_matriz
+
+        self.periodo = normalizar_periodo_matriz(self.periodo) or self.periodo
         cc = self.componente_curricular
         if cc is not None:
             if not self.codigo and cc.codigo:

@@ -30,14 +30,104 @@ class CadastroProfessorJaComoRatTests(ProfessorE2EBase):
         dados.update(overrides)
         return dados
 
-    def test_botao_aparece_no_cadastro_e_some_na_edicao(self):
+    def test_rat_aparece_no_cadastro_e_na_edicao_para_desup(self):
         cadastro = self.client.get(self.url_criar)
         self.assertIn('vem_com_rat', cadastro.context['form'].fields)
         self.assertContains(cadastro, 'Professor já vem como RAT')
 
         edicao = self.client.get(reverse('professors:professor_update', args=[self.prof_a1.pk]))
+        self.assertIn('vem_com_rat', edicao.context['form'].fields)
+        self.assertContains(edicao, 'Professor possui RAT')
+
+    def test_coordenador_nao_pode_editar_rat_no_cadastro_do_professor(self):
+        self.client.force_login(self.coord_a)
+        edicao = self.client.get(reverse('professors:professor_update', args=[self.prof_a1.pk]))
         self.assertNotIn('vem_com_rat', edicao.context['form'].fields)
-        self.assertNotContains(edicao, 'Professor já vem como RAT')
+        self.assertNotContains(edicao, 'Professor possui RAT')
+
+    def test_edicao_do_professor_pode_criar_rat(self):
+        url = reverse('professors:professor_update', args=[self.prof_a1.pk])
+        dados = self._dados_professor(
+            id_funcional=self.prof_a1.id_funcional,
+            rh_matricula=self.prof_a1.rh_matricula,
+            rh_nome=self.prof_a1.rh_nome,
+            vem_com_rat='on',
+            rat_unidade=self.unidade_a.pk,
+            rat_horas_adicionais='6.00',
+            rat_data_inicio=self.hoje.isoformat(),
+            rat_data_fim='',
+            rat_justificativa='RAT incluído na edição.',
+        )
+
+        resposta = self.client.post(url, dados)
+
+        self.assertEqual(resposta.status_code, 302)
+        rat = ExcecaoCargaUnidade.objects.get(professor=self.prof_a1)
+        self.assertEqual(rat.horas_adicionais, Decimal('6.00'))
+        self.assertEqual(rat.status, ExcecaoCargaUnidade.StatusChoices.APROVADA)
+        self.assertTrue(AuditoriaGlobal.objects.filter(acao='RAT_CRIADO_NA_EDICAO').exists())
+
+    def test_edicao_carrega_e_atualiza_rat_vigente(self):
+        rat = ExcecaoCargaUnidade.objects.create(
+            unidade=self.unidade_a,
+            professor=self.prof_a1,
+            horas_adicionais=Decimal('4.00'),
+            data_inicio=self.hoje,
+            justificativa='RAT original.',
+            status=ExcecaoCargaUnidade.StatusChoices.APROVADA,
+            solicitado_por=self.desup,
+            decidido_por=self.desup,
+            decidido_em=timezone.now(),
+        )
+        url = reverse('professors:professor_update', args=[self.prof_a1.pk])
+        pagina = self.client.get(url)
+        self.assertTrue(pagina.context['form'].initial['vem_com_rat'])
+        self.assertEqual(pagina.context['form'].initial['rat_horas_adicionais'], Decimal('4.00'))
+
+        dados = self._dados_professor(
+            id_funcional=self.prof_a1.id_funcional,
+            rh_matricula=self.prof_a1.rh_matricula,
+            rh_nome=self.prof_a1.rh_nome,
+            vem_com_rat='on',
+            rat_unidade=self.unidade_a.pk,
+            rat_horas_adicionais='8.00',
+            rat_data_inicio=self.hoje.isoformat(),
+            rat_data_fim=(self.hoje + timedelta(days=90)).isoformat(),
+            rat_justificativa='RAT atualizado.',
+        )
+        resposta = self.client.post(url, dados)
+
+        self.assertEqual(resposta.status_code, 302)
+        rat.refresh_from_db()
+        self.assertEqual(rat.horas_adicionais, Decimal('8.00'))
+        self.assertEqual(rat.justificativa, 'RAT atualizado.')
+        self.assertTrue(AuditoriaGlobal.objects.filter(acao='RAT_ATUALIZADO_NA_EDICAO').exists())
+
+    def test_desmarcar_rat_na_edicao_cancela_o_registro_vigente(self):
+        rat = ExcecaoCargaUnidade.objects.create(
+            unidade=self.unidade_a,
+            professor=self.prof_a1,
+            horas_adicionais=Decimal('4.00'),
+            data_inicio=self.hoje,
+            justificativa='RAT vigente.',
+            status=ExcecaoCargaUnidade.StatusChoices.APROVADA,
+            solicitado_por=self.desup,
+            decidido_por=self.desup,
+            decidido_em=timezone.now(),
+        )
+        url = reverse('professors:professor_update', args=[self.prof_a1.pk])
+        dados = self._dados_professor(
+            id_funcional=self.prof_a1.id_funcional,
+            rh_matricula=self.prof_a1.rh_matricula,
+            rh_nome=self.prof_a1.rh_nome,
+        )
+
+        resposta = self.client.post(url, dados)
+
+        self.assertEqual(resposta.status_code, 302)
+        rat.refresh_from_db()
+        self.assertEqual(rat.status, ExcecaoCargaUnidade.StatusChoices.CANCELADA)
+        self.assertTrue(AuditoriaGlobal.objects.filter(acao='RAT_CANCELADO_NA_EDICAO').exists())
 
     def test_cadastro_como_rat_cria_rat_aprovado_e_avisa_a_unidade(self):
         resposta = self.client.post(self.url_criar, self.dados_rat())

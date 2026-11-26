@@ -145,12 +145,12 @@
           </div>
 
           {% if form.vem_com_rat %}
-          <!-- RAT de entrada: só aparece no cadastro de um professor novo -->
+          <!-- RAT administrado pela DESUP no cadastro e na edição -->
           <div class="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
             <label for="{{ form.vem_com_rat.id_for_label }}" class="flex cursor-pointer items-center justify-between gap-4">
               <span>
-                <span class="block text-sm font-black text-slate-800">Professor já vem como RAT</span>
-                <span class="block text-xs text-slate-500">Marque quando o professor já chega cumprindo Regime Adicional de Trabalho. O RAT é registrado como aprovado junto com o cadastro.</span>
+                <span class="block text-sm font-black text-slate-800">{% if form.instance.pk %}Professor possui RAT{% else %}Professor já vem como RAT{% endif %}</span>
+                <span class="block text-xs text-slate-500">{% if form.instance.pk %}Marque para cadastrar ou editar o Regime Adicional de Trabalho vigente. Desmarcar cancela o RAT atual.{% else %}Marque quando o professor já chega cumprindo Regime Adicional de Trabalho. O RAT é registrado como aprovado junto com o cadastro.{% endif %}</span>
               </span>
               <span class="rat-switch shrink-0">
                 <input type="checkbox" name="{{ form.vem_com_rat.html_name }}" id="{{ form.vem_com_rat.id_for_label }}" {% if form.vem_com_rat.value %}checked{% endif %}>

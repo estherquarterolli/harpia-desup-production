@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django import forms
+from django.db.models import Q
 from django.utils import timezone
 from .models import ContractType, Professor
 from apps.courses.models import Course
@@ -12,15 +13,18 @@ _SELECT_CSS = 'w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-
 JUSTIFICATIVA_PADRAO_RAT_CADASTRO = (
     'Professor cadastrado pela DESUP já em Regime Adicional de Trabalho (RAT).'
 )
-# Campos do RAT de entrada: existem só no cadastro de um professor novo.
-CAMPOS_RAT_CADASTRO = (
+JUSTIFICATIVA_PADRAO_RAT_EDICAO = (
+    'RAT definido pela DESUP na edição do professor.'
+)
+# Campos de RAT administrados pela DESUP no cadastro e na edição.
+CAMPOS_RAT = (
     'vem_com_rat', 'rat_unidade', 'rat_horas_adicionais',
     'rat_data_inicio', 'rat_data_fim', 'rat_justificativa',
 )
 
 
 class ProfessorForm(forms.ModelForm):
-    # --- RAT de entrada (somente no cadastro) -------------------------------
+    # --- RAT administrado pela DESUP ----------------------------------------
     vem_com_rat = forms.BooleanField(
         label='Professor já vem como RAT', required=False,
         widget=forms.CheckboxInput(attrs={'class': 'w-4 h-4'}),
@@ -109,15 +113,52 @@ class ProfessorForm(forms.ModelForm):
         if not self.is_bound and self.initial.get('rh_nome'):
             self.initial['rh_nome'] = " ".join(self.initial['rh_nome'].split()).upper()
         self.fields['tipo_contrato'].queryset = ContractType.objects.permitidos().order_by('nome')
-        if self.instance.pk:
-            # O RAT de entrada só faz sentido no cadastro; depois disso o RAT segue
-            # o fluxo normal (pedido da unidade e decisão da DESUP).
-            for campo in CAMPOS_RAT_CADASTRO:
+        pode_editar_rat = bool(self.user and (
+            self.user.is_superuser or self.user.perfil == 'DESUP'
+        ))
+        self.rat_registro = None
+        if self.instance.pk and not pode_editar_rat:
+            for campo in CAMPOS_RAT:
                 self.fields.pop(campo, None)
         else:
             self.fields['rat_unidade'].queryset = self.fields['unidades'].queryset.order_by('nome')
             if not self.is_bound:
-                self.fields['rat_data_inicio'].initial = timezone.localdate()
+                hoje = timezone.localdate()
+                self.fields['rat_data_inicio'].initial = hoje
+                if self.instance.pk:
+                    from apps.core.models import ExcecaoCargaUnidade
+
+                    self.rat_registro = (
+                        ExcecaoCargaUnidade.objects.filter(
+                            professor=self.instance,
+                            status=ExcecaoCargaUnidade.StatusChoices.APROVADA,
+                        )
+                        .filter(Q(data_fim__isnull=True) | Q(data_fim__gte=hoje))
+                        .select_related('unidade')
+                        .order_by('-data_inicio', '-criado_em')
+                        .first()
+                    )
+                    if self.rat_registro:
+                        self.initial.update({
+                            'vem_com_rat': True,
+                            'rat_unidade': self.rat_registro.unidade_id,
+                            'rat_horas_adicionais': self.rat_registro.horas_adicionais,
+                            'rat_data_inicio': self.rat_registro.data_inicio,
+                            'rat_data_fim': self.rat_registro.data_fim,
+                            'rat_justificativa': self.rat_registro.justificativa,
+                        })
+            elif self.instance.pk:
+                from apps.core.models import ExcecaoCargaUnidade
+
+                self.rat_registro = (
+                    ExcecaoCargaUnidade.objects.filter(
+                        professor=self.instance,
+                        status=ExcecaoCargaUnidade.StatusChoices.APROVADA,
+                    )
+                    .filter(Q(data_fim__isnull=True) | Q(data_fim__gte=timezone.localdate()))
+                    .order_by('-data_inicio', '-criado_em')
+                    .first()
+                )
         # Cadastros e integrações anteriores a este campo podem omiti-lo. O
         # valor institucional seguro nesses casos é "Não informado".
         self.fields['nivel_ensino_origem'].required = False
@@ -174,7 +215,7 @@ class ProfessorForm(forms.ModelForm):
             return cleaned
 
         if not (cleaned.get('id_funcional') or '').strip():
-            self.add_error('id_funcional', 'Informe o ID funcional para cadastrar o professor como RAT.')
+            self.add_error('id_funcional', 'Informe o ID funcional para salvar o professor como RAT.')
 
         unidades = list(cleaned.get('unidades') or [])
         unidade_rat = cleaned.get('rat_unidade')
@@ -195,7 +236,12 @@ class ProfessorForm(forms.ModelForm):
             self.add_error('rat_data_fim', 'O fim da vigência não pode ser anterior ao início.')
 
         cleaned['rat_justificativa'] = (
-            (cleaned.get('rat_justificativa') or '').strip() or JUSTIFICATIVA_PADRAO_RAT_CADASTRO
+            (cleaned.get('rat_justificativa') or '').strip()
+            or (
+                JUSTIFICATIVA_PADRAO_RAT_EDICAO
+                if self.instance.pk
+                else JUSTIFICATIVA_PADRAO_RAT_CADASTRO
+            )
         )
         return cleaned
 

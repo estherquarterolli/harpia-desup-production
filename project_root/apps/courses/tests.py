@@ -319,7 +319,7 @@ class DisciplinaTemporariaTests(TestCase):
         self.assertIsNone(componente.componente_curricular_id)
         self.assertEqual(componente.codigo, f'TEMP-{componente.pk:05d}')
         self.assertEqual(componente.carga_horaria, 60)
-        self.assertEqual(componente.periodo, '2º Semestre')
+        self.assertEqual(componente.periodo, '2º Período')
 
     def test_linha_inicial_vazia_nao_bloqueia_linha_importada(self):
         """Simula a planilha acrescentada depois da primeira linha do formset."""
@@ -851,7 +851,7 @@ class MatrixComponentCamposBloqueadosTests(TestCase):
         formset.instance = matrix
         formset.save()
 
-        self.assertEqual(MatrixComponent.objects.get(matriz=matrix).periodo, '3º Semestre')
+        self.assertEqual(MatrixComponent.objects.get(matriz=matrix).periodo, '3º Período')
 
     def test_ch_nao_multipla_de_20_deriva_creditos_e_ch_semanal(self):
         disciplina = CurricularComponent.objects.create(
@@ -913,4 +913,4 @@ class MatrixComponentCamposBloqueadosTests(TestCase):
         mc.refresh_from_db()
         self.assertEqual(mc.carga_horaria, 60)   # mantém o legado, não vira 999 nem 80
         self.assertEqual(mc.creditos, 3)         # 60 // 20
-        self.assertEqual(mc.periodo, '2º Semestre')
+        self.assertEqual(mc.periodo, '2º Período')

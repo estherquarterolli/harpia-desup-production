@@ -317,7 +317,7 @@ class MatrizCicloDeVidaE2ETests(BaseCoursesE2ETests):
         # CORR-007: código/CH/créditos/CH semanal derivados da disciplina no servidor.
         comp = matriz.componentes_da_matriz.get()
         self.assertEqual(comp.componente_curricular_id, self.algoritmos.id)
-        self.assertEqual(comp.periodo, '1º Semestre')
+        self.assertEqual(comp.periodo, '1º Período')
         self.assertEqual(comp.codigo, 'E2E001')
         self.assertEqual(comp.carga_horaria, 80)
         self.assertEqual(comp.creditos, 4)
@@ -352,7 +352,7 @@ class MatrizCicloDeVidaE2ETests(BaseCoursesE2ETests):
         novo = matriz.componentes_da_matriz.get(componente_curricular=self.estrutura)
         self.assertEqual(novo.carga_horaria, 60)   # CH padrão da disciplina
         self.assertEqual(novo.creditos, 3)         # 60 // 20
-        self.assertEqual(novo.periodo, '2º Semestre')
+        self.assertEqual(novo.periodo, '2º Período')
 
         # ── Passo 5: editar o rascunho REMOVENDO o componente (DELETE) ─
         resp = self.client.post(url_edicao, data=payload_matriz(
@@ -423,7 +423,7 @@ class MatrizCicloDeVidaE2ETests(BaseCoursesE2ETests):
         calc.refresh_from_db()
         self.assertTrue(matriz.is_vigente)
         self.assertFalse(matriz.is_rascunho)
-        self.assertEqual(calc.periodo, '3º Semestre')
+        self.assertEqual(calc.periodo, '3º Período')
 
         auditoria = AuditoriaGlobal.objects.get(acao='MATRIZ_VIGENTE_EDITADA')
         self.assertEqual(auditoria.usuario_id, self.desup.id)
@@ -572,7 +572,7 @@ class MatrizDuplicacaoE2ETests(BaseCoursesE2ETests):
         por_codigo = {c['codigo']: c for c in componentes}
         self.assertEqual(por_codigo['E2E001']['carga_horaria'], 80)
         self.assertEqual(por_codigo['E2E001']['creditos'], 4)
-        self.assertEqual(por_codigo['E2E002']['periodo'], '2º Semestre')
+        self.assertEqual(por_codigo['E2E002']['periodo'], '2º Período')
 
         # ── Passo 3: reenvia como matriz nova (turno da noite) ────────
         linhas = [
@@ -1389,9 +1389,9 @@ class FormsetMatrizE2ETests(BaseCoursesE2ETests):
             c.codigo: (c.carga_horaria, c.creditos, c.carga_horaria_semanal, c.periodo)
             for c in matriz.componentes_da_matriz.all()
         }
-        self.assertEqual(derivados['E2E001'], (80, 4, Decimal('4'), '1º Semestre'))
-        self.assertEqual(derivados['E2E002'], (60, 3, Decimal('3'), '2º Semestre'))
-        self.assertEqual(derivados['E2E003'], (90, 4, Decimal('4.5'), '3º Semestre'))
+        self.assertEqual(derivados['E2E001'], (80, 4, Decimal('4'), '1º Período'))
+        self.assertEqual(derivados['E2E002'], (60, 3, Decimal('3'), '2º Período'))
+        self.assertEqual(derivados['E2E003'], (90, 4, Decimal('4.5'), '3º Período'))
 
         # CH total agregada aparece na listagem (80 + 60 + 90 = 230).
         resp = self.client.get(reverse('courses:matrix_list'), {'status': 'vigente'})
@@ -1571,7 +1571,7 @@ class FormsetMatrizE2ETests(BaseCoursesE2ETests):
         """A troca de disciplina é aceita: disciplina, período e código acompanham."""
         comp = self._trocar_disciplina_do_rascunho()
         self.assertEqual(comp.componente_curricular_id, self.banco.id)
-        self.assertEqual(comp.periodo, '4º Semestre')
+        self.assertEqual(comp.periodo, '4º Período')
         self.assertEqual(comp.codigo, 'E2E004')   # código da NOVA disciplina
 
     # CORRIGIDO (regressão da CORR-007): ao TROCAR a disciplina de uma linha existente,
@@ -1756,7 +1756,7 @@ class AdulteracaoDeCamposBloqueadosE2ETests(BaseCoursesE2ETests):
         self.assertEqual(comp.carga_horaria, 60)   # nem 999 nem 80
         self.assertEqual(comp.creditos, 3)
         self.assertEqual(comp.codigo, 'E2E001')
-        self.assertEqual(comp.periodo, '2º Semestre')   # período é editável, esse muda
+        self.assertEqual(comp.periodo, '2º Período')   # período é editável, esse muda
 
     def test_post_forjado_no_componente_curricular_respeita_o_catalogo(self):
         """Disciplina inexistente no catálogo é recusada (não cria matriz órfã)."""

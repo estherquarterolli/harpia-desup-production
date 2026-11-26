@@ -510,6 +510,71 @@ def registrar_rat_no_cadastro(
 
 
 @transaction.atomic
+def salvar_rat_na_edicao(
+    *, request, professor, rat, ativo, unidade=None, horas_adicionais=None,
+    data_inicio=None, data_fim=None, justificativa='',
+):
+    """Cria, atualiza ou cancela o RAT vigente pela edição do professor."""
+    _exigir_desup(request.user)
+    agora = timezone.now()
+
+    if rat and rat.professor_id != professor.pk:
+        raise ValidationError("O RAT informado não pertence a este professor.")
+
+    if not ativo:
+        if not rat:
+            return None
+        rat.status = ExcecaoCargaUnidade.StatusChoices.CANCELADA
+        rat.decidido_por = request.user
+        rat.decidido_em = agora
+        rat.motivo_decisao = "RAT desmarcado na edição do professor."
+        rat.save(update_fields=['status', 'decidido_por', 'decidido_em', 'motivo_decisao'])
+        titulo = "RAT cancelado na edição do professor"
+        mensagem = f"A DESUP cancelou o RAT de {professor.nome}."
+        acao = "RAT_CANCELADO_NA_EDICAO"
+    else:
+        if rat is None:
+            rat = ExcecaoCargaUnidade(
+                professor=professor,
+                solicitado_por=request.user,
+            )
+            acao = "RAT_CRIADO_NA_EDICAO"
+            titulo = "RAT registrado na edição do professor"
+        else:
+            acao = "RAT_ATUALIZADO_NA_EDICAO"
+            titulo = "RAT atualizado na edição do professor"
+
+        rat.unidade = unidade
+        rat.horas_adicionais = horas_adicionais
+        rat.data_inicio = data_inicio
+        rat.data_fim = data_fim
+        rat.justificativa = justificativa
+        rat.status = ExcecaoCargaUnidade.StatusChoices.APROVADA
+        rat.decidido_por = request.user
+        rat.decidido_em = agora
+        rat.motivo_decisao = "RAT definido pela DESUP na edição do professor."
+        rat.full_clean()
+        rat.save()
+        mensagem = (
+            f"A DESUP definiu o RAT de {professor.nome}: "
+            f"+{horas_adicionais} h semanais a partir de {data_inicio:%d/%m/%Y}."
+        )
+
+    Notificacao.objects.create(
+        unidade_destino=rat.unidade,
+        titulo=titulo,
+        mensagem=mensagem,
+        url_acao=reverse("core:rat_unidade"),
+    )
+    registrar_evento_prioridade1(
+        request,
+        acao,
+        f"Exceção {rat.pk}; unidade {rat.unidade_id}; professor {professor.pk}; status {rat.status}.",
+    )
+    return rat
+
+
+@transaction.atomic
 def remover_solicitacao_professor_externo(*, request, solicitacao_id):
     """Remove uma solicitação de professor enviada por uma unidade.
 
