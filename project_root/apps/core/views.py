@@ -1472,6 +1472,30 @@ class SolicitacaoProfessorExternoDecidirView(DesupPrioridade1Mixin, View):
         return redirect('core:solicitacao_professor_list')
 
 
+class SolicitacaoProfessorExternoRemoverView(DesupPrioridade1Mixin, View):
+    """Remove (exclui) uma solicitação de professor enviada por uma unidade."""
+    http_method_names = ['post', 'head', 'options']
+
+    def post(self, request, pk):
+        from .models import SolicitacaoProfessorExterno
+        from .services import remover_solicitacao_professor_externo
+
+        try:
+            nome = remover_solicitacao_professor_externo(request=request, solicitacao_id=pk)
+        except SolicitacaoProfessorExterno.DoesNotExist:
+            messages.error(request, 'Esta solicitação não existe mais.')
+        else:
+            messages.success(request, f'Solicitação de {nome} removida com sucesso.')
+        destino = request.POST.get('next', '')
+        if destino and url_has_allowed_host_and_scheme(
+            destino,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            return HttpResponseRedirect(destino)
+        return redirect('core:solicitacao_professor_list')
+
+
 class AlertasCargaDesupView(DesupPrioridade1Mixin, TemplateView):
     template_name = 'core/prioridade1/alertas_carga.html'
 

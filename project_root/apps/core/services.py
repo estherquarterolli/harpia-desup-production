@@ -460,3 +460,89 @@ def decidir_excecao_carga(*, request, excecao_id, decisao, motivo=""):
         f"Exceção {excecao.pk}; decisão {decisao}; unidade {excecao.unidade_id}.",
     )
     return excecao
+
+
+@transaction.atomic
+def registrar_rat_no_cadastro(
+    *, request, professor, unidade, horas_adicionais, data_inicio, data_fim=None, justificativa,
+):
+    """Registra o RAT de um professor que já chega à rede nesse regime.
+
+    O cadastro é feito pela própria DESUP, que é quem decide RAT; por isso o
+    registro já nasce aprovado e não passa pela regra de carga completa (o
+    professor ainda não tem alocações no momento do cadastro).
+    """
+    _exigir_desup(request.user)
+    agora = timezone.now()
+    excecao = ExcecaoCargaUnidade(
+        unidade=unidade,
+        professor=professor,
+        horas_adicionais=horas_adicionais,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        justificativa=justificativa,
+        status=ExcecaoCargaUnidade.StatusChoices.APROVADA,
+        solicitado_por=request.user,
+        decidido_por=request.user,
+        decidido_em=agora,
+        motivo_decisao="Professor cadastrado já como RAT.",
+    )
+    excecao.full_clean()
+    excecao.save()
+
+    mensagem = (
+        f"A DESUP cadastrou {professor.nome} já em RAT na unidade {unidade.sigla}: "
+        f"+{horas_adicionais} h semanais a partir de {data_inicio:%d/%m/%Y}."
+    )
+    Notificacao.objects.create(
+        unidade_destino=unidade,
+        titulo="RAT registrado no cadastro do professor",
+        mensagem=mensagem,
+        url_acao=reverse("core:rat_unidade"),
+    )
+    registrar_evento_prioridade1(
+        request,
+        "RAT_CADASTRADO_COM_PROFESSOR",
+        f"Exceção {excecao.pk}; unidade {unidade.pk}; professor {professor.pk}; "
+        f"+{horas_adicionais} h; início {data_inicio}; fim {data_fim or 'sem fim definido'}.",
+    )
+    return excecao
+
+
+@transaction.atomic
+def remover_solicitacao_professor_externo(*, request, solicitacao_id):
+    """Remove uma solicitação de professor enviada por uma unidade.
+
+    Apaga apenas o registro da solicitação. Efeitos já aplicados (vínculo de uma
+    cessão aprovada, professor cadastrado a partir do pedido) são mantidos.
+    """
+    _exigir_desup(request.user)
+    solicitacao = (
+        SolicitacaoProfessorExterno.objects.select_for_update(of=("self",))
+        .select_related("unidade_solicitante", "unidade_origem", "professor")
+        .get(pk=solicitacao_id)
+    )
+    era_pendente = solicitacao.status == SolicitacaoProfessorExterno.StatusChoices.PENDENTE
+    unidade = solicitacao.unidade_solicitante
+    nome = solicitacao.nome_professor
+    detalhes = (
+        f"Solicitação {solicitacao.pk} removida; tipo {solicitacao.tipo}; "
+        f"situação {solicitacao.status}; unidade {unidade.pk}; professor {nome}; "
+        f"semestre {solicitacao.semestre}."
+    )
+    tipo_display = solicitacao.get_tipo_display().lower()
+    solicitacao.delete()
+
+    if era_pendente:
+        mensagem = (
+            f"A solicitação ({tipo_display}) do professor {nome} para a unidade "
+            f"{unidade.sigla} foi removida pela DESUP."
+        )
+        Notificacao.objects.create(
+            unidade_destino=unidade,
+            titulo="Solicitação removida",
+            mensagem=mensagem,
+            url_acao=reverse("dashboard_unidade"),
+        )
+    registrar_evento_prioridade1(request, "SOLICITACAO_PROFESSOR_REMOVIDA", detalhes)
+    return nome

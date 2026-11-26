@@ -49,7 +49,10 @@
             </td>
             <td class="px-5 py-3 text-slate-500" data-label="Data">{{ solicitacao.criado_em|date:'d/m/Y' }}</td>
             <td class="px-5 py-3 text-right" data-label="Ação">
-              <button type="button" onclick="abrirModal('modalSolicitacao{{ solicitacao.pk }}')" aria-haspopup="dialog" class="inline-flex items-center gap-1 rounded-lg {% if solicitacao.status == 'PENDENTE' %}bg-[#025c9f] text-white hover:bg-[#153e70]{% else %}border border-slate-200 text-slate-600 hover:bg-slate-50{% endif %} px-3 py-1.5 text-xs font-bold"><i class="ph ph-eye text-sm" aria-hidden="true"></i>{% if solicitacao.status == 'PENDENTE' %}Decidir{% else %}Ver{% endif %}</button>
+              <div class="inline-flex flex-wrap items-center justify-end gap-2">
+                <button type="button" onclick="abrirModal('modalSolicitacao{{ solicitacao.pk }}')" aria-haspopup="dialog" class="inline-flex items-center gap-1 rounded-lg {% if solicitacao.status == 'PENDENTE' %}bg-[#025c9f] text-white hover:bg-[#153e70]{% else %}border border-slate-200 text-slate-600 hover:bg-slate-50{% endif %} px-3 py-1.5 text-xs font-bold"><i class="ph ph-eye text-sm" aria-hidden="true"></i>{% if solicitacao.status == 'PENDENTE' %}Decidir{% else %}Ver{% endif %}</button>
+                <button type="button" onclick="abrirModal('modalRemoverSolicitacao{{ solicitacao.pk }}')" aria-haspopup="dialog" aria-label="Remover solicitação de {{ solicitacao.nome_professor }}" class="inline-flex items-center gap-1 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50"><i class="ph ph-trash text-sm" aria-hidden="true"></i>Remover</button>
+              </div>
             </td>
           </tr>
           {% empty %}
@@ -99,6 +102,29 @@
         <button class="min-h-11 w-full rounded-lg bg-[#025c9f] px-4 text-sm font-black text-white hover:bg-[#153e70]">Registrar decisão</button>
       </form>
       {% endif %}
+    </div>
+  </div>
+</div>
+
+<div id="modalRemoverSolicitacao{{ solicitacao.pk }}" class="modal-solicitacao hidden fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="modalRemoverSolicitacao{{ solicitacao.pk }}Titulo">
+  <div class="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div class="flex items-start justify-between gap-3 border-b border-slate-100 px-6 py-4">
+      <h2 id="modalRemoverSolicitacao{{ solicitacao.pk }}Titulo" class="text-base font-black text-[#0b2a5b]">Remover solicitação?</h2>
+      <button type="button" onclick="fecharModal('modalRemoverSolicitacao{{ solicitacao.pk }}')" aria-label="Fechar" class="text-slate-400 hover:text-slate-600"><i class="ph ph-x text-xl" aria-hidden="true"></i></button>
+    </div>
+    <div class="space-y-3 px-6 py-4 text-sm text-slate-600">
+      <p>A solicitação de <strong class="text-slate-800">{{ solicitacao.nome_professor }}</strong> ({{ solicitacao.get_tipo_display|lower }}) enviada pela <strong class="text-slate-800">{{ solicitacao.unidade_solicitante.sigla }}</strong> será excluída da lista. Essa ação não pode ser desfeita.</p>
+      {% if solicitacao.status == 'PENDENTE' %}
+      <p class="rounded-xl bg-amber-50 p-3 text-xs text-amber-700">A unidade será avisada de que a solicitação foi removida.</p>
+      {% elif solicitacao.status == 'APROVADA' %}
+      <p class="rounded-xl bg-slate-50 p-3 text-xs text-slate-500">O que já foi feito com a aprovação (vínculo do professor à unidade ou cadastro) continua valendo.</p>
+      {% endif %}
+      <form method="post" action="{% url 'core:solicitacao_professor_remover' solicitacao.pk %}" class="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button type="button" onclick="fecharModal('modalRemoverSolicitacao{{ solicitacao.pk }}')" class="min-h-11 rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-600 hover:bg-slate-50">Cancelar</button>
+        <button type="submit" class="min-h-11 rounded-lg bg-red-600 px-4 text-sm font-black text-white hover:bg-red-700">Remover</button>
+      </form>
     </div>
   </div>
 </div>

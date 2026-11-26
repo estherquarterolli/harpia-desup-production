@@ -515,17 +515,49 @@ class ProfessorCreateView(DesupOnlyMixin, CreateView):
         return ctx
 
     def form_valid(self, form):
-        resposta = super().form_valid(form)
-        solicitacao = self._solicitacao_origem()
-        if solicitacao:
-            from apps.core.services import decidir_solicitacao_professor_externo
-            decidir_solicitacao_professor_externo(
-                request=self.request,
-                solicitacao_id=solicitacao.pk,
-                decisao=SolicitacaoProfessorExterno.StatusChoices.APROVADA,
+        from django.core.exceptions import ValidationError
+        from django.db import transaction
+        from apps.core.services import registrar_rat_no_cadastro
+
+        dados = form.cleaned_data
+        try:
+            # Professor, aprovação da solicitação e RAT de entrada são gravados
+            # juntos: se o RAT for recusado pela validação, nada fica pela metade.
+            with transaction.atomic():
+                resposta = super().form_valid(form)
+                solicitacao = self._solicitacao_origem()
+                if solicitacao:
+                    from apps.core.services import decidir_solicitacao_professor_externo
+                    decidir_solicitacao_professor_externo(
+                        request=self.request,
+                        solicitacao_id=solicitacao.pk,
+                        decisao=SolicitacaoProfessorExterno.StatusChoices.APROVADA,
+                    )
+                    SolicitacaoProfessorExterno.objects.filter(pk=solicitacao.pk).update(professor=self.object)
+                if dados.get('vem_com_rat'):
+                    registrar_rat_no_cadastro(
+                        request=self.request,
+                        professor=self.object,
+                        unidade=dados['rat_unidade'],
+                        horas_adicionais=dados['rat_horas_adicionais'],
+                        data_inicio=dados['rat_data_inicio'],
+                        data_fim=dados.get('rat_data_fim'),
+                        justificativa=dados['rat_justificativa'],
+                    )
+        except ValidationError as exc:
+            self.object = None
+            form.instance.pk = None
+            form.add_error(None, ' '.join(exc.messages))
+            return self.form_invalid(form)
+
+        if dados.get('vem_com_rat'):
+            messages.success(
+                self.request,
+                f"Professor cadastrado com sucesso, já como RAT na {dados['rat_unidade'].sigla} "
+                f"(+{dados['rat_horas_adicionais']} h semanais).",
             )
-            SolicitacaoProfessorExterno.objects.filter(pk=solicitacao.pk).update(professor=self.object)
-        messages.success(self.request, 'Professor cadastrado com sucesso.')
+        else:
+            messages.success(self.request, 'Professor cadastrado com sucesso.')
         return resposta
 
 

@@ -46,6 +46,7 @@ urlpatterns = [
     path('desup/equipe-diretiva/ocupacoes/<int:pk>/editar/', views.OcupacaoEquipeDiretivaUpdateView.as_view(), name='ocupacao_diretiva_update'),
     path('desup/solicitacoes-professor/', views.SolicitacaoProfessorExternoDesupView.as_view(), name='solicitacao_professor_list'),
     path('desup/solicitacoes-professor/<int:pk>/decidir/', views.SolicitacaoProfessorExternoDecidirView.as_view(), name='solicitacao_professor_decidir'),
+    path('desup/solicitacoes-professor/<int:pk>/remover/', views.SolicitacaoProfessorExternoRemoverView.as_view(), name='solicitacao_professor_remover'),
     path('desup/alertas-carga/', views.AlertasCargaDesupView.as_view(), name='alertas_carga_desup'),
     path('desup/alertas-carga/limites/novo/', views.LimiteCargaUnidadeCreateView.as_view(), name='limite_carga_create'),
     path('desup/alertas-carga/limites/<int:pk>/editar/', views.LimiteCargaUnidadeUpdateView.as_view(), name='limite_carga_update'),
