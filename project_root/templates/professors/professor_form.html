@@ -146,11 +146,11 @@
 
           {% if form.vem_com_rat %}
           <!-- RAT administrado pela DESUP no cadastro e na edição -->
-          <div class="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <div id="rat-ingresso-bloco" class="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
             <label for="{{ form.vem_com_rat.id_for_label }}" class="flex cursor-pointer items-center justify-between gap-4">
               <span>
-                <span class="block text-sm font-black text-slate-800">{% if form.instance.pk %}Professor possui RAT{% else %}Professor já vem como RAT{% endif %}</span>
-                <span class="block text-xs text-slate-500">{% if form.instance.pk %}Marque para cadastrar ou editar o Regime Adicional de Trabalho vigente. Desmarcar cancela o RAT atual.{% else %}Marque quando o professor já chega cumprindo Regime Adicional de Trabalho. O RAT é registrado como aprovado junto com o cadastro.{% endif %}</span>
+                <span class="block text-sm font-black text-slate-800">{% if form.instance.pk %}Professor externo possui RAT de ingresso{% else %}Professor externo já entra com RAT{% endif %}</span>
+                <span class="block text-xs text-slate-500">{% if form.instance.pk %}As horas informadas são toda a carga autorizada no ensino superior, sem divisão por dois. Desmarcar cancela o RAT de ingresso atual.{% else %}Use somente para professor externo, oriundo do Ensino Médio, que ingressa diretamente no ensino superior com RAT. As horas informadas serão sua carga semanal integral autorizada.{% endif %}</span>
               </span>
               <span class="rat-switch shrink-0">
                 <input type="checkbox" name="{{ form.vem_com_rat.html_name }}" id="{{ form.vem_com_rat.id_for_label }}" {% if form.vem_com_rat.value %}checked{% endif %}>
@@ -166,7 +166,7 @@
                 {% if form.rat_unidade.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.rat_unidade.errors.0 }}</p>{% endif %}
               </div>
               <div>
-                <label for="{{ form.rat_horas_adicionais.id_for_label }}" class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Horas adicionais semanais <span class="text-red-400">*</span></label>
+                <label for="{{ form.rat_horas_adicionais.id_for_label }}" class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Carga semanal autorizada <span class="text-red-400">*</span></label>
                 {{ form.rat_horas_adicionais }}
                 {% if form.rat_horas_adicionais.errors %}<p class="text-red-500 text-[11px] mt-1">{{ form.rat_horas_adicionais.errors.0 }}</p>{% endif %}
               </div>
@@ -294,9 +294,16 @@
   chk.addEventListener('change', carga); carga();
   var chkRat = document.getElementById('id_vem_com_rat');
   var boxRat = document.getElementById('rat-campos');
-  if (chkRat && boxRat) {
+  var blocoRat = document.getElementById('rat-ingresso-bloco');
+  var nivelOrigem = document.getElementById('id_nivel_ensino_origem');
+  if (chkRat && boxRat && blocoRat) {
     var rat = function () { boxRat.style.display = chkRat.checked ? '' : 'none'; };
+    var disponibilidadeRat = function () {
+      blocoRat.style.display = (!nivelOrigem || nivelOrigem.value === 'MEDIO' || chkRat.checked) ? '' : 'none';
+    };
     chkRat.addEventListener('change', rat); rat();
+    if (nivelOrigem) nivelOrigem.addEventListener('change', disponibilidadeRat);
+    disponibilidadeRat();
   }
   botoes.forEach(function (b) { b.addEventListener('click', function () { abrir(b.dataset.tab); }); });
   // Se a validação falhou, abre a aba que contém o primeiro erro.

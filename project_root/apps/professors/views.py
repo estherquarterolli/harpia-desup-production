@@ -91,7 +91,10 @@ def enriquecer_professores_com_carga(professores, unidade_atual=None):
         # sobra em vez de 14h) — mesma meta já usada em
         # extra_curricular/services.py (get_pendencias_data).
         meta_horas = 0.0 if prof.readaptado_vigente else prof.meta_horas_base_sala
+        prof.rat_ingresso_externo_horas = prof.carga_rat_ingresso_externo_vigente
+        prof.carga_autorizada_exibicao = meta_horas
         prof.ch_nao_alocada_total = max(meta_horas - prof.soma_horas, 0)
+        prof.ch_excedente_total = max(prof.soma_horas - meta_horas, 0)
         prof.acima_ch = meta_horas > 0 and prof.soma_horas > meta_horas
         if meta_horas:
             prof.percentual_alocado_total = round(min((prof.soma_horas / meta_horas) * 100, 100.0), 2)
@@ -312,7 +315,7 @@ class ProfessorListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         qs = Professor.objects.select_related(
             'tipo_contrato', 'unidade_principal'
-        ).prefetch_related('cursos', 'unidades', 'ocupacoes_diretivas', 'readaptacoes')
+        ).prefetch_related('cursos', 'unidades', 'ocupacoes_diretivas', 'readaptacoes', 'excecoes_carga')
         user = self.request.user
 
         q = self.request.GET.get('q', '')
@@ -467,7 +470,7 @@ class ProfessorDetailView(DesupOnlyMixin, DetailView):
     def get_queryset(self):
         return Professor.objects.select_related(
             'tipo_contrato', 'unidade_principal'
-        ).prefetch_related('cursos', 'unidades', 'ocupacoes_diretivas', 'readaptacoes')
+        ).prefetch_related('cursos', 'unidades', 'ocupacoes_diretivas', 'readaptacoes', 'excecoes_carga')
 
 class ProfessorCreateView(DesupOnlyMixin, CreateView):
     model = Professor
@@ -553,8 +556,8 @@ class ProfessorCreateView(DesupOnlyMixin, CreateView):
         if dados.get('vem_com_rat'):
             messages.success(
                 self.request,
-                f"Professor cadastrado com sucesso, já como RAT na {dados['rat_unidade'].sigla} "
-                f"(+{dados['rat_horas_adicionais']} h semanais).",
+                f"Professor cadastrado com RAT de ingresso externo na {dados['rat_unidade'].sigla} "
+                f"(carga autorizada: {dados['rat_horas_adicionais']} h semanais).",
             )
         else:
             messages.success(self.request, 'Professor cadastrado com sucesso.')
@@ -823,13 +826,13 @@ def htmx_tabela_alocacao(request):
         if user.unidade_id:
             from apps.allocations.services import professores_autorizados_unidade_qs
             queryset = professores_autorizados_unidade_qs(user.unidade_id).select_related('tipo_contrato').prefetch_related(
-                'unidades', 'ocupacoes_diretivas', 'readaptacoes'
+                'unidades', 'ocupacoes_diretivas', 'readaptacoes', 'excecoes_carga'
             ).order_by('rh_nome')
         else:
             queryset = Professor.objects.none()
     else:
         queryset = Professor.objects.select_related('tipo_contrato').prefetch_related(
-            'unidades', 'ocupacoes_diretivas', 'readaptacoes'
+            'unidades', 'ocupacoes_diretivas', 'readaptacoes', 'excecoes_carga'
         ).order_by('rh_nome')
 
     # Esta tela legada era o Ãºltimo ponto que ainda materializava todos os
@@ -855,7 +858,11 @@ def htmx_tabela_alocacao(request):
         # são relativos à meta de horas EM SALA (max_class_hours), não ao
         # total do contrato (ch_total/max_total_hours).
         meta_horas = prof.meta_horas_sala
+        prof.rat_ingresso_externo_horas = prof.carga_rat_ingresso_externo_vigente
+        prof.carga_autorizada_exibicao = meta_horas
         prof.ch_nao_alocada_total = max(meta_horas - soma, 0)
+        prof.ch_excedente_total = max(soma - meta_horas, 0)
+        prof.acima_ch = meta_horas > 0 and soma > meta_horas
         if meta_horas:
             prof.percentual_alocado_total = round(min((soma / meta_horas) * 100, 100.0), 2)
         else:

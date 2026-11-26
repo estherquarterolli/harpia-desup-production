@@ -35,7 +35,7 @@ class ProfessorForm(forms.ModelForm):
         widget=forms.Select(attrs={'class': _SELECT_CSS}),
     )
     rat_horas_adicionais = forms.DecimalField(
-        label='Horas adicionais semanais', required=False,
+        label='Carga semanal autorizada', required=False,
         max_digits=7, decimal_places=2, min_value=Decimal('0.01'),
         widget=forms.NumberInput(attrs={'class': _INPUT_CSS, 'min': '0.01', 'step': '0.01', 'placeholder': 'Ex: 4'}),
     )
@@ -116,8 +116,18 @@ class ProfessorForm(forms.ModelForm):
         pode_editar_rat = bool(self.user and (
             self.user.is_superuser or self.user.perfil == 'DESUP'
         ))
-        self.rat_registro = None
-        if self.instance.pk and not pode_editar_rat:
+        self.rat_registro = (
+            self._buscar_rat_ingresso_externo_vigente()
+            if self.instance.pk and pode_editar_rat
+            else None
+        )
+        professor_externo = (
+            self.instance.nivel_ensino_origem == Professor.NivelEnsinoOrigemChoices.MEDIO
+        )
+        pode_configurar_rat_externo = (
+            not self.instance.pk or self.rat_registro is not None or professor_externo
+        )
+        if self.instance.pk and (not pode_editar_rat or not pode_configurar_rat_externo):
             for campo in CAMPOS_RAT:
                 self.fields.pop(campo, None)
         else:
@@ -125,40 +135,15 @@ class ProfessorForm(forms.ModelForm):
             if not self.is_bound:
                 hoje = timezone.localdate()
                 self.fields['rat_data_inicio'].initial = hoje
-                if self.instance.pk:
-                    from apps.core.models import ExcecaoCargaUnidade
-
-                    self.rat_registro = (
-                        ExcecaoCargaUnidade.objects.filter(
-                            professor=self.instance,
-                            status=ExcecaoCargaUnidade.StatusChoices.APROVADA,
-                        )
-                        .filter(Q(data_fim__isnull=True) | Q(data_fim__gte=hoje))
-                        .select_related('unidade')
-                        .order_by('-data_inicio', '-criado_em')
-                        .first()
-                    )
-                    if self.rat_registro:
-                        self.initial.update({
-                            'vem_com_rat': True,
-                            'rat_unidade': self.rat_registro.unidade_id,
-                            'rat_horas_adicionais': self.rat_registro.horas_adicionais,
-                            'rat_data_inicio': self.rat_registro.data_inicio,
-                            'rat_data_fim': self.rat_registro.data_fim,
-                            'rat_justificativa': self.rat_registro.justificativa,
-                        })
-            elif self.instance.pk:
-                from apps.core.models import ExcecaoCargaUnidade
-
-                self.rat_registro = (
-                    ExcecaoCargaUnidade.objects.filter(
-                        professor=self.instance,
-                        status=ExcecaoCargaUnidade.StatusChoices.APROVADA,
-                    )
-                    .filter(Q(data_fim__isnull=True) | Q(data_fim__gte=timezone.localdate()))
-                    .order_by('-data_inicio', '-criado_em')
-                    .first()
-                )
+                if self.rat_registro:
+                    self.initial.update({
+                        'vem_com_rat': True,
+                        'rat_unidade': self.rat_registro.unidade_id,
+                        'rat_horas_adicionais': self.rat_registro.horas_adicionais,
+                        'rat_data_inicio': self.rat_registro.data_inicio,
+                        'rat_data_fim': self.rat_registro.data_fim,
+                        'rat_justificativa': self.rat_registro.justificativa,
+                    })
         # Cadastros e integrações anteriores a este campo podem omiti-lo. O
         # valor institucional seguro nesses casos é "Não informado".
         self.fields['nivel_ensino_origem'].required = False
@@ -203,6 +188,23 @@ class ProfessorForm(forms.ModelForm):
         else:
             self.fields['cursos'].queryset = Course.objects.none()
 
+    def _buscar_rat_ingresso_externo_vigente(self):
+        from apps.core.models import ExcecaoCargaUnidade
+
+        hoje = timezone.localdate()
+        return (
+            ExcecaoCargaUnidade.objects.filter(
+                professor=self.instance,
+                ingresso_externo=True,
+                status=ExcecaoCargaUnidade.StatusChoices.APROVADA,
+                data_inicio__lte=hoje,
+            )
+            .filter(Q(data_fim__isnull=True) | Q(data_fim__gte=hoje))
+            .select_related('unidade')
+            .order_by('-data_inicio', '-criado_em')
+            .first()
+        )
+
     def clean_nivel_ensino_origem(self):
         return (
             self.cleaned_data.get('nivel_ensino_origem')
@@ -213,6 +215,15 @@ class ProfessorForm(forms.ModelForm):
         cleaned = super().clean()
         if not cleaned.get('vem_com_rat'):
             return cleaned
+
+        if (
+            not self.rat_registro
+            and cleaned.get('nivel_ensino_origem') != Professor.NivelEnsinoOrigemChoices.MEDIO
+        ):
+            self.add_error(
+                'nivel_ensino_origem',
+                'O RAT de ingresso é exclusivo para professor externo oriundo do Ensino Médio.',
+            )
 
         if not (cleaned.get('id_funcional') or '').strip():
             self.add_error('id_funcional', 'Informe o ID funcional para salvar o professor como RAT.')
@@ -227,7 +238,7 @@ class ProfessorForm(forms.ModelForm):
             self.add_error('rat_unidade', 'A unidade do RAT precisa estar entre as unidades marcadas do professor.')
 
         if not cleaned.get('rat_horas_adicionais'):
-            self.add_error('rat_horas_adicionais', 'Informe as horas adicionais semanais do RAT.')
+            self.add_error('rat_horas_adicionais', 'Informe a carga semanal autorizada pelo RAT de ingresso.')
 
         inicio, fim = cleaned.get('rat_data_inicio'), cleaned.get('rat_data_fim')
         if not inicio:

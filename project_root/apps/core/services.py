@@ -387,6 +387,10 @@ def solicitar_rat(*, request, professor_id, horas_adicionais, data_inicio, data_
         or professor.unidades.filter(pk=unidade.pk).exists()
     ):
         raise PermissionDenied('Professor não vinculado à sua unidade.')
+    if professor.carga_rat_ingresso_externo_vigente is not None:
+        raise ValidationError(
+            'Este professor possui RAT de ingresso externo; a carga dele é administrada no cadastro do professor.'
+        )
     if not (professor.id_funcional or '').strip():
         raise ValidationError(MENSAGEM_ID_RAT_OBRIGATORIO)
     if not obter_cargas_rat([professor])[str(professor.pk)]['completa']:
@@ -477,6 +481,7 @@ def registrar_rat_no_cadastro(
     excecao = ExcecaoCargaUnidade(
         unidade=unidade,
         professor=professor,
+        ingresso_externo=True,
         horas_adicionais=horas_adicionais,
         data_inicio=data_inicio,
         data_fim=data_fim,
@@ -491,8 +496,8 @@ def registrar_rat_no_cadastro(
     excecao.save()
 
     mensagem = (
-        f"A DESUP cadastrou {professor.nome} já em RAT na unidade {unidade.sigla}: "
-        f"+{horas_adicionais} h semanais a partir de {data_inicio:%d/%m/%Y}."
+        f"A DESUP cadastrou {professor.nome} com RAT de ingresso externo na unidade {unidade.sigla}: "
+        f"carga integral autorizada de {horas_adicionais} h semanais a partir de {data_inicio:%d/%m/%Y}."
     )
     Notificacao.objects.create(
         unidade_destino=unidade,
@@ -545,6 +550,7 @@ def salvar_rat_na_edicao(
             titulo = "RAT atualizado na edição do professor"
 
         rat.unidade = unidade
+        rat.ingresso_externo = True
         rat.horas_adicionais = horas_adicionais
         rat.data_inicio = data_inicio
         rat.data_fim = data_fim
@@ -556,8 +562,8 @@ def salvar_rat_na_edicao(
         rat.full_clean()
         rat.save()
         mensagem = (
-            f"A DESUP definiu o RAT de {professor.nome}: "
-            f"+{horas_adicionais} h semanais a partir de {data_inicio:%d/%m/%Y}."
+            f"A DESUP definiu o RAT de ingresso externo de {professor.nome}: "
+            f"carga integral autorizada de {horas_adicionais} h semanais a partir de {data_inicio:%d/%m/%Y}."
         )
 
     Notificacao.objects.create(

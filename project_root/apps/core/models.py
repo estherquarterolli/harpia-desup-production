@@ -786,6 +786,15 @@ class ExcecaoCargaUnidade(models.Model):
         verbose_name="Decidido por",
     )
     motivo_decisao = models.TextField(blank=True, verbose_name="Motivo da decisão")
+    ingresso_externo = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name="RAT de ingresso externo",
+        help_text=(
+            "Indica que as horas do RAT são toda a carga autorizada do professor "
+            "externo no ensino superior, e não horas adicionais."
+        ),
+    )
     criado_em = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
     decidido_em = models.DateTimeField(null=True, blank=True, verbose_name="Decidido em")
 

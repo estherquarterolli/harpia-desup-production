@@ -621,7 +621,9 @@ class SolicitacaoRatUnidadeForm(forms.ModelForm):
         self.fields['professor'].help_text = 'Selecione um professor vinculado à sua unidade.'
         self.fields['professor'].queryset = Professor.objects.filter(
             Q(unidade_principal=unidade) | Q(unidades=unidade),
-        ).select_related('tipo_contrato').prefetch_related('ocupacoes_diretivas', 'readaptacoes').distinct()
+        ).select_related('tipo_contrato').prefetch_related(
+            'ocupacoes_diretivas', 'readaptacoes', 'excecoes_carga'
+        ).distinct()
 
     def clean_professor(self):
         from apps.professors.services import (
@@ -629,6 +631,10 @@ class SolicitacaoRatUnidadeForm(forms.ModelForm):
         )
 
         professor = self.cleaned_data['professor']
+        if professor.carga_rat_ingresso_externo_vigente is not None:
+            raise forms.ValidationError(
+                'Este professor possui RAT de ingresso externo; a carga dele é administrada no cadastro do professor.'
+            )
         if not (professor.id_funcional or '').strip():
             raise forms.ValidationError(MENSAGEM_ID_RAT_OBRIGATORIO)
         if not obter_cargas_rat([professor])[str(professor.pk)]['completa']:

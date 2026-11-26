@@ -194,7 +194,7 @@ def _professores_pendentes_com_ch(unidade_id, q: str = ""):
     queries de professores e fixo, independente de N.
     """
     professores = Professor.objects.select_related("tipo_contrato", "unidade_principal").prefetch_related(
-        "ocupacoes_diretivas", "readaptacoes"
+        "ocupacoes_diretivas", "readaptacoes", "excecoes_carga"
     )
     if unidade_id:
         professores = professores.filter(unidade_principal_id=unidade_id)

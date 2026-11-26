@@ -357,11 +357,46 @@ class Professor(models.Model):
         ).exists()
 
     @property
-    def meta_horas_base_sala(self) -> int:
+    def meta_horas_base_sala(self) -> float:
         """Limite de horas em sala antes da redução: metade da carga personalizada, ou o do contrato."""
+        carga_rat_externo = self.carga_rat_ingresso_externo_vigente
+        if carga_rat_externo is not None:
+            return float(carga_rat_externo)
         if self.carga_diferenciada and self.carga_horaria_personalizada:
             return self.carga_horaria_personalizada // 2
         return self.tipo_contrato.max_class_hours if self.tipo_contrato else 0
+
+    @property
+    def carga_rat_ingresso_externo_vigente(self):
+        """Carga integral autorizada pelo RAT de ingresso externo vigente.
+
+        Diferentemente do RAT comum, este valor substitui a meta contratual de
+        sala: não é adicional e não sofre divisão por dois.
+        """
+        from decimal import Decimal
+        from django.utils import timezone
+
+        if not self.pk:
+            return None
+        hoje = timezone.localdate()
+        cache = getattr(self, '_prefetched_objects_cache', {})
+        registros = cache.get('excecoes_carga')
+        if registros is None:
+            registros = self.excecoes_carga.filter(
+                ingresso_externo=True,
+                status='APROVADA',
+                data_inicio__lte=hoje,
+            ).filter(models.Q(data_fim__isnull=True) | models.Q(data_fim__gte=hoje))
+
+        horas = [
+            Decimal(str(item.horas_adicionais))
+            for item in registros
+            if item.ingresso_externo
+            and item.status == 'APROVADA'
+            and item.data_inicio <= hoje
+            and (item.data_fim is None or item.data_fim >= hoje)
+        ]
+        return sum(horas, Decimal('0')) if horas else None
 
     @property
     def meta_horas_sala(self):

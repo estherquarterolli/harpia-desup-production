@@ -161,7 +161,7 @@ class DashboardDesupView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView):
         professores_qs = Professor.objects.select_related(
             'tipo_contrato', 'unidade_principal'
         ).prefetch_related(
-            'unidades', 'ocupacoes_diretivas', 'readaptacoes',
+            'unidades', 'ocupacoes_diretivas', 'readaptacoes', 'excecoes_carga',
         ).order_by('rh_nome', 'pk')
         q = self.request.GET.get('q', '').strip()
         unidade_id = self.request.GET.get('unidade_id', '')
@@ -266,7 +266,7 @@ class DashboardProfessoresPartialView(LoginRequiredMixin, PerfilRequiredMixin, T
         qs = Professor.objects.select_related(
             'tipo_contrato', 'unidade_principal'
         ).prefetch_related(
-            'unidades', 'ocupacoes_diretivas', 'readaptacoes',
+            'unidades', 'ocupacoes_diretivas', 'readaptacoes', 'excecoes_carga',
         ).order_by('rh_nome')
 
         q = self.request.GET.get('q', '')
@@ -322,7 +322,7 @@ class DashboardUnidadeView(LoginRequiredMixin, PerfilRequiredMixin, TemplateView
             qs = Professor.objects.select_related(
                 'tipo_contrato', 'unidade_principal',
             ).prefetch_related(
-                'unidades', 'ocupacoes_diretivas', 'readaptacoes',
+                'unidades', 'ocupacoes_diretivas', 'readaptacoes', 'excecoes_carga',
             ).filter(
                 Q(unidade_principal_id=unidade.pk) | Q(unidades__id=unidade.pk)
             ).distinct().order_by('rh_nome', 'pk')
@@ -431,7 +431,7 @@ class UnidadeListView(UnidadeBaseView, ListView):
                 Professor.objects.filter(status=Professor.StatusChoices.ATIVO)
                 .filter(Q(unidades__id__in=ids) | Q(unidade_principal_id__in=ids))
                 .select_related('tipo_contrato')
-                .prefetch_related('unidades', 'ocupacoes_diretivas', 'readaptacoes')
+                .prefetch_related('unidades', 'ocupacoes_diretivas', 'readaptacoes', 'excecoes_carga')
                 .distinct()
             )
             enriquecer_professores_com_carga(professores)

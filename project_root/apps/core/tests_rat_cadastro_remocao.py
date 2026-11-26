@@ -1,11 +1,13 @@
 from datetime import timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.urls import reverse
 from django.utils import timezone
 
 from apps.professors.models import Professor
 from apps.professors.tests_e2e import ProfessorE2EBase
+from apps.professors.views import enriquecer_professores_com_carga
 
 from .models import AuditoriaGlobal, ExcecaoCargaUnidade, Notificacao, SolicitacaoProfessorExterno
 
@@ -20,6 +22,7 @@ class CadastroProfessorJaComoRatTests(ProfessorE2EBase):
 
     def dados_rat(self, **overrides):
         dados = self._dados_professor(
+            nivel_ensino_origem=Professor.NivelEnsinoOrigemChoices.MEDIO,
             vem_com_rat='on',
             rat_unidade=self.unidade_a.pk,
             rat_horas_adicionais='4.00',
@@ -33,19 +36,23 @@ class CadastroProfessorJaComoRatTests(ProfessorE2EBase):
     def test_rat_aparece_no_cadastro_e_na_edicao_para_desup(self):
         cadastro = self.client.get(self.url_criar)
         self.assertIn('vem_com_rat', cadastro.context['form'].fields)
-        self.assertContains(cadastro, 'Professor já vem como RAT')
+        self.assertContains(cadastro, 'Professor externo já entra com RAT')
 
+        self.prof_a1.nivel_ensino_origem = Professor.NivelEnsinoOrigemChoices.MEDIO
+        self.prof_a1.save(update_fields=['nivel_ensino_origem'])
         edicao = self.client.get(reverse('professors:professor_update', args=[self.prof_a1.pk]))
         self.assertIn('vem_com_rat', edicao.context['form'].fields)
-        self.assertContains(edicao, 'Professor possui RAT')
+        self.assertContains(edicao, 'Professor externo possui RAT de ingresso')
 
     def test_coordenador_nao_pode_editar_rat_no_cadastro_do_professor(self):
         self.client.force_login(self.coord_a)
         edicao = self.client.get(reverse('professors:professor_update', args=[self.prof_a1.pk]))
         self.assertNotIn('vem_com_rat', edicao.context['form'].fields)
-        self.assertNotContains(edicao, 'Professor possui RAT')
+        self.assertNotContains(edicao, 'Professor externo possui RAT de ingresso')
 
     def test_edicao_do_professor_pode_criar_rat(self):
+        self.prof_a1.nivel_ensino_origem = Professor.NivelEnsinoOrigemChoices.MEDIO
+        self.prof_a1.save(update_fields=['nivel_ensino_origem'])
         url = reverse('professors:professor_update', args=[self.prof_a1.pk])
         dados = self._dados_professor(
             id_funcional=self.prof_a1.id_funcional,
@@ -57,6 +64,7 @@ class CadastroProfessorJaComoRatTests(ProfessorE2EBase):
             rat_data_inicio=self.hoje.isoformat(),
             rat_data_fim='',
             rat_justificativa='RAT incluído na edição.',
+            nivel_ensino_origem=Professor.NivelEnsinoOrigemChoices.MEDIO,
         )
 
         resposta = self.client.post(url, dados)
@@ -64,6 +72,7 @@ class CadastroProfessorJaComoRatTests(ProfessorE2EBase):
         self.assertEqual(resposta.status_code, 302)
         rat = ExcecaoCargaUnidade.objects.get(professor=self.prof_a1)
         self.assertEqual(rat.horas_adicionais, Decimal('6.00'))
+        self.assertTrue(rat.ingresso_externo)
         self.assertEqual(rat.status, ExcecaoCargaUnidade.StatusChoices.APROVADA)
         self.assertTrue(AuditoriaGlobal.objects.filter(acao='RAT_CRIADO_NA_EDICAO').exists())
 
@@ -72,6 +81,7 @@ class CadastroProfessorJaComoRatTests(ProfessorE2EBase):
             unidade=self.unidade_a,
             professor=self.prof_a1,
             horas_adicionais=Decimal('4.00'),
+            ingresso_externo=True,
             data_inicio=self.hoje,
             justificativa='RAT original.',
             status=ExcecaoCargaUnidade.StatusChoices.APROVADA,
@@ -94,6 +104,7 @@ class CadastroProfessorJaComoRatTests(ProfessorE2EBase):
             rat_data_inicio=self.hoje.isoformat(),
             rat_data_fim=(self.hoje + timedelta(days=90)).isoformat(),
             rat_justificativa='RAT atualizado.',
+            nivel_ensino_origem=Professor.NivelEnsinoOrigemChoices.MEDIO,
         )
         resposta = self.client.post(url, dados)
 
@@ -108,6 +119,7 @@ class CadastroProfessorJaComoRatTests(ProfessorE2EBase):
             unidade=self.unidade_a,
             professor=self.prof_a1,
             horas_adicionais=Decimal('4.00'),
+            ingresso_externo=True,
             data_inicio=self.hoje,
             justificativa='RAT vigente.',
             status=ExcecaoCargaUnidade.StatusChoices.APROVADA,
@@ -129,6 +141,55 @@ class CadastroProfessorJaComoRatTests(ProfessorE2EBase):
         self.assertEqual(rat.status, ExcecaoCargaUnidade.StatusChoices.CANCELADA)
         self.assertTrue(AuditoriaGlobal.objects.filter(acao='RAT_CANCELADO_NA_EDICAO').exists())
 
+    def test_rat_externo_de_oito_horas_sinaliza_quatro_horas_excedentes(self):
+        self.prof_a1.nivel_ensino_origem = Professor.NivelEnsinoOrigemChoices.MEDIO
+        self.prof_a1.save(update_fields=['nivel_ensino_origem'])
+        ExcecaoCargaUnidade.objects.create(
+            unidade=self.unidade_a,
+            professor=self.prof_a1,
+            ingresso_externo=True,
+            horas_adicionais=Decimal('8.00'),
+            data_inicio=self.hoje,
+            justificativa='Carga integral de ingresso.',
+            status=ExcecaoCargaUnidade.StatusChoices.APROVADA,
+            solicitado_por=self.desup,
+            decidido_por=self.desup,
+            decidido_em=timezone.now(),
+        )
+
+        with patch('apps.professors.views._bulk_ch_alocada', return_value={self.prof_a1.pk: 12}), patch(
+            'apps.professors.views._bulk_ch_justificada', return_value={self.prof_a1.pk: 0}
+        ):
+            professor = enriquecer_professores_com_carga([self.prof_a1])['professores'][0]
+
+        self.assertEqual(professor.carga_autorizada_exibicao, 8)
+        self.assertEqual(professor.soma_horas, 12)
+        self.assertEqual(professor.ch_nao_alocada_total, 0)
+        self.assertEqual(professor.ch_excedente_total, 4)
+        self.assertTrue(professor.acima_ch)
+
+        with patch('apps.professors.views._bulk_ch_alocada', return_value={self.prof_a1.pk: 12}), patch(
+            'apps.professors.views._bulk_ch_justificada', return_value={self.prof_a1.pk: 0}
+        ):
+            pagina = self.client.get(self.url_lista)
+        self.assertEqual(pagina.status_code, 200)
+        self.assertContains(pagina, 'RAT externo')
+        self.assertContains(pagina, '4h excedentes')
+
+    def test_rat_comum_nao_substitui_meta_contratual(self):
+        ExcecaoCargaUnidade.objects.create(
+            unidade=self.unidade_a,
+            professor=self.prof_a1,
+            ingresso_externo=False,
+            horas_adicionais=Decimal('8.00'),
+            data_inicio=self.hoje,
+            justificativa='RAT solicitado pela unidade.',
+            status=ExcecaoCargaUnidade.StatusChoices.APROVADA,
+            solicitado_por=self.desup,
+        )
+
+        self.assertEqual(self.prof_a1.meta_horas_base_sala, 20)
+
     def test_cadastro_como_rat_cria_rat_aprovado_e_avisa_a_unidade(self):
         resposta = self.client.post(self.url_criar, self.dados_rat())
         self.assertEqual(resposta.status_code, 302)
@@ -137,6 +198,7 @@ class CadastroProfessorJaComoRatTests(ProfessorE2EBase):
         rat = ExcecaoCargaUnidade.objects.get(professor=professor)
         self.assertEqual(rat.unidade, self.unidade_a)
         self.assertEqual(rat.status, ExcecaoCargaUnidade.StatusChoices.APROVADA)
+        self.assertTrue(rat.ingresso_externo)
         self.assertEqual(rat.horas_adicionais, Decimal('4.00'))
         self.assertEqual(rat.decidido_por, self.desup)
         self.assertTrue(rat.justificativa)
@@ -163,6 +225,15 @@ class CadastroProfessorJaComoRatTests(ProfessorE2EBase):
         resposta = self.client.post(self.url_criar, self.dados_rat(rat_horas_adicionais=''))
         self.assertEqual(resposta.status_code, 200)
         self.assertIn('rat_horas_adicionais', resposta.context['form'].errors)
+        self.assertFalse(Professor.objects.filter(id_funcional='IDF-NOVO').exists())
+        self.assertFalse(ExcecaoCargaUnidade.objects.exists())
+
+    def test_rat_de_ingresso_recusa_professor_que_ja_e_do_ensino_superior(self):
+        resposta = self.client.post(self.url_criar, self.dados_rat(
+            nivel_ensino_origem=Professor.NivelEnsinoOrigemChoices.SUPERIOR,
+        ))
+        self.assertEqual(resposta.status_code, 200)
+        self.assertIn('nivel_ensino_origem', resposta.context['form'].errors)
         self.assertFalse(Professor.objects.filter(id_funcional='IDF-NOVO').exists())
         self.assertFalse(ExcecaoCargaUnidade.objects.exists())
 
