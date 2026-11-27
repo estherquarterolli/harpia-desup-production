@@ -556,8 +556,8 @@ class ProfessorCreateView(DesupOnlyMixin, CreateView):
         if dados.get('vem_com_rat'):
             messages.success(
                 self.request,
-                f"Professor cadastrado com RAT de ingresso externo na {dados['rat_unidade'].sigla} "
-                f"(carga autorizada: {dados['rat_horas_adicionais']} h semanais).",
+                f"Professor cadastrado com RAT na {dados['rat_unidade'].sigla} "
+                f"({dados['rat_horas_adicionais']} h semanais).",
             )
         else:
             messages.success(self.request, 'Professor cadastrado com sucesso.')

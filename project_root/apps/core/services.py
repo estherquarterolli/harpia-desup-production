@@ -466,6 +466,27 @@ def decidir_excecao_carga(*, request, excecao_id, decisao, motivo=""):
     return excecao
 
 
+def _professor_ingresso_externo(professor):
+    """RAT de ingresso externo (carga integral) só para quem vem do Ensino Médio."""
+    from apps.professors.models import Professor
+
+    return professor.nivel_ensino_origem == Professor.NivelEnsinoOrigemChoices.MEDIO
+
+
+def _mensagem_rat_dsup(professor, rat, horas, data_inicio, unidade=None):
+    if rat.ingresso_externo:
+        return (
+            f"A DESUP definiu o RAT de ingresso externo de {professor.nome}"
+            f"{f' na unidade {unidade.sigla}' if unidade else ''}: "
+            f"carga integral autorizada de {horas} h semanais a partir de {data_inicio:%d/%m/%Y}."
+        )
+    return (
+        f"A DESUP definiu o RAT de {professor.nome}"
+        f"{f' na unidade {unidade.sigla}' if unidade else ''}: "
+        f"+{horas} h semanais a partir de {data_inicio:%d/%m/%Y}."
+    )
+
+
 @transaction.atomic
 def registrar_rat_no_cadastro(
     *, request, professor, unidade, horas_adicionais, data_inicio, data_fim=None, justificativa,
@@ -481,7 +502,7 @@ def registrar_rat_no_cadastro(
     excecao = ExcecaoCargaUnidade(
         unidade=unidade,
         professor=professor,
-        ingresso_externo=True,
+        ingresso_externo=_professor_ingresso_externo(professor),
         horas_adicionais=horas_adicionais,
         data_inicio=data_inicio,
         data_fim=data_fim,
@@ -495,10 +516,7 @@ def registrar_rat_no_cadastro(
     excecao.full_clean()
     excecao.save()
 
-    mensagem = (
-        f"A DESUP cadastrou {professor.nome} com RAT de ingresso externo na unidade {unidade.sigla}: "
-        f"carga integral autorizada de {horas_adicionais} h semanais a partir de {data_inicio:%d/%m/%Y}."
-    )
+    mensagem = _mensagem_rat_dsup(professor, excecao, horas_adicionais, data_inicio, unidade=unidade)
     Notificacao.objects.create(
         unidade_destino=unidade,
         titulo="RAT registrado no cadastro do professor",
@@ -550,7 +568,7 @@ def salvar_rat_na_edicao(
             titulo = "RAT atualizado na edição do professor"
 
         rat.unidade = unidade
-        rat.ingresso_externo = True
+        rat.ingresso_externo = _professor_ingresso_externo(professor)
         rat.horas_adicionais = horas_adicionais
         rat.data_inicio = data_inicio
         rat.data_fim = data_fim
@@ -561,10 +579,7 @@ def salvar_rat_na_edicao(
         rat.motivo_decisao = "RAT definido pela DESUP na edição do professor."
         rat.full_clean()
         rat.save()
-        mensagem = (
-            f"A DESUP definiu o RAT de ingresso externo de {professor.nome}: "
-            f"carga integral autorizada de {horas_adicionais} h semanais a partir de {data_inicio:%d/%m/%Y}."
-        )
+        mensagem = _mensagem_rat_dsup(professor, rat, horas_adicionais, data_inicio)
 
     Notificacao.objects.create(
         unidade_destino=rat.unidade,
