@@ -146,7 +146,7 @@ def enriquecer_professores_com_carga(professores, unidade_atual=None):
                         continue
                     vistos_por_prof[prof_id].add(chave)
                     alocacao_map_por_prof[prof_id][comp.matriz_id] = (
-                        alocacao_map_por_prof[prof_id].get(comp.matriz_id, 0) + comp.ha_semanal
+                        alocacao_map_por_prof[prof_id].get(comp.matriz_id, 0) + comp.ch_semanal
                     )
 
                 for prof in professores_list:
@@ -201,7 +201,7 @@ def detalhar_alocacoes_professores(professores, user=None):
             continue
         vistos[linha.docente_id].add(chave)
         turno = linha.alocacao_curricular.turno
-        horas = round(comp.ha_semanal, 1)
+        horas = comp.ch_semanal
         por_id[linha.docente_id].detalhe_alocacao.append({
             'unidade': linha.alocacao_curricular.unidade.sigla,
             'atividade': comp.nome_disciplina or '—',

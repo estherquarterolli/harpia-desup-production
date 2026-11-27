@@ -20,7 +20,7 @@
       <input type="text"
              class="ac-input flex-1 min-w-0 bg-transparent outline-none
                {% if linha.docente and linha.cargo_diretivo %}ac-text-diretivo font-semibold{% elif linha.docente and linha.outra_unidade %}ac-text-outra font-semibold{% elif linha.docente %}text-emerald-800 font-semibold{% elif linha %}ac-text-carencia font-semibold{% elif not nova and comp.status == 'NAO_OFERECIDA' %}text-slate-500 font-semibold{% else %}text-slate-400{% endif %}"
-             placeholder="{% if not linha and not nova and comp.status == 'NAO_OFERECIDA' %}Não oferecido{% else %}Sem professor{% endif %}"
+             placeholder="{% if not linha and not nova and comp.status == 'NAO_OFERECIDA' %}Não oferecido{% elif linha %}Sem professor{% else %}Não informado{% endif %}"
              value="{% if linha.docente %}{{ linha.docente.nome }}{% elif not linha and not nova and comp.status == 'NAO_OFERECIDA' %}Não oferecido{% endif %}"
              aria-label="Docente de {{ comp.nome_disciplina }}{% if extra %} (linha adicional){% endif %}"
              autocomplete="off"

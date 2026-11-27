@@ -1751,7 +1751,7 @@ def _mapa_alocacoes_sala_por_professor(professor_ids):
         vistos = vistos_por_prof.setdefault(pid, set())
         if chave not in vistos:
             vistos.add(chave)
-            ha = Decimal(str(comp.ha_semanal or 0))
+            ha = Decimal(str(comp.ch_semanal or 0))
             horas_por_prof[pid] = horas_por_prof.get(pid, Decimal('0.00')) + ha
 
     resultado = {}

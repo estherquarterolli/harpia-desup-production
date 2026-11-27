@@ -473,7 +473,7 @@ class Professor(models.Model):
                 if chave in vistos:
                     continue
                 vistos.add(chave)
-                total += comp.ha_semanal
+                total += comp.ch_semanal
             return total
         except Exception:
             return 0

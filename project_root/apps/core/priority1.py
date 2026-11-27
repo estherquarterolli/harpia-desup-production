@@ -106,7 +106,7 @@ def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, t
             chave_professor = (docente_id, chave_base)
             if chave_professor not in vistos_professor:
                 vistos_professor.add(chave_professor)
-                cargas_professor[docente_id] += _decimal(componente.ha_semanal)
+                cargas_professor[docente_id] += _decimal(componente.ch_semanal)
 
             for unidade in componente.matriz.unidades.all():
                 if unidade_id and unidade.pk != int(unidade_id):
@@ -114,7 +114,7 @@ def obter_resumo_prioridade1(*, unidade_id=None, semestre=None, curso_id=None, t
                 chave_unidade = (unidade.pk, docente_id, chave_base)
                 if chave_unidade not in vistos_unidade:
                     vistos_unidade.add(chave_unidade)
-                    cargas_unidade[unidade.pk] += _decimal(componente.ha_semanal)
+                    cargas_unidade[unidade.pk] += _decimal(componente.ch_semanal)
 
     professores_escopo = Professor.objects.filter(status=Professor.StatusChoices.ATIVO)
     if unidade_id:
