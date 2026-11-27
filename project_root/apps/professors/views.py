@@ -14,7 +14,9 @@ from apps.allocations.services import semestre_atual
 from apps.core.models import Notificacao, SolicitacaoProfessorExterno, Unidade
 from .forms import ProfessorForm, SolicitacaoCadastroProfessorForm, SolicitacaoCessaoProfessorForm
 from .models import ContractType, Professor, filtro_vinculo_empregaticio
-from .services import _bulk_ch_alocada, _bulk_ch_justificada
+from .services import (
+    _bulk_ch_alocada, _bulk_ch_justificada, excluir_professor, motivo_exclusao_bloqueada,
+)
 
 
 ALLOCATION_TABLE_PAGE_SIZE = 20
@@ -609,25 +611,20 @@ class ProfessorDeleteView(ProfessorEditDeleteMixin, DeleteView):
     template_name = 'professors/professor_confirm_delete.html'
     success_url = reverse_lazy('professors:professor_list')
 
-    # CORR: `DeleteView.delete()` virou código morto no Django 4.0 (a view passou a usar
-    # `FormMixin`, e o POST cai em `form_valid()`) — por isso a mensagem de sucesso nunca
-    # chegava na tela. Além disso a exclusão precisa tratar `ProtectedError`: o docente
-    # alocado é protegido por `AlocacaoTurmaDocente.docente` (on_delete=PROTECT) e o POST
-    # estourava 500 em vez de explicar o motivo para o usuário.
     def form_valid(self, form):
         professor = self.object
         try:
-            resposta = super().form_valid(form)
-        except ProtectedError:
+            excluir_professor(professor)
+        except ProtectedError as erro:
             messages.error(
                 self.request,
-                f'Não é possível excluir {professor.nome}: o docente ainda está alocado '
-                'em componentes curriculares. Libere as alocações antes de excluir.',
+                f'Não é possível excluir {professor.nome}: existem vínculos protegidos com '
+                f'{motivo_exclusao_bloqueada(erro)}. Libere esses vínculos antes de excluir.',
             )
             return redirect(self.get_success_url())
 
         messages.success(self.request, 'Professor excluído com sucesso.')
-        return resposta
+        return redirect(self.get_success_url())
 
 
 def _identificador_unico_de_copia(campo, valor_base):

@@ -63,6 +63,20 @@ Use `config.settings.production`. O deploy deve executar `collectstatic` e
 `migrate`; as configurações versionadas já incluem essas etapas para Vercel,
 Render e processos compatíveis com o `Procfile`.
 
+### Exclusão de professores solicitados e estados da alocação
+
+A exclusão pela tela de professores preserva as solicitações de cadastro aprovadas
+como histórico, desvinculando o professor excluído. Alocações e outros vínculos
+protegidos continuam impedindo a exclusão, com o motivo correspondente. Um novo
+cadastro pode reutilizar o ID funcional e a matrícula mediante nova solicitação.
+Campos de alocação ainda não preenchidos exibem **Não informado**, em cinza;
+escolher **Sem professor (carência)** registra carência em vermelho. Essa correção
+não exige novas migrações nem conversão dos dados existentes.
+
+Teste as duas correções em banco isolado, com e-mails locais, usando
+`python manage.py test apps.professors.tests_exclusao_solicitacao apps.allocations.tests_estados --settings=config.settings.development`.
+Na raiz, execute também `node --test project_root/apps/allocations/tests_estados.cjs`.
+
 ### Comunicação por e-mail
 
 No admin, **Configurações do Sistema → Comunicação** permite à TI gerenciar o

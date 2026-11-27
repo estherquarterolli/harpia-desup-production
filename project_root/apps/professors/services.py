@@ -1,4 +1,55 @@
+from django.db import transaction
 from django.db.models import Q
+
+
+@transaction.atomic
+def excluir_professor(professor):
+    """Exclui o docente preservando o histórico dos cadastros aprovados.
+
+    A FK continua protegida no modelo para cessões e pedidos não concluídos.
+    Se qualquer outro vínculo impedir a exclusão, a desvinculação dos pedidos
+    também é revertida. A exclusão do professor mantém a auditoria dos signals.
+    """
+    from apps.core.models import SolicitacaoProfessorExterno
+    from .models import Professor
+
+    professor = Professor.objects.select_for_update().get(pk=professor.pk)
+    pedidos = SolicitacaoProfessorExterno.objects.select_for_update().filter(
+        professor=professor,
+        tipo=SolicitacaoProfessorExterno.TipoChoices.CADASTRO,
+        status=SolicitacaoProfessorExterno.StatusChoices.APROVADA,
+    ).order_by('pk')
+    identificadores = {
+        'professor_nome': professor.nome,
+        'professor_id_funcional': professor.id_funcional,
+        'professor_rh_matricula': professor.rh_matricula or '',
+    }
+    for pedido in pedidos:
+        dados = {'professor_id': None}
+        dados.update({
+            campo: valor for campo, valor in identificadores.items()
+            if not (getattr(pedido, campo) or '').strip()
+        })
+        # O histórico mantém os dados originais. Não emitir eventos diferidos de
+        # edição que poderiam sobreviver em memória ao rollback de uma exclusão.
+        SolicitacaoProfessorExterno.objects.filter(pk=pedido.pk).update(**dados)
+    return professor.delete()
+
+
+def motivo_exclusao_bloqueada(erro):
+    """Descreve os vínculos que realmente provocaram o ProtectedError."""
+    motivos = set()
+    for objeto in erro.protected_objects:
+        if objeto._meta.label_lower == 'allocations.alocacaoturmadocente':
+            motivos.add('alocações em componentes curriculares')
+        elif objeto._meta.label_lower == 'core.solicitacaoprofessorexterno':
+            motivos.add(
+                'solicitações de cessão' if objeto.tipo == 'CESSAO'
+                else 'solicitações de cadastro ainda vinculadas'
+            )
+        else:
+            motivos.add(str(objeto._meta.verbose_name_plural).lower())
+    return ', '.join(sorted(motivos)) or 'outros registros do sistema'
 
 
 MENSAGEM_CARGA_RAT_INCOMPLETA = (

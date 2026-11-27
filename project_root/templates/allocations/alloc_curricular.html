@@ -282,15 +282,13 @@
   }
 
   // ─── Resumo / botões ─────────────────────────────────────
-  // Uma disciplina está pendente quando é oferecida e alguma turma ainda não tem
-  // docente: há linha "Sem professor" ou menos docentes que a quantidade de turmas.
+  // Não informado e carência declarada são pendentes; o mesmo docente pode
+  // assumir várias turmas, sem exigir uma linha por turma.
   function rowPending(tr) {
     const slots = Array.from(tr.querySelectorAll('.ac-docente'));
     if (!slots.length) return false;
     if (slots[0].dataset.currentId === 'NAO_OFERECIDA') return false;
-    // Pendente: alguma linha "Sem professor" ou nenhum docente definido. A quantidade de turmas
-    // não exige um docente por turma (o mesmo docente pode dar todas).
-    const preenchidas = slots.filter(el => el.dataset.currentId !== 'SEM_PROFESSOR').length;
+    const preenchidas = slots.filter(el => !['NAO_INFORMADO', 'SEM_PROFESSOR'].includes(el.dataset.currentId)).length;
     return preenchidas < slots.length || preenchidas === 0;
   }
 
@@ -434,8 +432,8 @@
         window.removeEventListener('resize', this._reposition);
       }
       // Restaura o valor atual apenas se houver um nome salvo (docente ou "Não oferecido").
-      // Quando currentNome é vazio (status SEM_PROFESSOR sem docente) deixa o campo
-      // vazio para o placeholder "Sem professor" aparecer — nunca escreve no campo.
+      // Sem nome salvo, mantém o campo vazio para exibir o placeholder do estado
+      // atual ("Não informado" ou "Sem professor").
       if (!this.input.value.trim() && this.currentNome) {
         this.input.value = this.currentNome;
       } else if (!this.currentNome) {
@@ -653,12 +651,13 @@
       }
     }
 
-    // Reflete na linha o estado (docente / sem professor / não oferecido),
+    // Reflete na linha o estado (não informado / docente / carência / não oferecido),
     // espelhando as classes que o template renderiza no carregamento.
     _applyState(id, nome, cargo, outra, readaptado = false) {
       const isNone = id === 'SEM_PROFESSOR';
       const isNao = id === 'NAO_OFERECIDA';
-      const hasDoc = !isNone && !isNao;
+      const isUnknown = id === 'NAO_INFORMADO';
+      const hasDoc = !isNone && !isNao && !isUnknown;
       const diretivo = hasDoc && !!cargo;
       const outraUn = hasDoc && !!outra && !diretivo;
 
@@ -683,27 +682,30 @@
       } else if (!this.currentReadaptado && badge) {
         badge.remove();
       }
-      this.input.placeholder = isNao ? 'Não oferecido' : 'Sem professor';
+      this.input.placeholder = isUnknown ? 'Não informado' : isNao ? 'Não oferecido' : 'Sem professor';
       // Amarelo = equipe diretiva em sala; vermelho = carência; verde = docente.
       this.input.className = 'ac-input flex-1 min-w-0 bg-transparent outline-none ' +
         (diretivo ? 'ac-text-diretivo font-semibold' : outraUn ? 'ac-text-outra font-semibold' : hasDoc ? 'text-emerald-800 font-semibold'
-          : isNao ? 'text-slate-500 font-semibold' : 'ac-text-carencia font-semibold');
+          : isUnknown ? 'text-slate-400' : isNao ? 'text-slate-500 font-semibold' : 'ac-text-carencia font-semibold');
 
       this.wrap.className = 'ac-input-wrap flex items-center gap-1.5 w-full px-3 py-1.5 border rounded text-sm transition cursor-pointer ' +
         (diretivo ? 'ac-state-diretivo' : outraUn ? 'ac-state-outra' : hasDoc ? 'border-emerald-300 bg-emerald-50'
-          : isNao ? 'border-slate-300 bg-slate-100' : 'ac-state-carencia');
+          : isUnknown ? 'border-slate-300 bg-slate-50' : isNao ? 'border-slate-300 bg-slate-100' : 'ac-state-carencia');
       if (diretivo) this.wrap.title = `Equipe diretiva: ${cargo}. Este docente está alocado em sala.`;
       else if (outraUn) this.wrap.title = 'Professor de outra unidade: não está vinculado a esta unidade.';
       else if (isNone) this.wrap.title = 'Carência: esta turma está sem professor.';
       else this.wrap.removeAttribute('title');
 
-      // Ícone "sem professor" (antes do input)
+      // Ícone cinza para não informado, vermelho para carência declarada.
       let userIcon = this.wrap.querySelector(':scope > i.ph-chalkboard-teacher');
-      if (isNone && !userIcon) {
-        userIcon = document.createElement('i');
-        userIcon.className = 'ph ph-chalkboard-teacher text-base ac-carencia-icon flex-shrink-0';
-        this.wrap.insertBefore(userIcon, this.input);
-      } else if (!isNone && userIcon) {
+      if (isNone || isUnknown) {
+        if (!userIcon) {
+          userIcon = document.createElement('i');
+          this.wrap.insertBefore(userIcon, this.input);
+        }
+        userIcon.className = 'ph ph-chalkboard-teacher text-base flex-shrink-0 ' +
+          (isNone ? 'ac-carencia-icon' : 'text-slate-400');
+      } else if (userIcon) {
         userIcon.remove();
       }
 
@@ -869,7 +871,9 @@
     rows.forEach(function (tr) {
       var slots = Array.prototype.slice.call(tr.querySelectorAll('.ac-docente'));
       if (!slots.length || slots[0].dataset.currentId === 'NAO_OFERECIDA') return;
-      var ok = slots.filter(function (el) { return el.dataset.currentId !== 'SEM_PROFESSOR'; }).length;
+      var ok = slots.filter(function (el) {
+        return el.dataset.currentId !== 'SEM_PROFESSOR' && el.dataset.currentId !== 'NAO_INFORMADO';
+      }).length;
       if (ok < slots.length || ok === 0) pend++;
     });
     var all = rows;
