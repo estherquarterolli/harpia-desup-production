@@ -3,7 +3,7 @@
 <div class="ac-slot flex items-start gap-1.5">
   <div class="ac-docente relative flex-1 min-w-0"
        data-linha-id="{% if nova %}novo{% elif linha %}{{ linha.id }}{% endif %}"
-       data-current-id="{% if linha.docente %}{{ linha.docente.id }}{% elif not linha and not nova and comp.status == 'NAO_OFERECIDA' %}NAO_OFERECIDA{% else %}SEM_PROFESSOR{% endif %}"
+       data-current-id="{% if linha.docente %}{{ linha.docente.id }}{% elif linha %}SEM_PROFESSOR{% elif not nova and comp.status == 'NAO_OFERECIDA' %}NAO_OFERECIDA{% else %}NAO_INFORMADO{% endif %}"
        data-current-cargo="{% if linha.docente %}{{ linha.cargo_diretivo }}{% endif %}"
        data-current-outra="{% if linha.docente and linha.outra_unidade %}1{% endif %}"
        data-current-readaptado="{% if linha.docente and linha.docente.readaptado_vigente %}1{% endif %}"
@@ -40,7 +40,7 @@
          style="max-height: 320px; min-width: 280px;">
       <!-- Opções fixas -->
       <div class="ac-fixed-options border-b border-slate-100">
-        <div class="ac-option px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 flex items-center gap-2 text-slate-500 transition-colors"
+        <div class="ac-option ac-text-carencia px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 flex items-center gap-2 transition-colors"
              data-value="SEM_PROFESSOR">
           <i class="ph ph-chalkboard-teacher text-base" aria-hidden="true"></i> Sem professor (carência)
         </div>
