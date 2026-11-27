@@ -239,6 +239,7 @@ def _bulk_ch_alocada(professor_ids):
         "componente_matriz__componente_curricular_id",
         "componente_matriz__compartilhado",
         "componente_matriz__carga_horaria",
+        "componente_matriz__carga_horaria_semanal",
         "componente_matriz_id",
         "id",
     )
@@ -256,7 +257,11 @@ def _bulk_ch_alocada(professor_ids):
         if chave in vistos[pid]:
             continue
         vistos[pid].add(chave)
-        ha_semanal = (comp["componente_matriz__carga_horaria"] or 0) / 20.0
+        from apps.courses.models import ch_semanal_componente
+        ha_semanal = ch_semanal_componente(
+            comp["componente_matriz__carga_horaria"],
+            comp["componente_matriz__carga_horaria_semanal"],
+        )
         mapa[pid] = mapa.get(pid, 0) + ha_semanal
     return mapa
 

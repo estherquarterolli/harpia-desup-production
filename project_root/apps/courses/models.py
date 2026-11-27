@@ -10,6 +10,17 @@ def calcular_carga_horaria_semanal(carga_horaria):
         rounding=ROUND_HALF_UP,
     )
 
+def ch_semanal_componente(carga_horaria, carga_horaria_semanal):
+    """CH semanal de um componente da matriz.
+
+    Prevalece o valor semanal registrado na matriz (o que a DESUP vê/digita);
+    só cai em carga_horaria / 20 quando ele não foi informado.
+    """
+    if carga_horaria_semanal:
+        return float(carga_horaria_semanal)
+    return (carga_horaria or 0) / 20.0
+
+
 class Course(models.Model):
     """
     Modelo que representa um Curso no sistema.
@@ -273,8 +284,9 @@ class MatrixComponent(models.Model):
 
     @property
     def ha_semanal(self):
-        """Hora-Aula semanal: carga horária semestral / 20 semanas."""
-        return (self.carga_horaria or 0) / 20.0
+        """CH semanal da matriz (campo `carga_horaria_semanal`); se vazio,
+        carga horária semestral / 20 semanas."""
+        return ch_semanal_componente(self.carga_horaria, self.carga_horaria_semanal)
 
     @property
     def hr_semanal(self):

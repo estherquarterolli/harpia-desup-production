@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Symbion Leads Brasil</title>
+<style>
+:root{--bg:#f8fafc;--card:#fff;--fg:#0f172a;--mut:#64748b;--line:#e2e8f0;--brand:#111827;--brandfg:#fff;--wa:#16a34a;--red:#dc2626;--blue:#2563eb;--warn:#b45309;--tint-sent:#eff6ff;--tint-reply:#fefce8;--tint-won:#f0fdf4;--tint-no:#f1f5f9}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1220;--card:#111a2e;--fg:#e2e8f0;--mut:#94a3b8;--line:#243049;--brand:#e2e8f0;--brandfg:#0f172a;--warn:#fbbf24;--tint-sent:#10213f;--tint-reply:#2a2410;--tint-won:#0f2a1a;--tint-no:#18212f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);padding:12px 16px}
+.top{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+h1{margin:0;font-size:17px;flex:1 1 160px}
+.stats{display:flex;gap:14px;color:var(--mut);font-size:13px;flex-wrap:wrap}.stats b{color:var(--fg)}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+input,select,textarea,button{font:inherit;color:var(--fg)}
+input[type=text],input[type=search],input[type=email],select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+.filters input[type=search]{flex:1 1 200px;min-width:160px}
+button{cursor:pointer;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:7px 12px}
+button.p{background:var(--brand);color:var(--brandfg);border-color:var(--brand)}
+main{max-width:1100px;margin:0 auto;padding:14px 16px 60px;display:grid;gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:10px}
+.card.s-wa,.card.s-mail,.card.s-both{background:var(--tint-sent)}.card.s-reply{background:var(--tint-reply)}.card.s-won{background:var(--tint-won)}.card.s-no{background:var(--tint-no);opacity:.8}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.title{font-size:15px;font-weight:650}
+.meta{color:var(--mut);font-size:13px}
+.chip{font-size:12px;padding:2px 9px;border-radius:99px;border:1px solid var(--line);color:var(--mut);white-space:nowrap}
+.chip.nosite{background:#fef3c7;color:#92400e;border-color:#fde68a}.chip.social{background:#dbeafe;color:#1e40af;border-color:#bfdbfe}.chip.site{background:#f1f5f9;color:#334155}
+.chip.warn{background:#fee2e2;color:#991b1b;border-color:#fecaca}
+.acts{display:flex;flex-wrap:wrap;gap:6px}
+.btn{display:inline-block;border:0;border-radius:8px;padding:7px 12px;color:#fff;text-decoration:none;font-weight:600;cursor:pointer}
+.btn.wa{background:var(--wa)}.btn.g{background:var(--red)}.btn.o{background:var(--blue)}.btn.c{background:var(--brand);color:var(--brandfg)}.btn.l{background:#64748b}
+.btn[aria-disabled=true]{opacity:.35;pointer-events:none}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}@media(max-width:700px){.grid2{grid-template-columns:1fr}}
+label.f{display:grid;gap:3px;font-size:12px;color:var(--mut)}
+details summary{cursor:pointer;color:var(--mut);font-size:12px}
+pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;font:12px ui-monospace,monospace;margin:6px 0 0}
+.empty{text-align:center;color:var(--mut);padding:40px}
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--fg);max-width:520px;width:92vw;padding:18px}
+dialog::backdrop{background:#0008}
+dialog form{display:grid;gap:10px}
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--brand);color:var(--brandfg);padding:8px 14px;border-radius:99px;opacity:0;transition:.2s;pointer-events:none;z-index:20}.toast.on{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <h1>Symbion Leads Brasil</h1>
+    <div class="stats"><span><b id="sTotal">0</b> leads</span><span><b id="sSent">0</b> enviados</span><span><b id="sReply">0</b> responderam</span><span><b id="sWon">0</b> fechados</span></div>
+    <button class="p" id="bAdd">+ Adicionar lead</button>
+    <button id="bExport">Exportar CSV</button>
+    <button id="bBackup">Backup</button>
+    <button id="bRestore">Restaurar</button>
+    <button id="bSettings">Assinatura</button>
+    <input type="file" id="fRestore" accept=".json" hidden>
+  </div>
+  <div class="filters">
+    <input type="search" id="q" placeholder="Buscar empresa, cidade, nicho...">
+    <select id="fCountry"><option value="">Todos os países</option></select>
+    <select id="fSeg"><option value="">Todos os segmentos</option></select>
+    <select id="fSignal"><option value="">Qualquer site</option><option value="none">Sem site</option><option value="social">Só rede social / grátis</option><option value="site">Com site próprio</option></select>
+    <select id="fChannel"><option value="">Qualquer canal</option><option value="mail">Tem e-mail</option><option value="nomail">Sem e-mail ainda</option></select>
+    <select id="fStatus"><option value="">Todos os estados</option></select>
+  </div>
+</header>
+<main id="list"></main>
+<div class="toast" id="toast"></div>
+
+<dialog id="dAdd">
+  <form method="dialog" id="fAdd">
+    <h3 style="margin:0">Adicionar lead</h3>
+    <label class="f">Empresa *<input type="text" id="aCompany" required></label>
+    <div class="grid2">
+      <label class="f">Segmento<select id="aSeg"><option value="escola">Escola</option><option value="advogado">Advogado</option><option value="contador">Contabilidade</option><option value="dentista">Dentista</option><option value="autoescola">Autoescola</option><option value="outro" selected>Outro</option></select></label>
+      <label class="f">Nicho<input type="text" id="aNiche" placeholder="ex.: psicólogo"></label>
+      <label class="f">Cidade<input type="text" id="aCity"></label>
+      <label class="f">País<input type="text" id="aCountry"></label>
+      <label class="f">Idioma da mensagem<select id="aLang"><option value="pt" selected>Português</option><option value="es">Español</option><option value="it">Italiano</option><option value="en">English</option></select></label>
+      <label class="f">WhatsApp (com 55 + DDD, só números)<input type="text" id="aWa" placeholder="5521999999999"></label>
+      <label class="f">E-mail<input type="email" id="aEmail"></label>
+      <label class="f">Site<input type="text" id="aSite" placeholder="https://..."></label>
+      <label class="f">Situação do site<select id="aSignal"><option value="none">Sem site</option><option value="social">Só rede social</option><option value="facebook">Só Facebook</option><option value="instagram">Só Instagram</option><option value="linktree">Só Linktree</option><option value="free">Site gratuito</option><option value="site">Tem site próprio</option></select></label>
+    </div>
+    <div id="aWarn" class="chip warn" hidden></div>
+    <div class="row" style="justify-content:flex-end"><button type="button" id="aCancel">Cancelar</button><button class="p" type="submit">Adicionar</button></div>
+  </form>
+</dialog>
+
+<dialog id="dSet">
+  <form method="dialog" id="fSet">
+    <h3 style="margin:0">Assinatura</h3>
+    <label class="f">Nome<input type="text" id="sName"></label>
+    <label class="f">Empresa<input type="text" id="sCompany"></label>
+    <label class="f">Site (sem /pt, /en ou /es no final)<input type="text" id="sSite"></label>
+    <label class="f">Endereço postal (opcional; recomendado em e-mails para os EUA)<input type="text" id="sAddr"></label>
+    <div class="row" style="justify-content:flex-end"><button type="button" id="sCancel">Cancelar</button><button class="p" type="submit">Salvar</button></div>
+  </form>
+</dialog>
+
+<script>
+const LEADS = [{"company": "Carvalho Advogados", "niche": "advogado", "segment": "advogado", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 98121-3630", "wa": "5521981213630", "signal": "social", "detail": "Linktree", "rating": 5, "reviews": 552, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJORQjxo3fmwARRMi8eoigrpw", "id": "BR001"}, {"company": "ACJ Advocacia Previdenciária", "niche": "advogado", "segment": "advogado", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 99731-1491", "wa": "5521997311491", "signal": "none", "detail": "", "rating": 5, "reviews": 497, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJ2ceweoHfmwARwOrUmQy_xR8", "id": "BR002"}, {"company": "M. Mendonça - Advocacia", "niche": "advogado", "segment": "advogado", "city": "Londrina - PR", "country": "Brasil", "lang": "pt", "phone": "(43) 99914-4868", "wa": "5543999144868", "signal": "social", "detail": "Facebook", "rating": 5, "reviews": 320, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJE3KNFPFF65QRLKuYEI5TOAo", "id": "BR003"}, {"company": "Kawamura Advocacia", "niche": "advogado", "segment": "advogado", "city": "Londrina - PR", "country": "Brasil", "lang": "pt", "phone": "(43) 99181-1149", "wa": "5543991811149", "signal": "social", "detail": "Instagram", "rating": 5, "reviews": 168, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJA9FHW6pD65QRIDOSFuPTJa4", "id": "BR004"}, {"company": "Carvalho, Sousa e Vieira (advogados)", "niche": "advogado", "segment": "advogado", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 97133-3014", "wa": "5521971333014", "signal": "none", "detail": "", "rating": 5, "reviews": 99, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJZ3unwkzfmwARYpCnfL4Tvek", "id": "BR005"}, {"company": "Franciele Cardoso Advogada (Auxílio-Doença, Aposentadoria, INSS)", "niche": "advogado", "segment": "advogado", "city": "Londrina - PR", "country": "Brasil", "lang": "pt", "phone": "(43) 99669-1899", "wa": "5543996691899", "signal": "none", "detail": "", "rating": 5, "reviews": 97, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJ-0zi_c1D65QRYkTU4K9EnaY", "id": "BR006"}, {"company": "Hellen Santos Escritório de Advocacia", "niche": "advogado", "segment": "advogado", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 97032-4643", "wa": "5521970324643", "signal": "none", "detail": "", "rating": 4.9, "reviews": 70, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJC3RO6LuoQk0RS2xC0UmSCKg", "id": "BR007"}, {"company": "Elizângela Labre - Advogada Previdenciária, Família e Direito Civil- Campo Grande", "niche": "advogado", "segment": "advogado", "city": "Rio de Janeiro - Campo Grande", "country": "Brasil", "lang": "pt", "phone": "(21) 97508-9063", "wa": "5521975089063", "signal": "none", "detail": "", "rating": 5, "reviews": 27, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJNYDUWTbjmwARI12LD6VkbpQ", "id": "BR008"}, {"company": "ADVOGADO CRIMINALISTA - CAMPO GRANDE, RIO DE JANEIRO-RJ | Dr. Mattheus Corrêa", "niche": "advogado", "segment": "advogado", "city": "Rio de Janeiro - Campo Grande", "country": "Brasil", "lang": "pt", "phone": "(21) 97986-5697", "wa": "5521979865697", "signal": "none", "detail": "", "rating": 5, "reviews": 6, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJ3TxEFyTlmwAROuZXuVw53p8", "id": "BR009"}, {"company": "NPF Consultoria, Legalização e Contabilidade", "niche": "contador", "segment": "contador", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 98053-7455", "wa": "5521980537455", "signal": "none", "detail": "", "rating": 4.9, "reviews": 91, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJjx2UvQt_mQARV3rjZEo6ylA", "id": "BR010"}, {"company": "Marques & Gregorio Contabilidade", "niche": "contador", "segment": "contador", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 99642-4690", "wa": "5521996424690", "signal": "social", "detail": "Instagram", "rating": 5, "reviews": 40, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJGePoVapEZ2URGrUrdVkYRdg", "id": "BR011"}, {"company": "Família Martins Serviços Contábeis", "niche": "contador", "segment": "contador", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 96851-7049", "wa": "5521968517049", "signal": "none", "detail": "", "rating": 4.9, "reviews": 38, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJSdadytJLtgMRUOezcjvOS14", "id": "BR012"}, {"company": "Gecont Soluções Empresariais", "niche": "contador", "segment": "contador", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 99327-1779", "wa": "5521993271779", "signal": "social", "detail": "Instagram", "rating": 5, "reviews": 14, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJ9VuUOZbfmwARxeqT-VyyatI", "id": "BR013"}, {"company": "KIN Contabilidade", "niche": "contador", "segment": "contador", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 98578-5376", "wa": "5521985785376", "signal": "none", "detail": "", "rating": 5, "reviews": 6, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJ_R3xV5LfmwARFcEBWKc8tNU", "id": "BR014"}, {"company": "Escritório Bandeirante Contabilidade", "niche": "contador", "segment": "contador", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 96759-4954", "wa": "5521967594954", "signal": "social", "detail": "Instagram", "rating": 4.2, "reviews": 5, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJx2I90fLfmwARcOkyDB4k1Mc", "id": "BR015"}, {"company": "C S Araujo Escritório de Contabilidade", "niche": "contador", "segment": "contador", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 98165-4012", "wa": "5521981654012", "signal": "none", "detail": "", "rating": 5, "reviews": 5, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJGwPYoDBgmQARdtnzbwhT3Z8", "id": "BR016"}, {"company": "Pazini Contabilidade", "niche": "contador", "segment": "contador", "city": "Rio de Janeiro - Padre Miguel", "country": "Brasil", "lang": "pt", "phone": "(21) 99733-5848", "wa": "5521997335848", "signal": "social", "detail": "Instagram", "rating": 5, "reviews": 1, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJ-V8Sn3ffmwARuk5jNUeTGg4", "id": "BR017"}, {"company": "Silva & Rino Assessoria Contábil", "niche": "contador", "segment": "contador", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 96974-8208", "wa": "5521969748208", "signal": "none", "detail": "", "rating": "", "reviews": "", "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJPx38ryPfmwAR25AhqcXBujI", "id": "BR018"}, {"company": "Amigos Contabilidade", "niche": "contador", "segment": "contador", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 96444-7707", "wa": "5521964447707", "signal": "none", "detail": "", "rating": "", "reviews": "", "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJY4WrXdHfmwARL6SCx_6lVFI", "id": "BR019"}, {"company": "Sorria Rio", "niche": "dentista", "segment": "dentista", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 96744-6141", "wa": "5521967446141", "signal": "none", "detail": "", "rating": 4.4, "reviews": 584, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJeeoWLvPfmwARjV9rboQ_BC8", "id": "BR020"}, {"company": "Consultório Odontológico Gandra", "niche": "dentista", "segment": "dentista", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 97904-2659", "wa": "5521979042659", "signal": "social", "detail": "Instagram", "rating": 4.9, "reviews": 259, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJET2wwmvfmwARSkk9Qvukv-A", "id": "BR021"}, {"company": "Smart Dentistas", "niche": "dentista", "segment": "dentista", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 96509-2727", "wa": "5521965092727", "signal": "none", "detail": "", "rating": 4.8, "reviews": 133, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJO8UH1ezfmwARzPXNd37DWVc", "id": "BR022"}, {"company": "Art Ortodontia (Dentista em Bangu)", "niche": "dentista", "segment": "dentista", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 99925-1257", "wa": "5521999251257", "signal": "social", "detail": "WhatsApp", "rating": 5, "reviews": 26, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJ7SSK0PLfmwAR0WAIEDKNOuw", "id": "BR023"}, {"company": "Clínica odontológica - Odontos Bangu", "niche": "dentista", "segment": "dentista", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 99325-6850", "wa": "5521993256850", "signal": "none", "detail": "", "rating": 3.9, "reviews": 19, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJlR0ufZffmwAR9Da5a081IlI", "id": "BR024"}, {"company": "Autoescola Santana", "niche": "autoescola", "segment": "autoescola", "city": "Londrina - PR", "country": "Brasil", "lang": "pt", "phone": "(43) 99977-0548", "wa": "5543999770548", "signal": "social", "detail": "Linktree", "rating": 5, "reviews": 709, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJo-HGiKNE65QRPgeymD_7W7c", "id": "BR025"}, {"company": "Autoescola Direção Certa", "niche": "autoescola", "segment": "autoescola", "city": "Londrina - PR", "country": "Brasil", "lang": "pt", "phone": "(43) 98423-8128", "wa": "5543984238128", "signal": "social", "detail": "Linktree", "rating": 4.9, "reviews": 146, "website": "", "email": "", "maps": "https://www.google.com/maps/place/?q=place_id:ChIJcyfV1V5D65QRF2-yqRHJVEk", "id": "BR026"}, {"company": "Creche Escola Mundo Baby", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 99044-3036", "wa": "5521990443036", "signal": "none", "detail": "", "rating": 4.9, "reviews": 60, "website": "", "email": "", "maps": "", "id": "BR027"}, {"company": "Centro Educacional Caravellas", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Ilha do Governador (Tauá)", "country": "Brasil", "lang": "pt", "phone": "(21) 98481-4253", "wa": "5521984814253", "signal": "none", "detail": "", "rating": 4.6, "reviews": 54, "website": "", "email": "", "maps": "", "id": "BR028"}, {"company": "Creche Escola Saber Diferente", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Taquara", "country": "Brasil", "lang": "pt", "phone": "(21) 99046-4905", "wa": "5521990464905", "signal": "none", "detail": "", "rating": 4.9, "reviews": 53, "website": "", "email": "", "maps": "", "id": "BR029"}, {"company": "Espaço Tia Cissa Desenvolvimento Infantil", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Taquara", "country": "Brasil", "lang": "pt", "phone": "(21) 99128-4242", "wa": "5521991284242", "signal": "none", "detail": "", "rating": 5.0, "reviews": 50, "website": "", "email": "", "maps": "", "id": "BR030"}, {"company": "Colégio Rio da Prata", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 97140-2388", "wa": "5521971402388", "signal": "none", "detail": "", "rating": 4.1, "reviews": 49, "website": "", "email": "", "maps": "", "id": "BR031"}, {"company": "Jardim Escola Universo dos Sonhos", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Ilha do Governador", "country": "Brasil", "lang": "pt", "phone": "(21) 99594-1024", "wa": "5521995941024", "signal": "none", "detail": "", "rating": 4.9, "reviews": 45, "website": "", "email": "", "maps": "", "id": "BR032"}, {"company": "Creche Little Kids", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Pavuna", "country": "Brasil", "lang": "pt", "phone": "(21) 98575-7026", "wa": "5521985757026", "signal": "none", "detail": "", "rating": 5.0, "reviews": 41, "website": "", "email": "", "maps": "", "id": "BR033"}, {"company": "Creche Escola Duda Kids", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Santa Cruz", "country": "Brasil", "lang": "pt", "phone": "(21) 96404-3299", "wa": "5521964043299", "signal": "none", "detail": "", "rating": 5.0, "reviews": 41, "website": "", "email": "", "maps": "", "id": "BR034"}, {"company": "Creche Escola Jardim do Saber", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Taquara", "country": "Brasil", "lang": "pt", "phone": "(21) 96897-2769", "wa": "5521968972769", "signal": "none", "detail": "", "rating": 4.7, "reviews": 39, "website": "", "email": "", "maps": "", "id": "BR035"}, {"company": "Instituto Educacional Recanto dos Baixinhos", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Taquara", "country": "Brasil", "lang": "pt", "phone": "(21) 98529-9804", "wa": "5521985299804", "signal": "none", "detail": "", "rating": 4.8, "reviews": 36, "website": "", "email": "", "maps": "", "id": "BR036"}, {"company": "Creche Escola Baby Bee", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 97133-2564", "wa": "5521971332564", "signal": "none", "detail": "", "rating": 5.0, "reviews": 34, "website": "", "email": "", "maps": "", "id": "BR037"}, {"company": "Creche e Escola Sunny Days", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Méier", "country": "Brasil", "lang": "pt", "phone": "(21) 99893-0176", "wa": "5521998930176", "signal": "none", "detail": "", "rating": 4.8, "reviews": 34, "website": "", "email": "", "maps": "", "id": "BR038"}, {"company": "Território das Infâncias Educacional", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Méier", "country": "Brasil", "lang": "pt", "phone": "(21) 99783-7575", "wa": "5521997837575", "signal": "none", "detail": "", "rating": 4.5, "reviews": 32, "website": "", "email": "", "maps": "", "id": "BR039"}, {"company": "Jardim de Infância Cantinho Mágico", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Tijuca", "country": "Brasil", "lang": "pt", "phone": "(21) 97108-0914", "wa": "5521971080914", "signal": "none", "detail": "", "rating": 5.0, "reviews": 31, "website": "", "email": "", "maps": "", "id": "BR040"}, {"company": "Oficina do Conhecimento", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Taquara", "country": "Brasil", "lang": "pt", "phone": "(21) 97258-0491", "wa": "5521972580491", "signal": "none", "detail": "", "rating": 4.5, "reviews": 23, "website": "", "email": "", "maps": "", "id": "BR041"}, {"company": "Creche Escola Sorriso de Criança", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Méier", "country": "Brasil", "lang": "pt", "phone": "(21) 98592-0409", "wa": "5521985920409", "signal": "none", "detail": "", "rating": 5.0, "reviews": 20, "website": "", "email": "", "maps": "", "id": "BR042"}, {"company": "Creche Mundo da Bibi", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Santa Cruz", "country": "Brasil", "lang": "pt", "phone": "(21) 96608-6789", "wa": "5521966086789", "signal": "none", "detail": "", "rating": 4.8, "reviews": 19, "website": "", "email": "", "maps": "", "id": "BR043"}, {"company": "Creche Escola Sementinha do Amor", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Taquara", "country": "Brasil", "lang": "pt", "phone": "(21) 97326-1378", "wa": "5521973261378", "signal": "none", "detail": "", "rating": 4.9, "reviews": 18, "website": "", "email": "", "maps": "", "id": "BR044"}, {"company": "Creche Escola Recanto do Girassol", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 99360-4813", "wa": "5521993604813", "signal": "none", "detail": "", "rating": 5.0, "reviews": 12, "website": "", "email": "", "maps": "", "id": "BR045"}, {"company": "Crescendo Centro Educacional", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Méier", "country": "Brasil", "lang": "pt", "phone": "(21) 99984-5400", "wa": "5521999845400", "signal": "none", "detail": "", "rating": 5.0, "reviews": 11, "website": "", "email": "", "maps": "", "id": "BR046"}, {"company": "Espaço da Criança", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Santa Cruz", "country": "Brasil", "lang": "pt", "phone": "(21) 99065-8815", "wa": "5521990658815", "signal": "none", "detail": "", "rating": 4.4, "reviews": 10, "website": "", "email": "", "maps": "", "id": "BR047"}, {"company": "Children Espaço de Educação Infantil", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Campo Grande", "country": "Brasil", "lang": "pt", "phone": "(21) 97699-5257", "wa": "5521976995257", "signal": "none", "detail": "", "rating": 5.0, "reviews": 9, "website": "", "email": "", "maps": "", "id": "BR048"}, {"company": "Jardim Escola Três Irmãs", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 96496-2703", "wa": "5521964962703", "signal": "none", "detail": "", "rating": 4.2, "reviews": 9, "website": "", "email": "", "maps": "", "id": "BR049"}, {"company": "Creche Escola Primeiros Passos", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Ilha do Governador (Moneró)", "country": "Brasil", "lang": "pt", "phone": "(21) 96725-2210", "wa": "5521967252210", "signal": "none", "detail": "", "rating": 4.4, "reviews": 9, "website": "", "email": "", "maps": "", "id": "BR050"}, {"company": "Jardim Escola Sonho Encantado", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Irajá", "country": "Brasil", "lang": "pt", "phone": "(21) 96492-0193", "wa": "5521964920193", "signal": "none", "detail": "", "rating": 4.8, "reviews": 8, "website": "", "email": "", "maps": "", "id": "BR051"}, {"company": "Escola Gênesis Irajá", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Irajá", "country": "Brasil", "lang": "pt", "phone": "(21) 99482-3557", "wa": "5521994823557", "signal": "none", "detail": "", "rating": 4.3, "reviews": 8, "website": "", "email": "", "maps": "", "id": "BR052"}, {"company": "Centro Educacional Espaço da Criança", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Penha", "country": "Brasil", "lang": "pt", "phone": "(21) 99355-8930", "wa": "5521993558930", "signal": "none", "detail": "", "rating": 4.5, "reviews": 8, "website": "", "email": "", "maps": "", "id": "BR053"}, {"company": "Creche e Berçário Espaço do Bebê", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Guadalupe", "country": "Brasil", "lang": "pt", "phone": "(21) 96498-8569", "wa": "5521964988569", "signal": "none", "detail": "", "rating": 5.0, "reviews": 7, "website": "", "email": "", "maps": "", "id": "BR054"}, {"company": "Creche Escola ENSA", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Ilha do Governador (Freguesia)", "country": "Brasil", "lang": "pt", "phone": "(21) 98692-0587", "wa": "5521986920587", "signal": "none", "detail": "", "rating": 4.3, "reviews": 6, "website": "", "email": "", "maps": "", "id": "BR055"}, {"company": "Jardim Escola Viver", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Irajá", "country": "Brasil", "lang": "pt", "phone": "(21) 96951-4275", "wa": "5521969514275", "signal": "none", "detail": "", "rating": 4.8, "reviews": 5, "website": "", "email": "", "maps": "", "id": "BR056"}, {"company": "Creche Vale do Sol", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Taquara", "country": "Brasil", "lang": "pt", "phone": "(21) 97468-5771", "wa": "5521974685771", "signal": "none", "detail": "", "rating": 5.0, "reviews": 4, "website": "", "email": "", "maps": "", "id": "BR057"}, {"company": "Creche Escola Geração Bangu", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 97114-8276", "wa": "5521971148276", "signal": "none", "detail": "", "rating": 5.0, "reviews": 4, "website": "", "email": "", "maps": "", "id": "BR058"}, {"company": "Creche Escola Novo Amor", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Bangu", "country": "Brasil", "lang": "pt", "phone": "(21) 97061-1884", "wa": "5521970611884", "signal": "none", "detail": "", "rating": 5.0, "reviews": 2, "website": "", "email": "", "maps": "", "id": "BR059"}, {"company": "Creche João e Maria", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Guadalupe", "country": "Brasil", "lang": "pt", "phone": "(21) 98032-4067", "wa": "5521980324067", "signal": "none", "detail": "", "rating": 5.0, "reviews": 2, "website": "", "email": "", "maps": "", "id": "BR060"}, {"company": "Jardim Escola Canaã", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Penha", "country": "Brasil", "lang": "pt", "phone": "(21) 97031-1076", "wa": "5521970311076", "signal": "none", "detail": "", "rating": 5.0, "reviews": 1, "website": "", "email": "", "maps": "", "id": "BR061"}, {"company": "Centro Educacional Ravah", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Guadalupe", "country": "Brasil", "lang": "pt", "phone": "(21) 97022-4856", "wa": "5521970224856", "signal": "none", "detail": "", "rating": 5.0, "reviews": 1, "website": "", "email": "", "maps": "", "id": "BR062"}, {"company": "Creche Guadalupe", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Barros Filho", "country": "Brasil", "lang": "pt", "phone": "(21) 97720-9220", "wa": "5521977209220", "signal": "none", "detail": "", "rating": 5.0, "reviews": 1, "website": "", "email": "", "maps": "", "id": "BR063"}, {"company": "Instituto Irajá", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Irajá", "country": "Brasil", "lang": "pt", "phone": "(21) 98110-1365", "wa": "5521981101365", "signal": "none", "detail": "", "rating": "", "reviews": "", "website": "", "email": "", "maps": "", "id": "BR064"}, {"company": "Educandário Luso", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Irajá", "country": "Brasil", "lang": "pt", "phone": "(21) 98825-3438", "wa": "5521988253438", "signal": "none", "detail": "", "rating": "", "reviews": "", "website": "", "email": "", "maps": "", "id": "BR065"}, {"company": "Colégio Atlas", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Irajá", "country": "Brasil", "lang": "pt", "phone": "(21) 96489-0133", "wa": "5521964890133", "signal": "none", "detail": "", "rating": "", "reviews": "", "website": "", "email": "", "maps": "", "id": "BR066"}, {"company": "Centro Educacional Primeiros Passos (CEPP)", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Pavuna", "country": "Brasil", "lang": "pt", "phone": "(21) 99717-5694", "wa": "5521997175694", "signal": "none", "detail": "", "rating": "", "reviews": "", "website": "", "email": "", "maps": "", "id": "BR067"}, {"company": "Escola Futuros Talentos", "niche": "escola", "segment": "escola", "city": "Rio de Janeiro - Guadalupe", "country": "Brasil", "lang": "pt", "phone": "(21) 98732-1511", "wa": "5521987321511", "signal": "none", "detail": "", "rating": "", "reviews": "", "website": "", "email": "", "maps": "", "id": "BR068"}];
+const SENT = {"phones": ["34614295282", "34622101530", "34629175045", "34711579512", "351911972879", "351912510677", "351913750006", "351915023768", "351932000420", "351934008818", "351934605104", "351936026292", "351938523515", "351965274118", "351969724242", "353872410122", "353872514994", "393355451921", "393396402449", "447397505638", "447738837494", "447919335446", "447951419834"], "emails": ["drphilipday@gmail.com", "fraser@marcroftandco.co.nz", "info@geelongperformancephysio.com", "info@handaladental.ca", "info@linehanconstruction.com", "info@mmd.ie", "info@powell-eddison.co.uk", "info@theinjuryclinic.com.au", "mail@taylorfawcett.co.uk", "olivia@mhco.co.nz", "reception@anchordental.ca", "whelanchiropractic@comcast.net"]};
+const KEY = 'symbion-leads-brasil-v1';
+const STATUS = {new:'Novo',wa:'Enviado (WhatsApp)',mail:'Enviado (e-mail)',both:'Enviado (ambos)',reply:'Respondeu',won:'Fechado',no:'Sem interesse'};
+const SIGLABEL = {social:'só rede social',none:'sem site',facebook:'só Facebook',instagram:'só Instagram',linktree:'só Linktree',free:'site gratuito',site:'tem site próprio'};
+
+/* ---------- storage (à prova de falhas) ---------- */
+let db = {settings:{name:'Esther Quarterolli',company:'Symbion Labs',site:'https://symbionlab.com.br',addr:''},state:{},custom:[]};
+try{const raw=localStorage.getItem(KEY); if(raw){const p=JSON.parse(raw); db={...db,...p,settings:{...db.settings,...(p.settings||{})}};}}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(db));}catch(e){toast('Não consegui salvar neste navegador. Use "Backup".');}}
+const st = id => (db.state[id] ||= {status:'new',note:'',email:'',lang:''});
+const all = () => LEADS.concat(db.custom);
+
+/* ---------- utilidades ---------- */
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const enc = encodeURIComponent;
+const digits = s => String(s||'').replace(/\D/g,'');
+function toast(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),2200);}
+const mapsOf = l => l.maps || ('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent((l.company+' '+(l.city||'')).trim()));
+const langOf = l => st(l.id).lang || l.lang;
+const emailOf = l => (st(l.id).email || l.email || '').trim();
+const socialSig = s => ['facebook','instagram','linktree','free','social'].includes(s);
+function wasSent(l){return (l.wa && SENT.phones.includes(digits(l.wa))) || (emailOf(l) && SENT.emails.includes(emailOf(l).toLowerCase()));}
+
+/* ---------- segmentos (Brasil) ---------- */
+const SEG={
+ escola:{label:'Escola',plural:'escolas',offer:'um rascunho de uma página para a escola (com informações de matrícula e contato)'},
+ advogado:{label:'Advogado',plural:'escritórios de advocacia',offer:'um rascunho de um site institucional sóbrio para o escritório, com atenção às regras de publicidade da OAB'},
+ contador:{label:'Contabilidade',plural:'escritórios de contabilidade',offer:'um rascunho de um site institucional (serviços e contato) para o escritório'},
+ dentista:{label:'Dentista',plural:'dentistas e clínicas odontológicas',offer:'um rascunho de uma página para a clínica (serviços, localização e botão de agendamento)'},
+ autoescola:{label:'Autoescola',plural:'autoescolas',offer:'um rascunho de uma página para a autoescola (categorias, preços e contato)'},
+ outro:{label:'Outro',plural:'negócios',offer:'um rascunho de uma página para o negócio'}
+};
+const SEGLABEL = l => (SEG[l.segment]||{}).label || '';
+function placeOf(l){const p=(l.city||'').split(' - ');return (p.length>1&&p[1].trim().length===2)?p[0].trim():p[p.length-1].trim();}
+function segParts(l){
+  const g=SEG[l.segment]||SEG.outro, c=l.company, place=placeOf(l), first=(db.settings.name||'').split(' ')[0]||'';
+  const obs = l.signal==='none' ? `Pesquisei ${g.plural} em ${place} no Google e não encontrei um site de ${c}.`
+            : `Vi que ${c} divulga o trabalho no ${l.detail||'redes sociais'}, mas não encontrei um site próprio.`;
+  const rate = (l.rating!==''&&l.rating!=null&&Number(l.rating)>=4&&Number(l.reviews)>=5) ? ` Vi também a nota ${Number(l.rating).toFixed(1).replace('.',',')} com ${l.reviews} avaliações: uma ótima reputação que poderia aparecer mais para quem pesquisa.` : '';
+  const offer = `Posso montar, sem custo e sem compromisso, ${g.offer}, para você ver como ficaria. Posso enviar?`;
+  const out = `(Se não tiver interesse, é só dizer "não" e eu não escrevo mais.)`;
+  return {first,obs,rate,offer,out,c};
+}
+function segWA(l){if(l.segment==='escola')return escolaWA(l);const p=segParts(l);
+  return `Olá, tudo bem?\n\nMeu nome é ${p.first}, sou da ${db.settings.company}, empresa brasileira de criação de sites.\n\n${p.obs}${p.rate}\n\n${p.offer}\n\n${p.out}\n\n${sig('pt')}`;}
+function segMail(l){if(l.segment==='escola')return escolaMail(l);const p=segParts(l);
+  return {subject:`Rascunho gratuito de site para ${l.company}`,
+          body:`Olá,\n\nMeu nome é ${p.first}, sou da ${db.settings.company}, empresa brasileira de criação de sites.\n\n${p.obs}${p.rate}\n\n${p.offer}\n\n${p.out.replace('dizer "não"','responder "não"')}\n\n${sig('pt')}`};}
+
+/* ---------- escolas: gancho de matrículas ---------- */
+function anoLetivo(){const d=new Date();return d.getMonth()>=6?d.getFullYear()+1:d.getFullYear();}
+function escolaParts(l){
+  const place=placeOf(l), c=l.company, first=(db.settings.name||'').split(' ')[0]||'', ano=anoLetivo();
+  const obs = l.signal==='none' ? `Pesquisei escolas em ${place} no Google e não encontrei um site de ${c}.`
+            : `Vi que ${c} divulga o trabalho no ${l.detail||'redes sociais'}, mas não encontrei um site próprio.`;
+  const rate = (l.rating!==''&&l.rating!=null&&Number(l.rating)>=4&&Number(l.reviews)>=5) ? ` Vi também a nota ${Number(l.rating).toFixed(1).replace('.',',')} com ${l.reviews} avaliações: uma ótima reputação que merece ser vista por mais famílias.` : '';
+  const why = `Hoje muitos pais pesquisam na internet antes de escolher onde matricular os filhos, e estamos justamente na época de matrículas para ${ano}.`;
+  const offer = `Posso montar, sem custo e sem compromisso, um rascunho de uma página para a escola (com turmas, informações de matrícula e botão de WhatsApp) para você ver como ficaria. Posso enviar?`;
+  const out = `(Se não tiver interesse, é só dizer "não" e eu não escrevo mais.)`;
+  return {place,c,first,ano,obs,rate,why,offer,out};
+}
+function escolaWA(l){const p=escolaParts(l);
+  return `Olá, tudo bem? 😊\n\nMeu nome é ${p.first}, sou da ${db.settings.company}, empresa brasileira de criação de sites.\n\n📢 *Não perca a oportunidade de expor sua escola e captar mais alunos para ${p.ano}!*\n\n${p.obs}${p.rate}\n\n${p.why}\n\n${p.offer}\n\n${p.out}\n\n${sig('pt')}`;}
+function escolaMail(l){const p=escolaParts(l);
+  return {subject:`Matrículas ${p.ano}: um site para ${p.c}`,
+          body:`Olá,\n\nMeu nome é ${p.first}, sou da ${db.settings.company}, empresa brasileira de criação de sites.\n\nNão perca a oportunidade de expor sua escola e captar mais alunos para ${p.ano}!\n\n${p.obs}${p.rate}\n\n${p.why}\n\n${p.offer}\n\n${p.out.replace('dizer "não"','responder "não"')}\n\n${sig('pt')}`};}
+
+/* ---------- mensagens ---------- */
+function sig(lang){const s=db.settings;const lp=(lang==='pt'||lang==='es')?lang:'en';
+  return `${s.name}\n${s.company}\n${s.site.replace(/\/+$/,'')}/${lp}/`+(s.addr?`\n${s.addr}`:'');}
+const WHY={
+ pt:{none:'não tem site próprio',facebook:'só tem a página do Facebook',instagram:'só tem o Instagram',linktree:'só tem uma página de links (Linktree)',free:'tem só um site gratuito'},
+ es:{none:'no tiene página web propia',facebook:'solo tiene la página de Facebook',instagram:'solo tiene Instagram',linktree:'solo tiene una página de enlaces (Linktree)',free:'solo tiene una web gratuita'},
+ it:{none:'non ha un sito web proprio',facebook:'ha solo la pagina Facebook',instagram:'ha solo Instagram',linktree:'ha solo una pagina di link (Linktree)',free:'ha solo un sito gratuito'},
+ en:{none:"doesn't have its own website yet",facebook:'only has a Facebook page',instagram:'only has an Instagram page',linktree:'only has a links page (Linktree)',free:'only has a free website'}
+};
+function wa(l){
+  if(langOf(l)==='pt' && l.segment && SEG[l.segment]) return segWA(l);
+  const lang=langOf(l),c=l.company,site=l.signal==='site',why=(WHY[lang]||WHY.en)[l.signal];
+  const T={
+   pt:site?`Olá! Sou da Symbion Labs, uma empresa brasileira de criação de sites. Vi o site da ${c} e gostaria de preparar, sem custo e sem compromisso, um conceito de uma página com um visual mais moderno (feito com IA a partir das informações públicas de vocês) para verem como poderia ficar. Querem que eu envie? (Se não tiverem interesse, é só dizer "não" e eu não escrevo mais.)`
+          :`Olá! Sou da Symbion Labs, uma empresa brasileira de criação de sites. Vi que a ${c} ${why}. Posso montar, sem custo e sem compromisso, um rascunho de uma página para você ver como ficaria. Quer que eu envie? (Se não tiver interesse, é só dizer "não" e eu não escrevo mais.)`,
+   es:site?`¡Hola! Soy de Symbion Labs, una empresa brasileña de creación de sitios web. Vi la web de ${c} y me gustaría preparar, sin coste y sin compromiso, un concepto de una página con un diseño más moderno (hecho con IA a partir de su información pública) para que vean cómo podría quedar. ¿Quieren que se lo envíe? (Si no les interesa, solo digan «no» y no vuelvo a escribir.)`
+          :`¡Hola! Soy de Symbion Labs, una empresa brasileña de creación de sitios web. Vi que ${c} ${why}. Puedo preparar, sin coste y sin compromiso, un borrador de una página para que veas cómo quedaría. ¿Quieres que te lo envíe? (Si no te interesa, solo di «no» y no vuelvo a escribir.)`,
+   it:site?`Ciao! Sono di Symbion Labs, un'azienda brasiliana che crea siti web. Ho visto il sito di ${c} e vorrei preparare, gratis e senza impegno, un concept di una pagina con un look più moderno (fatto con l'IA dalle vostre informazioni pubbliche) per mostrarvi come potrebbe essere. Volete che ve lo mandi? (Se non siete interessati, basta dire «no» e non scrivo più.)`
+          :`Ciao! Sono di Symbion Labs, un'azienda brasiliana che crea siti web. Ho visto che ${c} ${why}. Posso preparare, gratis e senza impegno, una bozza di una pagina per mostrarti come potrebbe essere. Vuoi che te la mandi? (Se non ti interessa, basta dire «no» e non ti scrivo più.)`,
+   en:site?`Hi! I'm with Symbion Labs, a Brazilian web development company. I came across ${c}'s website and I'd be glad to sketch a free one-page concept with a more modern look (made with AI from your public information) so you can see what it could look like. Want me to send it? (If not, just say "no" and I won't message again.)`
+          :`Hi! I'm with Symbion Labs, a Brazilian web development company. I noticed ${c} ${why}. I can sketch a free one-page draft for you to look at, no obligation. Want me to send it? (If not, just say "no" and I won't message again.)`
+  };
+  return (T[lang]||T.en)+'\n\n'+sig(lang);
+}
+function mail(l){
+  if(langOf(l)==='pt' && l.segment && SEG[l.segment]) return segMail(l);
+  const lang=langOf(l),c=l.company,site=l.signal==='site',why=(WHY[lang]||WHY.en)[l.signal],city=(l.city||'').split(',')[0],nicho=l.niche||'';
+  const T={
+   pt:{s:site?`Conceito gratuito de site para ${c}`:`Uma pergunta rápida sobre ${c}`,
+       b:(site?`Olá,\n\nSou da Symbion Labs, uma empresa brasileira de criação de sites. Vi o site da ${c}${city?` ao pesquisar negócios em ${city}`:''}. Gostaria de preparar, sem custo e sem compromisso, um conceito de uma página com um visual mais moderno (feito com IA a partir das informações públicas de vocês) para verem o que é possível. Posso enviar?\n\nSe não tiverem interesse, respondam "não" e eu não escrevo mais.\n\n`
+              :`Olá,\n\nSou da Symbion Labs, uma empresa brasileira de criação de sites. Vi que a ${c} ${why}. Posso montar, sem custo e sem compromisso, um rascunho de uma página para você ver como ficaria. Posso enviar?\n\nSe não tiver interesse, responda "não" e eu não escrevo mais.\n\n`)},
+   es:{s:site?`Borrador gratuito de web para ${c}`:`Una pregunta rápida sobre ${c}`,
+       b:(site?`Hola,\n\nSoy de Symbion Labs, un estudio web brasileño. Vi la web de ${c}${city?` mientras buscaba negocios en ${city}`:''}. Me encantaría preparar, sin coste y sin compromiso, un concepto de una página con un diseño más moderno (hecho con IA a partir de su información pública) para que vean lo que es posible. ¿Se lo envío?\n\nSi no les interesa, respondan «no» y no volveré a escribir.\n\n`
+              :`Hola,\n\nSoy de Symbion Labs, un estudio web brasileño. Vi que ${c} ${why}. Puedo preparar, sin coste y sin compromiso, un borrador de una página para que vea cómo quedaría. ¿Se lo envío?\n\nSi no le interesa, responda «no» y no volveré a escribir.\n\n`)},
+   it:{s:site?`Concept gratuito di sito per ${c}`:`Una domanda veloce su ${c}`,
+       b:(site?`Buongiorno,\n\nSono di Symbion Labs, uno studio web brasiliano. Ho visto il sito di ${c}${city?` cercando attività a ${city}`:''}. Vorrei preparare, gratis e senza impegno, un concept di una pagina con un look più moderno (fatto con l'IA dalle vostre informazioni pubbliche) per mostrarvi cosa è possibile. Posso inviarlo?\n\nSe non siete interessati, rispondete «no» e non scriverò più.\n\n`
+              :`Buongiorno,\n\nSono di Symbion Labs, uno studio web brasiliano. Ho visto che ${c} ${why}. Posso preparare, gratis e senza impegno, una bozza di una pagina per mostrarvi come potrebbe essere. Posso inviarla?\n\nSe non siete interessati, rispondete «no» e non scriverò più.\n\n`)},
+   en:{s:site?`Free website concept for ${c}`:`Quick question about ${c}`,
+       b:(site?`Hi there,\n\nI'm with Symbion Labs, a Brazilian web studio. I came across ${c}'s website${nicho&&city?` while looking at ${nicho} businesses in ${city}`:''}. I'd be glad to sketch a free one-page concept of a modernised version (made with AI from your public information) so you can see what's possible, no obligation. Want me to send it?\n\nIf you're not interested, just reply "no" and I won't write again.\n\n`
+              :`Hi there,\n\nI'm with Symbion Labs, a Brazilian web studio. I noticed ${c} ${why}. I can sketch a free one-page draft for you to look at, no obligation. Want me to send it?\n\nIf you're not interested, just reply "no" and I won't write again.\n\n`)}
+  };
+  const t=T[lang]||T.en; return {subject:t.s,body:t.b+sig(lang)};
+}
+
+/* ---------- filtros ---------- */
+const $ = id => document.getElementById(id);
+function fillSelects(){
+  const cs=[...new Set(all().map(l=>l.country))].sort();
+  $('fCountry').innerHTML='<option value="">Todos os países</option>'+cs.map(c=>`<option>${esc(c)}</option>`).join('');
+  $('fSeg').innerHTML='<option value="">Todos os segmentos</option>'+Object.entries(SEG).filter(([k])=>all().some(l=>l.segment===k)).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
+  $('fStatus').innerHTML='<option value="">Todos os estados</option>'+Object.entries(STATUS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
+}
+function passes(l){
+  const q=$('q').value.trim().toLowerCase();
+  if(q && !(`${l.company} ${l.city} ${l.niche} ${l.country}`.toLowerCase().includes(q))) return false;
+  if($('fCountry').value && l.country!==$('fCountry').value) return false;
+  if($('fSeg').value && l.segment!==$('fSeg').value) return false;
+  const sg=$('fSignal').value;
+  if(sg==='none' && l.signal!=='none') return false;
+  if(sg==='social' && !socialSig(l.signal)) return false;
+  if(sg==='site' && l.signal!=='site') return false;
+  const ch=$('fChannel').value;
+  if(ch==='mail' && !emailOf(l)) return false;
+  if(ch==='nomail' && emailOf(l)) return false;
+  if($('fStatus').value && st(l.id).status!==$('fStatus').value) return false;
+  return true;
+}
+
+/* ---------- render ---------- */
+function card(l){
+  const s=st(l.id), em=emailOf(l), lang=langOf(l);
+  const w=wa(l), m=mail(l);
+  const waHref=l.wa?`https://wa.me/${digits(l.wa)}?text=${enc(w)}`:'#';
+  const gm=em?`https://mail.google.com/mail/?view=cm&fs=1&to=${enc(em)}&su=${enc(m.subject)}&body=${enc(m.body)}`:'#';
+  const ol=em?`https://outlook.live.com/mail/0/deeplink/compose?to=${enc(em)}&subject=${enc(m.subject)}&body=${enc(m.body)}`:'#';
+  const q=enc(`${l.company} ${l.city||''} email contacto`);
+  const sc=l.signal==='none'?'nosite':socialSig(l.signal)?'social':'site';
+  const rate=l.rating!==''&&l.rating!=null?`★ ${l.rating} (${l.reviews})`:'';
+  return `<article class="card s-${s.status}" data-id="${l.id}">
+   <div class="row"><span class="title">${esc(l.company)}</span>${SEGLABEL(l)?`<span class="chip">${esc(SEGLABEL(l))}</span>`:''}<span class="chip ${sc}">${l.signal==='social'?('só '+esc(l.detail||'rede social')):(SIGLABEL[l.signal]||l.signal)}</span>${rate?`<span class="chip">${rate}</span>`:''}${wasSent(l)?'<span class="chip warn">já enviado antes</span>':''}</div>
+   <div class="meta">${esc(l.niche)} · ${esc(l.city)}, ${esc(l.country)} ${l.phone?` · ${esc(l.phone)}`:''}
+     ${l.website?` · <a href="${esc(l.website)}" target="_blank" rel="noopener">site</a>`:''}${` · <a href="${esc(mapsOf(l))}" target="_blank" rel="noopener">Maps</a>`}</div>
+   <div class="acts">
+     <a class="btn wa" href="${waHref}" target="_blank" rel="noopener" ${l.wa?'':'aria-disabled="true"'}>WhatsApp</a>
+     <a class="btn g" href="${gm}" target="_blank" rel="noopener" ${em?'':'aria-disabled="true"'}>Gmail</a>
+     <a class="btn o" href="${ol}" target="_blank" rel="noopener" ${em?'':'aria-disabled="true"'}>Outlook</a>
+     <button class="btn c" data-act="cpwa">Copiar WhatsApp</button>
+     <button class="btn c" data-act="cpmail" ${em?'':'disabled'}>Copiar e-mail</button>
+     ${em?'':`<a class="btn l" href="https://www.google.com/search?q=${q}" target="_blank" rel="noopener">Buscar e-mail</a>`}
+   </div>
+   <div class="grid2">
+     <label class="f">E-mail (cole aqui quando achar)<input type="email" data-f="email" value="${esc(em)}" placeholder="nome@empresa.com"></label>
+     <label class="f">Idioma da mensagem<select data-f="lang">${['pt','es','it','en'].map(x=>`<option value="${x}" ${x===lang?'selected':''}>${{pt:'Português',es:'Español',it:'Italiano',en:'English'}[x]}</option>`).join('')}</select></label>
+     <label class="f">Estado<select data-f="status">${Object.entries(STATUS).map(([k,v])=>`<option value="${k}" ${k===s.status?'selected':''}>${v}</option>`).join('')}</select></label>
+     <label class="f">Anotação<input type="text" data-f="note" value="${esc(s.note)}" placeholder="ex.: respondeu, pediu preço..."></label>
+   </div>
+   <details><summary>ver mensagens</summary><b>WhatsApp</b><pre>${esc(w)}</pre><b>E-mail</b><pre>${esc('Assunto: '+m.subject+'\n\n'+m.body)}</pre></details>
+  </article>`;
+}
+function render(){
+  const ls=all().filter(passes);
+  $('list').innerHTML=ls.length?ls.map(card).join(''):'<div class="empty">Nenhum lead com esses filtros.</div>';
+  const a=all(); const sent=a.filter(l=>['wa','mail','both','reply','won'].includes(st(l.id).status)).length;
+  $('sTotal').textContent=a.length;$('sSent').textContent=sent;
+  $('sReply').textContent=a.filter(l=>st(l.id).status==='reply').length;$('sWon').textContent=a.filter(l=>st(l.id).status==='won').length;
+}
+async function copy(t){let ok=false;try{await navigator.clipboard.writeText(t);ok=true;}catch(e){}
+  if(!ok){try{const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();ok=document.execCommand('copy');a.remove();}catch(e){}}
+  toast(ok?'Copiado!':'Não foi possível copiar: use "ver mensagens".');}
+
+$('list').addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]'); if(!b) return;
+  const id=b.closest('.card').dataset.id, l=all().find(x=>x.id===id);
+  if(b.dataset.act==='cpwa') copy(wa(l));
+  if(b.dataset.act==='cpmail'){const m=mail(l);copy(`Para: ${emailOf(l)}\nAssunto: ${m.subject}\n\n${m.body}`);}
+});
+$('list').addEventListener('change',e=>{
+  const f=e.target.dataset.f; if(!f) return;
+  const id=e.target.closest('.card').dataset.id; st(id)[f]=e.target.value; save(); setTimeout(render,0);
+});
+['q','fCountry','fSeg','fSignal','fChannel','fStatus'].forEach(id=>$(id).addEventListener('input',render));
+
+/* ---------- adicionar ---------- */
+$('bAdd').onclick=()=>{$('fAdd').reset();$('aWarn').hidden=true;$('dAdd').showModal();};
+$('aCancel').onclick=()=>$('dAdd').close();
+function checkWarn(){const w=digits($('aWa').value),e=$('aEmail').value.trim().toLowerCase();
+  const hit=(w&&SENT.phones.includes(w))||(e&&SENT.emails.includes(e));const el=$('aWarn');el.hidden=!hit;el.textContent=hit?'Atenção: este contato já foi usado nos envios anteriores.':'';return hit;}
+['aWa','aEmail'].forEach(id=>$(id).addEventListener('input',checkWarn));
+$('fAdd').addEventListener('submit',e=>{
+  if(checkWarn() && !confirm('Este contato já foi enviado antes. Adicionar mesmo assim?')){e.preventDefault();return;}
+  const n=db.custom.length+1;
+  db.custom.push({id:'C'+String(n).padStart(3,'0')+'-'+Date.now().toString(36),company:$('aCompany').value.trim(),niche:$('aNiche').value.trim(),city:$('aCity').value.trim(),country:$('aCountry').value.trim()||'Brasil',segment:$('aSeg').value,detail:'',
+    lang:$('aLang').value,phone:$('aWa').value.trim(),wa:digits($('aWa').value),signal:$('aSignal').value,rating:'',reviews:'',website:$('aSite').value.trim(),email:$('aEmail').value.trim(),maps:''});
+  save();fillSelects();render();toast('Lead adicionado');
+});
+
+/* ---------- assinatura ---------- */
+$('bSettings').onclick=()=>{const s=db.settings;$('sName').value=s.name;$('sCompany').value=s.company;$('sSite').value=s.site;$('sAddr').value=s.addr||'';$('dSet').showModal();};
+$('sCancel').onclick=()=>$('dSet').close();
+$('fSet').addEventListener('submit',()=>{db.settings={name:$('sName').value.trim(),company:$('sCompany').value.trim(),site:$('sSite').value.trim(),addr:$('sAddr').value.trim()};save();render();toast('Assinatura salva');});
+
+/* ---------- exportar / backup ---------- */
+function download(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);}
+$('bExport').onclick=()=>{
+  const cols=['empresa','nicho','cidade','pais','telefone','email','site','situacao_site','estado','anotacao'];
+  const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  const rows=all().map(l=>[l.company,l.niche,l.city,l.country,l.phone,emailOf(l),l.website,SIGLABEL[l.signal]||l.signal,STATUS[st(l.id).status],st(l.id).note].map(q).join(','));
+  download('symbion-leads.csv','﻿'+cols.join(',')+'\n'+rows.join('\n'),'text/csv');
+};
+$('bBackup').onclick=()=>download('symbion-backup.json',JSON.stringify(db),'application/json');
+$('bRestore').onclick=()=>$('fRestore').click();
+$('fRestore').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const p=JSON.parse(r.result);db={...db,...p,settings:{...db.settings,...(p.settings||{})}};save();fillSelects();render();toast('Backup restaurado');}catch(err){toast('Arquivo inválido');}};r.readAsText(f);e.target.value='';});
+
+fillSelects();render();
+</script>
+</body>
+</html>
